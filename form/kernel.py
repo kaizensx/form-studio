@@ -1259,9 +1259,10 @@ def op_reference(path, fmt, out):
     from . import mesh_audit
     p = Path(path)
     fmt = fmt.lower()
-    if fmt in (".step", ".stp"):
-        from build123d import import_step
-        shape = import_step(str(p))
+    from .formats import extensions, unsupported
+    if fmt in extensions("brep"):
+        from .recipes.meshsolid import import_cad
+        shape = import_cad(p, fmt)
         bb = shape.bounding_box()
         diag = max(bb.diagonal, 1.0)
         P, T = _tessellate(shape, min(0.5, max(0.02, diag / 600)))
@@ -1273,9 +1274,10 @@ def op_reference(path, fmt, out):
                 pts = [e.position_at(i / (n - 1)) for i in range(n)]
                 segs += [(a.X, a.Y, a.Z, b.X, b.Y, b.Z) for a, b in zip(pts, pts[1:])]
         E = np.array(segs, dtype=np.float32) if segs else _mesh_edges(P, T)
-        info = {"format": "step", "bbox": [[bb.min.X, bb.min.Y, bb.min.Z], [bb.max.X, bb.max.Y, bb.max.Z]],
+        info = {"format": fmt[1:].replace("stp", "step").replace("igs", "iges").replace("brp", "brep"),
+                "bbox": [[bb.min.X, bb.min.Y, bb.min.Z], [bb.max.X, bb.max.Y, bb.max.Z]],
                 "volume_mm3": float(shape.volume), "solids": len(shape.solids()), "faces": len(shape.faces())}
-    elif fmt in (".stl", ".obj", ".3mf"):
+    elif fmt in extensions("mesh", "pointcloud"):
         if fmt == ".stl":
             tris, _f, _sha = mesh_audit.read_stl(p)
         else:
@@ -1306,7 +1308,7 @@ def op_reference(path, fmt, out):
         if drawn:
             info["drawn"] = drawn
     else:
-        raise RecipeError(f"Unsupported format {fmt}", "", "Import a STEP (.step/.stp) or STL file.")
+        raise RecipeError(unsupported(p.with_suffix(fmt)), "", "Import a STEP or a mesh file.")
     if len(T) > 2 * DRAW_TRIANGLES:                  # a STEP whose tessellation is this heavy: say what to do next
         raise RecipeError(f"The part has {len(T):,} triangles to draw; Form Studio draws up to {2 * DRAW_TRIANGLES:,}.", "",
                           "Import the part's main bodies as separate STEP files, or leave out fasteners and threads.")

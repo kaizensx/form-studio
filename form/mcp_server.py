@@ -32,6 +32,9 @@ from . import render as rendering
 from .digest import impact_digest, job_digest
 from .digest import digest as _digest
 from .studio import H, Studio, StudioError
+from .formats import extensions as _format_exts
+
+MESH_EXTS = _format_exts("mesh", "pointcloud")      # meshes and scans: preflighted when fetched (form/formats.py)
 
 INSTRUCTIONS = """\
 Form Studio is an AI CAD studio: it designs parts, products and mechanisms as real, editable CAD and keeps an honest
@@ -657,7 +660,8 @@ def build() -> MCPServer:
     @mcp.tool(annotations=ToolAnnotations(read_only_hint=False, destructive_hint=False, open_world_hint=True))
     async def fetch_link(url: str, conversation: str = "", ctx: Context = None) -> dict:
         """Download what a link the person gave points to, from Form Studio's engine (use this instead of a shell: it
-        works where your sandbox has no network). A file link (STL, 3MF, OBJ, STEP, PDF, image; also a signed
+        works where your sandbox has no network). A file link (any part, mesh, scan, drawing or zip triage reads, a PDF or
+        an image; also a signed
         MakerWorld download link, fetched at once before it expires) is downloaded; a Printables model page has its
         part files downloaded with title, author and licence; a Thingiverse or MakerWorld page returns why its files
         cannot be fetched and what the person can do; any other page is not read (resolve_model_page reads its title).
@@ -693,7 +697,7 @@ def build() -> MCPServer:
                 key = hashlib.sha256(url.encode()).hexdigest()[:12]
                 got = start_mod.fetch_to_folder(url, st.root / ".references" / "links" / key)
             for a in got.get("attachments", []):
-                if a["path"].lower().endswith((".stl", ".obj", ".3mf")):
+                if a["path"].lower().endswith(MESH_EXTS):
                     try:
                         pf = meshprep.preflight(Path(a["path"]), cache=st.root / ".cache" / "meshprep")
                         a["preflight"] = {k: pf.get(k) for k in ("triangles", "size_mm", "closed", "class", "estimate_s",
@@ -728,12 +732,15 @@ def build() -> MCPServer:
     @mcp.tool(annotations=RO, meta=ALWAYS)
     async def triage(source: str, intent: str = "", tolerance: float = 0.02) -> dict:
         """Assess anything the person brings and choose the route: call this first for a file, a link or a request
-        in words. source: an absolute file path (STL, OBJ, 3MF, STEP, a photo, a PDF, a sketch), a link, or the
-        person's words. For a mesh it reads the file, repairs a copy and measures it: triangles, size, a guess at
+        in words. source: an absolute file path, a link, or the person's words. Files: meshes (STL, OBJ, 3MF, PLY, OFF,
+        AMF, glTF/GLB, Collada DAE, X3D, VRML, VTK/VTP/VTU), scans (XYZ, PTS, LAS, E57, a PLY of vertices: a surface is
+        made from the points first, facts.surface_from_points), CAD (STEP, IGES, BREP), drawings (DXF, SVG: route
+        profile), a zip of these (route archive: unpacked safely, each file with its own route and path), a photo, a
+        PDF, a sketch; anything else gets one message naming what is read. For a mesh it reads the file, repairs a copy and measures it: triangles, size, a guess at
         the units, open and non-manifold edges before and after the safe repairs, bodies, genus, and the share of the
         surface that is flat or ruled (what CAD makes) against sculpted. It returns the class (mechanical, organic,
-        mixed), the route (parametric, surface_body, mesh_body, assembly, reference_only; cad_reference,
-        photo_reference, sketch, document, link, describe, concepts), why, the calls to make in order ("steps"),
+        mixed), the route (parametric, surface_body, mesh_body, assembly, reference_only; cad_reference, profile,
+        archive, photo_reference, sketch, document, link, describe, concepts), why, the calls to make in order ("steps"),
         what will be prepared first (repair, working_copy), "cannot" (what this route will not give: say it), and
         "ask": one question, present only when the answer changes the result and is not in the file. Take the route
         without asking the person to choose it. reconstruct runs this itself; call triage alone to explain or to
@@ -746,7 +753,7 @@ def build() -> MCPServer:
 
     @mcp.tool(annotations=RO)
     async def mesh_preflight(path: str) -> dict:
-        """Preflight a mesh file. Before working on a large mesh (STL, OBJ, 3MF): triangles, vertices, bounds, closed or not, its class
+        """Preflight a mesh file. Before working on a large mesh or scan (any format triage reads): triangles, vertices, bounds, closed or not, its class
         (light, medium, heavy, very heavy), estimated seconds for reading and analysing it, and a decimated display
         proxy for a heavy one. The proxy is for display only; analysis and import always use the file itself.
         path: absolute local path. Cached by path, size and time, so asking again is instant."""
@@ -757,7 +764,9 @@ def build() -> MCPServer:
             try:
                 return meshprep.preflight(Path(path).expanduser(), cache=st.root / ".cache" / "meshprep")
             except (OSError, ValueError) as e:
-                raise StudioError(f"Could not read {Path(path).name} as a mesh: {e}", "Give the absolute path of an STL, OBJ or 3MF.")
+                from .formats import supported_text
+                raise StudioError(f"Could not read {Path(path).name} as a mesh: {e}",
+                                  "Give the absolute path of a mesh or scan: " + supported_text("mesh", "pointcloud") + ".")
         return await _run(go)
 
     async def _with_views(st, pid: str, payload: dict) -> list:
@@ -800,7 +809,8 @@ def build() -> MCPServer:
         budget and say which joint ranges they reached.
         language="openscad": source is an OpenSCAD file; parameters come from Customizer comments (`w = 40; // [20:1:120]`).
         OpenSCAD output is a mesh: no STEP, no B-rep checks (reported as not available, never faked).
-        references: absolute paths of STEP/STL parts to import first, so a Python design can use self.reference("name.step").
+        references: absolute paths of parts to import first (STEP, IGES, BREP, any mesh or scan triage reads), so a
+        Python design can use self.reference("name.step").
         purpose: "print" (for 3D printing) or "model" (just a 3D model; not sliced, no print checks). Omitted: the
         person's default. process (models only): cnc, laser, injection, casting, sheet_metal, render, cad, other.
         plan: the brief id from design_brief/plan_design. A complex brief (a mechanism, an organic or styled form, a
@@ -1744,8 +1754,9 @@ def build() -> MCPServer:
 
     @mcp.tool(annotations=RW)
     async def import_reference(project: str, path: str, name: str | None = None, ctx: Context = None) -> dict:
-        """Import an existing part (STEP or STL, e.g. a Raspberry Pi 5 STEP from the manufacturer) into a project's
-        references. FORM copies it, measures it in the kernel (bounding box, volume: computed) and draws it in the 3D
+        """Import an existing part (e.g. a Raspberry Pi 5 STEP from the manufacturer) into a project's references:
+        STEP, IGES, BREP, a mesh (STL, OBJ, 3MF, PLY, OFF, AMF, glTF/GLB, DAE, X3D, VRML, VTK) or a scan (XYZ, PTS, LAS,
+        E57: made a surface first); a zip imports every part in it. FORM copies it, measures it in the kernel (bounding box, volume: computed) and draws it in the 3D
         view as a blueprint companion, in its own coordinates. A Python design can then read it with
         self.reference("<name>") for clearance cuts. path: absolute local path. Re-importing a name replaces it."""
         st = studio()
@@ -1753,6 +1764,8 @@ def build() -> MCPServer:
         act(project, "look", f"Imported reference part {rec['file']}", ctx)
         size = [round(b - a, 2) for a, b in zip(*rec["bbox"])]
         return {"reference": rec["file"], "format": rec["format"], "bbox_mm": rec["bbox"], "size_mm": size,
+                **({"archive": rec["archive"]} if rec.get("archive") else {}),
+                **({"surface_from_points": rec["surface_from_points"]} if rec.get("surface_from_points") else {}),
                 "volume_mm3": round(rec["volume_mm3"], 1) if rec.get("volume_mm3") is not None else None,
                 "evidence": "computed (read by Form Studio's kernel from the file)",
                 "use_in_design": f'self.reference("{rec["file"]}") returns it as a build123d shape in the same coordinates.',
@@ -1764,7 +1777,9 @@ def build() -> MCPServer:
                           reference: str | None = None, files: list[str] | None = None,
                           references: list[str] | None = None, route: str = "auto", scale: float = 1.0,
                           units: str = "auto", ctx: Context = None) -> dict:
-        """Turn a mesh (STL, OBJ or 3MF) into a design, by the route its triage chooses. project_or_file: an absolute
+        """Turn a mesh or scan into a design, by the route its triage chooses (STL, OBJ, 3MF, PLY, OFF, AMF, glTF/GLB,
+        DAE, X3D, VRML, VTK; XYZ, PTS, LAS, E57 point clouds become a surface first; a zip of meshes: one design, a
+        part each; units of glTF, DAE, AMF, 3MF, LAS and E57 are converted). project_or_file: an absolute
         path to the mesh, or a project id whose imported mesh reference to use (reference: which one; default the
         first mesh). It first repairs what is safe (sliver triangles hanging off an edge, wrong-way triangles, small
         holes, flat openings; each listed under repairs) and then, with route="auto":
@@ -1862,7 +1877,7 @@ def build() -> MCPServer:
     @mcp.tool(annotations=RO, structured_output=False)
     async def analyze_reference(project: str, reference: str, tolerance: float = 0.05, levels: dict | None = None,
                                 ctx: Context = None) -> list:
-        """Read an imported mesh (STL, OBJ, 3MF) like an engineer before modelling it again as clean CAD
+        """Read an imported mesh or scan like an engineer before modelling it again as clean CAD
         (design_guide topic "reference_parts"). Returns pictures of dimensioned sections in the three principal
         planes at several levels (look at them), and JSON: principal axes, levels of the flat faces (steps), section
         loops with sizes and vector outlines, and features with sizes: holes, bosses, openings (pockets, slots,

@@ -40,7 +40,8 @@ MODEL_ENVELOPE = [1e6, 1e6, 1e6]       # a 3D model is checked against no printe
 STL_TOL = 0.01
 SOLID_TOL = 0.05     # the tessellation summaries, checks and impact signatures are read on (the kernel's op_summary
                      # default): a draft's signature compares with its revision's, and the kernel meshes it once
-REF_FORMATS = (".step", ".stp", ".stl", ".obj", ".3mf")
+from .formats import PART_KINDS as _PART_KINDS, extensions as _extensions   # noqa: E402 - beside its first use
+REF_FORMATS = _extensions(*_PART_KINDS)        # what import_reference keeps (form/formats.py); a .zip is unpacked first
 SCHEMA = "form-project/1"
 
 
@@ -140,6 +141,19 @@ DEADLINE_FACTOR, DEADLINE_PAD = 3.0, 45.0
 DEADLINE_PRIOR_S, DEADLINE_PER_FEATURE = 2.0, 1.0
 DRAFT_KEEP = 40                     # draft files (the live stages of an attempt) kept; older ones go
 DRAFT_AGE_S = 6 * 3600              # and none older than this
+
+
+def _obj_text(parts) -> str:
+    """An OBJ of named parts (triangles in mm), for a mesh kept in a format other programs and the kernel read."""
+    out = ["# converted by Form Studio; units: millimetres"]
+    base = 1
+    for prt in parts:
+        out.append("o " + (re.sub(r"\s+", "_", prt.name) or "part"))
+        P = prt.T.reshape(-1, 3)
+        out += [f"v {x:.9g} {y:.9g} {z:.9g}" for x, y, z in P]
+        out += [f"f {base + 3 * i} {base + 3 * i + 1} {base + 3 * i + 2}" for i in range(len(prt.T))]
+        base += len(P)
+    return "\n".join(out) + "\n"
 
 
 class StudioError(Exception):
@@ -670,7 +684,8 @@ class Studio:
         for r in references or []:
             src = Path(r).expanduser()
             if not src.is_file() or src.suffix.lower() not in REF_FORMATS:
-                raise StudioError(f"Not a STEP or mesh file: {src}", "Give the absolute path of a .step, .stp, .stl, .obj or .3mf file.")
+                from .formats import unsupported
+                raise StudioError(f"Not a CAD, mesh or scan file: {src}", unsupported(src))
             refs[self._ref_name(src.name)] = str(src.resolve())
         vals = {**self.recipes[rid].defaults(), **(values or {})}
         self._check_assembly(rid, vals)
@@ -2282,6 +2297,39 @@ class Studio:
     def _refs_fp(self, p: dict) -> str:
         return H(sorted((r["file"], r.get("sha256")) for r in self.references(p)))
 
+    def _import_zip(self, p: dict, src: Path | None, name: str | None, data: bytes | None) -> dict:
+        """Every 3D part in a zip as a reference of its own (form/formats.py unpacks it safely). Returns the first
+        part's record with {"archive": {"imported", "skipped"}}."""
+        import tempfile
+        from . import formats
+        with tempfile.TemporaryDirectory(prefix="zip-", dir=self.root) as tmp:
+            z = Path(tmp) / "in.zip"
+            if data is not None:
+                if len(data) > 200_000_000:
+                    raise StudioError("The file is larger than 200 MB.")
+                z.write_bytes(data)
+            elif src and src.is_file():
+                z = src
+            else:
+                raise StudioError(f"File not found: {src}", "Give the absolute path of the zip.")
+            try:
+                got = formats.unpack(z, Path(tmp) / "files")
+            except formats.ArchiveError as e:
+                raise StudioError(str(e), "Unpack it and import the files one by one.")
+            recs, skipped = [], list(got["skipped"])
+            for f in got["files"]:
+                if f["kind"] not in formats.PART_KINDS:
+                    skipped.append({"name": f["name"], "why": f"a {f['kind']}, not a 3D part"})
+                    continue
+                try:
+                    recs.append(self.import_reference(p, Path(f["path"]), Path(f["name"]).name))
+                except StudioError as e:
+                    skipped.append({"name": f["name"], "why": str(e)[:200]})
+        if not recs:
+            raise StudioError(f"{(name or (src.name if src else 'The zip'))} holds no 3D part Form Studio reads.",
+                              formats.unsupported("x.zip").split(". ", 1)[-1])
+        return {**recs[0], "archive": {"imported": [r["file"] for r in recs], "skipped": skipped[:20]}}
+
     def uses_references(self, rid: str) -> bool:
         """Only designs that call self.reference(...) or MeshBody.load(...) depend on imported parts (cheap text test, cached per source)."""
         if not rid.startswith(SOURCE_PREFIX):
@@ -2302,14 +2350,27 @@ class Studio:
         The part is drawn as a blueprint companion in its own coordinates (the design's frame), and a design can
         read it with self.reference(name). Re-importing the same name replaces the file.
         """
+        from . import formats
+        if (Path(name or "").suffix.lower() == ".zip" or (src and src.suffix.lower() == ".zip")):
+            return self._import_zip(p, src, name, data)
         if name and src and Path(name).suffix.lower() not in REF_FORMATS and src.suffix.lower() in REF_FORMATS:
             name += src.suffix.lower()          # a label ("Original base") for a .stl: keep the file's format
         name = self._ref_name(name or src.name)
         if Path(name).suffix not in REF_FORMATS:
-            raise StudioError("Only STEP (.step, .stp) parts and STL, OBJ or 3MF meshes can be imported.",
-                              "Export the part from its CAD program as STEP, or as STL for a mesh.")
+            raise StudioError(formats.unsupported(name), "Export the part from its program as STEP, or as STL, OBJ or "
+                              "3MF for a mesh.")
         d = self.dir(p["id"]) / "references"
         d.mkdir(parents=True, exist_ok=True)
+        converted = None
+        if Path(name).suffix == ".gltf" and data is None and src and src.is_file():
+            # a .gltf keeps its data in files beside it: read it where it is, keep the triangles as an OBJ
+            from .recon import mesh as meshmod
+            try:
+                parts, _info = meshmod.read_parts(src)
+            except (OSError, ValueError) as e:
+                raise StudioError(f"Could not read {src.name}: {e}", "Send the .glb, or a zip of the .gltf with its .bin.")
+            src, data, converted = None, _obj_text(parts).encode("utf-8"), "gltf"
+            name = name[:-5] + ".obj"
         target = d / name
         tmp = d / (name + ".tmp")
         if data is not None:
@@ -2328,10 +2389,12 @@ class Studio:
             raise StudioError(f"Could not read {name}: {e}", e.hint or "Check that the file is a valid STEP or a closed STL.")
         fsutil.replace(tmp, target)
         rec = {"file": name, "kind": "part", "format": "step" if name.endswith((".step", ".stp")) else Path(name).suffix[1:],
+               **({"converted_from": converted} if converted else {}),
                "ts": time.time(), "sha256": sha_file(target), "bytes": target.stat().st_size,
                "bbox": info["bbox"], "volume_mm3": info["volume_mm3"], "solids": info.get("solids"),
                "triangles": info.get("triangles_in_file", info.get("triangles")), "evidence": "computed",
-               "imported_from": src.name if src else name, **({"drawn": info["drawn"]} if info.get("drawn") else {})}
+               "imported_from": src.name if src else name,
+               **({"surface_from_points": info["pointcloud"]} if info.get("pointcloud") else {}), **({"drawn": info["drawn"]} if info.get("drawn") else {})}
         with self.lock(p["id"]):
             p = self.load(p["id"])
             refs = [r for r in p["brief"]["references"] if not (r.get("kind") == "part" and r["file"] == name)]

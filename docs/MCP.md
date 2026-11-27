@@ -133,7 +133,7 @@ instead.
 | [`fetch_link`](#fetch_link) | changes | Download what a link the person gave points to, from Form Studio's engine (use this instead of a shell: it works where your sandbox has no network). |
 | [`resolve_model_page`](#resolve_model_page) | read-only | Resolve a model page link. What a model link is, without downloading files: site, title, author, licence, pictures and the file list (Printables, Thingiverse with an app token), or why the files cannot be fetched and how the person gets them (MakerWorld, Thingiverse without a token). |
 | [`triage`](#triage) | read-only | Assess anything the person brings and choose the route: call this first for a file, a link or a request in words. |
-| [`mesh_preflight`](#mesh_preflight) | read-only | Preflight a mesh file. Before working on a large mesh (STL, OBJ, 3MF): triangles, vertices, bounds, closed or not, its class (light, medium, heavy, very heavy), estimated seconds for reading and analysing it, and a decimated display proxy for a heavy one. |
+| [`mesh_preflight`](#mesh_preflight) | read-only | Preflight a mesh file. Before working on a large mesh or scan (any format triage reads): triangles, vertices, bounds, closed or not, its class (light, medium, heavy, very heavy), estimated seconds for reading and analysing it, and a decimated display proxy for a heavy one. |
 | [`create_design`](#create_design) | changes | Create a project from your own design code (see design_guide): one Python file defining one Recipe subclass, built with build123d. |
 | [`update_design`](#update_design) | changes | Replace a design's code as a new revision (history keeps every version). |
 | [`edit_design`](#edit_design) | changes | Edit a design's code by naming what changes: one build, one revision. |
@@ -172,9 +172,9 @@ instead.
 | [`open_in_slicer`](#open_in_slicer) | changes | Open the design in the user's slicer, sliced with settings chosen for this part on this printer: orientation (the orientation finder's first choice), layer height, walls, top/bottom layers, infill and pattern, supports (only where overhangs need them), brim, seam, filament for the design's material and the speed profile (one of the printer's own process presets). |
 | [`open_bench`](#open_bench) | changes | Open the bench web page. The bench is the local web page where the user inspects the 3D model, compares revisions and approves releases. |
 | [`brief_presets`](#brief_presets) | read-only | List brief presets. Intake guidance for common kinds of part (remote holder, desk accessory, organizer, bathroom mount, enclosure, car accessory): the questions worth asking the person, environment defaults (temperature, humidity, UV, load), a material to start from and the checks to plan for. |
-| [`import_reference`](#import_reference) | changes | Import an existing part (STEP or STL, e.g. a Raspberry Pi 5 STEP from the manufacturer) into a project's references. |
-| [`reconstruct`](#reconstruct) | changes | Turn a mesh (STL, OBJ or 3MF) into a design, by the route its triage chooses. |
-| [`analyze_reference`](#analyze_reference) | read-only | Read an imported mesh (STL, OBJ, 3MF) like an engineer before modelling it again as clean CAD (design_guide topic "reference_parts"). |
+| [`import_reference`](#import_reference) | changes | Import an existing part (e.g. a Raspberry Pi 5 STEP from the manufacturer) into a project's references: STEP, IGES, BREP, a mesh (STL, OBJ, 3MF, PLY, OFF, AMF, glTF/GLB, DAE, X3D, VRML, VTK) or a scan (XYZ, PTS, LAS, E57: made a surface first); a zip imports every part in it. |
+| [`reconstruct`](#reconstruct) | changes | Turn a mesh or scan into a design, by the route its triage chooses (STL, OBJ, 3MF, PLY, OFF, AMF, glTF/GLB, DAE, X3D, VRML, VTK; XYZ, PTS, LAS, E57 point clouds become a surface first; a zip of meshes: one design, a part each; units of glTF, DAE, AMF, 3MF, LAS and E57 are converted). |
+| [`analyze_reference`](#analyze_reference) | read-only | Read an imported mesh or scan like an engineer before modelling it again as clean CAD (design_guide topic "reference_parts"). |
 | [`analyze_assembly`](#analyze_assembly) | read-only | Analyze an assembly of meshes. |
 | [`compare_to_reference`](#compare_to_reference) | read-only | Compare the design (or one part of its assembly) with an imported mesh, to iterate a remodel until it is within tolerance (default 0.1 mm for a remodel; say which you used). |
 | [`reference_residual`](#reference_residual) | read-only | List what remains of a remodel. |
@@ -413,7 +413,8 @@ pages: "1", "1-3", "2,5" (at most 4). Use this for official dimensions of boards
 ### `fetch_link`
 
 Download what a link the person gave points to, from Form Studio's engine (use this instead of a shell: it
-works where your sandbox has no network). A file link (STL, 3MF, OBJ, STEP, PDF, image; also a signed
+works where your sandbox has no network). A file link (any part, mesh, scan, drawing or zip triage reads, a PDF or
+an image; also a signed
 MakerWorld download link, fetched at once before it expires) is downloaded; a Printables model page has its
 part files downloaded with title, author and licence; a Thingiverse or MakerWorld page returns why its files
 cannot be fetched and what the person can do; any other page is not read (resolve_model_page reads its title).
@@ -445,12 +446,15 @@ visual reference. Then fetch_link(url) downloads what can be downloaded.
 *Read-only.*
 
 Assess anything the person brings and choose the route: call this first for a file, a link or a request
-in words. source: an absolute file path (STL, OBJ, 3MF, STEP, a photo, a PDF, a sketch), a link, or the
-person's words. For a mesh it reads the file, repairs a copy and measures it: triangles, size, a guess at
+in words. source: an absolute file path, a link, or the person's words. Files: meshes (STL, OBJ, 3MF, PLY, OFF,
+AMF, glTF/GLB, Collada DAE, X3D, VRML, VTK/VTP/VTU), scans (XYZ, PTS, LAS, E57, a PLY of vertices: a surface is
+made from the points first, facts.surface_from_points), CAD (STEP, IGES, BREP), drawings (DXF, SVG: route
+profile), a zip of these (route archive: unpacked safely, each file with its own route and path), a photo, a
+PDF, a sketch; anything else gets one message naming what is read. For a mesh it reads the file, repairs a copy and measures it: triangles, size, a guess at
 the units, open and non-manifold edges before and after the safe repairs, bodies, genus, and the share of the
 surface that is flat or ruled (what CAD makes) against sculpted. It returns the class (mechanical, organic,
-mixed), the route (parametric, surface_body, mesh_body, assembly, reference_only; cad_reference,
-photo_reference, sketch, document, link, describe, concepts), why, the calls to make in order ("steps"),
+mixed), the route (parametric, surface_body, mesh_body, assembly, reference_only; cad_reference, profile,
+archive, photo_reference, sketch, document, link, describe, concepts), why, the calls to make in order ("steps"),
 what will be prepared first (repair, working_copy), "cannot" (what this route will not give: say it), and
 "ask": one question, present only when the answer changes the result and is not in the file. Take the route
 without asking the person to choose it. reconstruct runs this itself; call triage alone to explain or to
@@ -466,7 +470,7 @@ decide before a larger plan. Reads only; nothing is changed, moved or sent.
 
 *Read-only.*
 
-Preflight a mesh file. Before working on a large mesh (STL, OBJ, 3MF): triangles, vertices, bounds, closed or not, its class
+Preflight a mesh file. Before working on a large mesh or scan (any format triage reads): triangles, vertices, bounds, closed or not, its class
 (light, medium, heavy, very heavy), estimated seconds for reading and analysing it, and a decimated display
 proxy for a heavy one. The proxy is for display only; analysis and import always use the file itself.
 path: absolute local path. Cached by path, size and time, so asking again is instant.
@@ -494,7 +498,8 @@ joint moves everything attached below it), Mate() for pins and threads. A declar
 budget and say which joint ranges they reached.
 language="openscad": source is an OpenSCAD file; parameters come from Customizer comments (`w = 40; // [20:1:120]`).
 OpenSCAD output is a mesh: no STEP, no B-rep checks (reported as not available, never faked).
-references: absolute paths of STEP/STL parts to import first, so a Python design can use self.reference("name.step").
+references: absolute paths of parts to import first (STEP, IGES, BREP, any mesh or scan triage reads), so a
+Python design can use self.reference("name.step").
 purpose: "print" (for 3D printing) or "model" (just a 3D model; not sliced, no print checks). Omitted: the
 person's default. process (models only): cnc, laser, injection, casting, sheet_metal, render, cad, other.
 plan: the brief id from design_brief/plan_design. A complex brief (a mechanism, an organic or styled form, a
@@ -1136,8 +1141,9 @@ assumptions to confirm with the person, never measurements.
 
 ### `import_reference`
 
-Import an existing part (STEP or STL, e.g. a Raspberry Pi 5 STEP from the manufacturer) into a project's
-references. FORM copies it, measures it in the kernel (bounding box, volume: computed) and draws it in the 3D
+Import an existing part (e.g. a Raspberry Pi 5 STEP from the manufacturer) into a project's references:
+STEP, IGES, BREP, a mesh (STL, OBJ, 3MF, PLY, OFF, AMF, glTF/GLB, DAE, X3D, VRML, VTK) or a scan (XYZ, PTS, LAS,
+E57: made a surface first); a zip imports every part in it. FORM copies it, measures it in the kernel (bounding box, volume: computed) and draws it in the 3D
 view as a blueprint companion, in its own coordinates. A Python design can then read it with
 self.reference("<name>") for clearance cuts. path: absolute local path. Re-importing a name replaces it.
 
@@ -1149,7 +1155,9 @@ self.reference("<name>") for clearance cuts. path: absolute local path. Re-impor
 
 ### `reconstruct`
 
-Turn a mesh (STL, OBJ or 3MF) into a design, by the route its triage chooses. project_or_file: an absolute
+Turn a mesh or scan into a design, by the route its triage chooses (STL, OBJ, 3MF, PLY, OFF, AMF, glTF/GLB,
+DAE, X3D, VRML, VTK; XYZ, PTS, LAS, E57 point clouds become a surface first; a zip of meshes: one design, a
+part each; units of glTF, DAE, AMF, 3MF, LAS and E57 are converted). project_or_file: an absolute
 path to the mesh, or a project id whose imported mesh reference to use (reference: which one; default the
 first mesh). It first repairs what is safe (sliver triangles hanging off an edge, wrong-way triangles, small
 holes, flat openings; each listed under repairs) and then, with route="auto":
@@ -1196,7 +1204,7 @@ once per part: that makes unrelated designs. Values are computed from the mesh a
 
 *Read-only.*
 
-Read an imported mesh (STL, OBJ, 3MF) like an engineer before modelling it again as clean CAD
+Read an imported mesh or scan like an engineer before modelling it again as clean CAD
 (design_guide topic "reference_parts"). Returns pictures of dimensioned sections in the three principal
 planes at several levels (look at them), and JSON: principal axes, levels of the flat faces (steps), section
 loops with sizes and vector outlines, and features with sizes: holes, bosses, openings (pockets, slots,

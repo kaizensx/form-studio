@@ -42,15 +42,15 @@ import threading
 import time
 import uuid
 from pathlib import Path
-from . import fsutil
+from . import formats, fsutil
 
 _log = logging.getLogger("form.conversations")
 
 HEIC_EXT = {".heic", ".heif"}         # iPhone photos: converted to JPEG on attach, so every agent can look at them
 IMAGE_EXT = {".png", ".jpg", ".jpeg", ".webp", ".gif", ".bmp"} | HEIC_EXT
 PDF_EXT = {".pdf"}
-CAD_EXT = {".step", ".stp", ".stl", ".3mf", ".obj"}
-MESH_EXT = {".stl", ".3mf", ".obj"}
+CAD_EXT = set(formats.extensions(*formats.PART_KINDS, "2d", "archive"))   # the "Part" chip: form/formats.py
+MESH_EXT = set(formats.extensions("mesh", "pointcloud"))
 SKETCH_SUFFIX = ".sketch.json"        # a sketch drawn in Form Studio (form/sketch.py): structured geometry, read as JSON
 MAX_ATTACHMENT = 2_000_000_000      # dense scans and sculpts are often hundreds of MB; a local file is never read whole
 WARN_ATTACHMENT = 500_000_000       # above this the person is told it will be slow
@@ -890,7 +890,7 @@ class Conversations:
         stem = re.sub(r"[^A-Za-z0-9_\-]+", "-", base).strip("-")[:60] or "file"
         kind = kind_of(stem + ext)
         if kind == "file":
-            raise ConversationError(f"{raw}: attach images, PDFs, STEP/STL/3MF/OBJ parts or a sketch.",)
+            raise ConversationError(formats.unsupported(raw))
         d = self.files_dir(cid)
         aid = uuid.uuid4().hex[:6]
         target = d / f"{aid}-{stem}{ext}"

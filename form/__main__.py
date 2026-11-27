@@ -51,6 +51,8 @@
   form delete <project> --yes                           move a project to .trash inside the projects folder
   form export <project> [--out f.formstudio] [--no-conversations]   project + conversations + design code, one file
   form import <file.formstudio | file.formproj | conversation.json>   import; a clashing id gets a new one
+  form formats                                          every file format Form Studio reads (kind, units), as JSON
+  form import-reference <project> FILE [--name N]       keep a part, mesh, scan or zip of them as a reference
   form export-conversation <id> [--format md|json] [--out file]       one conversation as Markdown or JSON
   form starters [add "text" | edit ID "text" | remove ID | pin ID | unpin ID | restore]   Home's learned starters
   form recipes [list|inspect|install|uninstall|source] ...  the agents' building blocks (installs need --sha256)
@@ -204,6 +206,10 @@ def main(argv=None):
     if argv[:1] in (["fetch"], ["resolve"], ["mesh-preflight"]):   # inputs: model links and big meshes (JSON)
         from .start import main_inputs
         return main_inputs(argv)
+    if argv[:1] == ["formats"]:                   # every file format Form Studio reads (form/formats.py), as JSON
+        from .formats import cli_table
+        print(json.dumps(cli_table(), indent=1))
+        return 0
     if argv[:1] == ["triage"]:                    # what an input is and the route it takes (JSON)
         from .triage import main as triage_main
         return triage_main(argv[1:])
@@ -276,9 +282,16 @@ def main(argv=None):
     sub.add_parser("fetch", help="fetch URL [--conversation ID]: download a linked file or a model page's files (JSON)")
     sub.add_parser("resolve", help="resolve URL: what a model link is (site, title, licence, files) without downloading")
     sub.add_parser("mesh-preflight", help="mesh-preflight FILE [--no-proxy]: triangles, size, closed, class, time "
-                                          "estimate and a display proxy for a large STL/OBJ/3MF")
+                                          "estimate and a display proxy for a large mesh or scan")
     sub.add_parser("triage", help="triage FILE|LINK|WORDS: what the input is (mesh class, defects, units, bodies) and "
-                                  "the route Form Studio takes for it (JSON)")
+                                  "the route Form Studio takes for it (JSON); any format `form formats` lists")
+    sub.add_parser("formats", help="every file format Form Studio reads, with its kind and units (JSON)")
+    ir = sub.add_parser("import-reference", help="import-reference <project> FILE [--name N]: keep a part, mesh, scan "
+                                                 "or zip of them as a reference of the design (any 3D format `form "
+                                                 "formats` lists)")
+    ir.add_argument("project")
+    ir.add_argument("file")
+    ir.add_argument("--name")
     sub.add_parser("concepts", help="concept groups: [<group-or-project>] | pick <group> <project> [--keep-others]")
     sub.add_parser("install", help="install what Form Studio uses (--list, <id>, --yes, --dry-run)")
     sub.add_parser("config", help="get [key] | set <key> <value>: read or change studio.toml")
@@ -458,7 +471,8 @@ def main(argv=None):
     gd.add_argument("a", type=int)
     gd.add_argument("b", type=int, nargs="?")
     gd.add_argument("--png", help="also write the picture (added green, removed red) here")
-    rc = sub.add_parser("reconstruct", help="a mesh (STL, OBJ, 3MF) as editable CAD, verified against it: reconstruct FILE "
+    rc = sub.add_parser("reconstruct", help="a mesh or scan (any format `form formats` lists, or a zip) as editable CAD, "
+                                            "verified against it: reconstruct FILE "
                                             "[FILE ...] [--name N] [--tolerance MM] [--layer 0|1|2]; several files of one "
                                             "product make one design with one part each")
     rc.add_argument("file")
@@ -551,6 +565,8 @@ def main(argv=None):
             _print({"pipeline": job_digest(job), "project": digest(st, p["id"])})
         elif a.cmd == "state":
             _print(digest(st, a.project))
+        elif a.cmd == "import-reference":
+            _print(st.import_reference(st.load(a.project), Path(a.file).expanduser(), a.name))
         elif a.cmd == "reconstruct":
             last = [0.0]
 

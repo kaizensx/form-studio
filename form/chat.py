@@ -21,7 +21,7 @@ import tempfile
 import threading
 import time
 
-from . import secrets
+from . import formats, secrets
 import tomllib
 import uuid
 from pathlib import Path
@@ -90,7 +90,7 @@ tool you call shows up there live (3D model, drafts, checks, slice), so you do n
   Any attached part, drawing or link: triage(path) first. It says what the input is and the route to take, with the
   calls in order; take that route yourself and do not ask the user to choose it. Ask only when it returns "ask" (one
   question), and tell the user what "cannot" lists.
-  A mesh (STL, OBJ, 3MF) the user wants editable, converted or turned into CAD: reconstruct(path). It runs the triage,
+  A mesh or scan (any format triage reads) the user wants editable, converted or turned into CAD: reconstruct(path). It runs the triage,
   repairs the mesh (every repair is listed) and makes the design by the right route: a mechanical part becomes
   sketches, holes and fillets verified against the mesh; a scan, a sculpt or a figure becomes a surface body or a mesh
   body with a Scale and a Flat base, into which you cut exact features (design_guide topic "organic", SCULPTED MESHES).
@@ -666,14 +666,22 @@ class Chat:
         if job.attachments:
             d = self.store.files_dir(job.conversation)
             what = {"image": "image", "pdf": "PDF; read_document(path) also opens it page by page",
-                    "cad": "CAD part; triage(path) says what it is and the route; reconstruct(path) makes a mesh "
-                           "editable; import_reference(project, path) keeps it as a reference",
+                    "cad": "CAD part, mesh or scan; triage(path) says what it is and the route; reconstruct(path) makes "
+                           "a mesh editable; import_reference(project, path) keeps it as a reference",
                     "sketch": "sketch drawn in Form Studio; its geometry is below"}
 
             def hint(a):
                 h = what.get(a["kind"], a["kind"])
+                k = formats.kind_of(a["file"])
                 if a["file"].lower().endswith(".3mf"):          # read with lib3mf: named parts, placed as in the slicer
                     h = "3MF with named parts, Bambu, Orca and MakerWorld layouts included; use import_reference(project, path)"
+                elif k == "pointcloud":
+                    h = ("point cloud from a scanner; triage(path) makes a surface from the points first and routes it "
+                         "like a mesh; reconstruct(path) and import_reference(project, path) take it as it is")
+                elif k == "2d":
+                    h = "2D drawing; triage(path) gives its outlines and sizes (route profile)"
+                elif k == "archive":
+                    h = "zip; triage(path) unpacks it safely and gives each file inside its route and path"
                 if a["kind"] == "cad" and (a.get("mesh") or {}).get("class") in ("heavy", "very heavy"):
                     h += f"; a {a['mesh']['class']} mesh: triage(path) and reconstruct(path) handle its size themselves"
                 src = a.get("source") or {}
@@ -1196,7 +1204,7 @@ def main_chat(argv: list[str]) -> int:
                                     "llamacpp), or a provider you added (custom-<name>, see `form providers list`); default: [chat] agent")
     ap.add_argument("--model", help="a model alias or id the agent accepts (default: [chat] model)")
     ap.add_argument("--effort")
-    ap.add_argument("--attach", action="append", default=[], metavar="FILE", help="image, PDF, STEP or STL (repeat)")
+    ap.add_argument("--attach", action="append", default=[], metavar="FILE", help="image, PDF, part, mesh, scan or zip (any format `form formats` lists; repeat)")
     ap.add_argument("--json", action="store_true", help="print one JSON event per line instead of text")
     a = ap.parse_args(argv)
     cfg = config.load()

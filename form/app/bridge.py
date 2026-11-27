@@ -424,6 +424,18 @@ class Bridge(QObject):
         except OSError:
             return False
 
+    @Slot(str, result="QVariantList")
+    def fileFilters(self, which: str) -> list:
+        """The file dialog filters for "attach", "part" or "photo", from the one table of formats (form/formats.py)."""
+        from ..formats import name_filters
+        return name_filters(which)
+
+    @Slot(str, result=str)
+    def formatsText(self, kinds: str) -> str:
+        """The formats of some kinds as one line ("STL, OBJ, 3MF, ..."): drop hints say what is read."""
+        from ..formats import supported_text
+        return supported_text(*[k for k in kinds.split(",") if k])
+
     @Slot(result=QUrl)
     def downloads(self) -> QUrl:
         return QUrl.fromLocalFile(QStandardPaths.writableLocation(QStandardPaths.StandardLocation.DownloadLocation))

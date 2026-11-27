@@ -1598,7 +1598,7 @@ QtObject {
         else if (pendingSend && !chatNeedsModel) { var t = pendingSend; pendingSend = ""; send(t) }
     }
 
-    // attachments: images, PDFs, STEP/STL. Copied into the conversation's folder; sent with the next message.
+    // attachments: images, PDFs, sketches and every part, mesh, scan, drawing or zip form/formats.py lists. Copied into the conversation's folder; sent with the next message.
     function attachFiles(urls) {
         var list = []
         for (var i = 0; i < urls.length; i++) list.push(urls[i])

@@ -141,7 +141,7 @@ Column {
 
     Fold { title: "Reference parts"; note: root.parts.length ? root.parts.length + " imported" : "none"; key: "brief.parts"; openByDefault: root.parts.length > 0
         Txt { kind: "fine"; width: parent.width
-            text: "A STEP or STL of something the design must fit around, such as a board from its maker. It is drawn in blueprint where its file places it. Designs written as code can cut around it with self.reference(\"name\")." }
+            text: "A STEP, IGES, mesh or scan of something the design must fit around, such as a board from its maker. It is drawn in blueprint where its file places it. Designs written as code can cut around it with self.reference(\"name\")." }
         Column { width: parent.width; visible: root.parts.length > 0
             Repeater { model: root.parts
                 KV { id: pr; required property var modelData; required property int index; first: index === 0
@@ -194,7 +194,7 @@ Column {
 
     FileDialog { id: dlg; title: "Attach a reference photo"; nameFilters: ["Images (*.png *.jpg *.jpeg *.webp)"]
         onAccepted: root.attach(selectedFile) }
-    FileDialog { id: partDlg; title: "Import a reference part"; nameFilters: ["STEP or mesh (*.step *.stp *.stl *.obj *.3mf)"]
+    FileDialog { id: partDlg; title: "Import a reference part"; nameFilters: Bridge.fileFilters("part")
         onAccepted: Store.importPart(selectedFile) }
     Connections { target: Store; function onImportPartRequested() { Ws.setOpen("brief.parts", true); Store.ask(partDlg) } }
 }

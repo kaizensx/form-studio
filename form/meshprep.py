@@ -221,7 +221,8 @@ def preflight(path: Path, fmt: str | None = None, cache: Path | None = None, pro
 def main(argv: list[str] | None = None) -> int:
     argv = sys.argv[1:] if argv is None else argv
     if not argv or argv[0] in ("-h", "--help"):
-        print("usage: form mesh-preflight FILE [--no-proxy]   (STL, OBJ or 3MF)")
+        from .formats import supported_text
+        print("usage: form mesh-preflight FILE [--no-proxy]   (" + supported_text("mesh", "pointcloud") + ")")
         return 0 if argv else 2
     try:
         out = preflight(Path(argv[0]), proxy="--no-proxy" not in argv)

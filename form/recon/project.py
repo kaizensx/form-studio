@@ -129,13 +129,29 @@ def reconstruct(st, src, name: str | None = None, tolerance: float = 0.02, layer
     from .. import triage as triage_mod
     src = Path(src).expanduser()
     if not src.is_file():
-        raise StudioError(f"File not found: {src}", "Give the absolute path of an STL, OBJ or 3MF file.")
+        raise StudioError(f"File not found: {src}", "Give the absolute path of a mesh or scan file.")
+    from .. import formats
+    if src.suffix.lower() == ".zip":
+        try:
+            got = formats.unpack(src)
+        except formats.ArchiveError as e:
+            raise StudioError(str(e), "Unpack it and reconstruct the files one by one.")
+        meshes = [Path(f["path"]) for f in got["files"] if f["kind"] in ("mesh", "pointcloud")]
+        if len(meshes) == 1:
+            src = meshes[0]
+        elif len(meshes) > 1:
+            from .. import multipart
+            return multipart.reconstruct_parts(st, meshes[:12], name=name, tolerance=tolerance, layer=layer,
+                                               purpose=purpose, budget_s=budget_s, on_progress=on_progress)
+        else:
+            raise StudioError(f"{src.name} holds no mesh or scan to reconstruct.",
+                              "triage(path) lists what it holds; a STEP in it is already CAD (import_reference).")
     if src.suffix.lower() not in FORMATS:
-        if src.suffix.lower() in (".step", ".stp"):
-            raise StudioError(f"{src.name} is already CAD (STEP): there is nothing to reconstruct.",
+        if src.suffix.lower() in formats.extensions("brep"):
+            raise StudioError(f"{src.name} is already CAD ({src.suffix[1:].upper()}): there is nothing to reconstruct.",
                               "Next: create_design(..., references=[path]) and use it with self.reference(name).",
                               next="cad_reference")
-        raise StudioError(f"{src.name} is not a mesh Form Studio reads.", "Use an STL (binary or ASCII), OBJ or 3MF file.")
+        raise StudioError(f"{src.name} is not a mesh Form Studio reads.", formats.unsupported(src))
     if not (0.0005 <= float(tolerance) <= 5):
         raise StudioError("The tolerance must be between 0.0005 and 5 mm.")
     if int(layer) not in (0, 1, 2):
@@ -153,7 +169,7 @@ def reconstruct(st, src, name: str | None = None, tolerance: float = 0.02, layer
     try:
         tri = triage_mod.assess_mesh(src, float(tolerance))
     except (ValueError, OSError) as e:
-        raise StudioError(f"Could not read {src.name} as a mesh: {e}", "Export it again as a binary STL, OBJ or 3MF.")
+        raise StudioError(f"Could not read {src.name} as a mesh: {e}", "Export it again as a binary STL, OBJ, 3MF or PLY.")
     chosen = tri["route"] if route == "auto" else route
     say({"stage": "triage", "text": f"{tri['class'].capitalize()} mesh: {chosen.replace('_', ' ')}", "fraction": 0.01})
     extra = {"triage": _triage_brief(tri, chosen)}
@@ -337,6 +353,6 @@ def reconstruct_reference(st, p: dict, file: str, **kw) -> dict:
     if file not in refs:
         raise StudioError(f"There is no reference part “{file}” in this project.", "Import the mesh first (Brief > Import part).")
     if Path(file).suffix.lower() not in FORMATS:
-        raise StudioError(f"{file} is already CAD (STEP); only meshes need reconstructing.")
+        raise StudioError(f"{file} is already CAD; only meshes and scans need reconstructing.")
     kw.setdefault("name", f"{Path(file).stem} (editable)")
     return reconstruct(st, st.dir(p["id"]) / "references" / file, **kw)

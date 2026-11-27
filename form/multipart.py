@@ -228,9 +228,10 @@ def reconstruct_parts(st, srcs: list, name: str | None = None, tolerance: float 
         raise StudioError("At most 12 meshes go into one design.")
     for s in paths:
         if not s.is_file():
-            raise StudioError(f"File not found: {s}", "Give the absolute path of each STL, OBJ or 3MF file.")
+            raise StudioError(f"File not found: {s}", "Give the absolute path of each mesh or scan file.")
         if s.suffix.lower() not in FORMATS:
-            raise StudioError(f"{s.name} is not a mesh Form Studio reads.", "Use STL (binary or ASCII), OBJ or 3MF files.")
+            from .formats import unsupported
+            raise StudioError(f"{s.name} is not a mesh Form Studio reads.", unsupported(s))
     if not (0.0005 <= float(tolerance) <= 5):
         raise StudioError("The tolerance must be between 0.0005 and 5 mm.")
     if int(layer) not in (0, 1, 2):

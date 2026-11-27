@@ -1,4 +1,5 @@
-"""Reading triangle meshes (STL, OBJ, 3MF with named parts), welding them and reporting what is wrong with them. numpy and scipy only.
+"""Reading triangle meshes (STL, OBJ, 3MF with named parts, and every other format form/formats.py lists: PLY, OFF,
+AMF, glTF, Collada, X3D, VRML, VTK and point clouds, through form/meshformats.py), welding them and reporting what is wrong with them. numpy and scipy only.
 
 Nothing here repairs a mesh behind your back. `weld` merges vertices closer than a tolerance and drops triangles that
 collapse to a line or a point; both are counted in the report. `topology` lists open boundaries, non-manifold edges
@@ -18,7 +19,9 @@ from xml.etree import ElementTree
 
 import numpy as np
 
-FORMATS = (".stl", ".obj", ".3mf")
+from ..formats import extensions as _extensions
+
+FORMATS = _extensions("mesh", "pointcloud")      # every format read_parts reads (form/formats.py)
 
 
 @dataclass
@@ -419,8 +422,11 @@ def read_parts(path: Path, fmt: str | None = None) -> tuple[list[Part], dict]:
         parts, kind = _obj(p.read_bytes(), p.stem), "obj"
     elif ext == ".3mf":
         parts, kind = _3mf(p)
+    elif ext in FORMATS:
+        return _other(p, ext)
     else:
-        raise ValueError(f"Unsupported mesh format {ext or '(none)'}; use STL, OBJ or 3MF.")
+        from ..formats import unsupported
+        raise ValueError(unsupported(p))
     for part in parts:
         if not np.all(np.isfinite(part.T)):
             raise ValueError("The mesh has coordinates that are not finite numbers.")
@@ -428,6 +434,33 @@ def read_parts(path: Path, fmt: str | None = None) -> tuple[list[Part], dict]:
             "triangles_in": int(sum(len(x.T) for x in parts)),
             "units": "mm" + ("" if kind.startswith("3mf") else " (assumed)")}
     if ext == ".3mf" or len(parts) > 1:
+        info["parts"] = [x.summary() for x in parts]
+    return parts, info
+
+
+def _other(p: Path, ext: str) -> tuple[list[Part], dict]:
+    """A format of form/meshformats.py; a point cloud becomes a surface first (form/pointcloud.py)."""
+    from .. import meshformats, pointcloud
+    r = meshformats.read(p, ext)
+    sha = sha256_file(p)
+    info = {"file": p.name, "format": r["format"], "bytes": p.stat().st_size, "sha256": sha}
+    u = r["units"]
+    info["units"] = u["units"] + ("" if not u["source"].startswith("assumed") else " (assumed)")
+    info["units_source"] = u["source"]
+    if r["axes"]:
+        info["axes"] = r["axes"]
+    if r["notes"]:
+        info["notes"] = r["notes"]
+    if r["points"] is not None:
+        V, F, rep = pointcloud.surface_cached(r["points"], r["normals"], sha)
+        parts = [Part(p.stem, V[F], {})]
+        info["pointcloud"] = rep
+    else:
+        parts = [Part(name, T, {}) for name, T in r["parts"] if len(T)]
+        if not parts:
+            raise ValueError("The file holds no triangles.")
+    info["triangles_in"] = int(sum(len(x.T) for x in parts))
+    if len(parts) > 1:
         info["parts"] = [x.summary() for x in parts]
     return parts, info
 

@@ -36,7 +36,7 @@ Item {
     Glass { anchors.fill: parent; flat: true; radius: 30 }
 
     FileDialog { id: pick; title: "Add a photo, a part or a drawing"; fileMode: FileDialog.OpenFiles
-        nameFilters: ["Photos, parts and drawings (*.png *.jpg *.jpeg *.webp *.heic *.gif *.bmp *.pdf *.step *.stp *.stl *.3mf)"]
+        nameFilters: Bridge.fileFilters("attach")      // one table of formats for every way in (form/formats.py)
         onAccepted: Store.attachFiles(selectedFiles) }
     Connections { target: Store; function onStartFocusChanged() { ta.forceActiveFocus() } }
 

@@ -16,6 +16,15 @@ reorganised, with a switch for every engine you install, and the agent and model
   is classed mechanical, organic or mixed from its own surface, with its triangle count, defects, a guess at its
   units and its bodies. `triage` is an MCP tool and `form triage FILE` in the terminal; "Make editable" and
   `reconstruct` run it themselves. You are asked only when the answer changes the result, with one question.
+- **Bring files from any program.** Besides STL, OBJ, 3MF and STEP, Form Studio now reads PLY (ASCII and binary,
+  vertex colours included), OFF, AMF, glTF and GLB, Collada (DAE), X3D, VRML, VTK, VTP and VTU meshes; scanner point
+  clouds as XYZ, PTS, LAS and E57 (and a PLY of vertices), turned into a surface first and then routed like a mesh;
+  IGES and OpenCASCADE BREP as exact CAD; DXF and SVG drawings as a profile with their sizes; and zip archives of
+  any of these, as Printables and Thingiverse hand them out, unpacked safely with each file triaged. Units are
+  converted where the file states them (3MF, AMF, Collada, STEP, IGES, DXF, SVG) or the format fixes them (glTF,
+  LAS and E57 are metres), and glTF's and Collada's Y-up becomes Z-up. Every way in takes them: drop, the paperclip,
+  Import a reference part, links, `triage`, `reconstruct`, `import_reference` and `form formats`. A format that is
+  not read (FBX, USD, LAZ, native SolidWorks or Inventor parts) gets one message saying why and what is read.
 - **Scans and sculpts become designs.** A smooth closed sculpt becomes a surface body: NURBS faces over a cage you
   can edit, with a STEP export. One with fine detail, handles or many triangles becomes a mesh body: the repaired
   mesh with a Scale and a Flat base parameter, into which exact CAD features (holes, pockets, a split) are cut. The

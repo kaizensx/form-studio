@@ -39,9 +39,9 @@ Home is one composer for whatever you have.
 | **Words** | Describe the part, typed or dictated. |
 | **A photo** | Drop or paste it. With a bank card, a coin or a ruler in the picture, the agent estimates sizes from it, labels them "estimated from the photo" and keeps them *assumed* until you measure. |
 | **A sketch** | Draw it on the sketch pad. The agent receives the shapes as structured geometry in millimetres, and the picture. |
-| **A part** | A STEP, STL, OBJ or 3MF file to design around or start from, up to 2 GB. A file from your disk is cloned into the conversation, never read whole, so a 500 MB scan attaches at once. |
+| **A part** | A file to design around or start from, up to 2 GB: meshes (STL, OBJ, 3MF, PLY, OFF, AMF, glTF and GLB, Collada DAE, X3D, VRML, VTK, VTP and VTU), scans as point clouds (XYZ, PTS, LAS, E57, or a PLY of vertices), CAD (STEP, IGES, OpenCASCADE BREP), drawings (DXF, SVG) and zip archives of any of these. `form formats` lists them with their units. A file from your disk is cloned into the conversation, never read whole, so a 500 MB scan attaches at once. |
 | **A drawing** | A PDF datasheet or mechanical drawing, read as images so its dimensions survive. |
-| **A link** | Pasted on Home or in a chat, the engine fetches it: a file link (STL, STEP, 3MF, OBJ, PDF, PNG, JPEG, WebP) is downloaded, streamed to disk with its progress. A Printables model page has its part files downloaded with the title, author and licence, kept with each file. A MakerWorld or Thingiverse page says why its files cannot be fetched and how to get them; a signed MakerWorld download link copied from your browser is fetched at once, before it expires. Any other page is passed to the agent as a link. |
+| **A link** | Pasted on Home or in a chat, the engine fetches it: a file link (any part, scan, drawing or zip Form Studio reads, a PDF or a picture) is downloaded, streamed to disk with its progress. A Printables model page has its part files downloaded with the title, author and licence, kept with each file. A MakerWorld or Thingiverse page says why its files cannot be fetched and how to get them; a signed MakerWorld download link copied from your browser is fetched at once, before it expires. Any other page is passed to the agent as a link. |
 
 Drop or paste files anywhere on Home. Under the composer, choose **For my printer** or **Just a 3D model** for what
 starts next, or **Start blank** for an empty design in the workspace with no agent. From a terminal:
@@ -123,8 +123,22 @@ each one named as it arrives.
   magnet pockets, bearing seats, printable threads and involute gears, each dimension with its source.
 - **Text and patterns.** Embossed or debossed lettering with a shipped font, revision stamps on the underside, hex
   vents, perforations, slots, knurls and grip ribs, with web-thickness checks.
-- **Reference parts.** Import a STEP, or an STL, OBJ or 3MF mesh, of the thing your part must fit (a circuit board, a phone, a motor). It is
-  drawn as a blueprint companion, and a design can cut clearance from it with `self.reference("pi5.step")`.
+- **Reference parts.** Import a STEP, IGES or BREP, a mesh or a scan of the thing your part must fit (a circuit board, a
+  phone, a motor); a zip imports every part in it. It is drawn as a blueprint companion, and a design can cut
+  clearance from it with `self.reference("pi5.step")`.
+- **Files from any program.** One table (`form/formats.py`, `form formats`) says what is read, and every way a file
+  comes in uses it. Meshes: STL, OBJ, 3MF, PLY (ASCII or binary; vertex colours noted, not used), OFF, AMF (plain or
+  zipped), glTF and GLB (node transforms applied; Draco-compressed files are refused by name), Collada DAE, X3D, VRML
+  (2.0), VTK legacy, VTP and VTU (solid cells give their outer surface). Point clouds from scanners: XYZ, PTS, LAS
+  (uncompressed) and E57 (every scan placed by its pose), and a PLY of vertices: a surface is made from the points
+  first (normals from the neighbours, a signed distance, marching tetrahedra; a few seconds, the grid size reported)
+  and then routed like a mesh; where the scan has no points the surface stays open. CAD: STEP, IGES, OpenCASCADE
+  BREP. Drawings: DXF and SVG, read for their outlines and sizes (route profile). Zip archives of any of these are
+  unpacked safely (no file outside its folder, sizes bounded) and each file triaged. Units: converted where the file
+  states them (3MF, AMF, Collada, STEP, IGES, DXF, SVG) or the format fixes them (glTF, LAS, E57: metres; glTF and
+  Collada Y-up turned to Z-up); STL, OBJ, PLY, OFF, X3D, VRML and VTK carry none, so millimetres are assumed and a
+  size that makes no sense is asked about. Not read: FBX (no reader with a licence that can ship), USD and USDZ
+  (Pixar's usd-core is about 100 MB), LAZ, IFC and native SolidWorks, Inventor, Fusion or Creo parts.
 - **3MF from any slicer.** 3MF files are read with lib3mf, including the production-extension layout Bambu Studio,
   Orca Slicer and MakerWorld write (meshes in `3D/Objects/*.model`). Each object is a named part where the slicer
   placed it, with its plate and filament colour; modifier volumes are left out of the shape. OBJ files keep their
@@ -308,11 +322,12 @@ workflow is `design_guide(topic="reference_parts")`; **Rebuild as editable CAD**
 
 ## Mesh to editable CAD
 
-Bring an STL, OBJ or 3MF and Form Studio rebuilds it as CAD, then measures how close the result is to the mesh.
+Bring a mesh or a scan (any format above) and Form Studio rebuilds it as CAD, then measures how close the result is to the mesh.
 **Triage first.** Whatever is brought is assessed before anything is built: `form triage FILE` (MCP `triage`) reads a
 mesh, repairs a copy and measures it (triangles, size, a guess at the units, open and non-manifold edges before and
 after the safe repairs, bodies, genus, and how much of the surface is the flat and ruled geometry CAD makes), classes
-it mechanical, organic or mixed, and chooses the route. It also routes a STEP, a photo, a PDF, a link and plain words.
+it mechanical, organic or mixed, and chooses the route. A point cloud is made a surface first. It also routes STEP,
+IGES and BREP (CAD reference), DXF and SVG (profile), a zip (each file inside), a photo, a PDF, a link and plain words.
 
 | The mesh is | Route | Result |
 |---|---|---|

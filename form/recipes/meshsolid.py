@@ -152,15 +152,42 @@ def load(name: str):
     return _loaded[k]
 
 
-def import_shape(p: Path):
-    """A STEP as its B-rep, an STL, OBJ or 3MF as a sewn mesh solid."""
-    from build123d import import_step
-    ext = p.suffix.lower()
+def import_cad(p: Path, ext: str | None = None):
+    """STEP, IGES or OCCT BREP as its B-rep (millimetres: OCCT converts a STEP's or an IGES's units on read)."""
+    from build123d import import_brep, import_step
+    ext = (ext or p.suffix).lower()
     if ext in (".step", ".stp"):
         return import_step(str(p))
+    if ext in (".brep", ".brp"):
+        return import_brep(str(p))
+    if ext in (".iges", ".igs"):
+        from build123d import Compound, Shape
+        from OCP.IFSelect import IFSelect_RetDone
+        from OCP.IGESControl import IGESControl_Reader
+        from OCP.Interface import Interface_Static
+        Interface_Static.SetCVal_s("xstep.cascade.unit", "MM")
+        r = IGESControl_Reader()
+        if r.ReadFile(str(p)) != IFSelect_RetDone:
+            raise ValueError(f"{p.name} is not a readable IGES file.")
+        r.TransferRoots()
+        shape = r.OneShape()
+        if shape.IsNull():
+            raise ValueError(f"{p.name} holds no shape the kernel can read.")
+        out = Shape.cast(shape)
+        return out if out is not None else Compound(shape)
+    raise ValueError(f"{p.name} is not STEP, IGES or BREP.")
+
+
+def import_shape(p: Path):
+    """STEP, IGES or BREP as its B-rep; a mesh or point cloud (form/formats.py) as a sewn mesh solid."""
+    from ..formats import extensions
+    ext = p.suffix.lower()
+    if ext in extensions("brep"):
+        return import_cad(p)
     if ext == ".stl":
         return read_stl_solid(p)
-    if ext in (".obj", ".3mf"):
+    if ext in extensions("mesh", "pointcloud"):
         from ..recon.mesh import read_triangles
         return solid_from_triangles(read_triangles(p)[0].tolist())
-    raise ValueError(f"Unsupported reference format {ext}; use STEP, STL, OBJ or 3MF.")
+    from ..formats import unsupported
+    raise ValueError(unsupported(p))

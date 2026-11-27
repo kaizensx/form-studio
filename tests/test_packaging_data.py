@@ -207,9 +207,13 @@ class PackagedData(unittest.TestCase):
         self.assertNotIn("uncategorised", cov)
 
     def test_chat_attachments_accept_meshes(self):
+        # the attach dialog's filters come from the one table of formats (form/formats.py, tests/test_formats.py)
+        from form import formats
         talk = (ROOT / "form" / "app" / "qml" / "Form" / "Talk.qml").read_text(encoding="utf-8")
-        for ext in ("*.stl", "*.3mf", "*.obj", "*.step"):
-            self.assertIn(ext, talk)
+        self.assertIn('Bridge.fileFilters("attach")', talk)
+        offered = " ".join(formats.name_filters("attach"))
+        for ext in ("*.stl", "*.3mf", "*.obj", "*.step", "*.ply", "*.e57", "*.zip"):
+            self.assertIn(ext, offered)
 
 
 if __name__ == "__main__":

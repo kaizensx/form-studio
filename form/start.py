@@ -587,7 +587,7 @@ def main(argv: list[str]) -> int:
                                  "a sketch and links in one message to an agent, or a blank design.")
     ap.add_argument("--text", default="", help="what you want to make")
     ap.add_argument("--photo", action="append", default=[], metavar="FILE", help="a photo (repeat)")
-    ap.add_argument("--file", action="append", default=[], metavar="FILE", help="a STEP, STL, 3MF or PDF (repeat)")
+    ap.add_argument("--file", action="append", default=[], metavar="FILE", help="a part, mesh, scan, drawing, zip or PDF: any format `form formats` lists (repeat)")
     ap.add_argument("--sketch", metavar="F.json", help="a sketch as Form Studio's sketch JSON (see form/sketch.py)")
     ap.add_argument("--link", action="append", default=[], metavar="URL", help="a link: a file is downloaded, a page is passed on (repeat)")
     ap.add_argument("--purpose", choices=PURPOSES, help="print: for my printer; model: just a 3D model; game: a game asset (default: whether you said you have a 3D printer)")

@@ -33,8 +33,10 @@ from urllib.parse import unquote, urlparse
 from .. import __version__, net
 
 USER_AGENT = f"FormStudio/{__version__} (open-source CAD app; fetches a model link a person pasted)"
-FILE_EXT = (".stl", ".step", ".stp", ".3mf", ".obj", ".pdf", ".png", ".jpg", ".jpeg", ".webp")
-MODEL_EXT = (".stl", ".3mf", ".obj", ".step", ".stp")
+from ..formats import PART_KINDS as _PK, extensions as _exts     # noqa: E402
+
+MODEL_EXT = _exts(*_PK, "2d", "archive")      # every part, scan, drawing and zip Form Studio reads (form/formats.py)
+FILE_EXT = MODEL_EXT + _exts("document", "photo")
 PAGE_LIMIT = 3_000_000                 # bytes of a web page or API answer read at most
 TIMEOUT = 20
 
@@ -145,7 +147,7 @@ def file_url(r: dict, f: dict) -> str:
 
 
 def model_files(r: dict) -> list[dict]:
-    """The listed files that are parts (STL, 3MF, OBJ, STEP), in the site's order."""
+    """The listed files that are parts, scans, drawings or zips of them (form/formats.py), in the site's order."""
     return [f for f in r.get("files") or [] if str(f.get("name", "")).lower().endswith(MODEL_EXT)]
 
 

@@ -169,8 +169,7 @@ Rectangle {
         function onChatRecallChanged() { if (Store.chatRecall) { ta.text = Store.chatRecall; ta.cursorPosition = ta.text.length } } }
 
     FileDialog { id: pick; title: "Attach files"; fileMode: FileDialog.OpenFiles
-        nameFilters: ["Everything Form Studio reads (*.png *.jpg *.jpeg *.webp *.heic *.gif *.bmp *.pdf *.step *.stp *.stl *.3mf *.obj)",
-                      "Parts and meshes (*.step *.stp *.stl *.3mf *.obj)", "Photos and pictures (*.png *.jpg *.jpeg *.webp *.heic *.gif *.bmp)", "Drawings (*.pdf)"]
+        nameFilters: Bridge.fileFilters("attach")      // one table of formats for every way in (form/formats.py)
         onAccepted: Store.attachFiles(selectedFiles) }
 
     readonly property int branchCount: Store.convBranches.length
@@ -745,7 +744,7 @@ Rectangle {
                 : "Enter sends · Shift+Enter for a new line · drop files to attach" }
     }
 
-    // drop photos, sketches, PDFs, STEP/STL anywhere on the column
+    // drop photos, sketches, PDFs, parts, meshes, scans and zips anywhere on the column
     DropArea {
         id: drop; anchors.fill: parent; z: 5
         onEntered: function (d) { d.accepted = d.hasUrls || (d.hasText && /^https?:\/\/\S+$/i.test(String(d.text).trim())) }
@@ -761,6 +760,6 @@ Rectangle {
             Column { anchors.centerIn: parent; spacing: 8
                 Icon { name: "paperclip"; size: 22; color: Theme.datum; anchors.horizontalCenter: parent.horizontalCenter }
                 Txt { text: "Drop to attach"; font.weight: Theme.wSemi; anchors.horizontalCenter: parent.horizontalCenter }
-                Txt { kind: "fine"; text: "Photos, PDFs, STEP, STL, 3MF, OBJ or a link"; anchors.horizontalCenter: parent.horizontalCenter } } }
+                Txt { kind: "fine"; text: "Photos, PDFs, parts, meshes, scans, zips or a link"; anchors.horizontalCenter: parent.horizontalCenter } } }
     }
 }

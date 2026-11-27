@@ -65,7 +65,7 @@ Item {
             if (Store.hidden.length) add("Tools", "showall", "eye", "Show all features", F.plural(Store.hidden.length, "feature") + " hidden", function () { Store.showAll() }, "Shift+H")
             if (Store.hasDraft) { add("Tools", "commit", "git_commit_horizontal", "Commit the draft", "Saves a revision", function () { Store.commit() }, "Ctrl+Return")
                 add("Tools", "discard", "undo_2", "Discard the draft", "", function () { Store.discard() }) }
-            add("Tools", "importpart", "box", "Import a reference part…", "STEP or STL, shown in blueprint", function () { Store.askImportPart() })
+            add("Tools", "importpart", "box", "Import a reference part…", "STEP, IGES, a mesh, a scan or a zip, shown in blueprint", function () { Store.askImportPart() })
             add("Tools", "freecad", "external_link", "Open the STEP in FreeCAD", "Release · working files", function () { Store.openIn("step", "freecad") })
             if (Store.canAskReview) add("Tools", "review", "eye", "Ask for a design review", "Silhouette, relationships, details", function () { Store.askReview() })
         }

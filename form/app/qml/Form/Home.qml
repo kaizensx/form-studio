@@ -484,6 +484,6 @@ Item {
             Rectangle { anchors.horizontalCenter: parent.horizontalCenter; y: 22; width: dropTx.implicitWidth + 40; height: 36; radius: 18; color: Theme.glassSolid; border.color: Theme.alpha(Theme.datum, 0.5)
                 Row { id: dropTx; anchors.centerIn: parent; spacing: 8
                     Icon { name: "import"; size: 14; color: Theme.datum; anchors.verticalCenter: parent.verticalCenter }
-                    Txt { text: "Drop to start from it · photos, STEP, STL, 3MF, PDF drawings, links"; font.weight: Theme.wMedium; anchors.verticalCenter: parent.verticalCenter } } } }
+                    Txt { text: "Drop to start from it · photos, parts, meshes, scans, drawings, zips, links"; font.weight: Theme.wMedium; anchors.verticalCenter: parent.verticalCenter } } } }
     }
 }

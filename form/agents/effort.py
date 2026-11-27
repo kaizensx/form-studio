@@ -19,7 +19,8 @@ _HARD = re.compile(
     r"texture|knurl|lattice|voronoi|weave|"
     r"enclosure for|waterproof|gearbox", re.I)
 _MEDIUM = re.compile(r"\b(design|make|create|build|model) (me )?(a|an|some)\b|\bnew\b|concepts?\b|ideas?\b", re.I)
-_MESH = (".stl", ".obj", ".3mf", ".ply", ".step", ".stp")
+from ..formats import PART_KINDS as _PK, extensions as _exts   # noqa: E402
+_MESH = _exts(*_PK, "archive")
 
 
 def task_class(message: str, attachments: list | None = None) -> str:

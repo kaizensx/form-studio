@@ -4,8 +4,9 @@
                                 "steps", "prepare", "alternates", "ask", "cannot", "seconds"}
     python -m form.triage X     the same as JSON (`form triage X`)
 
-A mesh (STL, OBJ, 3MF) is read, welded, repaired on a copy (form/meshrepair.py) and measured: triangles, size, a guess
-at its units, open and non-manifold edges before and after the safe repairs, loose pieces, genus, and how much of its
+A mesh (STL, OBJ, 3MF, PLY, OFF, AMF, glTF, Collada, X3D, VRML, VTK; form/formats.py is the list) is read, welded,
+repaired on a copy (form/meshrepair.py) and measured: triangles, size, a guess at its units (or the units the file
+states, converted), open and non-manifold edges before and after the safe repairs, loose pieces, genus, and how much of its
 surface is the flat and ruled geometry a CAD program makes (see `mechanical_share`). From that it is classed
 mechanical, organic or mixed, and one route is chosen:
 
@@ -17,8 +18,12 @@ mechanical, organic or mixed, and one route is chosen:
     reference_only  a surface that does not close (a large opening that is not flat): kept as a reference to design
                     around; nothing is guessed
 
-Other inputs get their route too: a STEP file (cad_reference), a photo (photo_reference), a Form Studio sketch
-(sketch), a PDF (document), a link (link), plain words (describe or concepts). The route names the tool calls, in
+A point cloud (XYZ, PTS, LAS, E57, a PLY of vertices) first becomes a surface (form/pointcloud.py: normals, a signed
+distance, marching tetrahedra; bounded, a few seconds) and is then assessed and routed like a mesh, with the
+reconstruction in its facts. Other inputs get their route too: STEP, IGES or BREP (cad_reference), a DXF or SVG
+drawing (profile), a zip (archive: unpacked safely, each file triaged), a photo (photo_reference), a Form Studio
+sketch (sketch), a PDF (document), a link (link), plain words (describe or concepts). A format Form Studio does not
+read gets one message naming what it does read (formats.unsupported). The route names the tool calls, in
 order. `ask` is one question, present only when the answer changes the result and cannot be read from the file (the
 units of a mesh whose size makes no sense in millimetres, the wall of a surface that does not close, the scale of a
 photo). `cannot` lists what this route will not give, said before the work and not after.
@@ -38,11 +43,15 @@ from pathlib import Path
 
 import numpy as np
 
-MESH = (".stl", ".obj", ".3mf")
-CAD = (".step", ".stp")
-PHOTO = (".png", ".jpg", ".jpeg", ".webp", ".heic", ".heif", ".bmp", ".gif", ".tif", ".tiff")
-DOCUMENT = (".pdf",)
-VECTOR = (".svg", ".dxf")
+from . import formats
+
+MESH = formats.extensions("mesh", "pointcloud")
+CAD = formats.extensions("brep")
+PHOTO = formats.extensions("photo")
+DOCUMENT = formats.extensions("document")
+VECTOR = formats.extensions("2d")
+ARCHIVE = formats.extensions("archive")
+MAX_ARCHIVE_TRIAGE = 12     # files of a zip assessed in one triage; the rest are listed with their kind
 
 MECHANICAL_PCT = 70.0       # at least this share of the surface is CAD-like: mechanical
 ORGANIC_PCT = 30.0          # under this: organic; between: mixed
@@ -68,6 +77,8 @@ ROUTES = {
     "photo_reference": "A photo to design from: sizes come from a reference object in it and stay assumed.",
     "sketch": "A Form Studio sketch: its JSON dimensions are authoritative over the picture.",
     "document": "A drawing or datasheet: read the pages, take dimensions as specified.",
+    "profile": "A 2D drawing: its outlines are the profile of a part (extruded, revolved or cut) at the drawing's sizes.",
+    "archive": "A zip: unpacked safely; each file in it has its own route.",
     "link": "A link: fetch it, then triage what it holds.",
     "describe": "A specification in words: design it directly.",
     "concepts": "An idea in words: offer a few different approaches as real designs and let the person pick.",
@@ -139,12 +150,16 @@ def mechanical_share(V: np.ndarray, F: np.ndarray, samples: int = 40_000, k: int
             "crease_pct": round(crease, 2)}
 
 
-def units_guess(size, stated: str | None = None) -> dict:
+def units_guess(size, stated: str | None = None, source: str | None = None) -> dict:
     """A guess at a mesh's units from its size. STL and OBJ carry none, so millimetres are assumed; a part under
-    UNIT_SMALL_MM or over UNIT_LARGE_MM in its largest dimension makes that assumption unlikely."""
+    UNIT_SMALL_MM or over UNIT_LARGE_MM in its largest dimension makes that assumption unlikely. A format that states
+    its units (3MF, AMF, Collada) or has them by rule (glTF, LAS, E57: metres) was converted to millimetres on read."""
     L = float(max(size))
     if stated and "assumed" not in stated:
-        return {"units": stated, "source": "the file", "plausible": True}
+        out = {"units": stated, "source": source or "the file", "plausible": True}
+        if stated != "mm":
+            out["converted"] = "to millimetres on read"
+        return out
     out = {"units": "mm", "source": "assumed (the format carries no units)", "largest_mm_if_mm": round(L, 4)}
     if L < UNIT_SMALL_MM:
         out.update({"plausible": False, "likely": "metres" if L < 3.0 else "centimetres",
@@ -207,7 +222,9 @@ def assess_mesh(path: Path, tolerance: float = 0.02) -> dict:
     parts = [p for p in pieces if p["share_pct"] >= 100 * PART_AREA_FRAC and p["closed"] and p["outward"]]
     cavities = [p for p in pieces if p["closed"] and not p["outward"]]
     genus = sum(p.get("genus", 0) for p in pieces if p["closed"])
-    units = units_guess(size, info.get("units"))
+    units = units_guess(size, info.get("units"), info.get("units_source"))
+    if info.get("units_source") and "assumed" in info["units_source"]:
+        units["source"] = info["units_source"]
     mech = share["mechanical_pct"]
     cls = "mechanical" if mech >= MECHANICAL_PCT else "organic" if mech < ORGANIC_PCT else "mixed"
     thick = 2.0 * abs(top["volume_mm3"]) / max(top["area_mm2"], 1e-9) if top["closed"] else None
@@ -227,8 +244,23 @@ def assess_mesh(path: Path, tolerance: float = 0.02) -> dict:
              "bodies": len(parts), "cavities": len(cavities), "genus": int(genus) if top["closed"] else None,
              "mean_thickness_mm": round(float(thick), 3) if thick is not None else None,
              **share, "evidence": "computed from the file"}
-    out = {"input": {"kind": "mesh", "path": str(path)}, "facts": facts, "class": cls}
+    for k in ("axes", "notes"):
+        if info.get(k):
+            facts[k] = info[k]
+    kind = "mesh"
+    if info.get("pointcloud"):
+        kind = "pointcloud"
+        pc = info["pointcloud"]
+        facts["points"] = pc["points_in_file"]
+        facts["surface_from_points"] = pc
+        facts["evidence"] = "computed from the surface reconstructed from the file's points"
+    out = {"input": {"kind": kind, "path": str(path)}, "facts": facts, "class": cls}
     out.update(_mesh_route(facts, cls, top, tolerance, diag))
+    if kind == "pointcloud":
+        out["prepare"].insert(0, {"step": "surface_from_points", "grid_mm": pc["grid_mm"], "seconds": pc["seconds"],
+                                  "note": pc["note"]})
+        out["cannot"].append(f"Detail finer than about {pc['grid_mm']:g} mm: the surface is made from the points on a "
+                             "grid of that size.")
     out["seconds"] = round(time.perf_counter() - t0, 2)
     return out
 
@@ -327,6 +359,104 @@ def _open(rep: dict) -> str:
 
 # ---- everything else --------------------------------------------------------------------------------------------------
 
+def assess_cad(path: Path) -> dict:
+    """STEP, IGES or OCCT BREP, read as text (no kernel)."""
+    ext = path.suffix.lower()
+    if ext in (".iges", ".igs"):
+        return assess_iges(path)
+    if ext in (".brep", ".brp"):
+        return assess_brep(path)
+    return assess_step(path)
+
+
+def _cad_out(path: Path, facts: dict, solids: int, faces: int, what: str, unit: str | None) -> dict:
+    return {"input": {"kind": "cad", "path": str(path)}, "facts": facts, "class": "mechanical",
+            "route": "cad_reference", "prepare": [], "alternates": [], "ask": None,
+            "why": f"{what} is already exact CAD (" + (f"{solids} solids" if solids else "surfaces only: no solid")
+                   + f", {faces} faces" + (f", units {unit}" if unit else "") + "): nothing to reconstruct. "
+                   "Its units are converted on import.",
+            "cannot": [f"Its feature history: {what} carries the final shape, not the sketches and dimensions that made "
+                       "it. Features are added on top, or the part is rebuilt with Params where it must change."]
+                      + ([] if solids else ["A body: the file has no solid, so volume and cuts need a closed model."]),
+            "steps": ["create_design(..., references=[path]) or import_reference(project, path)",
+                      "use it in the design: self.reference(name) (cut around it, add to it)"]
+                     + (["analyze_assembly(project, references=[...]) for how the solids fit and move"] if solids > 1 else [])}
+
+
+_IGES_UNITS = {1: "inch", 2: "mm", 3: "unknown", 4: "foot", 5: "mile", 6: "m", 7: "km", 8: "mil", 9: "micron",
+               10: "cm", 11: "microinch"}
+
+
+def _iges_fields(g: str) -> list:
+    """The global section's parameters, Hollerith strings (nH...) kept whole even when they hold the delimiter."""
+    delim, end = ",", ";"
+    if g[:2] == "1H":
+        delim = g[2]
+    out, i, cur = [], 0, ""
+    while i < len(g):
+        m = re.match(r"\s*(\d+)H", g[i:])
+        if m and not cur.strip():
+            n = int(m.group(1))
+            start = i + m.end()
+            cur = g[start:start + n]
+            i = start + n
+            continue
+        c = g[i]
+        if c in (delim, end):
+            out.append(cur)
+            cur = ""
+            if c == end:
+                break
+        else:
+            cur += c
+        i += 1
+    return out
+
+
+def assess_iges(path: Path) -> dict:
+    """An IGES file from its fixed 80-column records: the global section's units, the directory's entity types."""
+    text = path.read_text(encoding="latin-1", errors="replace")
+    lines = text.splitlines()
+    glob = "".join(ln[:72] for ln in lines if len(ln) >= 73 and ln[72] == "G")
+    d = [ln for ln in lines if len(ln) >= 73 and ln[72] == "D"]
+    types = {}
+    for ln in d[::2]:
+        try:
+            t = int(ln[:8])
+        except ValueError:
+            continue
+        types[t] = types.get(t, 0) + 1
+    unit = None
+    if glob:
+        fields = _iges_fields(glob)
+        try:
+            unit = _IGES_UNITS.get(int(float(fields[13].strip() or 0)))
+        except (IndexError, ValueError):
+            unit = None
+    if not d:
+        raise ValueError("Not an IGES file: it has no directory entries.")
+    solids = types.get(186, 0)
+    faces = types.get(510, 0) + types.get(144, 0) + types.get(143, 0)
+    facts = {"file": path.name, "format": "iges", "bytes": path.stat().st_size, "solids": solids, "faces": faces,
+             "entities": sum(types.values()), "units": {"units": unit or "unknown", "source": "the file" if unit else "not stated"},
+             "evidence": "read from the file's directory; the kernel measures it on import"}
+    return _cad_out(path, facts, solids, faces, "An IGES file", unit)
+
+
+def assess_brep(path: Path) -> dict:
+    """An OpenCASCADE BREP file from its text: solids and faces in its topology section."""
+    head = path.read_bytes()[:64]
+    if not head.lstrip().startswith((b"DBRep_DrawableShape", b"CASCADE Topology")):
+        raise ValueError("Not an OpenCASCADE BREP file (binary BREP is not read).")
+    text = path.read_text(encoding="latin-1", errors="replace")
+    solids = len(re.findall(r"^\s*so\b", text, re.M | re.I))
+    faces = len(re.findall(r"^\s*fa\b", text, re.M | re.I))
+    facts = {"file": path.name, "format": "brep", "bytes": path.stat().st_size, "solids": solids, "faces": faces,
+             "units": {"units": "mm", "source": "assumed (BREP carries no units)"},
+             "evidence": "read from the file's text; the kernel measures it on import"}
+    return _cad_out(path, facts, solids, faces, "An OpenCASCADE BREP file", None)
+
+
 def assess_step(path: Path) -> dict:
     """A STEP file, read as text (no kernel): solids, faces, units, product names."""
     head = b""
@@ -365,6 +495,102 @@ def assess_step(path: Path) -> dict:
                      + (["analyze_assembly(project, references=[...]) for how the solids fit and move"] if several else [])}
 
 
+_DXF_UNITS = {0: None, 1: "in", 2: "ft", 4: "mm", 5: "cm", 6: "m", 8: "microinch", 9: "mil", 10: "yd", 13: "micron",
+              14: "dm"}
+_MM = {"in": 25.4, "ft": 304.8, "mm": 1.0, "cm": 10.0, "m": 1000.0, "microinch": 25.4e-6, "mil": 0.0254,
+       "yd": 914.4, "micron": 0.001, "dm": 100.0, "pt": 25.4 / 72, "pc": 25.4 / 6, "px": 25.4 / 96, "q": 0.25}
+
+
+def assess_drawing(path: Path) -> dict:
+    """A DXF or SVG: how many outlines, which are closed, their overall size in millimetres, the units."""
+    ext = path.suffix.lower()
+    facts = {"file": path.name, "format": ext[1:], "bytes": path.stat().st_size}
+    if ext == ".dxf":
+        import ezdxf
+        from ezdxf import bbox as dxf_bbox
+        try:
+            doc = ezdxf.readfile(str(path))
+        except (OSError, ezdxf.DXFError) as e:
+            raise ValueError(f"not a readable DXF: {e}") from e
+        msp = doc.modelspace()
+        code = int(doc.header.get("$INSUNITS", 0) or 0)
+        unit = _DXF_UNITS.get(code)
+        k = _MM.get(unit or "mm", 1.0)
+        kinds = {}
+        closed = 0
+        for e in msp:
+            t = e.dxftype()
+            kinds[t] = kinds.get(t, 0) + 1
+            if t in ("CIRCLE", "ELLIPSE") or (t in ("LWPOLYLINE", "POLYLINE") and e.is_closed) or (
+                    t == "SPLINE" and e.closed):
+                closed += 1
+        ext_box = dxf_bbox.extents(msp)
+        size = [round((ext_box.extmax[i] - ext_box.extmin[i]) * k, 4) for i in (0, 1)] if ext_box.has_data else [0, 0]
+        facts.update(entities=kinds, closed_outlines=closed, size_mm=size,
+                     units={"units": unit or "mm", "source": "the file ($INSUNITS)" if unit else
+                            "assumed (the drawing does not say: $INSUNITS is unset)"})
+    else:
+        import svgelements
+        try:
+            svg = svgelements.SVG.parse(str(path))
+        except Exception as e:                       # noqa: BLE001 - svgelements raises many kinds on a bad file
+            raise ValueError(f"not a readable SVG: {e}") from e
+        shapes = [e for e in svg.elements() if isinstance(e, svgelements.Shape)]
+        closed = 0
+        for e in shapes:
+            try:
+                p = svgelements.Path(e)
+                closed += sum(1 for sp in p.as_subpaths() if svgelements.Path(sp).segments() and
+                              isinstance(svgelements.Path(sp).segments()[-1], svgelements.Close))
+            except Exception:                        # noqa: BLE001 - an element without a path (text, an image)
+                continue
+        raw = path.read_text(encoding="utf-8", errors="replace")[:4000]
+        m = re.search(r"<svg[^>]*\bwidth\s*=\s*\"([\d.]+)\s*(mm|cm|in|pt|pc|px|q)?\"", raw, re.I)
+        unit = (m.group(2) or "").lower() if m else ""
+        box = svg.bbox()
+        # svgelements works in pixels (96 per inch), the physical units of width/height already applied
+        size = [round((box[2] - box[0]) * _MM["px"], 4), round((box[3] - box[1]) * _MM["px"], 4)] if box else [0, 0]
+        facts.update(shapes=len(shapes), closed_outlines=closed, size_mm=size,
+                     units={"units": unit or "px", "source": "the file (width and height)" if unit in ("mm", "cm", "in", "q", "pt", "pc")
+                            else "the SVG rule (96 px per inch), since the file gives no physical unit"})
+    facts["evidence"] = "read from the file"
+    return {"input": {"kind": "drawing", "path": str(path)}, "facts": facts, "class": None, "route": "profile",
+            "prepare": [], "alternates": ["sketch"], "ask": None,
+            "why": f"A 2D drawing with {facts['closed_outlines']} closed outline(s), "
+                   + " x ".join(f"{x:g}" for x in facts["size_mm"]) + " mm overall: a profile at its own sizes.",
+            "cannot": ["The depth or height: a drawing is flat. Ask for it, or read it from a dimension in the drawing."],
+            "steps": ["create_design: the profile from the drawing (build123d import_svg for SVG; for DXF the outlines "
+                      "with the sizes above), extruded, revolved or cut to the depth the person gives",
+                      "ask_measurement for the depth when the drawing does not state it"]}
+
+
+def assess_archive(path: Path, tolerance: float = 0.02) -> dict:
+    """A zip: unpacked safely into a folder of its own (formats.unpack), each file it holds triaged."""
+    got = formats.unpack(path)
+    members = []
+    for i, f in enumerate(got["files"]):
+        rec = {"name": f["name"], "path": f["path"], "kind": f["kind"], "bytes": f["bytes"]}
+        if i < MAX_ARCHIVE_TRIAGE:
+            t = triage(f["path"], tolerance=tolerance)
+            rec.update(route=t["route"], line=line(t), ask=t.get("ask"))
+        members.append(rec)
+    parts = [m for m in members if m["kind"] in formats.PART_KINDS]
+    facts = {"file": path.name, "format": "zip", "bytes": path.stat().st_size, "folder": got["folder"],
+             "files": len(members), "parts": len(parts), "skipped": got["skipped"][:20],
+             "evidence": "read from the archive"}
+    steps = ["Follow each file's own route, with its path below"]
+    if len(parts) > 1:
+        steps.insert(0, "Several parts of one product: reconstruct(files=[their paths]) makes ONE design with one part "
+                        "each; import_reference each one to design around them")
+    return {"input": {"kind": "archive", "path": str(path)}, "facts": facts, "class": None, "route": "archive",
+            "members": members, "prepare": [{"step": "unpack", "folder": got["folder"],
+                                             "note": "Unpacked safely: no file outside its folder, sizes bounded."}],
+            "alternates": [], "ask": None, "cannot": [] if members else ["Anything: the zip holds no file Form Studio reads."],
+            "why": f"A zip of {len(members)} file(s) Form Studio reads ({len(parts)} 3D part(s))"
+                   + (f"; {len(got['skipped'])} other file(s) skipped" if got["skipped"] else "") + ".",
+            "steps": steps}
+
+
 def _word_route(text: str, intent: str = "") -> dict:
     t = text.strip()
     nums = re.findall(r"\d+(?:[.,]\d+)?\s*(?:mm|cm|m\b|in\b|inch|\"|°|deg|M\d)", t, re.I) + re.findall(r"\bM\d{1,2}\b", t)
@@ -401,12 +627,17 @@ def triage(source, intent: str = "", tolerance: float = 0.02) -> dict:
                 try:
                     out = assess_mesh(p, tolerance)
                 except (ValueError, OSError) as e:
-                    out = _unreadable(p, e, "Export it again as a binary STL, OBJ or 3MF.")
+                    out = _unreadable(p, e, "Export it again as a binary STL, OBJ, 3MF or PLY.")
             elif ext in CAD:
                 try:
-                    out = assess_step(p)
-                except OSError as e:
+                    out = assess_cad(p)
+                except (OSError, ValueError) as e:
                     out = _unreadable(p, e, "Export it again as STEP (AP214 or AP242).")
+            elif ext in ARCHIVE:
+                try:
+                    out = assess_archive(p, tolerance)
+                except (OSError, ValueError) as e:
+                    out = _unreadable(p, e, "Unpack it and send the files, or zip them again.")
             elif ext in PHOTO:
                 out = {"input": {"kind": "photo", "path": str(p)}, "facts": {"file": p.name, "bytes": p.stat().st_size},
                        "class": None, "route": "photo_reference", "prepare": [], "alternates": [],
@@ -426,7 +657,12 @@ def triage(source, intent: str = "", tolerance: float = 0.02) -> dict:
                        "cannot": ["Dimensions the drawing does not state: they are asked for or stay assumed."],
                        "steps": ["read_document(path): pages as images", "design_brief with the stated dimensions "
                                  "(source: specified)", "create_design"]}
-            elif ext in VECTOR or ext == ".json":
+            elif ext in VECTOR:
+                try:
+                    out = assess_drawing(p)
+                except (OSError, ValueError) as e:
+                    out = _unreadable(p, e, "Export the drawing again as DXF (R2010 or later) or SVG.")
+            elif ext == ".json":
                 out = {"input": {"kind": "sketch", "path": str(p)}, "facts": {"file": p.name, "bytes": p.stat().st_size},
                        "class": None, "route": "sketch", "prepare": [], "alternates": [], "ask": None,
                        "why": "A drawn outline: its own numbers are authoritative over how it looks.",
@@ -434,10 +670,11 @@ def triage(source, intent: str = "", tolerance: float = 0.02) -> dict:
             else:
                 out = {"input": {"kind": "unknown", "path": str(p)}, "facts": {"file": p.name, "bytes": p.stat().st_size},
                        "class": None, "route": "unknown", "prepare": [], "alternates": [], "ask": None,
-                       "why": f"{ext or 'A file without an extension'} is not a format Form Studio reads.",
+                       "why": formats.unsupported(p),
                        "cannot": ["Reading this file."],
-                       "steps": ["Ask for STL, OBJ, 3MF or STEP for a part; PNG or JPG for a photo; PDF for a drawing."]}
-        elif p is not None and p.suffix.lower() in MESH + CAD + PHOTO + DOCUMENT and ("/" in s or "\\" in s):
+                       "steps": ["Ask for the part as " + formats.supported_text("mesh", "brep") + "; a scan as "
+                                 + formats.supported_text("pointcloud") + "; PNG or JPG for a photo; PDF for a drawing."]}
+        elif p is not None and formats.kind_of(p) is not None and ("/" in s or "\\" in s):
             out = {"input": {"kind": "unknown", "path": s}, "facts": {}, "class": None, "route": "unknown", "prepare": [],
                    "alternates": [], "ask": None, "why": f"There is no file at {s}.", "cannot": ["Reading a file that is not there."],
                    "steps": ["Give the absolute path of the file the person attached."]}
@@ -458,8 +695,8 @@ def line(t: dict) -> str:
     """One sentence for a log or a chat: what it is and what happens to it."""
     f = t.get("facts") or {}
     what = t["input"]["kind"]
-    if what == "mesh":
-        what = (f"{t.get('class')} mesh, {f.get('triangles', 0):,} triangles, "
+    if what in ("mesh", "pointcloud"):
+        what = (f"{t.get('class')} {'surface from points' if what == 'pointcloud' else 'mesh'}, {f.get('triangles', 0):,} triangles, "
                 + " x ".join(f"{x:g}" for x in f.get("size_mm", [])) + " mm")
     return f"{what}: route {t['route']} ({t.get('why', '')})"
 

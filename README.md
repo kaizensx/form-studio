@@ -141,7 +141,7 @@ A library of design helpers gives the agent proven building blocks for mechanism
 
 ## Reconstruct
 
-Bring the part you already have. A STEP or STL of a board, a phone or a motor becomes a reference the design is built around, with clearance cut from the real geometry. A photo of a broken part with a card or coin beside it starts **Replace a broken part**: sizes estimated from the photo stay *assumed* until you measure the ones that decide the fit, then the agent designs the replacement and strengthens it where it broke.
+Bring the part you already have, from whatever program or scanner made it: STEP, IGES, STL, OBJ, 3MF, PLY, glTF, Collada, VRML, VTK, a point cloud (XYZ, PTS, LAS, E57), a DXF or SVG drawing, or a zip of them. A board, a phone or a motor becomes a reference the design is built around, with clearance cut from the real geometry. A photo of a broken part with a card or coin beside it starts **Replace a broken part**: sizes estimated from the photo stay *assumed* until you measure the ones that decide the fit, then the agent designs the replacement and strengthens it where it broke.
 
 Whatever you bring is assessed first. **Triage** reads a mesh, a STEP, a photo, a sketch, a PDF, a link or plain words, says what it is and takes the right route by itself; `form triage FILE` prints the same assessment in a terminal. A mesh is repaired on a copy (sliver triangles, flipped faces, small holes, flat openings, loose debris; every repair is listed and no vertex is moved) and classed mechanical, organic or mixed from its own surface.
 
@@ -153,7 +153,7 @@ Whatever you bring is assessed first. **Triage** reads a mesh, a STEP, a photo, 
 | Several closed bodies | One design, one part per body |
 | A surface that does not close | A reference to design around; nothing is guessed |
 
-**Make editable** turns a mechanical mesh (STL, 3MF or OBJ) into CAD you can change: it always builds an exact solid from the triangles, then fits planes, cylinders, cones, spheres and tori where the surface allows and, for a part that is one extrusion or one revolution, rebuilds the profile, holes and patterns as parameters. A report gives the two-sided deviation, the volume change and how much of the area became parametric; anything that does not fit within tolerance stays exact rather than being guessed.
+**Make editable** turns a mechanical mesh or scan into CAD you can change: it always builds an exact solid from the triangles, then fits planes, cylinders, cones, spheres and tori where the surface allows and, for a part that is one extrusion or one revolution, rebuilds the profile, holes and patterns as parameters. A report gives the two-sided deviation, the volume change and how much of the area became parametric; anything that does not fit within tolerance stays exact rather than being guessed.
 
 ## Review
 

@@ -29,9 +29,9 @@ def _ref(st, p: dict, reference: str) -> tuple[dict, Path]:
         raise StudioError(f"There is no reference part “{reference}” in this project.",
                           f"Imported: {names}. Import the mesh first (import_reference).")
     if Path(rec["file"]).suffix.lower() not in FORMATS:
-        raise StudioError(f"{rec['file']} is a STEP: it is already CAD.",
+        raise StudioError(f"{rec['file']} is already CAD (STEP, IGES or BREP).",
                           "Read it in a design with self.reference(...) and measure it with measure; the remodel tools "
-                          "are for meshes (STL, OBJ, 3MF).")
+                          "are for meshes and scans.")
     path = st.dir(p["id"]) / "references" / rec["file"]
     return rec, path
 
