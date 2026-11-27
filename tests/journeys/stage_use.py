@@ -135,7 +135,7 @@ def run(ui):
         c = _centre(ui)
         ui.check(abs(c[0]) <= tol and abs(c[1]) <= tol, "%s: the part is in the middle of the free stage (off by %.0f, %.0f)" % (what, c[0], c[1]))
         return c
-    home = centred("as the design stands")[2]
+    centred("as the design stands")
 
     def moved_then(what, change):
         _pan_zoom(ui)
@@ -145,7 +145,9 @@ def run(ui):
         ui.check(abs(_centre(ui)[0]) > 30, "the view the person chose stays while nothing else changes")
         change()
         c = centred(what)
-        ui.check(abs(c[2] - home) < 0.02 * home, "%s: the part is framed as before (%.0f, %.0f)" % (what, c[2], home))
+        # (the whole part, framed for the free stage as it now is: one with more room may stand closer)
+        home = ui.js("Store.viewer.homeDist()")
+        ui.check(abs(c[2] - home) < 0.02 * home, "%s: the whole part is framed again (%.0f, %.0f)" % (what, c[2], home))
     moved_then("the pane folded", lambda: ui.run_js("Store.paneFolded = true"))
     moved_then("the pane back", lambda: ui.run_js("Store.paneFolded = false"))
     moved_then("Focus", lambda: ui.key("Ctrl+."))

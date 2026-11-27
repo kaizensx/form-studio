@@ -126,6 +126,7 @@ Item {
     readonly property bool asmOn: !!asm && asmMode !== "print"
     onAsmModeChanged: { asmTween = true; _frame(); asmTweenOff.restart(); if (interactive && model && model.assembly) setView(Store.viewName, true) }
     onExplodeChanged: _frame()
+    onPoseChanged: _frame()                  // a lid opened stands higher than the box: the bounds follow the pose
     function glideFrame() { asmTween = true; asmTweenOff.restart() }   // the next re-centring glides (a streamed stage that grew)
     Timer { id: asmTweenOff; interval: Motion.part + 60 + Motion.stagger * (vp.asm ? Math.min(6, vp.asm.parts.length) : 0); onTriggered: vp.asmTween = false }
     function jointOf(id) {
@@ -145,8 +146,9 @@ Item {
         var j = jointOf(x.id)
         return j ? [j.id] : []
     }
-    function partXf(x) {                     // part as printed → where it is drawn: { pos, rot }
-        if (!asmOn) return { pos: Qt.vector3d(0, 0, 0), rot: Qt.quaternion(1, 0, 0, 0) }
+    function partXf(x) { return _xf(x, asmOn ? asmMode : "print") }
+    function _xf(x, mode) {                  // part as printed → where it is drawn in this mode: { pos, rot }
+        if (mode === "print") return { pos: Qt.vector3d(0, 0, 0), rot: Qt.quaternion(1, 0, 0, 0) }
         var pl = x.placement, t = Qt.vector3d(pl.t[0], pl.t[1], pl.t[2]), q = Qt.quaternion(pl.q[0], pl.q[1], pl.q[2], pl.q[3])
         var ch = chainOf(x)
         for (var i = ch.length - 1; i >= 0; i--) {
@@ -158,7 +160,7 @@ Item {
                 t = r.times(t.minus(o)).plus(o); q = r.times(q)
             } else t = t.plus(ax.times(v))
         }
-        if (asmMode === "exploded") { var e = x.explode_total || x.explode; t = t.plus(Qt.vector3d(e[0], e[1], e[2]).times(explode)) }
+        if (mode === "exploded") { var e = x.explode_total || x.explode; t = t.plus(Qt.vector3d(e[0], e[1], e[2]).times(explode)) }
         return { pos: t, rot: q }
     }
     // ── points on parts, from the print frame (where the engine computes) to where the part is drawn now ──
@@ -214,7 +216,20 @@ Item {
         shift = sh                           // may animate; bounds use the target, not the value mid-animation
         shiftTo = sh
         var lo = Qt.vector3d(b[0][0], b[0][1], b[0][2]), hi = Qt.vector3d(b[1][0], b[1][1], b[1][2])
-        if (on && asmMode === "exploded") {
+        // assembled or pulled apart: each part's box as printed, moved where it is drawn (its joints' pose included:
+        // a lid opened stands above the box), so the framing holds the whole arrangement
+        var posed = on && a.parts.every(function (x) { return !!x.print_bbox && !!x.placement })
+        if (posed) {
+            lo = Qt.vector3d(1e9, 1e9, 1e9); hi = Qt.vector3d(-1e9, -1e9, -1e9)
+            for (var k = 0; k < a.parts.length; k++) {
+                var y = a.parts[k], pb = y.print_bbox, xf = _xf(y, asmMode)
+                for (var m = 0; m < 8; m++) {
+                    var p = xf.rot.times(Qt.vector3d(pb[m & 1][0], pb[(m >> 1) & 1][1], pb[(m >> 2) & 1][2])).plus(xf.pos)
+                    lo = Qt.vector3d(Math.min(lo.x, p.x), Math.min(lo.y, p.y), Math.min(lo.z, p.z))
+                    hi = Qt.vector3d(Math.max(hi.x, p.x), Math.max(hi.y, p.y), Math.max(hi.z, p.z))
+                }
+            }
+        } else if (on && asmMode === "exploded") {
             var asm = a
             for (var i = 0; i < asm.parts.length; i++) {
                 var x = asm.parts[i], xe = x.explode_total || x.explode, e = Qt.vector3d(xe[0], xe[1], xe[2]).times(explode)
@@ -267,25 +282,39 @@ Item {
     Behavior on target { enabled: vp.tween; Vector3dAnimation { duration: Motion.camera; easing.type: Easing.BezierSpline; easing.bezierCurve: vp.camCurve } }
 
     // ── the free area: pixels the HUD covers on each side. The camera keeps the part in what is left, so a legend
-    // or an options bar never sits on it. The parent sets the targets; the camera glides there.
+    // or an options bar never sits on it. The parent sets the insets (where the free area will be); the shown ones glide
+    // there with the camera, and the framing is worked out for the insets as set, not for a value mid-glide.
     property real insetLeft: 0
     property real insetRight: 0
     property real insetTop: 0
     property real insetBottom: 0
     property bool insetGlide: false          // off until the first frame, so the view does not slide in on load
-    Behavior on insetLeft { enabled: vp.insetGlide; NumberAnimation { duration: Motion.camera; easing.type: Easing.BezierSpline; easing.bezierCurve: Motion.out } }
-    Behavior on insetRight { enabled: vp.insetGlide; NumberAnimation { duration: Motion.camera; easing.type: Easing.BezierSpline; easing.bezierCurve: Motion.out } }
-    Behavior on insetTop { enabled: vp.insetGlide; NumberAnimation { duration: Motion.camera; easing.type: Easing.BezierSpline; easing.bezierCurve: Motion.out } }
-    Behavior on insetBottom { enabled: vp.insetGlide; NumberAnimation { duration: Motion.camera; easing.type: Easing.BezierSpline; easing.bezierCurve: Motion.out } }
+    property real shownLeft: insetLeft
+    property real shownRight: insetRight
+    property real shownTop: insetTop
+    property real shownBottom: insetBottom
+    Behavior on shownLeft { enabled: vp.insetGlide; NumberAnimation { duration: Motion.camera; easing.type: Easing.BezierSpline; easing.bezierCurve: Motion.out } }
+    Behavior on shownRight { enabled: vp.insetGlide; NumberAnimation { duration: Motion.camera; easing.type: Easing.BezierSpline; easing.bezierCurve: Motion.out } }
+    Behavior on shownTop { enabled: vp.insetGlide; NumberAnimation { duration: Motion.camera; easing.type: Easing.BezierSpline; easing.bezierCurve: Motion.out } }
+    Behavior on shownBottom { enabled: vp.insetGlide; NumberAnimation { duration: Motion.camera; easing.type: Easing.BezierSpline; easing.bezierCurve: Motion.out } }
+    // the free area changed (the bar grew with its suggestions, a column, the pane, the window) or the part did (a
+    // draft, a lid opened, pulled apart): a whole part that would now reach past the free area is framed again
+    onInsetLeftChanged: { _fitIn = true; _fitDue.restart() }
+    onInsetRightChanged: { _fitIn = true; _fitDue.restart() }
+    onInsetTopChanged: { _fitIn = true; _fitDue.restart() }
+    onInsetBottomChanged: { _fitIn = true; _fitDue.restart() }
+    property bool _fitIn: false
+    Timer { id: _fitDue; interval: 0; onTriggered: vp._keepFit() }
     // A panel that opens or a window that shrinks can leave almost no free area, or an inset mid-glide that is not a
     // number yet: the free area never drops under 40 px, and the pull-back stays at most 4x, so the camera never runs
     // past its far plane and the view never goes black.
     function _fin(v, d) { return isFinite(v) ? v : d }
-    readonly property real freeW: Math.max(40, Math.min(120, width), _fin(width - insetLeft - insetRight, width))
-    readonly property real freeH: Math.max(40, Math.min(120, height), _fin(height - insetTop - insetBottom, height))
+    readonly property real freeW: Math.max(40, Math.min(120, width), _fin(width - shownLeft - shownRight, width))
+    readonly property real freeH: Math.max(40, Math.min(120, height), _fin(height - shownTop - shownBottom, height))
     // pull back when the free area is much smaller than the view, so the framing keeps its margin
     // (across: a part seen from a corner is about 0.85 of its bounding sphere wide, and that and its dimension lines have to fit the free width)
-    readonly property real fitK: Math.min(4, Math.max(1, _fin(0.78 * height / freeH, 1), _fin(1.0 * height / freeW, 1)))
+    readonly property real fitK: _fitKFor(freeW, freeH)
+    function _fitKFor(fw, fh) { return Math.min(4, Math.max(1, _fin(0.78 * height / fh, 1), _fin(1.0 * height / fw, 1))) }
     readonly property real mmPerPx: _fin(dist, 420) * fitK * 2 * Math.tan(13 * Math.PI / 180) / Math.max(1, height)
     // the orbit centre stays near what is on the plate: a long pan or a jump never leaves the part in the dark
     readonly property real reach: Math.max(groundSpan, 2 * radius(bounds)) * 1.5 + 200
@@ -323,8 +352,64 @@ Item {
         tween = animate !== false
         // take the short way round
         var a = v[0]; while (a - az > 180) a -= 360; while (a - az < -180) a += 360
-        az = a; el = v[1]; target = center(b); dist = frame(b, box ? Math.min(1.25, slack) : slack)
-        _moved = !!box; if (!box) _homeDist = dist
+        // (the distance is kept in a local: with the glide on, dist still reads the old value right after it is set)
+        var d = box ? frame(b, Math.min(1.25, slack)) : homeDist(a, v[1])
+        az = a; el = v[1]; target = center(b); dist = d
+        _moved = !!box; if (!box) _homeDist = d
+    }
+    // ── the whole part, inside the free area ──
+    // The framing above is by the bounding sphere: right for most parts, but a tall one (a vase, a hook, a box with its
+    // lid open or pulled apart) seen from the side is nearly as tall as its sphere, and it ran up under the top row and
+    // down into the bar. homeDist is the sphere's framing, pulled back as far as it takes for the part's box (and its
+    // dimension lines and their numbers) to stand inside the free area as set, with a margin, seen from (a, e).
+    function homeDist(a, e) {
+        var d = frame(bounds, slack)
+        if (!interactive || lite || !model) return d
+        return Math.min(3000, Math.max(d, fitDist(a === undefined ? az : a, e === undefined ? el : e)))
+    }
+    function fitDist(a, e) {
+        var H = Math.max(1, height), W = Math.max(1, width), F = H / 2 / Math.tan(13 * Math.PI / 180)
+        var fw = Math.max(40, Math.min(120, W), _fin(W - insetLeft - insetRight, W))
+        var fh = Math.max(40, Math.min(120, H), _fin(H - insetTop - insetBottom, H))
+        var offX = (insetLeft - insetRight) / 2, offY = (insetTop - insetBottom) / 2
+        // margins: the numbers of the dimension lines stand on the lines (21 px tall, about 60 wide), plus some air
+        var mx = showDims ? 40 : 16, my = showDims ? 22 : 16
+        var hx = Math.max(10, fw / 2 - mx), hy = Math.max(10, fh / 2 - my)
+        var ra = a * Math.PI / 180, re = Math.max(-89, Math.min(89, e)) * Math.PI / 180
+        var back = Qt.vector3d(Math.sin(ra) * Math.cos(re), -Math.cos(ra) * Math.cos(re), Math.sin(re))
+        var look = Quaternion.lookAt(Qt.vector3d(0, 0, 0), scene(back.times(-1)))
+        var rt = cam.plate(look.times(Qt.vector3d(1, 0, 0))), up = cam.plate(look.times(Qt.vector3d(0, 1, 0)))
+        // the box, and the dimension lines 7 mm outside it on the floor and up one corner
+        var b = bounds, c = center(b), o = showDims ? 7 : 0, pts = []
+        for (var i = 0; i < 8; i++) {
+            var p = Qt.vector3d(i & 1 ? b.hi.x + o : b.lo.x - o, i & 2 ? b.hi.y + o : b.lo.y - o, i & 4 ? b.hi.z : b.lo.z).minus(c)
+            pts.push([p.dotProduct(rt), p.dotProduct(up), p.dotProduct(back)])
+        }
+        function fits(far) {
+            var ox = offX * far / F, oy = offY * far / F
+            for (var j = 0; j < pts.length; j++) {
+                var D = far - pts[j][2]
+                if (D < 1) return false
+                if (Math.abs(F * (pts[j][0] + ox) / D - offX) > hx || Math.abs(-F * (pts[j][1] - oy) / D - offY) > hy) return false
+            }
+            return true
+        }
+        var lo = 1, hi = 3000 * 4
+        if (!fits(hi)) return 3000
+        for (var n = 0; n < 40 && hi - lo > 0.5; n++) { var mid = (lo + hi) / 2; if (fits(mid)) hi = mid; else lo = mid }
+        return hi / _fitKFor(fw, fh)
+    }
+    // the free area or the part changed: a whole part (not a view the person panned or zoomed) is framed again when
+    // it would reach past the free area, and comes back to its own framing when the area frees up again. The camera
+    // glides there with the insets, so the part never slides under the bar first.
+    function _keepFit() {
+        var back = _fitIn; _fitIn = false
+        if (!interactive || lite || !model || _moved || revealing || ma.pressed || pinch.active || faceDrag.active || spin) return
+        // (against where the camera is going, not where it is mid-glide: the bar glides, and so do the insets)
+        var d = homeDist(), cur = _homeDist > 0 ? _homeDist : dist
+        if (d > cur * 1.01 || (back && Math.abs(d - cur) > 0.01 * cur)) {
+            tween = true; target = center(bounds); dist = d; _homeDist = d
+        }
     }
     // ── the part stays in the middle of the free area ──
     // Orbiting keeps it there. Panning, zooming and framing one feature (F) are the person's own view (_moved): it is
@@ -336,11 +421,12 @@ Item {
     signal touched()                         // a press on the view (before it turns into an orbit, a pick or a pan)
     function recentre() {
         _moved = false
-        tween = true; target = center(bounds); dist = _homeDist > 0 ? _homeDist : frame(bounds, slack)
+        var d = homeDist()
+        tween = true; target = center(bounds); dist = d; _homeDist = d
     }
     function layoutChanged() { if (_moved && interactive && !lite && !ma.pressed && !pinch.active && !faceDrag.active && !revealing) recentre() }
-    onWidthChanged: layoutChanged()
-    onHeightChanged: layoutChanged()
+    onWidthChanged: { layoutChanged(); _fitIn = true; _fitDue.restart() }
+    onHeightChanged: { layoutChanged(); _fitIn = true; _fitDue.restart() }
     function featureBox(id) {
         for (var k = 0; k < asmParts.count; k++) {          // assembly: transform the feature's box with its part
             var n = asmParts.objectAt(k)
@@ -393,7 +479,7 @@ Item {
     }
     property bool _refitDue: false
     function _overshoot() {                  // how far the part's box reaches past the free area: <= 1 inside, 2 = twice too wide; 99 = behind the camera
-        var b = bounds, k = 0, cx = insetLeft + freeW / 2, cy = insetTop + freeH / 2
+        var b = bounds, k = 0, cx = shownLeft + freeW / 2, cy = shownTop + freeH / 2
         for (var i = 0; i < 8; i++) {
             var q = _px(Qt.vector3d(i & 1 ? b.hi.x : b.lo.x, i & 2 ? b.hi.y : b.lo.y, i & 4 ? b.hi.z : b.lo.z))
             if (!q) return 99
@@ -406,13 +492,14 @@ Item {
         _refitDue = false
         var k = _overshoot()
         tween = true; target = center(bounds)
-        dist = Math.min(3000, Math.max(frame(bounds, slack), k < 99 ? dist * Math.max(1, k) * 1.08 : dist))
-        _moved = false; _homeDist = dist
+        var d = Math.min(3000, Math.max(homeDist(), k < 99 ? dist * Math.max(1, k) * 1.08 : dist))
+        dist = d
+        _moved = false; _homeDist = d
         refitCheck.restart()
     }
     // once the camera has arrived: a part that is long across the view may still reach past it
     Timer { id: refitCheck; interval: Motion.camera + 60
-        onTriggered: { var k = vp._overshoot(); if (k > 1.0 && k < 99 && !ma.pressed) { vp.tween = true; vp.dist = Math.min(3000, vp.dist * k * 1.06); vp._homeDist = vp.dist } } }
+        onTriggered: { var k = vp._overshoot(); if (k > 1.0 && k < 99 && !ma.pressed) { var d = Math.min(3000, vp.dist * k * 1.06); vp.tween = true; vp.dist = d; vp._homeDist = d } } }
     Connections { target: faceDrag; function onActiveChanged() { if (!faceDrag.active && vp._refitDue) { if (vp._fits()) vp._refitDue = false; else vp._refit() } } }
     // The camera frames a new build once, as it starts, and then stays where it is while the features arrive. A build
     // of the same design at about the same size leaves the camera where the person put it.
@@ -423,8 +510,9 @@ Item {
             if (Math.abs(orad - r) < 0.04 * r) return
         }
         camCurve = Theme.easeMove; camBack.restart()
-        tween = true; target = center(bounds); dist = frame(bounds, slack)
-        _moved = false; _homeDist = dist
+        var d = homeDist()
+        tween = true; target = center(bounds); dist = d
+        _moved = false; _homeDist = d
     }
     // the meshes drawn by the parts repeaters: replaced only when the geometry really changed
     property var _mesh: []
@@ -490,7 +578,8 @@ Item {
     property bool _dimGlide: false
     Behavior on dimLo { enabled: vp._dimGlide; Vector3dAnimation { duration: Theme.move(Theme.cross); easing.type: Easing.OutCubic } }
     Behavior on dimHi { enabled: vp._dimGlide; Vector3dAnimation { duration: Theme.move(Theme.cross); easing.type: Easing.OutCubic } }
-    onBoundsChanged: if (!revealing) _syncDims(false)
+    // (and a part that outgrows the free area is held in it: _keepFit; one that shrinks keeps the camera where it is)
+    onBoundsChanged: { if (!revealing) _syncDims(false); _fitDue.restart() }
     function _shownBox() {                   // { lo, hi } on the plate of the features drawn so far; null = all of it; "none"
         if (!revealing || !_hold.length || asmOn) return null
         var lo = null, hi = null
@@ -644,8 +733,8 @@ Item {
             readonly property real ra: vp.az * Math.PI / 180
             readonly property real re: Math.max(-89, Math.min(89, vp.el)) * Math.PI / 180
             // the look-at point, moved so the orbit centre lands in the middle of the free area
-            readonly property real ox: (vp.insetLeft - vp.insetRight) / 2 * vp.mmPerPx
-            readonly property real oy: (vp.insetTop - vp.insetBottom) / 2 * vp.mmPerPx
+            readonly property real ox: (vp.shownLeft - vp.shownRight) / 2 * vp.mmPerPx
+            readonly property real oy: (vp.shownTop - vp.shownBottom) / 2 * vp.mmPerPx
             // (along the camera's own right and up, as lookAt turns it for this direction: it rolls the camera a few
             // degrees, and a shift along the level right and the plain up lands the centre low when the free area is
             // off to one side: 31 px for 200 px of offset)
@@ -1101,8 +1190,8 @@ Item {
         visible: vp.interactive && !vp.lite && !!vp.model && vp.plateK < 0.5 && isFinite(px) && px > 8
         opacity: 1 - vp.plateK * 2
         width: px; height: 22
-        x: vp.scaleLeft >= 0 ? vp.scaleLeft : vp.width - vp.insetRight - width - 18
-        y: (vp.scaleFoot >= 0 ? vp.scaleFoot : vp.height - Math.max(0, vp.insetBottom) + 6) - height
+        x: vp.scaleLeft >= 0 ? vp.scaleLeft : vp.width - vp.shownRight - width - 18
+        y: (vp.scaleFoot >= 0 ? vp.scaleFoot : vp.height - Math.max(0, vp.shownBottom) + 6) - height
         Behavior on width { NumberAnimation { duration: Motion.ui } }
         Rectangle { y: parent.height - 5; width: parent.width; height: 1; color: Theme.ink4 }
         Rectangle { y: parent.height - 9; width: 1; height: 9; color: Theme.ink4 }

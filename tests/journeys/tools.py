@@ -76,11 +76,18 @@ def journey_measure(ui):
     ui.wait_until(lambda: tool(ui) == "select" and ui.store.get("measuring") is False, 3, "V to go back to Select")
     ui.click_text("Measure")
     ui.wait_until(lambda: ui.store.get("measuring") is True, 3, "the Measure rail button")
-    ui.click("viewport", *room(ui, 0.45, 0.58))
-    ui.wait_until(lambda: ui.store.get("measureFrom") is not None, 10, "the first point")
+    # the enclosure is two parts laid out for printing, framed whole: a point can land in the gap between them
+    def hit(points, cond, what):
+        for u, v in points:
+            ui.click("viewport", *room(ui, u, v))
+            try:
+                return ui.wait_until(cond, 4, what)
+            except Exception:
+                continue
+        return ui.wait_until(cond, 6, what)
+    hit(((0.45, 0.58), (0.47, 0.45), (0.42, 0.38)), lambda: ui.store.get("measureFrom") is not None, "the first point")
     ui.expect("Click the second point")
-    ui.click("viewport", *room(ui, 0.58, 0.68))
-    m = ui.wait_until(lambda: ui.store.get("measures"), 10, "a measurement after two clicks")[0]
+    m = hit(((0.58, 0.68), (0.62, 0.76), (0.52, 0.74)), lambda: ui.store.get("measures"), "a measurement after two clicks")[0]
     ui.eq(m["kind"], "distance")
     mm = float(m["label"].split()[0])
     bb = ui.js("Store.view.bbox")

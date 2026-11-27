@@ -125,6 +125,9 @@ reorganised, with a switch for every engine you install, and the agent and model
 - **Refinement always opens** from its header, in every stage.
 - **The part comes back to the middle** when a column folds, opens or is resized, the pane folds, Focus is switched
   or the window is resized; it never shrinks while it is built.
+- **A tall part stands whole on the stage.** A vase, a wall hook or a box with its lid open or pulled apart ran up
+  under the top row and down into the bar and its suggestions. The part, its dimension lines and their numbers now
+  stay inside the free stage at every window size, and the camera glides back when the bar grows.
 - **"The Form Studio engine is not answering" in Settings.** A burst of requests was dropped although the engine
   was fine. The engine now accepts them all, and the app asks again once before saying so.
 - **Threaded holes have their thread.** A hole cut with the built-in internal thread could come out as a plain

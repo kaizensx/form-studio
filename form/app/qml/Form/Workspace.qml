@@ -281,8 +281,8 @@ Item {
         // the key light answers: a faint pool over the floor that breathes while nothing happens, and narrows and warms
         // while a build plays. It lies over the room, not in it, so its breathing never makes the glass blur again.
         Room { id: keyLight; anchors.fill: parent; wall: false; vignetteK: 0; visible: !Store.layers && !Store.plateWanted
-            poolX: (vp.insetLeft + (centre.width - vp.insetRight)) / 2 / Math.max(1, centre.width)
-            poolY: Math.min(0.72, (vp.insetTop + (centre.height - vp.insetBottom)) / 2 / Math.max(1, centre.height) + 0.1)
+            poolX: (vp.shownLeft + (centre.width - vp.shownRight)) / 2 / Math.max(1, centre.width)
+            poolY: Math.min(0.72, (vp.shownTop + (centre.height - vp.shownBottom)) / 2 / Math.max(1, centre.height) + 0.1)
             poolW: ws.cueOn ? 640 : 900; poolH: ws.cueOn ? 300 : 380
             poolK: Theme.dark ? (ws.cueOn ? 0.16 : 0.09) : (ws.cueOn ? 0.5 : 0.25)
             breathe: !ws.cueOn && !Store.chatBusy && !Store.sheet && Window.active
@@ -347,8 +347,8 @@ Item {
         Item {
             id: wipe; objectName: "compareWipe"; z: 3
             property real frac: 0.5                 // across the free area of the view
-            readonly property real lo: vp.insetLeft + 24
-            readonly property real hi: Math.max(lo + 40, vp.width - vp.insetRight - 24)
+            readonly property real lo: vp.shownLeft + 24
+            readonly property real hi: Math.max(lo + 40, vp.width - vp.shownRight - 24)
             readonly property real at: Math.round(lo + (hi - lo) * frac)
             readonly property bool on: vp.wipeOn && !ws.sim
             visible: on; x: at; y: 40; width: 1; height: Math.min(Store.barY, centre.height) - 60
