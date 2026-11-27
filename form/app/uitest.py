@@ -455,17 +455,21 @@ class UI:
         aims at where a control rests; on a slow software-rendered runner a click aimed mid-animation lands on
         whatever is there once the event arrives."""
         it = self.item(target) if isinstance(target, str) else target
-        t0, last = time.time(), None
-        while time.time() - t0 < limit:
+        # at rest: the same place over three looks in a row. Two looks 40 ms apart also agree in the middle of an
+        # animation where a frame takes longer than that (a Windows runner drawing in software), and the click then
+        # went to where the control had been: a sheet still sliding in was closed by a click beside it
+        t0, last, same = time.time(), None, 0
+        while time.time() - t0 < limit * self.slow:
             try:
                 p = self._pt(it, fx, fy)
                 now = (p.x(), p.y(), round(it.width()), round(it.height()))
             except RuntimeError:                       # the item went away; let the caller find out
                 return
-            if now == last:
+            same = same + 1 if now == last else 0
+            if same >= 2:
                 return
             last = now
-            self._pump(40)
+            self._pump(round(40 * min(self.slow, 3.0)))
 
     def hover(self, target, fx: float = 0.5, fy: float = 0.5):
         if not isinstance(target, (tuple, list)):

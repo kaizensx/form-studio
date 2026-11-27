@@ -417,6 +417,9 @@ QtObject {
         slicerOpened = null
         _stamp = ""
         return refresh(true).then(function () {
+            // the person left for Home, or opened another design, while this one loaded: it does not take the
+            // screen back (a workspace with no design in it, on a machine slow enough to see it)
+            if (pid !== id || !data) return
             screen = "work"; viewName = "iso"; blankCanvas = false
             if (viewer) { showHead(); viewer.setView("iso", false) }
             if (data.project.auto_run !== false && !job) {
