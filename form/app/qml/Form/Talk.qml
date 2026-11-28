@@ -1,4 +1,5 @@
 import QtQuick
+import QtCore
 import QtQuick.Controls
 import QtQuick.Dialogs
 import FormNative
@@ -58,13 +59,34 @@ Rectangle {
         if (d.fit && d.fit.yield < 0.95) out.push({ label: "Improve the modelled fit yield", prompt: "The modelled fit yield is " + Math.round(d.fit.yield * 100) + "%. What drives it, and what change would raise it? It is a model, so say what a test print should confirm." })
         return out.slice(0, 4)
     }
-    Component.onCompleted: sync()
+    Component.onCompleted: { sync(); try { Store.savedPrompts = JSON.parse(kept.prompts) } catch (e) { Store.savedPrompts = [] } }
+    // the messages saved as commands outlive the session
+    Settings { id: kept; category: "talk"; property string prompts: "[]" }
+    Connections { target: Store; function onSavedPromptsChanged() { kept.prompts = JSON.stringify(Store.savedPrompts) } }
+    // the feature a build is on, in the design's own words; else what the tool that runs does
+    readonly property var toolSays: ({ create_design: "Writing the design", update_design: "Rewriting the design", edit_design: "Editing a feature",
+        create_project: "Starting the design", commit_change: "Committing a revision", preview_change: "Trying a change", render: "Looking at the part",
+        get_project: "Reading the design", run_pipeline: "Running the checks", plan_design: "Planning the features", design_brief: "Writing the brief",
+        design_guide: "Reading the design guide", read_document: "Opening a document", fetch_link: "Opening a link", strength_study: "Running the strength study",
+        get_strength_study: "Reading the strength study", run_study: "Running a study", measure: "Measuring the solid", mass_properties: "Working out the mass",
+        ask_user: "Asking you", ask_measurement: "Asking for a measurement", import_reference: "Importing a reference", reconstruct: "Rebuilding the mesh as CAD",
+        critique: "Reviewing its own design", optimize: "Searching for a better design", manufacturability: "Checking it can be made" })
+    // the step the agent is on in this turn: every tool call since your message
+    readonly property int stepNow: { var n = 0, it = Store.chatItems; for (var i = it.length - 1; i >= 0 && it[i].t !== "user"; i--) if (it[i].t === "tool") n++; return n }
+    function liveDetail() {
+        var L = Store.chatLive, b = Store.building
+        if (b && b.of) return (b.index !== undefined ? b.index + 1 : b.at) + " of " + b.of
+        if (L && L.kind === "tool") return L.name + " · step " + (talk.stepNow + 1)
+        if (L && (L.kind === "thinking" || L.kind === "text") && L.chars) return (L.chars / 1000).toFixed(1) + " kB"
+        return talk.stepNow ? F.plural(talk.stepNow, "step") : ""
+    }
 
     function liveText() {
         var L = Store.chatLive, who = Store.chatAgentLabel
         if (Store.chatAsking) return who + " is waiting for your answer"
         if (!L) return who + " is thinking…"
-        if (L.kind === "tool") return (L.name === "create_design" || L.name === "update_design") ? "Writing design code… " + (L.chars / 1000).toFixed(1) + " kB" : "Calling " + L.name + "…"
+        if (Store.building && Store.building.label) return "Building " + Store.building.label
+        if (L.kind === "tool") return talk.toolSays[L.name] || "Calling " + L.name
         if (L.kind === "text") return "Writing…"
         if (L.kind === "thinking") return "Thinking…" + (L.chars ? " " + (L.chars / 1000).toFixed(1) + " kB" : "")
         return "Working…"
@@ -92,6 +114,17 @@ Rectangle {
     ListModel { id: blocks }
     function build() {
         var out = [], items = Store.chatItems, group = null, model = "", agent = "", answers = ({})
+        // what this turn's reply rests on: the tool calls whose results say how they are known (form/cite.py), in the
+        // order they were made; `said` are the turn's reply blocks, which get the indices once the turn has ended
+        var srcs = [], said = [], plan = null
+        function closeTurn(ended) {
+            if (ended && srcs.length) {
+                var cites = srcs.map(function (x) { return [x.n, x.figures] })
+                said.forEach(function (b) { b.cites = cites })
+                out.push({ t: "sources", k: "src" + out.length, list: srcs.map(function (x) { return { n: x.n, title: x.title, how: x.how } }) })
+            }
+            srcs = []; said = []; plan = null
+        }
         for (var a = 0; a < items.length; a++) if (items[a].t === "answer") answers[items[a].id] = items[a]
         for (var i = 0; i < items.length; i++) {
             var ev = items[i]
@@ -99,6 +132,11 @@ Rectangle {
             if (ev.t === "tool") {
                 if (!group) { group = { t: "steps", k: "s" + i, steps: [] }; out.push(group) }
                 group.steps.push({ id: ev.id, tool: ev.name, input: ev.input, ts: ev.ts || 0 })
+                var got = Store.chatTools[ev.id]
+                if (got && got.source && !srcs.some(function (x) { return x.title === got.source.title && x.how === got.source.how }))
+                    srcs.push({ n: srcs.length + 1, title: got.source.title, how: got.source.how, figures: got.source.figures || [] })
+                // its plan (plan_design), as a card: an approval the agent asks for next is answered on it
+                if (ev.name === "plan_design" && got && got.plan && got.plan.length) { group = null; plan = { t: "plan", k: "p" + i, steps: got.plan, q: null }; out.push(plan) }
                 // the concepts it proposed, right here in the conversation: what they look like, and a pick
                 var res = ev.name === "propose_concepts" ? Store.chatTools[ev.id] : null
                 if (res && res.concepts && res.concepts.group) { group = null; out.push({ t: "concepts", k: "c" + i, group: res.concepts.group }) }
@@ -118,14 +156,21 @@ Rectangle {
                           open: !!Store.chatAsking && Store.chatAsking.id === ev.id && !answers[ev.id] }
                 if (q.kind === "measure")                // a guided measurement: where, the picture, the unit and tolerance
                     ["project", "param", "unit", "tolerance_mm", "where", "diagram", "image_url", "mark", "current"].forEach(function (f) { q[f] = ev[f] === undefined ? null : ev[f] })
+                if (plan && !plan.q && q.kind === "confirm") { plan.q = q; continue }
                 out.push({ t: "ask", k: "q" + i, q: q })
                 continue
             }
             if (ev.t === "suggest") { out.push({ t: "suggest", k: "g" + i, options: ev.options || [] }); continue }
-            if (ev.t === "user") out.push({ t: "user", k: "u" + i, text: ev.text, attachments: ev.attachments || [], local: !!ev.local, n: ev.n === undefined ? -1 : ev.n })
-            else if (ev.t === "text") out.push({ t: "text", k: "t" + i, text: ev.text, n: ev.n === undefined ? -1 : ev.n })
+            if (ev.t === "user") { closeTurn(false); out.push({ t: "user", k: "u" + i, text: ev.text, attachments: ev.attachments || [], local: !!ev.local, n: ev.n === undefined ? -1 : ev.n }) }
+            else if (ev.t === "text") { var tb = { t: "text", k: "t" + i, text: ev.text, n: ev.n === undefined ? -1 : ev.n, cites: [] }; said.push(tb); out.push(tb) }
+            else if (ev.t === "act" && ev.change && String(ev.by).toLowerCase() === "you") {
+                // changes made by hand since the last reply: one note that names them, and the newest revision's card
+                var hn = out.length && out[out.length - 1].t === "hand" ? out[out.length - 1] : null
+                if (!hn) { hn = { t: "hand", k: "h" + i, edits: [], change: null }; out.push(hn) }
+                hn.edits.push({ text: ev.text, to: ev.change.to }); hn.change = ev.change
+            }
             else if (ev.t === "act") out.push({ t: "act", k: "a" + i, by: ev.by, text: ev.text, change: ev.change || null })
-            else if (ev.t === "end") out.push({ t: "end", k: "e" + i, cost: ev.cost_usd, steps: ev.steps, seconds: ev.seconds, stopped: !!ev.stopped,
+            else if (ev.t === "end") closeTurn(true), out.push({ t: "end", k: "e" + i, cost: ev.cost_usd, steps: ev.steps, seconds: ev.seconds, stopped: !!ev.stopped,
                                                 model: Store.modelName(ev) || model, agent: ev.agent || agent, change: ev.change || null,
                                                 usage: ev.usage || null })
             else if (ev.t === "error") out.push({ t: "error", k: "x" + i, text: ev.text, hint: ev.hint || "", agent: ev.agent || agent })
@@ -346,9 +391,10 @@ Rectangle {
             Loader { id: body; x: 16; width: parent.width - 32
                 sourceComponent: it.m.t === "user" ? cUser : it.m.t === "text" ? cText : it.m.t === "steps" ? cSteps : it.m.t === "act" ? cAct
                                : it.m.t === "end" ? cEnd : it.m.t === "ask" ? cAsk : it.m.t === "suggest" ? cSuggest
-                               : it.m.t === "concepts" ? cConcepts : cErr }
+                               : it.m.t === "concepts" ? cConcepts : it.m.t === "sources" ? cSources : it.m.t === "plan" ? cPlan
+                               : it.m.t === "hand" ? cHand : cErr }
             // actions on hover: copy, fork from here, and for your own message, edit and send again
-            Rectangle { readonly property bool want: (hh.hovered || cb.hovered || eb.hovered || fb.hovered) && (it.m.t === "user" || it.m.t === "text") && !it.m.local
+            Rectangle { readonly property bool want: (hh.hovered || cb.hovered || eb.hovered || fb.hovered || sb.hovered) && (it.m.t === "user" || it.m.t === "text") && !it.m.local
                 opacity: want ? 1 : 0; visible: opacity > 0; Behavior on opacity { NumberAnimation { duration: Theme.fast } }
                 z: 2; anchors.right: parent.right; anchors.rightMargin: 14; y: it.m.t === "user" ? it.height - 6 : -10
                 width: ar.implicitWidth + 4; height: 26; radius: Theme.rSm + 1; color: Theme.plate3; border.color: Theme.rule2
@@ -356,7 +402,10 @@ Rectangle {
                     Btn { id: cb; small: true; kind: "quiet"; icon: "copy"; tip: "Copy"; onClicked: { Bridge.copy(it.m.text); Store.toast("Copied") } }
                     Btn { id: fb; objectName: "msgFork"; small: true; kind: "quiet"; icon: "git_branch"; tip: "Fork from here: a new branch with the conversation up to this message"
                         visible: it.m.n >= 0 && !Store.chatBusy; onClicked: Store.forkConv(it.m.n) }
-                    Btn { id: eb; small: true; kind: "quiet"; icon: "pencil"; tip: "Edit and send again"; visible: it.m.t === "user"; onClicked: Store.recallChat(it.m.text) } } }
+                    Btn { id: eb; small: true; kind: "quiet"; icon: "pencil"; tip: "Edit and send again"; visible: it.m.t === "user"; onClicked: Store.recallChat(it.m.text) }
+                    Btn { id: sb; objectName: "msgSave"; small: true; kind: "quiet"; icon: "bookmark"; active: Store.promptSaved(it.m.text)
+                        tip: Store.promptSaved(it.m.text) ? "Saved as a command: remove it" : "Save as a command: it appears in the palette (Ctrl+K)"
+                        visible: it.m.t === "user"; onClicked: Store.togglePrompt(it.m.text) } } }
 
             Component { id: cUser; Item { implicitHeight: ub.height
                 Rectangle { id: ub; anchors.right: parent.right; radius: Theme.rLg; color: Theme.plate3; border.color: Theme.rule; opacity: it.m.local ? 0.7 : 1
@@ -381,7 +430,18 @@ Rectangle {
                                     HoverHandler { id: ah }
                                     Tip { show: ah.hovered; text: ach.modelData.name } } } }
                         Txt { id: ut; width: Math.min(implicitWidth, body.width - 54); text: it.m.text; lineHeight: 1.4 } } } } }
-            Component { id: cText; Md { id: rt; objectName: "replyText"; source: it.m.text; width: body.width; revs: true
+            Component { id: cSources; TalkSources { width: body.width; list: it.m.list } }
+            Component { id: cPlan; TalkPlan { width: body.width; steps: it.m.steps; q: it.m.q; onEdit: ta.forceActiveFocus() } }
+            // by hand since the last reply: what you changed, named, and the newest revision's card
+            Component { id: cHand; Column { objectName: "handNote"; spacing: 8
+                Item { width: body.width; height: hnt.implicitHeight
+                    Icon { x: 1; y: 3; name: "user"; size: 14; color: Theme.ink3 }
+                    Txt { id: hnt; objectName: "handNoteText"; x: 24; width: parent.width - 24; tone: 2; font.pixelSize: 13; lineHeight: 1.35; textFormat: Text.StyledText
+                        text: "By hand since the last reply: " + it.m.edits.map(function (e) {
+                            var s = String(e.text).replace(/&/g, "&amp;").replace(/</g, "&lt;"), c = s.indexOf(":")
+                            return (c > 0 ? "<b><font color=\"" + Theme.ink + "\">" + s.slice(0, c) + "</font></b>," + s.slice(c + 1) : s) + (e.to !== null && e.to !== undefined ? " (" + F.pad(e.to) + ")" : "") }).join("; ") + "." } }
+                TalkChange { visible: !!it.m.change; width: body.width; change: it.m.change } } }
+            Component { id: cText; Md { id: rt; objectName: "replyText"; source: it.m.text; width: body.width; revs: true; cites: it.m.cites || []
                 // while the reply is still being written, a caret sits after its last word
                 property real endX: 0; property real endY: 0; property real endH: 16
                 onLineLaidOut: function (line) { rt.endX = line.x + line.implicitWidth; rt.endY = line.y; rt.endH = line.height }
@@ -514,14 +574,17 @@ Rectangle {
                     height: visible ? lt.implicitHeight : 0
                     Behavior on height { enabled: Store.chatBusy; NumberAnimation { duration: Theme.move(140); easing.type: Easing.OutQuad } }
                     Md { id: lt; source: Store.chatLive && Store.chatLive.text ? Store.chatLive.text : ""; width: parent.width } }
-                Row { spacing: 8
-                    Row { spacing: 3; anchors.verticalCenter: parent.verticalCenter
-                        Repeater { model: 3
-                            Rectangle { required property int index; width: 4; height: 4; radius: 2; color: Theme.datum
-                                SequentialAnimation on opacity { running: Store.chatBusy; loops: Animation.Infinite
-                                    PauseAnimation { duration: index * 160 } NumberAnimation { from: 0.25; to: 1; duration: 320 } NumberAnimation { to: 0.25; duration: 320 } PauseAnimation { duration: (2 - index) * 160 } } } } }
-                    Txt { kind: "fine"; text: talk.liveText(); elide: Text.ElideRight; wrapMode: Text.NoWrap }
-                    Txt { kind: "fine"; mono: true; tone: 4; visible: Store.chatSeconds >= 1; text: talk.secs(Store.chatSeconds) } } } }
+                Item { objectName: "liveStatus"; width: parent.width; height: 20
+                    Item { id: ldot; width: 14; height: 14; anchors.verticalCenter: parent.verticalCenter
+                        Rectangle { anchors.centerIn: parent; width: 14; height: 14; radius: 7; color: Theme.alpha(Theme.datum, 0.22) }
+                        Rectangle { anchors.centerIn: parent; width: 6; height: 6; radius: 3; color: Theme.datum; Glow { blur: 7; strength: 0.7 }
+                            SequentialAnimation on opacity { running: Store.chatBusy && talk.onScreen && !Theme.reduced; loops: Animation.Infinite; alwaysRunToEnd: true
+                                NumberAnimation { to: 0.45; duration: 700; easing.type: Easing.InOutSine } NumberAnimation { to: 1; duration: 700; easing.type: Easing.InOutSine } } } }
+                    Txt { id: lsay; objectName: "liveSay"; x: 24; anchors.verticalCenter: parent.verticalCenter; font.pixelSize: 13; text: talk.liveText()
+                        width: Math.min(implicitWidth, parent.width - 24 - ldet.width - 10); elide: Text.ElideRight; wrapMode: Text.NoWrap }
+                    Txt { id: ldet; objectName: "liveDetail"; anchors.right: parent.right; anchors.verticalCenter: parent.verticalCenter; mono: true; tone: 3; font.pixelSize: Theme.tCap; wrapMode: Text.NoWrap
+                        width: Math.min(implicitWidth, parent.width * 0.55); elide: Text.ElideLeft; horizontalAlignment: Text.AlignRight
+                        text: talk.liveDetail() + (Store.chatSeconds >= 1 ? (talk.liveDetail() ? " · " : "") + talk.secs(Store.chatSeconds) : "") } } } }
     }
 
     // ── the bar's status line: what the agent is doing, or what you can do; click it to open or fold the transcript ──
@@ -591,14 +654,20 @@ Rectangle {
             HoverHandler { id: ch }
             // the prompt: an accent "›" before whatever is typed
             // (22 px mono: its line box is 28.6 px; it stands on the middle of the first line of the prompt, as the caret does)
-            Text { x: 16; y: sv.y + ta.topPadding - 5; visible: sv.contentItem.contentY < 4; text: "›"; color: Theme.datum; font.family: Theme.mono; font.pixelSize: 22; font.weight: Theme.wBody; renderType: Theme.textRender }
+            Rectangle { id: scope; objectName: "promptScope"; visible: Store.selScope !== "" && sv.contentItem.contentY < 4
+                x: 12; y: sv.y + ta.topPadding - 3; height: 26; radius: 13; width: visible ? scopeTxt.implicitWidth + 22 : 0
+                color: Theme.alpha(Theme.datum, 0.12); border.width: 1; border.color: Theme.alpha(Theme.datum, 0.22)
+                Txt { id: scopeTxt; anchors.centerIn: parent; mono: true; font.pixelSize: 12; color: Theme.strong(Theme.datum); wrapMode: Text.NoWrap; text: Store.selScope }
+                HoverHandler { id: sch }
+                Tip { show: sch.hovered; text: "Your message goes with what is picked on the part, with its numbers. Clear the selection to ask about the whole design." } }
+            Text { x: 16; y: sv.y + ta.topPadding - 5; visible: sv.contentItem.contentY < 4 && !scope.visible; text: "›"; color: Theme.datum; font.family: Theme.mono; font.pixelSize: 22; font.weight: Theme.wBody; renderType: Theme.textRender }
             // the caret, standing in the empty prompt while the keyboard is elsewhere (with it here, the field draws its own)
-            Caret { id: restCaret; objectName: "promptCaret"; field: ta; resting: true; x: 39; y: sv.y + ta.topPadding; height: ta.cursorRectangle.height
+            Caret { id: restCaret; objectName: "promptCaret"; field: ta; resting: true; x: ta.leftPadding; y: sv.y + ta.topPadding; height: ta.cursorRectangle.height
                 visible: !ta.activeFocus && ta.text === "" && ta.enabled }
             Rectangle { anchors.fill: parent; anchors.margins: -3; radius: parent.radius + 3; color: "transparent"; border.width: 3; border.color: Theme.alpha(Theme.datum, 0.13)
                 opacity: ta.activeFocus ? 1 : 0; Behavior on opacity { NumberAnimation { duration: Theme.fast } } }
             // what an empty prompt says, after the caret: one line, cut with an ellipsis where the controls begin
-            Txt { objectName: "promptPlaceholder"; visible: ta.text === "" && ta.preeditText === ""; x: 48; y: sv.y + ta.topPadding + (ta.contentHeight - height) / 2
+            Txt { objectName: "promptPlaceholder"; visible: ta.text === "" && ta.preeditText === ""; x: ta.leftPadding + 9; y: sv.y + ta.topPadding + (ta.contentHeight - height) / 2
                 width: comp.width - x - ta.rightPadding; elide: Text.ElideRight; wrapMode: Text.NoWrap; lineHeight: 1
                 font.pixelSize: ta.font.pixelSize; font.letterSpacing: -0.1; color: Theme.ink3; text: ta.placeholder }
             Column {
@@ -649,11 +718,11 @@ Rectangle {
                         enabled: Store.chat.available
                         selectionColor: Theme.alpha(Theme.datum, 0.3); selectedTextColor: Theme.ink; selectByMouse: true
                         // on one line (slim) the controls stand right of the words, so the words stop before them
-                        leftPadding: 39; rightPadding: talk.slim ? footRow.width + 62 : 14; topPadding: talk.slim ? 17 : 13; bottomPadding: talk.slim ? 16 : 6; background: null; renderType: Theme.textRender
+                        leftPadding: scope.visible ? scope.width + 24 : 39; rightPadding: talk.slim ? footRow.width + 62 : 14; topPadding: talk.slim ? 17 : 13; bottomPadding: talk.slim ? 16 : 6; background: null; renderType: Theme.textRender
                         function submit() {
                             if (!text.trim()) return
                             if (Store.chatAsking && Store.chatAsking.free && Store.chatAsking.kind !== "measure") { Store.answerAsk(Store.chatAsking.id, text.trim(), []); text = ""; return }
-                            if (!Store.chatBusy && Store.chatReady) { Store.sendWithLinks(text); text = "" } }
+                            if (!Store.chatBusy && Store.chatReady) { Store.sendWithLinks(Store.scoped(text)); text = "" } }
                         Keys.onTabPressed: nextItemInFocusChain(true).forceActiveFocus(Qt.TabFocusReason)
                         Keys.onBacktabPressed: nextItemInFocusChain(false).forceActiveFocus(Qt.BacktabFocusReason)
                         Keys.onPressed: function (e) {

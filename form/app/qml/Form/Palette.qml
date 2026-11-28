@@ -24,7 +24,7 @@ Item {
     objectName: "palette"
     readonly property string selText: rows[picks[sel]] ? rows[picks[sel]].text : ""     // the highlighted command
     property alias query: q.text
-    readonly property var groups: ["Recent", "Go to", "Tools", "Bench", "Designs", "Conversations", "Settings"]
+    readonly property var groups: ["Recent", "Saved prompts", "Go to", "Tools", "Bench", "Designs", "Conversations", "Settings"]
     function updates() { Store.checkUpdates(true).then(function (u) {
         if (u && u.available) { Store.updateHidden = false; Store.openSheet("update") }
         else if (u && !u.enabled) Store.toast("Update checks are off", "[updates] check = false or FORM_NO_UPDATE_CHECK=1")
@@ -90,6 +90,9 @@ Item {
                 (e.state === "current" || e.state === "running" ? "" : e.by === "agent" ? "Ask for: " : e.by === "person" ? "" : "Run: ") + e.label, st,
                 function () { if (e.state === "current" && e.by === "engine") Store.openStudy(e); else if (e.state !== "running") Store.runStudy(e.id) })
         })
+        // messages you saved as commands (the bookmark on a message of yours): one key sends it again, with the selection
+        Store.savedPrompts.forEach(function (p, i) { add("Saved prompts", "prompt." + i + "." + p.name, "bookmark", p.name, p.text.length > p.name.length ? "your saved prompt" : "send it again",
+            function () { Store.talkOpen = true; Store.send(Store.scoped(p.text)) }) })
         add("Tools", "new", "plus", "New design", "Describe it, or drop a photo, a sketch, a part or a link", function () { Store.startNew() }, "Ctrl+N")
         add("Tools", "sketch", "pen_tool", "Sketch a new design", "Lines, circles, arcs and dimensions in mm", function () { if (Store.screen !== "home") Store.home(); Store.openSheet("sketch") })
         add("Tools", "replace", "wrench", "Replace a broken part", "From a photo: estimated, measured, designed", function () { if (Store.screen !== "home") Store.home(); Store.openSheet("replace") })
@@ -177,7 +180,7 @@ Item {
             var rec = []
             Store.paletteRecent.forEach(function (id) { for (var k = 0; k < items.length; k++) if (items[k].id === id) { rec.push(Object.assign({}, items[k], { g: "Recent" })); break } })
             rec = rec.slice(0, 4)
-            var per = { "Go to": 6, "Tools": 5, "Designs": 4, "Conversations": 3, "Settings": 2 }, seen = {}
+            var per = { "Saved prompts": 4, "Go to": 6, "Tools": 5, "Designs": 4, "Conversations": 3, "Settings": 2 }, seen = {}
             rec.forEach(function (r) { seen[r.id] = true })
             items = rec.concat(items.filter(function (c) { if (seen[c.id]) return false; per[c.g] = (per[c.g] || 0) - 1; return per[c.g] >= 0 }))
         } else {
@@ -219,15 +222,21 @@ Item {
         id: box
         source: Store.backdrop; radius: Theme.rPane
         width: Math.min(640, parent.width - 80); anchors.horizontalCenter: parent.horizontalCenter; y: Math.max(64, Math.round(parent.height * 0.14))
-        height: 58 + Math.min(list.contentHeight, Math.min(440, parent.height - y - 120)) + 12 + 36
+        height: 58 + Math.min(list.contentHeight, Math.min(460, parent.height - y - 120)) + 12 + 36
         onHeightChanged: place()
         Rectangle { anchors.fill: parent; radius: box.radius; color: Theme.alpha(Theme.plate1, box.blurred ? 0.66 : 0.9) }
         MouseArea { anchors.fill: parent }
         // the prompt: the well the command is typed into, as in the bar under the part
-        Rectangle { x: 8; y: 8; width: parent.width - 16; height: 44; radius: Theme.rPane - 8; color: Theme.glassWell; border.width: 1; border.color: Theme.rule }
+        Rectangle { id: well; x: 8; y: 8; width: parent.width - 16; height: 44; radius: Theme.rPane - 8; color: Theme.glassWell; border.width: 1; border.color: Theme.alpha(Theme.datum, 0.55)
+            Glow { color: Theme.datum; blur: 14; strength: Theme.dark ? 0.22 : 0.12; radius: well.radius } }
+        // where the search looks first: the open design
+        Rectangle { id: ctx; objectName: "paletteScope"; visible: !!Store.project && Store.screen === "work"; anchors.right: well.right; anchors.rightMargin: 10; anchors.verticalCenter: well.verticalCenter
+            width: ctxT.width + 16; height: 22; radius: 6; color: Theme.alpha(Theme.lineBase, Theme.dark ? 0.10 : 0.07)
+            Txt { id: ctxT; anchors.centerIn: parent; kind: "cap"; tone: 2; color: Theme.ink2; wrapMode: Text.NoWrap; elide: Text.ElideRight
+                width: Math.min(implicitWidth, 180); text: Store.project ? Store.project.name : "" } }
         Text { x: 22; y: 7; height: 44; verticalAlignment: Text.AlignVCenter; text: "›"; color: Theme.datum
             font.family: Theme.mono; font.pixelSize: 20; font.weight: Theme.wMedium; renderType: Theme.textRender }
-        Field { id: q; x: 40; y: 14; width: parent.width - 62; height: 32; bare: true; placeholder: "Search commands, designs and conversations"
+        Field { id: q; x: 40; y: 14; width: parent.width - 62 - (ctx.visible ? ctx.width + 8 : 0); height: 32; bare: true; placeholder: "Search commands, designs and conversations"
             onEdited: { pal.sel = 0; list.positionViewAtBeginning(); Qt.callLater(pal.pickBest) }     // once the rows follow the text
             input.font.pixelSize: 15
             input.Keys.onPressed: function (e) {
@@ -246,11 +255,15 @@ Item {
                 required property int index
                 readonly property bool isHead: !!modelData.head
                 readonly property bool on: !isHead && pal.picks[pal.sel] === index
-                width: list.width; height: isHead ? 30 : 36
-                Txt { visible: row.isHead; kind: "cap"; x: 14; y: 13; color: Theme.datum; text: row.modelData.head || "" }
-                Rectangle { visible: !row.isHead; anchors.fill: parent; radius: Theme.rMd; color: row.on ? Theme.glass2 : "transparent" }
-                Icon { visible: !row.isHead; x: 14; name: row.modelData.icon || "dot"; size: 14; anchors.verticalCenter: parent.verticalCenter; color: row.on ? Theme.datum : Theme.ink3 }
-                Txt { visible: !row.isHead; x: 40; anchors.verticalCenter: parent.verticalCenter; textFormat: Text.StyledText; text: row.isHead ? "" : pal.lit(row.modelData.text, row.modelData.at)
+                width: list.width; height: isHead ? 34 : 40
+                Txt { visible: row.isHead; kind: "cap"; x: 14; y: 16; color: Theme.ink3; text: row.modelData.head || "" }
+                // the row the keys are on: a lit plate with a hairline, the brightest thing in the list
+                Rectangle { visible: row.on; anchors.fill: parent; radius: 12; border.width: 1; border.color: Theme.alpha(Theme.lineBase, Theme.dark ? 0.10 : 0.08)
+                    gradient: Gradient { orientation: Gradient.Horizontal
+                        GradientStop { position: 0; color: Theme.alpha(Theme.lineBase, Theme.dark ? 0.16 : 0.09) }
+                        GradientStop { position: 1; color: Theme.alpha(Theme.lineBase, Theme.dark ? 0.09 : 0.05) } } }
+                Icon { visible: !row.isHead; x: 14; name: row.modelData.icon || "dot"; size: 15; anchors.verticalCenter: parent.verticalCenter; color: row.on ? Theme.ink : Theme.ink2 }
+                Txt { visible: !row.isHead; x: 42; anchors.verticalCenter: parent.verticalCenter; textFormat: Text.StyledText; font.weight: Theme.wMedium; text: row.isHead ? "" : pal.lit(row.modelData.text, row.modelData.at)
                     width: Math.min(implicitWidth, parent.width - 40 - 12 - (kb.visible ? kb.width + 10 : 0) - 60); elide: Text.ElideRight; wrapMode: Text.NoWrap; id: lab }
                 Txt { visible: !row.isHead; kind: "fine"; anchors.left: lab.right; anchors.leftMargin: 10; anchors.right: kb.visible ? kb.left : parent.right; anchors.rightMargin: 12
                     anchors.verticalCenter: parent.verticalCenter; elide: Text.ElideMiddle; wrapMode: Text.NoWrap; tone: 3; text: row.modelData.hint || "" }

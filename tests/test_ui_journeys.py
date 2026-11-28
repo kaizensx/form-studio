@@ -101,6 +101,9 @@ class Journeys(unittest.TestCase):
     def test_first_run(self):
         self.journey("first_run.py")
 
+    def test_sources(self):                 # Sources from the tool log, the plan card, the live line, the hand-edit note, a saved prompt
+        self.journey("sources.py")
+
     def test_design(self):
         self.journey("design.py")
 

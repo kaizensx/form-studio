@@ -57,12 +57,39 @@ def _link(href: str, label: str, st: dict) -> str:
     return '<a href="%s"%s>%s</a>' % (_attr(href), colour, label)
 
 
+_NUMBER = re.compile(r"(?<![\w.])(?:\d+\.\d+|\d{3,})(?![\w]|\.\d|-[A-Za-z])")
+_UNIT = re.compile(r"[ \u00a0]?(?:(?:MPa|GPa|kPa|Pa|mm³|cm³|mm²|cm²|mm|cm|kg|g|N·m|Nm|N|Hz|min|s|h)\b|[%°])")
+
+
+def _cited(plain: str, st: dict) -> str:
+    """Plain words → HTML, each number that stands in a source's tool result marked once with that source's index
+    (style["cites"]: [[index, [figures]]], built from the tool log by form/cite.py). Nothing else is marked."""
+    cites = st.get("cites")
+    if not cites:
+        return _esc(plain)
+    done = st.setdefault("_cited", set())
+    out, pos = [], 0
+    for m in _NUMBER.finditer(plain):
+        fig = m.group(0)
+        n = next((c[0] for c in cites if fig in c[1]), None) if fig not in done else None
+        if n is None:
+            continue
+        done.add(fig)
+        unit = _UNIT.match(plain, m.end())
+        end = unit.end() if unit else m.end()
+        out.append(_esc(plain[pos:end]))
+        out.append('<sup><span style="color:%s; font-family:\'%s\'; font-size:11px;">&nbsp;%d</span></sup>' % (st.get("link", "#3ee6ff"), st["mono"], int(n)))
+        pos = end
+    out.append(_esc(plain[pos:]))
+    return "".join(out)
+
+
 def inline(text: str, style: dict | None = None) -> str:
     """One paragraph's text → HTML. Unclosed markers stay as the characters they are."""
     st = style or DEFAULT_STYLE
     out, pos = [], 0
     for m in _INLINE.finditer(text):
-        out.append(_esc(text[pos:m.start()]))
+        out.append(_cited(text[pos:m.start()], st))
         pos = m.end()
         if m.group("esc"):
             out.append(_esc(m.group("esc")[1]))
@@ -89,7 +116,7 @@ def inline(text: str, style: dict | None = None) -> str:
         elif m.group("rev"):
             word = _esc(m.group("rev"))
             out.append(_link("form:rev/%d" % int(m.group("revn")), word, st) if st.get("revs") else word)
-    out.append(_esc(text[pos:]))
+    out.append(_cited(text[pos:], st))
     return "".join(out).replace("\n", " ")
 
 

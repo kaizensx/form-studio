@@ -133,10 +133,21 @@ def main():
             {"type": "image", "source": {}}, {"type": "text", "text": f"Part - r01. Rendered from the kernel tessellation. File: {f}"}]}]}})
     answered = ""
     first = message.splitlines()[0] if message.strip() else ""
-    if re.search(r"\bask\b", first):
+    cited = re.search(r"\bcite\b", first)
+    if cited:
+        for tid, name, inp, res, ok in CITE_LOG:
+            tool(tid, name, inp, res, ok)
+    planned = re.search(r"\bplan\b", first)
+    if planned:
+        tool("p1", "plan_design", {"brief": "b1", "features": ["base", "upright", "gussets"]},
+             {"plan": {"route": "prismatic"}, "route": "prismatic", "steps": PLAN_STEPS})
+    if re.search(r"\bask\b", first) or (planned and "quiet" not in first):
         sys.path.insert(0, str(Path(__file__).resolve().parents[2]))
         from form import ask
-        if "approve" in message:
+        if planned:
+            q = ask.question("Build this plan?", ["Approve", "Skip the plan"], kind="confirm",
+                             why="Four steps; nothing is built until you answer.")
+        elif "approve" in message:
             q = ask.question("Replace the current design with this one?", ["Replace it", "Keep the current one"], kind="confirm",
                              why="The current revision stays in the history either way.")
         elif "words" in message:
@@ -180,6 +191,11 @@ def main():
     out({"type": "stream_event", "event": {"type": "content_block_delta", "delta": {"type": "text_delta", "text": "You said: "}}})
     out({"type": "stream_event", "event": {"type": "content_block_stop"}})
     reply = "You said: " + message.splitlines()[0] + (f"\n\nYou answered: {answered}" if answered else "")
+    if cited:
+        reply += "\n\n" + CITE_REPLY
+    by_hand = re.search(r"^By hand since your last reply.*?(?=\n\n|\Z)", message, re.S | re.M)
+    if by_hand:
+        reply += "\n\nI read: " + " / ".join(x[2:] for x in by_hand.group(0).splitlines() if x.startswith("- "))
     extra += received(message)
     reply += "".join("\n\n" + x for x in extra if x)
     if "outline" in message:
@@ -189,6 +205,32 @@ def main():
     out({"type": "assistant", "message": {"content": [{"type": "text", "text": reply}]}})
     out({"type": "result", "total_cost_usd": session_total(data, sid, 0.25), "num_turns": 2, "session_id": sid})
     return 0
+
+
+def tool(tid: str, name: str, inp: dict, res, ok: bool = True) -> None:
+    """One tool call and its result, as Claude Code's stream reports them."""
+    out({"type": "assistant", "message": {"content": [{"type": "tool_use", "id": tid, "name": "mcp__form__" + name, "input": inp}]}})
+    out({"type": "user", "message": {"content": [{"type": "tool_result", "tool_use_id": tid, "is_error": not ok, "content": [
+        {"type": "text", "text": res if isinstance(res, str) else json.dumps(res)}]}]}})
+
+
+# "cite" in the first line: a turn whose reply rests on tool results (form/cite.py reads the Sources from these).
+# Three are sources, each with the evidence class its result or its tool gives; design_guide names no class and the
+# failed study is no source at all. The reply's numbers 14.2, 19.4 and 276.0 stand in the first two results; 250 in none.
+CITE_LOG = [
+    ("c1", "strength_study", {"project": "p", "load_n": 250},
+     {"study": "Strength, static", "rev": 7, "headline": "Peak stress 14.2 MPa, safety factor 19.4",
+      "evidence": "simulated; linear static, discretisation error 2.8 %"}, True),
+    ("c2", "standard_part", {"action": "describe", "spec": "material:AL-6061-T6"},
+     {"name": "6061-T6 yield, material library", "yield_mpa": 276.0, "evidence": "specified (handbook value)"}, True),
+    ("c3", "read_document", {"path": "/tmp/ab12cd-nema-ics16.pdf", "page": 4}, {"pages": 1, "text": "NEMA ICS 16, frame 17"}, True),
+    ("c4", "design_guide", {"topic": "core"}, {"text": "The contract for a design written as code."}, True),
+    ("c5", "strength_study", {"project": "p", "load_n": 9000}, "Error executing tool strength_study: the mesh did not converge.", False),
+]
+CITE_REPLY = ("Yes. Peak stress is 14.2 MPa at the root fillet, against a yield of 276.0 MPa: a safety factor of 19.4 "
+              "at 250 N.")
+PLAN_STEPS = [{"n": 1, "label": "Base plate with two M5 slots for the rail"}, {"n": 2, "label": "Upright with the NEMA 17 pattern"},
+              {"n": 3, "label": "Two gussets, then a fillet at the root"}, "Check strength at 250 N, then machinability"]
 
 
 STATUE_Q = ("This file is a 3D scan of a statue (807 x 591 x 2211 mm, 554k triangles), not a mechanical part. The automatic "
