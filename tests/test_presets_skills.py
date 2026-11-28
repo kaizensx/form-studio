@@ -14,15 +14,16 @@ SKILLS = sorted((PLUGIN / "skills").glob("*/SKILL.md"))
 
 
 def mcp_tools() -> set[str]:
-    """Tool names registered in form/mcp_server.py: async functions decorated with @mcp.tool."""
-    tree = ast.parse((ROOT / "form" / "mcp_server.py").read_text(encoding="utf-8"))
+    """Tool names registered in form/mcp_server.py and form/fea/tools.py: async functions decorated with @mcp.tool."""
     out = set()
-    for node in ast.walk(tree):
-        if isinstance(node, ast.AsyncFunctionDef):
-            for d in node.decorator_list:
-                f = d.func if isinstance(d, ast.Call) else d
-                if isinstance(f, ast.Attribute) and f.attr == "tool":
-                    out.add(node.name)
+    for rel in ("mcp_server.py", "fea/tools.py"):
+        tree = ast.parse((ROOT / "form" / rel).read_text(encoding="utf-8"))
+        for node in ast.walk(tree):
+            if isinstance(node, ast.AsyncFunctionDef):
+                for d in node.decorator_list:
+                    f = d.func if isinstance(d, ast.Call) else d
+                    if isinstance(f, ast.Attribute) and f.attr == "tool":
+                        out.add(node.name)
     return out
 
 

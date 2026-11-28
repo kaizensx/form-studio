@@ -80,6 +80,9 @@ Rules:
 - One request makes one design. Several files of one product: one design, several parts (reconstruct files=[...],
   create_design relation="part_of"). A second create_design in a conversation says its relation: replaces, part_of,
   alternative or new.
+- "Will it hold?": strength_study with supports and loads on picked faces and a material, then get_strength_study
+  (design_guide(topic="strength")). Quote its evidence class and the lower safety factor. A study that did not converge
+  has no safety factor; stress at a singularity it names is never the part's stress. Stale after any change: run again.
 - Complex designs (mechanisms, organic or styled forms, textures, several parts) are staged: design_brief ->
   design_guide(topic=...), design_examples -> plan_design -> create_design(plan=...) -> look at the sheet -> critique
   -> update_design. The design_guide topics and this server's skills hold each workflow.
@@ -482,7 +485,8 @@ def build() -> MCPServer:
         reference_parts (meshes to rebuild as clean editable CAD: analyze, plan, write, compare, refine),
         hybrid (a construction route per feature: kernel, subd_cage, sculpt_recon or procedural, and when to model a
         cage in Blender with model_mesh), game (purpose "game": budgets, LODs, UVs, bakes, collision and engine
-        presets, built with game_asset).
+        presets, built with game_asset), strength (strength studies: supports and loads on picked faces, reading
+        convergence, singularities and the safety factor).
         They document form.craft, the helper library for lofts, shells, hinges, snaps, gears, organic bodies and
         textures. Then design_examples for a close exemplar, and create_design."""
         from . import design_guide as dg

@@ -71,6 +71,9 @@ Rules:
 - One request makes one design. Several files of one product: one design, several parts (reconstruct files=[...],
   create_design relation="part_of"). A second create_design in a conversation says its relation: replaces, part_of,
   alternative or new.
+- "Will it hold?": strength_study with supports and loads on picked faces and a material, then get_strength_study
+  (design_guide(topic="strength")). Quote its evidence class and the lower safety factor. A study that did not converge
+  has no safety factor; stress at a singularity it names is never the part's stress. Stale after any change: run again.
 - Complex designs (mechanisms, organic or styled forms, textures, several parts) are staged: design_brief ->
   design_guide(topic=...), design_examples -> plan_design -> create_design(plan=...) -> look at the sheet -> critique
   -> update_design. The design_guide topics and this server's skills hold each workflow.
@@ -272,7 +275,8 @@ mechanisms, organic, texture, aesthetics, dfm (design for printing; not applicab
 reference_parts (meshes to rebuild as clean editable CAD: analyze, plan, write, compare, refine),
 hybrid (a construction route per feature: kernel, subd_cage, sculpt_recon or procedural, and when to model a
 cage in Blender with model_mesh), game (purpose "game": budgets, LODs, UVs, bakes, collision and engine
-presets, built with game_asset).
+presets, built with game_asset), strength (strength studies: supports and loads on picked faces, reading
+convergence, singularities and the safety factor).
 They document form.craft, the helper library for lofts, shells, hinges, snaps, gears, organic bodies and
 textures. Then design_examples for a close exemplar, and create_design.
 
@@ -1909,7 +1913,13 @@ Reads the project, never changes it. Every check is computed from the written GL
 Run a strength study on the design: will it hold? Finite elements on the B-rep (quadratic tetrahedra, Netgen
 mesh), refined until the answer stops changing, with the discretisation error stated. kind: "static" (stress,
 displacement, safety factor against the material's yield), "modal" (natural frequencies; no supports = free
-body; loads ignored) or "buckling" (the factor on the loads at which it buckles).
+body; loads ignored), "buckling" (the factor on the loads at which it buckles), "thermal" (steady heat conduction:
+temperatures and the heat through the part) or "thermal_stress" (the stress from that temperature field, with
+any loads; reference_C is the temperature at which the part is stress free).
+thermal: [{"type": "temperature", "faces": [...], "value_C": 80}, {"type": "convection", "faces": [...],
+"h_W_m2K": 10, "ambient_C": 20}, {"type": "heat", "faces": [...], "value_W": 5}, {"type": "heat_flux", "faces":
+[...], "value_W_m2": 2000}]; a face with none is insulated. A heat study needs the material's conductivity
+("k_W_mK"), thermal stress also its expansion ("cte_per_K").
 Faces are picked as points on the part, [x, y, z] in design millimetres, each part as printed (as for
 analyze_selection, which shows the face a point lands on).
 fixtures: [{"type": "fixed" | "roller" | "pin" | "hold", "faces": [[x, y, z], ...]}]. fixed: no movement. roller: slides
@@ -1948,6 +1958,8 @@ Linear elastic, small strain; a printed part is solved solid and isotropic. Need
 | `run_now` | boolean |  |
 | `force` | boolean |  |
 | `remove` | boolean |  |
+| `thermal` | array \| null |  |
+| `reference_C` | number |  |
 
 ### `get_strength_study`
 

@@ -114,6 +114,7 @@ class Space:
         self.X = np.asarray(b.doflocs).T.copy()                  # (N, 3)
         self.dx = np.asarray(b.dx)                               # (nel, nq)
         self.dN = np.stack([np.asarray(b.basis[a][0].grad) for a in range(10)])     # (10, 3, nel, nq)
+        self.Nq = np.stack([np.asarray(b.basis[a][0].value) for a in range(10)])    # (10, nel, nq)
         self.vol = self.dx.sum(axis=1)
         w = np.full(10, 1.0 / 60.0)
         self.bn = Basis(self.sk, el, quadrature=(np.asarray(el.doflocs).T.copy(), w))     # gradients at the 10 nodes
@@ -181,6 +182,39 @@ class Space:
         Nq = np.stack([np.asarray(b4.basis[a][0].value) for a in range(10)])     # (10, nel, nq)
         Me = np.einsum("aeq,beq,eq->eab", Nq, Nq, np.asarray(b4.dx) * rho[:, None], optimize=True)
         return sp_.kron(self._scalar(Me), sp_.identity(3), format="csr")
+
+    def conduction(self, k: np.ndarray) -> sp_.csr_matrix:
+        """Heat conduction matrix (N x N): integral of k grad Na . grad Nb, conductivity per element."""
+        Ke = np.einsum("aieq,bieq,eq->eab", self.dN, self.dN, self.dx * k[:, None], optimize=True)
+        A = self._scalar(Ke)
+        return ((A + A.T) * 0.5).tocsr()
+
+    def surface_load(self, tris: np.ndarray, value: float) -> np.ndarray:
+        """Scalar nodal loads of a density `value` on boundary triangles: integral of value Na over the surface."""
+        f = np.zeros(self.N)
+        if len(tris):
+            nodes, N, w, nJ = self.surface_quad(tris)
+            np.add.at(f, nodes, float(value) * np.einsum("aq,q,nq->na", N, w, np.linalg.norm(nJ, axis=2)))
+        return f
+
+    def surface_mass(self, tris: np.ndarray, coef: float) -> sp_.csr_matrix:
+        """Scalar surface matrix: integral of coef Na Nb over boundary triangles (convection)."""
+        nodes, N, w, nJ = self.surface_quad(tris)
+        Me = float(coef) * np.einsum("aq,bq,q,nq->nab", N, N, w, np.linalg.norm(nJ, axis=2))
+        I = np.repeat(nodes, 6, axis=1).ravel()
+        J = np.tile(nodes, (1, 6)).ravel()
+        A = sp_.coo_matrix((Me.reshape(-1), (I, J)), shape=(self.N, self.N)).tocsr()
+        A.sum_duplicates()
+        return A
+
+    def thermal_load(self, beta: np.ndarray, dT: np.ndarray) -> np.ndarray:
+        """Nodal forces of a temperature change dT (N,) held back by the material: beta = (3 lam + 2 mu) alpha per
+        element. Integral of beta dT div(v)."""
+        dTq = np.einsum("beq,eb->eq", self.Nq, dT[self.edofs.T])
+        fe = np.einsum("aieq,eq->eai", self.dN, self.dx * dTq * beta[:, None], optimize=True)
+        f = np.zeros(self.ndof)
+        np.add.at(f, (3 * self.edofs.T[:, :, None] + np.arange(3)).reshape(-1), fe.reshape(-1))
+        return f
 
     def element_stress_q(self, u: np.ndarray, lam, mu) -> np.ndarray:
         """Stress at the stiffness quadrature points, (nel, nq, 3, 3)."""
@@ -268,20 +302,25 @@ class Space:
         return B
 
     # ---- stress ----------------------------------------------------------------------------------------------------
-    def stress(self, u: np.ndarray, lam: np.ndarray, mu: np.ndarray, dom: np.ndarray | None = None) -> dict:
+    def stress(self, u: np.ndarray, lam: np.ndarray, mu: np.ndarray, dom: np.ndarray | None = None,
+               thermal: np.ndarray | None = None) -> dict:
         """Stress from a displacement field.
 
         "element": (nel, 10, 6) the stress of each element at its own 10 nodes (linear inside an element);
         "nodal": (N, 6) the smoothed stress: the volume-weighted mean over the elements at each node, taken within one
         solid when several are glued (stress jumps where the material changes), then the solid with the highest von
         Mises stress at a shared node; "eta": (nel,) each element's error indicator in the energy norm (the difference
-        between its own stress and the smoothed one; Zienkiewicz and Zhu 1987); "energy": u K u / 2."""
+        between its own stress and the smoothed one; Zienkiewicz and Zhu 1987).
+        thermal: (nel, 10) the stress a held-back temperature change takes off each normal component, (3 lam + 2 mu)
+        alpha dT at each element's nodes (stress = D (strain - thermal strain))."""
         ue = u.reshape(-1, 3)[self.edofs.T]
         H = np.einsum("ajen,eai->enij", self.dNn, ue, optimize=True)           # (nel, 10 nodes, 3, 3)
         e = 0.5 * (H + np.swapaxes(H, 2, 3))
         tr = np.einsum("enii->en", e)
         s = lam[:, None, None, None] * tr[..., None, None] * np.eye(3) + 2 * mu[:, None, None, None] * e
         se = np.stack([s[..., 0, 0], s[..., 1, 1], s[..., 2, 2], s[..., 0, 1], s[..., 1, 2], s[..., 0, 2]], axis=-1)
+        if thermal is not None:
+            se[..., :3] -= thermal[..., None]
         d = self.edofs.T
         doms = [None] if dom is None or dom.max() == dom.min() else list(np.unique(dom))
         nodal = np.zeros((self.N, 6))

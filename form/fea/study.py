@@ -22,7 +22,9 @@ factor.
 
 Supports: "fixed" (no movement), "roller" (free to slide in the face, no movement across it; a symmetry plane),
 "pin" (a cylindrical face: free to turn about its axis, held across and along it), "hold" (no movement along the
-directions given, free in the others). Loads: "force" (newtons, spread
+directions given, free in the others). Thermal conditions (kinds "thermal" and "thermal_stress"): "temperature" (deg
+C), "heat_flux" (W/m2), "heat" (W over the faces), "convection" (h in W/(m2 K) and the ambient temperature); a face
+with none is insulated. Loads: "force" (newtons, spread
 evenly over the faces), "pressure" (MPa, pushing on the face), "preload" (a bolt's clamping force between two face
 sets, a modelled connector), "gravity" (in g, with a direction). A modal study ignores loads; with no supports it is
 a free body.
@@ -40,12 +42,14 @@ import time
 import uuid
 from pathlib import Path
 
-from . import ENGINE, HOW_TO_GET, KIND_LABEL, KINDS, python
+from . import ENGINE, ENGINE_KIND, HOW_TO_GET, KIND_LABEL, KINDS, python
 from . import material as material_mod
 
 KEY_VERSION = 1                 # bump when the engine's method changes a result (form/fea/core.py ENGINE_VERSION too)
 FIXTURES = ("fixed", "roller", "pin", "hold")
 LOADS = ("force", "pressure", "preload", "gravity")
+THERMAL = ("temperature", "heat_flux", "heat", "convection")
+NEED = {"thermal": ("k",), "thermal_stress": ("E", "poisson", "k", "cte")}       # material values a kind cannot run without
 MESH_OPTIONS = {"h0": (0.01, 1e4), "levels_max": (3, 10), "dof_max": (2e4, 4e6), "budget_s": (5, 3600),
                 "tol_disp": (1e-4, 0.2), "tol_stress": (1e-3, 0.3), "tol_freq": (1e-4, 0.2), "tol_buckling": (1e-4, 0.2),
                 "singular_radius": (0.01, 100.0)}
@@ -96,7 +100,7 @@ def clean(body: dict) -> dict:
         raise _err("A study is an object: kind, material, fixtures, loads.")
     kind = str(body.get("kind") or "static").lower()
     if kind not in KINDS:
-        raise _err(f"Unknown study kind “{kind}”.", "Kinds: static, modal, buckling.")
+        raise _err(f"Unknown study kind “{kind}”.", "Kinds: static, modal, buckling, thermal, thermal_stress.")
     out = {"kind": kind, "name": " ".join(str(body.get("name") or "").split())[:80]}
     fixtures = []
     for i, f in enumerate(body.get("fixtures") or []):
@@ -159,6 +163,45 @@ def clean(body: dict) -> dict:
                 raise _err(f"The direction of {what} is zero.")
             g = float(ld.get("g", 1.0))
             loads.append({"type": t, "vector": [g * G0 * x / n for x in d], "g": g})
+    thermal = []
+    for i, c in enumerate(body.get("thermal") or []):
+        t = str((c or {}).get("type") or "").lower()
+        what = f"thermal condition {i + 1}"
+        if t not in THERMAL:
+            raise _err(f"{what.capitalize()}: unknown type “{t}”.", "Types: temperature, heat_flux, heat, convection.")
+        item = {"type": t, "faces": _faces(c.get("faces") or c.get("at"), what)}
+        try:
+            if t == "temperature":
+                item["value"] = float(c.get("value_C", c.get("value")))
+            elif t == "heat_flux":
+                item["value"] = float(c.get("value_W_m2", c.get("value")))
+            elif t == "heat":
+                item["value"] = float(c.get("value_W", c.get("value")))
+            else:
+                item["h"] = float(c.get("h_W_m2K", c.get("h")))
+                item["ambient"] = float(c.get("ambient_C", c.get("ambient")))
+                if item["h"] <= 0:
+                    raise _err(f"The convection coefficient of {what} must be positive.")
+        except (TypeError, ValueError):
+            raise _err(f"{what.capitalize()} ({t}) needs " + {"temperature": "value_C", "heat_flux": "value_W_m2 (W per m2)",
+                                                               "heat": "value_W (watts)", "convection":
+                                                               "h_W_m2K and ambient_C"}[t] + ".") from None
+        thermal.append(item)
+    if kind in ("thermal", "thermal_stress"):
+        if not any(c["type"] in ("temperature", "convection") for c in thermal):
+            raise _err(f"A {KIND_LABEL[kind]} study needs a face held at a temperature, or a face with convection.",
+                       "thermal=[{\"type\": \"temperature\", \"faces\": [[x, y, z]], \"value_C\": 80}, {\"type\": "
+                       "\"convection\", \"faces\": [[x, y, z]], \"h_W_m2K\": 10, \"ambient_C\": 20}]")
+        out["thermal"] = thermal
+        try:
+            out["reference_C"] = float(body.get("reference_C", 20.0))
+        except (TypeError, ValueError):
+            raise _err("reference_C is the temperature at which the part is free of thermal stress, in deg C.") from None
+        if kind == "thermal_stress" and not fixtures:
+            raise _err("A thermal stress study needs supports: at least enough to stop the part moving as a whole.",
+                       "Rollers on three faces that meet at a corner hold a part without stopping it from expanding.")
+    elif thermal:
+        raise _err(f"Thermal conditions belong to a thermal or thermal_stress study, not to a {KIND_LABEL[kind]} one.")
     if kind in ("static", "buckling"):
         if not fixtures:
             raise _err(f"A {KIND_LABEL[kind]} study needs at least one support.",
@@ -166,9 +209,11 @@ def clean(body: dict) -> dict:
         if not loads:
             raise _err(f"A {KIND_LABEL[kind]} study needs at least one load.",
                        "loads=[{\"type\": \"force\", \"faces\": [[x, y, z]], \"vector\": [0, 0, -100]}] (newtons).")
-    out["fixtures"], out["loads"] = fixtures, ([] if kind == "modal" else loads)
+    out["fixtures"], out["loads"] = ([] if kind == "thermal" else fixtures), ([] if kind in ("modal", "thermal") else loads)
     if kind == "modal" and loads:
         out["ignored"] = "Loads are ignored in a modal study (no prestress)."
+    if kind == "thermal" and (loads or fixtures):
+        out["ignored"] = "Supports and loads are ignored in a steady heat study; use thermal_stress for the stress."
     mat = body.get("material")
     out["material"] = mat if isinstance(mat, (str, dict)) and mat else None
     mats = body.get("materials") or {}
@@ -275,7 +320,7 @@ def materials_for(st, p: dict, d: dict, rev: int | None = None) -> dict:
             raise _err(f"No material is set for {who}, and a strength study needs one.",
                        "Give material=\"AL-6061\" (or the values with their source) with the study, or set the "
                        "design's material with set_appearance.")
-        out[pid_] = material_mod.resolve(choice)
+        out[pid_] = material_mod.resolve(choice, NEED.get(d["kind"], material_mod.MECHANICAL))
     return out
 
 
@@ -293,8 +338,11 @@ def _engine_tag(cfg) -> list:
 
 def key(st, p: dict, d: dict, rev: int | None = None) -> str:
     mats = materials_for(st, p, d, rev)
-    numbers = {k: [m["E"], m["nu"], m.get("density"), m.get("yield")] for k, m in mats.items()}
+    numbers = {k: [m["E"], m["nu"], m.get("density"), m.get("yield")] +
+               ([m.get("k"), m.get("cte")] if d["kind"] in NEED else []) for k, m in mats.items()}
     core = {k: d.get(k) for k in ("kind", "fixtures", "loads", "modes", "mesh")}
+    if d["kind"] in NEED:
+        core.update(thermal=d.get("thermal"), reference_C=d.get("reference_C"))
     return H("fea", st.keys(p, rev)["geometry"], core, numbers, _engine_tag(st.cfg))
 
 
@@ -400,9 +448,18 @@ def field_path(st, p: dict, sid: str) -> Path | None:
 # ---- running ---------------------------------------------------------------------------------------------------
 
 def headline(d: dict, r: dict) -> str:
+    if r["kind"] == "thermal":
+        tail = "" if r.get("converged") else " (not converged)"
+        return (f"{r['t_min_C']:.4g} to {r['t_max_C']:.4g} °C; {r['heat_through_W']:.4g} W through the part{tail}")
     if r["kind"] == "static":
         if not r.get("converged"):
             return "not converged: " + (r.get("not_converged_because") or "")
+        if r.get("thermal"):
+            sf = r.get("safety_factor")
+            head = f"safety factor {sf['value']:.2f} (at least {sf['low']:.2f})" if sf else "no safety factor (no yield strength)"
+            return (f"{head}; peak von Mises {r['peak_von_mises_MPa']:.3g} MPa ± "
+                    f"{100 * (r['discretisation_error']['stress'] or 0):.1f} % at {r['thermal']['t_min_C']:.4g} to "
+                    f"{r['thermal']['t_max_C']:.4g} °C, max displacement {r['max_displacement_mm']:.3g} mm")
         err = 100 * (r["discretisation_error"]["stress"] or 0)
         sf = r.get("safety_factor")
         head = f"safety factor {sf['value']:.2f} (at least {sf['low']:.2f})" if sf else "no safety factor (no yield strength)"
@@ -447,7 +504,10 @@ def _engine_spec(d: dict, prep: dict, mats: dict) -> dict:
         if ld["type"] == "preload":
             item["faces_b"] = refs(ld["faces_b"])
         loads.append(item)
-    for group in fixtures + loads:
+    conditions = []
+    for c in d.get("thermal") or []:
+        conditions.append({**{k: v for k, v in c.items() if k != "faces"}, "faces": refs(c["faces"])})
+    for group in fixtures + loads + conditions:
         for k in ("faces", "faces_b"):
             for r in group.get(k) or []:
                 r.pop("_pick", None)
@@ -455,7 +515,10 @@ def _engine_spec(d: dict, prep: dict, mats: dict) -> dict:
     for part in prep["parts"]:
         m = material_mod.engine_material(mats[part["id"]])
         materials.append({**m, "centre": part["centre"], "part": part["id"]})
-    spec = {"kind": d["kind"], "materials": materials, "fixtures": fixtures, "loads": loads, "mesh": dict(d.get("mesh") or {})}
+    spec = {"kind": ENGINE_KIND.get(d["kind"], d["kind"]), "materials": materials, "fixtures": fixtures, "loads": loads,
+            "mesh": dict(d.get("mesh") or {})}
+    if d["kind"] in NEED:
+        spec["thermal"] = {"reference": d.get("reference_C", 20.0), "conditions": conditions}
     if d.get("modes"):
         spec["modes"] = d["modes"]
     return spec
@@ -468,6 +531,8 @@ def _picks(d: dict) -> list:
     for ld in d["loads"]:
         out.extend(ld.get("faces") or [])
         out.extend(ld.get("faces_b") or [])
+    for c in d.get("thermal") or []:
+        out.extend(c["faces"])
     return [{"at": x["at"]} for x in out]
 
 
@@ -581,11 +646,12 @@ def run(st, pid: str, sid: str, force: bool = False, on_progress=None, cancelled
         raise
     out.update({
         "id": sid, "name": d["name"], "key": k, "rev": rev["n"], "ts": time.time(), "wall_seconds": round(time.time() - t0, 2),
-        "definition": {x: d.get(x) for x in ("kind", "fixtures", "loads", "modes", "mesh")},
-        "materials": {pid_ or "design": {x: m.get(x) for x in ("name", "key", "kind", "E", "nu", "density", "yield",
+        "definition": {x: d.get(x) for x in ("kind", "fixtures", "loads", "modes", "mesh", "thermal", "reference_C") if x in d},
+        "materials": {pid_ or "design": {x: m.get(x) for x in ("name", "key", "kind", "E", "nu", "density", "yield", "k", "cte",
                                                                 "strength_basis", "sources", "notes", "knockdown")}
                       for pid_, m in mats.items()},
-        "units": {"E": "MPa", "yield": "MPa", "density": "kg/m3", "length": "mm", "force": "N", "stress": "MPa"},
+        "units": {"E": "MPa", "yield": "MPa", "density": "kg/m3", "length": "mm", "force": "N", "stress": "MPa",
+                  "k": "W/(m K)", "cte": "1/K", "temperature": "deg C", "heat": "W"},
         "faces": [{x: pk.get(x) for x in ("at", "part", "feature", "type", "area", "radius")} for pk in prep["picks"]],
         "frame": "assembled" if prep["assembled"] else "as built",
     })

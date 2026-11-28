@@ -2,7 +2,7 @@
 
 "Will it hold?" answered on a design: pick the faces that are held and the faces that are loaded, and get stress,
 displacement and a safety factor against the material's yield, with the discretisation error stated. The same engine
-gives natural frequencies and the load at which a slender part buckles.
+gives natural frequencies, the load at which a slender part buckles, steady temperatures and thermal stress.
 
 Every result carries its evidence class: `simulated (FEA, linear static, converged to 1.1 %)`. A study that does not
 reach its tolerance reads `simulated (FEA, linear static, not converged)`, says why, and gives no safety factor.
@@ -12,6 +12,9 @@ reach its tolerance reads `simulated (FEA, linear static, not converged)`, says 
 - [Materials](#materials)
 - [How the error is stated](#how-the-error-is-stated)
 - [Singularities](#singularities)
+- [A hand estimate beside the result](#a-hand-estimate-beside-the-result)
+- [Heat and thermal stress](#heat-and-thermal-stress)
+- [Strength as a constraint in a search](#strength-as-a-constraint-in-a-search)
 - [What the model does not cover](#what-the-model-does-not-cover)
 - [Verification](#verification)
 - [Timings](#timings)
@@ -28,6 +31,8 @@ reach its tolerance reads `simulated (FEA, linear static, not converged)`, says 
 | `static` | Stress and displacement under the loads | Safety factor, peak von Mises stress ± error, largest displacement |
 | `modal` | The frequencies the part rings at | Natural frequencies in Hz (a part with no supports is a free body) |
 | `buckling` | When a slender part gives way sideways | The factor on the loads at which the perfect elastic part buckles |
+| `thermal` | How hot it gets and how much heat it carries | Temperature range and the heat through the part |
+| `thermal_stress` | The stress a temperature field causes, with any loads | As `static`, with the temperature range |
 
 The solid is the design's B-rep. Netgen meshes it into tetrahedra, with more elements on fillets and around holes.
 The elements are quadratic (10-node) and isoparametric: the mid-side node of every edge lies on the geometry, so a
@@ -118,11 +123,70 @@ Each one is listed in the result with where it is, why it is singular, how many 
 there at every refinement, so the growth is visible. The fix for a sharp corner is a fillet; with a fillet the
 stress converges and counts.
 
+## A hand estimate beside the result
+
+Where the part reads as a prismatic bar fixed at one end (a cantilever, a strut, a tie rod), a static result carries
+`hand_estimate`: the beam-theory stress at the fixed end and the deflection at the load, from section properties
+measured on the solid. Its evidence class is `computed (closed form: Euler-Bernoulli beam, section properties measured
+on the solid)`, and it shares nothing with the solver.
+
+It applies when the solid is one part, at least three times longer than wide, with the same cross-section along its
+length (four slices agree within 8 %), one fixed end face and forces as loads. For anything else it says why no
+formula fits: `{"applies": false, "why": "not slender: 80 mm long and 60 mm wide"}`. An estimate that does not fit is
+not offered. It leaves out shear deflection and every stress concentration, so a simulated peak well above it points
+to a fillet, a hole or a notch the formula does not know.
+
+## Heat and thermal stress
+
+`thermal` solves steady heat conduction on the same mesh. Conditions sit on picked faces:
+
+| Condition | Unit | Meaning |
+|---|---|---|
+| `temperature` | °C | The face is held at this temperature |
+| `convection` | W/(m² K), °C | Exchange with a fluid at `ambient_C` with coefficient `h_W_m2K` |
+| `heat` | W | Heat entering, spread evenly over the faces |
+| `heat_flux` | W/m² | Heat entering per area |
+
+A face with no condition is insulated, which is also what a symmetry plane is. At least one temperature or convection
+must set the level. The result gives the temperature range with where, the heat through each condition, and the heat
+balance (heat in against heat out), which must close.
+
+`thermal_stress` solves that temperature field first and then the static study with the strain α (T − `reference_C`)
+added: expansion the supports or the part itself hold back becomes stress, expansion that is free does not. Supports
+and loads are as for a static study; the result is a static result with the temperatures beside it.
+
+The material needs its thermal conductivity (`k_W_mK`) for a heat study, and its expansion coefficient (`cte_per_K`)
+as well for thermal stress, each from the library with its source or given with one. Steady state only; conductivity
+and expansion do not vary with temperature; no radiation.
+
+## Strength as a constraint in a search
+
+`optimize` and `make_lighter` take a static study as a constraint:
+
+```bash
+form optimize bracket --vary t:3:10 --minimize solid_mass_g --require "fea.safety_factor>=2"
+form lighter bracket --require "fea.safety_factor>=2"
+```
+
+A solve costs seconds and a search builds dozens of candidates, so the study is not solved on every one. The search
+runs first on what the kernel computes for each candidate. The study is then solved on real candidates, best first,
+and by halving between one that failed and one that passed, within 8 solves and 300 s. The winner is the best
+candidate that was itself solved and met the constraint; `strength.solved` lists every one with its numbers and
+evidence, and a candidate that was not solved is never called feasible. The result says that the search was not
+steered by the strength constraint.
+
+`fea.safety_factor` is the lower value, with the stated error applied. `fea.peak_von_mises_MPa` and
+`fea.max_displacement_mm` are available too. A candidate whose study does not converge, or on which a picked face is
+no longer there, fails the constraint with that reason. With a strength requirement `make_lighter` does not offer
+lower infill or fewer walls: the study is of a solid part.
+
 ## What the model does not cover
 
 - **Linear elastic material.** No yielding, no creep, no fatigue, no impact. A safety factor below 1 means the linear
   model predicts yield; it does not say how the part fails.
 - **Small strain and small displacement.** The load does not change the shape it acts on.
+- **Curved faces are followed by quadratic element sides,** not exactly. Where a curved side would turn an element
+  inside out, the whole mesh falls back to straight sides and the result's `mesh.element` says so.
 - **Isotropic, homogeneous solids.** A printed part's layers and infill are not in the model.
 - **Bonded contact only.** Parts are joined where they touch; sliding, opening and friction are not modelled.
 - **Linear buckling** is the load of the perfect elastic part. A real part, never perfectly straight, buckles
@@ -160,30 +224,43 @@ tolerance it must meet. `tests/test_fea_verification.py` runs the suite; this ta
 | Natural frequencies of a free beam | free-free mode 1: bending, thin direction | Euler-Bernoulli, beta L = 4.7300 | 664.56 Hz | 663.28 Hz | 0.19 % | 2.0 % | PASS |
 |  | free-free mode 2: bending, stiff direction | Euler-Bernoulli, beta L = 4.7300 | 1329.1 Hz | 1317.5 Hz | 0.88 % | 2.0 % | PASS |
 | Euler buckling of a column | buckling load factor | Euler: pi^2 E I/(4 L^2) / P | 10.795 | 10.815 | 0.18 % | 2.0 % | PASS |
+| Heat through a wall with convection | heat through the wall | q = (T1 - Ta) / (L / k + 1 / h), times the area | 38.4 W | 38.4 W | 0.00 % | 0.5 % | PASS |
+|  | temperature of the convective face | Ta + q / h | 68 C | 68 C | 0.00 % | 0.5 % | PASS |
+| Heat through a pipe wall | heat through the wall (a quarter) | 2 pi k L (Ti - To) / ln(ro / ri) | 169.96 W | 169.96 W | 0.00 % | 0.5 % | PASS |
+|  | temperature at mid-wall (span minus the worst node error) | T(r) = Ti - (Ti - To) ln(r / ri) / ln(ro / ri) | 150 K | 149.99 K | 0.01 % | 0.5 % | PASS |
+| Thermal stress in a bar that cannot expand | stress in a bar that cannot expand | E alpha dT | 201.6 MPa | 201.6 MPa | 0.00 % | 0.5 % | PASS |
+|  | sideways growth of the free faces | (1 + nu) alpha dT a | 0.01248 mm | 0.01248 mm | 0.00 % | 0.5 % | PASS |
+| Thermal stress in a thick cylinder | hoop stress at the bore (hot side, compression) | Timoshenko and Goodier, Theory of Elasticity, art. 151: long cylinder, steady radial heat flow | -330.47 MPa | -329.97 MPa | 0.15 % | 2.0 % | PASS |
+|  | hoop stress at the outside (cold side, tension) | the same solution at r = ro | 209.53 MPa | 209.17 MPa | 0.17 % | 2.0 % | PASS |
 | Sharp inside corner (singularity) | the sharp inside corner is named and its stress left out | Williams (1952): the stress at a re-entrant corner is unbounded | yes | yes |  |  | PASS |
 
 | Case | Study | Refinements | Unknowns | Stated error | Converged | Time |
 |---|---|---|---|---|---|---|
-| Cantilever beam, end load | static | 3 | 4,380 | 0.5 % | yes | 0.24 s |
-| Plate with a hole in tension | static | 4 | 43,461 | 0.7 % | yes | 2.89 s |
-| Thick cylinder under internal pressure | static | 3 | 12,345 | 0.3 % | yes | 0.69 s |
-| Cantilever under its own weight | static | 3 | 2,574 | 0.1 % | yes | 0.12 s |
-| Two bonded solids in series | static | 3 | 3,996 | 0.1 % | yes | 0.21 s |
-| Block under a bolt preload | static | 3 | 27,339 | 0.1 % | yes | 1.53 s |
-| NAFEMS LE1: elliptic membrane | static | 4 | 27,453 | 0.6 % | yes | 1.53 s |
-| NAFEMS LE10: thick plate under pressure | static | 4 | 70,632 | 1.9 % | yes | 5.19 s |
-| Natural frequencies of a cantilever | modal | 3 | 3,474 | 0.2 % | yes | 0.18 s |
-| Natural frequencies of a free beam | modal | 3 | 3,474 | 0.1 % | yes | 0.17 s |
-| Euler buckling of a column | buckling | 3 | 5,541 | 0.5 % | yes | 0.24 s |
-| Sharp inside corner (singularity) | static | 5 | 105,135 | 4.5 % | yes | 6.95 s |
+| Cantilever beam, end load | static | 3 | 4,380 | 0.5 % | yes | 0.25 s |
+| Plate with a hole in tension | static | 4 | 43,461 | 0.7 % | yes | 2.7 s |
+| Thick cylinder under internal pressure | static | 3 | 12,345 | 0.3 % | yes | 0.68 s |
+| Cantilever under its own weight | static | 3 | 2,574 | 0.1 % | yes | 0.09 s |
+| Two bonded solids in series | static | 3 | 3,996 | 0.1 % | yes | 0.16 s |
+| Block under a bolt preload | static | 3 | 27,339 | 0.1 % | yes | 1.36 s |
+| NAFEMS LE1: elliptic membrane | static | 4 | 27,453 | 0.6 % | yes | 1.35 s |
+| NAFEMS LE10: thick plate under pressure | static | 4 | 70,632 | 1.9 % | yes | 5.01 s |
+| Natural frequencies of a cantilever | modal | 3 | 3,474 | 0.2 % | yes | 0.16 s |
+| Natural frequencies of a free beam | modal | 3 | 3,474 | 0.1 % | yes | 0.16 s |
+| Euler buckling of a column | buckling | 3 | 5,541 | 0.5 % | yes | 0.22 s |
+| Heat through a wall with convection | thermal | 3 | 15,379 | 0.1 % | yes | 1.23 s |
+| Heat through a pipe wall | thermal | 3 | 3,489 | 0.1 % | yes | 0.18 s |
+| Thermal stress in a bar that cannot expand | static | 3 | 5,418 | 0.1 % | yes | 0.25 s |
+| Thermal stress in a thick cylinder | static | 4 | 32,976 | 0.3 % | yes | 1.89 s |
+| Sharp inside corner (singularity) | static | 5 | 105,135 | 4.5 % | yes | 6.4 s |
 
-22 quantities in 12 cases, all within tolerance; 19.94 s in total. Run on 2026-11-28 with Netgen 6.2.2608, scikit-fem 12.0.2, SciPy 1.18.1, PyAMG 5.4.1 and NumPy 2.5.5.
+30 quantities in 16 cases, all within tolerance; 22.09 s in total. Run on 2026-11-28 with Netgen 6.2.2608, scikit-fem 12.0.2, SciPy 1.18.1, PyAMG 5.4.1 and NumPy 2.5.5.
 <!-- verification:end -->
 
 The cases:
 
 - **Cantilever beam.** 100 × 10 × 10 mm, 100 N at the free end, ν = 0. Deflection against Timoshenko's beam with
-  shear (κ = 10(1 + ν)/(12 + 11ν)) and against Euler-Bernoulli; bending stress against M c / I.
+  shear (κ = 10(1 + ν)/(12 + 11ν)) and against Euler-Bernoulli; bending stress against M c / I. The hand estimate
+  is checked here too: it must give the root stress and the tip deflection of beam theory.
 - **Plate with a hole.** A 200 × 100 × 2 mm strip with a 20 mm hole in 100 MPa tension, one eighth by symmetry,
   solved to a stress tolerance of 2 %.
   Howland's solution for a finite width as fitted by Heywood (Peterson's Stress Concentration Factors, chart 4.1):
@@ -203,6 +280,14 @@ The cases:
 - **Natural frequencies.** A clamped-free and a free-free steel beam against Euler-Bernoulli,
   f = (βL)² / (2π L²) · √(E I / ρ A) with βL = 1.8751, 4.6941 and 4.7300 (Blevins, table 8-1).
 - **Euler column.** A clamped-free column, P = π² E I / (4 L²).
+- **Heat through a wall.** A 20 mm wall held at 100 °C with convection on the other side: q = (T1 − Ta) / (L/k + 1/h)
+  and the temperature of the convective face.
+- **Heat through a pipe wall.** Radial conduction, Q = 2π k L (Ti − To) / ln(ro/ri), and the logarithmic temperature
+  profile at mid-wall.
+- **Thermal stress in a held bar.** A bar that cannot grow along its length, heated by 80 K: σ = E α ΔT, and the
+  sideways growth (1 + ν) α ΔT.
+- **Thermal stress in a thick cylinder.** 200 °C inside and 50 °C outside, plane strain: the hoop stress at the bore
+  and at the outside (Timoshenko and Goodier, Theory of Elasticity, art. 151).
 - **Sharp inside corner.** An L-bracket without a fillet: the study must name the corner, show its stress growing with
   refinement, and report a peak that leaves it out.
 
@@ -221,9 +306,9 @@ three 6 mm holes, fixed at the two base holes and loaded at the hole of the upri
 <!-- timings:begin -->
 | Study | Time | Unknowns | Tetrahedra | Refinements | Evidence | Result |
 |---|---|---|---|---|---|---|
-| static | 8.9 s | 106,110 | 22,470 | 3 | simulated (FEA, linear static, converged to 1.8 %) | peak von Mises 50.4 MPa, safety factor 5.48 |
-| modal | 9.3 s | 71,583 | 13,103 | 3 | simulated (FEA, modal, converged to 0.5 %) | first frequencies 925, 1357, 3154 Hz |
-| buckling | 10.5 s | 71,583 | 13,103 | 3 | simulated (FEA, linear buckling, converged to 0.4 %) | load factor 151.6 |
+| static | 8.5 s | 106,110 | 22,470 | 3 | simulated (FEA, linear static, converged to 1.8 %) | peak von Mises 50.4 MPa, safety factor 5.48 |
+| modal | 8.6 s | 71,583 | 13,103 | 3 | simulated (FEA, modal, converged to 0.5 %) | first frequencies 925, 1357, 3154 Hz |
+| buckling | 9.7 s | 71,583 | 13,103 | 3 | simulated (FEA, linear buckling, converged to 0.4 %) | load factor 151.6 |
 
 Machine: arm64, Darwin 27.3.0, 18 cores. The time is the whole study in the engine: every mesh, every solve, the stress recovery and the field data.
 <!-- timings:end -->
@@ -239,18 +324,20 @@ Two MCP tools, and the same from the terminal with JSON output.
 
 | MCP tool | Command | Does |
 |---|---|---|
-| `strength_study` | `form strength static\|modal\|buckling <project> ...` | Defines a study and runs it. With no definition: the design's studies and their states |
+| `strength_study` | `form strength static\|modal\|buckling\|thermal\|thermal_stress <project> ...` | Defines a study and runs it. With no definition: the design's studies and their states |
 | `strength_study(study=...)` | `form strength run <project> <study>` | Runs a saved study again |
 | `get_strength_study` | `form strength show <project> <study>` | State, progress, the result, the field file; `cancel=True` stops a running study |
 | | `form strength list <project>` | The design's studies with their states |
 | | `form strength verify` | The verification suite |
 
-`form study strength ...`, `form study static ...`, `form study modal ...` and `form study buckling ...` are the same
-commands.
+`form study strength ...`, `form study static ...`, `form study modal ...`, `form study buckling ...` and
+`form study thermal ...` are the same commands.
 
 ```bash
 form strength static bracket --fix 33,20,3 --fix 65,20,3 --force 3,20,45:300,0,-200 --material AL-6061
 form strength modal bracket --fix 33,20,3 --modes 4 --material AL-6061
+form strength thermal heatsink --temperature 0,0,0:80 --convection 20,5,30:15:25 \
+     --material '{"k_W_mK": 167, "source": "6061-T6 datasheet"}'
 form strength buckling column --fix 5,5,0 --force 5,5,200:0,0,-1000 \
      --material '{"E_GPa": 210, "poisson": 0.3, "yield_MPa": 355, "density_kg_m3": 7850, "source": "EN 10025-2"}'
 ```
@@ -266,8 +353,9 @@ The command exits 0 with a converged result, 3 when the study ran and did not co
 What a result holds: `headline`, `evidence`, `how_known`, `converged` (and `not_converged_because`),
 `safety_factor` (`value`, `low`, `against`, `strength_source`, `at`), `peak_von_mises_MPa` and `peak_at`,
 `max_displacement_mm`, `discretisation_error`, `singularities`, `equilibrium`, `convergence.levels`, `mesh`,
-`materials` (every number with its source), `assumptions`, `faces` (what each picked point landed on), and for the
-other kinds `frequencies_Hz`, `modes`, `load_factor` and `meaning`.
+`materials` (every number with its source), `assumptions`, `faces` (what each picked point landed on),
+`hand_estimate`, and for the other kinds `frequencies_Hz`, `modes`, `load_factor` and `meaning`, or `t_min_C`,
+`t_max_C`, `heat_through_W`, `conditions` and `heat_balance`.
 
 ## Stored results and staleness
 
@@ -308,6 +396,8 @@ For the viewport: the outside surface of the finest mesh with per-vertex results
 - `safety_factor`: strength over von Mises stress at that vertex; absent when no strength is sourced.
 - `singular`: 1 where the vertex lies in a singular zone that was left out of the verdict. Draw these differently:
   their stress is not a result.
+- A heat study has `temperature` (°C) and `heat_flux` (W/m²); a thermal stress study adds `temperature` to the
+  static fields.
 - A modal or buckling study has `modes` instead: `count` shapes of 3 components per vertex, each scaled so its largest
   component is 1, with `mode_frequencies_Hz` or `mode_load_factors`.
 - `frame` is `as built` for one solid and `assembled` for a design of several parts.
@@ -317,7 +407,7 @@ About 90 bytes per vertex; a bracket's field is 0.2 to 0.5 MB.
 ## The engine and its licences
 
 The solver libraries are an optional engine with a Python of its own, installed from Settings, Engines & software
-with one click (about 135 MB). Form Studio itself stays importable and MIT without them; the solver runs out of
+with one click (about 190 MB, measured on macOS arm64). Form Studio itself stays importable and MIT without them; the solver runs out of
 process.
 
 | Library | Version | Role | Licence |
@@ -331,7 +421,8 @@ process.
 
 The LGPL libraries are used as unmodified wheels in a separate environment. Gmsh and CalculiX (both GPL) are not used.
 
-How it solves: element matrices are assembled from the shape-function gradients; one load case is solved by conjugate
+How it solves: the elements are isoparametric (scikit-fem's quadratic tetrahedron on a quadratic mesh), integrated
+with a 14-point rule; element matrices are assembled from the shape-function gradients; one load case is solved by conjugate
 gradients preconditioned with smoothed-aggregation multigrid, using the six rigid-body modes as its near-null space
 (a sparse direct factorisation below 15,000 unknowns); frequencies and buckling factors come from shift-invert
 Lanczos on a factorisation made once.

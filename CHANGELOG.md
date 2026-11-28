@@ -20,21 +20,39 @@
   density from the materials library, each with its document, or from values given with the study and their source.
   Nothing is defaulted: a missing modulus stops the study, a missing yield strength means no safety factor. A
   printed filament is solved solid and isotropic, judged against its weakest sourced strength, and says so.
-- **A verification suite, published.** Ten textbook cases with 18 quantities, each with its reference and tolerance:
+- **A verification suite, published.** Textbook and published cases, each quantity with its reference and tolerance:
   a cantilever against Timoshenko and Euler-Bernoulli, a plate with a hole against Peterson's chart, Lamé's thick
   cylinder, self weight, two bonded solids, a bolt preload, the frequencies of a clamped and a free beam, Euler's
   column, and a sharp corner that must be named. [docs/STRENGTH.md](docs/STRENGTH.md) has the table;
   `form strength verify` runs it.
 - **Headless and in the background.** `strength_study` and `get_strength_study` over MCP, and `form strength
-  static|modal|buckling|run|list|show|verify` (also as `form study strength ...`) with JSON output. A study runs
+  static|modal|buckling|thermal|thermal_stress|run|list|show|verify` (also as `form study strength ...`) with JSON
+  output. A study runs
   as a job with progress and cancel. Its result is stored beside the revision under a key of the geometry, the
   loads, the material's numbers and the engine, so it goes stale after any change and says which revision it
-  describes. A typical bracket converges in about 25 s.
+  describes. A typical bracket converges in about 10 s.
 - **Field data for the viewport.** Each result has a compact surface field: per-vertex displacement, von Mises
   stress, safety factor and a mask of the singular zones; mode shapes for modal and buckling studies.
+- **Curved elements.** The quadratic tetrahedra are isoparametric: every mid-side node lies on the geometry, so a
+  fillet or a bore is a curved surface in the model. Lamé's cylinder comes out within 0.1 %, and the bracket's fillet
+  stress settles in three refinements.
+- **NAFEMS LE1 and LE10** are in the verification suite with their published targets (92.7 MPa and −5.38 MPa).
+- **A hand estimate beside the result.** Where a part reads as a bar fixed at one end, a static result carries the
+  beam-theory stress and deflection from section properties measured on the solid (evidence: computed, closed
+  form). Any other shape says why no formula fits.
+- **Strength as a constraint in a search.** `optimize` and `make_lighter` take `fea.safety_factor >= 2` (the lower
+  value, with the stated error applied). The study is solved on real candidates, best first, within 8 solves and
+  300 s; only candidates that were solved and passed count, and the result lists each one.
+- **Heat and thermal stress.** `thermal` studies solve steady conduction with temperature, convection, heat and
+  heat-flux conditions on picked faces, and report the temperature range, the heat through each condition and the
+  heat balance. `thermal_stress` adds the expansion of that temperature field to a static study. Checked against a
+  wall with convection, a pipe wall, a held bar and Timoshenko's thick cylinder.
+- **A `hold` support** stops single directions of a face, and a support along a line is named as singular.
+- **Guidance for agents.** A `strength-studies` skill and `design_guide(topic="strength")`: loads on picked faces,
+  sourced materials, reading convergence, and never quoting the stress at a singularity.
 - **The solver is an optional engine.** "Strength studies (FEA)" in Settings, Engines & software installs Netgen
   (LGPL-2.1, unmodified wheels), scikit-fem and SciPy (BSD-3-Clause) and PyAMG (MIT) into a Python of their own,
-  about 135 MB. Without it a study computes nothing and says how to get it.
+  about 190 MB. Without it a study computes nothing and says how to get it.
 
 ## 1.1.0
 

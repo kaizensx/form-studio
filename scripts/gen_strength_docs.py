@@ -52,7 +52,7 @@ def table(rep: dict) -> str:
                        f"{fmt(r['got'])}{unit} | {err} | {tol} | {'PASS' if r['pass'] else 'FAIL'} |")
     out += ["", "| Case | Study | Refinements | Unknowns | Stated error | Converged | Time |", "|---|---|---|---|---|---|---|"]
     for c in rep["cases"]:
-        key = {"static": "stress", "modal": "frequency", "buckling": "load_factor"}[c["kind"]]
+        key = {"static": "stress", "modal": "frequency", "buckling": "load_factor", "thermal": "temperature"}[c["kind"]]
         stated = (c.get("stated_error") or {}).get(key)
         out.append(f"| {c['title']} | {c['kind']} | {c['levels']} | {c['unknowns']:,} | "
                    f"{'' if stated is None else f'{max(100 * stated, 0.1):.1f} %'} | {'yes' if c['converged'] else 'no'} | {c['seconds']} s |")

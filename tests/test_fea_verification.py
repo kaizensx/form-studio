@@ -21,7 +21,8 @@ from form import config, fea  # noqa: E402
 ENGINE = fea.python(config.load())
 CASES = ("cantilever", "plate_with_hole", "thick_cylinder", "self_weight", "bonded_bar", "preload_block",
          "nafems_le1", "nafems_le10",
-         "modal_cantilever", "modal_free", "euler_column", "sharp_corner")
+         "modal_cantilever", "modal_free", "euler_column", "thermal_slab", "thermal_cylinder", "thermal_stress_bar",
+         "thermal_stress_cylinder", "sharp_corner")
 
 
 def engine(*args, timeout=900):
@@ -50,8 +51,8 @@ class Verification(unittest.TestCase):
         self.assertEqual(self.proc.returncode, 0)
 
     def test_every_case_converged_with_an_error_statement(self):
-        key = {"static": "stress", "modal": "frequency", "buckling": "load_factor"}
-        tol = {"static": 0.05, "modal": 0.01, "buckling": 0.02}
+        key = {"static": "stress", "modal": "frequency", "buckling": "load_factor", "thermal": "temperature"}
+        tol = {"static": 0.05, "modal": 0.01, "buckling": 0.02, "thermal": 0.01}
         for c in self.rep["cases"]:
             with self.subTest(case=c["case"]):
                 self.assertTrue(c["converged"], c.get("not_converged_because"))

@@ -484,8 +484,11 @@ answer stops changing. The full method and the verification table are in [STRENG
 | Linear static | Safety factor against the material's yield, peak von Mises stress ± its error, largest displacement |
 | Modal | Natural frequencies and mode shapes, held or as a free body |
 | Linear buckling | The factor on the loads at which the perfect elastic part buckles |
+| Steady heat | Temperature range, the heat through each condition, the heat balance |
+| Thermal stress | The static result of a temperature field, with any loads |
 
-- **Supports and loads on picked faces:** fixed, roller and pin; force, pressure, a bolt's preload and gravity. A
+- **Supports and loads on picked faces:** fixed, roller, pin and hold; force, pressure, a bolt's preload and gravity;
+  temperature, convection and heat for thermal studies. A
   design of several parts is solved assembled, bonded where the parts touch, with a material for each.
 - **Evidence:** `simulated (FEA, linear static, converged to 1.1 %)`. The convergence of every refinement is kept,
   the reactions are balanced against the loads, and a study that does not converge says so and gives no safety
@@ -494,13 +497,18 @@ answer stops changing. The full method and the verification table are in [STRENG
   growing, is listed with its location and growth and left out of the verdict.
 - **Sourced materials.** Young's modulus, Poisson's ratio, yield and density come with their documents; nothing is
   defaulted.
-- **Verified.** Ten textbook cases, 18 quantities, each within its tolerance: beams, a plate with a hole, a thick
-  cylinder, frequencies, Euler buckling.
+- **Verified.** Sixteen cases, each quantity within its tolerance: beams, a plate with a hole, a thick cylinder,
+  NAFEMS LE1 and LE10, frequencies, Euler buckling, heat through a wall and a pipe, thermal stress.
+- **Curved elements.** Mid-side nodes lie on the geometry, so fillets and bores are curved in the model.
+- **A hand estimate** from beam theory sits beside the result where the part is a bar fixed at one end.
+- **As a constraint:** `optimize` and `make_lighter` keep `fea.safety_factor >= 2` on candidates they solve, and say
+  which ones those were.
 - **Stored with the revision.** A result goes stale after any change to the geometry, the loads, the material or
   the engine, and says which revision it describes.
-- **Headless:** `strength_study`, `get_strength_study`; `form strength static|modal|buckling|run|list|show|verify`.
-  Runs in the background with progress and cancel; a typical bracket converges in about 25 s.
-- **Optional engine:** Netgen, scikit-fem, SciPy and PyAMG in a Python of their own (about 135 MB), installed from
+- **Headless:** `strength_study`, `get_strength_study`; `form strength
+  static|modal|buckling|thermal|thermal_stress|run|list|show|verify`. Runs in the background with progress and
+  cancel; a typical bracket converges in about 10 s.
+- **Optional engine:** Netgen, scikit-fem, SciPy and PyAMG in a Python of their own (about 190 MB), installed from
   Settings.
 
 ## Analysis, measurement and annotations

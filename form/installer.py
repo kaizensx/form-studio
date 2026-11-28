@@ -888,7 +888,7 @@ REGISTRY: list[Software] = [
              "Optional: the solver for strength, modal and buckling studies. Netgen meshes the solid, scikit-fem, "
              "SciPy and PyAMG solve it. Runs in its own Python, out of the app.",
              "optional", "engine", _d_fea, _m_fea,
-             size="about 135 MB (its own Python 3.12 with Netgen, scikit-fem, SciPy, PyAMG and NumPy)",
+             size="about 190 MB (its own Python 3.12 with Netgen, scikit-fem, SciPy, PyAMG and NumPy)",
              homepage="https://ngsolve.org", licence="LGPL-2.1 (Netgen), BSD-3-Clause (scikit-fem, SciPy, NumPy), MIT (PyAMG)",
              licence_url="https://github.com/NGSolve/netgen/blob/master/LICENSE",
              about="Answers “will it hold?” on a design: pick the faces that are held and the faces that are loaded, "

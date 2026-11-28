@@ -3,6 +3,8 @@
     form strength static <project> --fix X,Y,Z --force X,Y,Z:FX,FY,FZ [--material AL-6061]
     form strength modal <project> [--fix X,Y,Z] [--modes 6] [--material KEY]
     form strength buckling <project> --fix X,Y,Z --force X,Y,Z:FX,FY,FZ
+    form strength thermal <project> --temperature X,Y,Z:80 --convection X,Y,Z:10:20      steady heat
+    form strength thermal_stress <project> --roller X,Y,Z ... --temperature X,Y,Z:80 [--reference 20]
     form strength run <project> <study> [--again]      solve a saved study (again after a change)
     form strength list <project>                        the design's studies with their states
     form strength show <project> <study> [--full] [--field]
@@ -15,7 +17,11 @@ A face is a point on it, X,Y,Z in design millimetres (each part as printed). Opt
     --force X,Y,Z:FX,FY,FZ       newtons on that face     --pressure X,Y,Z:MPa
     --preload X,Y,Z:X,Y,Z:N      a bolt's clamping force between two faces
     --gravity [G[:DX,DY,DZ]]     1 g downwards (-Z) by default
-    --material KEY | JSON        a materials-library key, or {"E_GPa", "poisson", "yield_MPa", "density_kg_m3", "source"}
+    --temperature X,Y,Z:C        a face held at a temperature     --convection X,Y,Z:H:AMBIENT   W/(m2 K), deg C
+    --heat X,Y,Z:W               watts into a face                --heat-flux X,Y,Z:W_M2
+    --reference C                the stress-free temperature of a thermal_stress study (20)
+    --material KEY | JSON        a materials-library key, or {"E_GPa", "poisson", "yield_MPa", "density_kg_m3",
+                                 "k_W_mK", "cte_per_K", "source"}
     --mesh JSON          {"h0", "levels_max", "dof_max", "budget_s", "tol_stress", "tol_disp", "singular_radius"}
     --name NAME   --study ID (replace that study)   --no-run (save only)   --again (solve even if current)   --full
 
@@ -28,7 +34,7 @@ import json
 import subprocess
 import sys
 
-KINDS = ("static", "modal", "buckling")
+KINDS = ("static", "modal", "buckling", "thermal", "thermal_stress")
 
 
 def _out(d) -> None:
@@ -47,7 +53,7 @@ def _pt(text: str, what: str) -> list:
 
 def parse(kind: str, args: list) -> tuple[dict, dict]:
     """(definition, options) from the command line. Raises ValueError with a sentence."""
-    body = {"kind": kind, "fixtures": [], "loads": [], "material": None, "mesh": {}, "name": ""}
+    body = {"kind": kind, "fixtures": [], "loads": [], "material": None, "mesh": {}, "name": "", "thermal": []}
     opt = {"study": "", "run": True, "again": False, "full": False}
     i = 0
 
@@ -81,6 +87,21 @@ def parse(kind: str, args: list) -> tuple[dict, dict]:
                 g = float(gs)
                 d = _pt(ds, "The direction of gravity") if ds else d
             body["loads"].append({"type": "gravity", "g": g, "direction": d})
+        elif a == "--temperature":
+            f, _, v = val(a).partition(":")
+            body["thermal"].append({"type": "temperature", "faces": [_pt(f, "The face of --temperature")], "value_C": float(v)})
+        elif a == "--convection":
+            parts = val(a).split(":")
+            if len(parts) != 3:
+                raise ValueError("--convection is X,Y,Z:H:AMBIENT (W/(m2 K) and deg C).")
+            body["thermal"].append({"type": "convection", "faces": [_pt(parts[0], "The face of --convection")],
+                                    "h_W_m2K": float(parts[1]), "ambient_C": float(parts[2])})
+        elif a in ("--heat", "--heat-flux"):
+            f, _, v = val(a).partition(":")
+            body["thermal"].append({"type": "heat" if a == "--heat" else "heat_flux", "faces": [_pt(f, f"The face of {a}")],
+                                    "value": float(v)})
+        elif a == "--reference":
+            body["reference_C"] = float(val(a))
         elif a == "--material":
             m = val(a)
             body["material"] = json.loads(m) if m.strip().startswith("{") else m

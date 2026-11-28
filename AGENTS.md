@@ -67,7 +67,7 @@ To write a new built-in one, see `docs/RECIPES.md`.
 Form Studio's design and print-engineering practice is written as skills in `plugins/form/skills/<name>/SKILL.md`
 (intake, parametric-design, industrial-design, design-review, explore-variants, fdm-engineering, fit-calibration,
 hardware-integration, assemblies-and-mechanisms, modular-storage, verify-print, print-feedback, release, cad-core,
-staged-design, surfacing-organic, texture, remodel-from-mesh, game-asset). Each says when to use it and which MCP tools
+staged-design, surfacing-organic, texture, remodel-from-mesh, game-asset, strength-studies). Each says when to use it and which MCP tools
 to call; longer texts sit in its `references/`. Claude Code installs them as a plugin (`claude plugin marketplace add
 kaizensx/form-studio`, then `claude plugin install form@form-studio`); other agents: read the matching `SKILL.md`
 before that kind of task.

@@ -48,9 +48,11 @@ DFM = _g.topic_text("dfm")
 REFERENCE_PARTS = _g.topic_text("reference_parts")
 HYBRID = _g.topic_text("hybrid")
 GAME = _g.topic_text("game")
+STRENGTH = _g.topic_text("strength")
 
 TOPICS = {"core": None, "surfacing": SURFACING, "mechanisms": MECHANISMS, "organic": ORGANIC, "texture": TEXTURE,
-          "aesthetics": AESTHETICS, "dfm": DFM, "reference_parts": REFERENCE_PARTS, "hybrid": HYBRID, "game": GAME}
+          "aesthetics": AESTHETICS, "dfm": DFM, "reference_parts": REFERENCE_PARTS, "hybrid": HYBRID, "game": GAME,
+          "strength": STRENGTH}
 
 
 def game_available() -> bool:

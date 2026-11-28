@@ -20,6 +20,9 @@ The reference formulas and where they are from:
   beta L = 1.8751, 4.6941 (clamped-free) and 4.7300 (free-free); Blevins, Formulas for Natural Frequency and Mode
   Shape, table 8-1.
 * Euler buckling of a clamped-free column: P = pi^2 E I / (4 L^2).
+* Steady conduction through a plane wall with a convective side, and through a cylinder wall: Incropera and DeWitt,
+  Fundamentals of Heat and Mass Transfer, chapter 3. Thermal stress in a long thick cylinder with steady radial heat
+  flow: Timoshenko and Goodier, Theory of Elasticity, art. 151.
 * NAFEMS LE1 and LE10: The Standard NAFEMS Benchmarks, NAFEMS (1990), linear elastic tests 1 and 10; the target
   values are the published ones (92.7 MPa and -5.38 MPa for the direct stress yy at point D).
 """
@@ -300,6 +303,103 @@ def nafems_le10():
     return shape, spec, check
 
 
+def thermal_slab():
+    """A wall 20 mm thick, k = 15 W/(m K): 100 C on one side, convection h = 500 W/(m2 K) to 20 C on the other."""
+    from netgen.occ import Box, Pnt
+    L, a, k, h, T1, Ta = 20.0, 40.0, 15.0, 500.0, 100.0, 20.0
+    shape = Box(Pnt(0, 0, 0), Pnt(L, a, a))
+    spec = {"kind": "thermal", "materials": [{"name": "stainless (verification)", "k": k}],
+            "thermal": {"conditions": [{"type": "temperature", "faces": [_face((0, 20, 20))], "value": T1},
+                                       {"type": "convection", "faces": [_face((L, 20, 20))], "h": h, "ambient": Ta}]}}
+
+    def check(res, keep):
+        q = (T1 - Ta) / (L * 1e-3 / k + 1 / h)                  # W/m2
+        X = keep["model"].sp.X
+        return [_row("heat through the wall", q * (a * 1e-3) ** 2, res["heat_through_W"], 0.005, "W",
+                     "q = (T1 - Ta) / (L / k + 1 / h), times the area"),
+                _row("temperature of the convective face", Ta + q / h, float(keep["T"][X[:, 0] > L - 1e-6].mean()), 0.005, "C",
+                     "Ta + q / h")]
+    return shape, spec, check
+
+
+def thermal_cylinder():
+    """A pipe wall, inner radius 20, outer 40 mm, k = 50 W/(m K): 200 C inside, 50 C outside; a quarter, 10 mm long."""
+    from netgen.occ import Box, Cylinder, Pnt, Z
+    ri, ro, Lz, k, Ti, To = 20.0, 40.0, 10.0, 50.0, 200.0, 50.0
+    shape = (Cylinder(Pnt(0, 0, 0), Z, r=ro, h=Lz) - Cylinder(Pnt(0, 0, -1), Z, r=ri, h=Lz + 2)) * Box(Pnt(0, 0, 0), Pnt(50, 50, Lz))
+    c = math.cos(math.pi / 4)
+    spec = {"kind": "thermal", "materials": [{"name": "steel (verification)", "k": k}],
+            "thermal": {"conditions": [{"type": "temperature", "faces": [_face((ri * c, ri * c, 5))], "value": Ti},
+                                       {"type": "temperature", "faces": [_face((ro * c, ro * c, 5))], "value": To}]}}
+
+    def check(res, keep):
+        Q = 2 * math.pi * k * (Lz * 1e-3) * (Ti - To) / math.log(ro / ri) / 4          # the quarter
+        X = keep["model"].sp.X
+        r = np.hypot(X[:, 0], X[:, 1])
+        mid = np.abs(r - 30.0) < 0.75
+        exact = Ti - (Ti - To) * np.log(r[mid] / ri) / math.log(ro / ri)
+        worst = float(np.abs(keep["T"][mid] - exact).max())
+        return [_row("heat through the wall (a quarter)", Q, res["heat_through_W"], 0.005, "W", "2 pi k L (Ti - To) / ln(ro / ri)"),
+                _row("temperature at mid-wall (span minus the worst node error)", Ti - To, Ti - To - worst, 0.005, "K",
+                     "T(r) = Ti - (Ti - To) ln(r / ri) / ln(ro / ri)")]
+    return shape, spec, check
+
+
+def thermal_stress_bar():
+    """A steel bar held between two walls (rollers on both ends and two sides), heated by 80 K: it cannot grow along
+    its length. alpha = 12e-6 1/K."""
+    from netgen.occ import Box, Pnt
+    L, a, dT, al = 100.0, 10.0, 80.0, 12e-6
+    shape = Box(Pnt(0, 0, 0), Pnt(L, a, a))
+    spec = {"kind": "static", "materials": _mat(k=50.0, cte=al, **{"yield": 400.0}),
+            "fixtures": [{"type": "roller", "faces": [_face((0, 5, 5))]}, {"type": "roller", "faces": [_face((L, 5, 5))]},
+                         {"type": "roller", "faces": [_face((50, 0, 5))]}, {"type": "roller", "faces": [_face((50, 5, 0))]}],
+            "loads": [],
+            "thermal": {"reference": 20.0, "conditions": [{"type": "temperature", "faces": [_face((0, 5, 5))], "value": 20.0 + dT}]}}
+
+    def check(res, keep):
+        E, nu = STEEL["E"], STEEL["nu"]
+        top = float(keep["u"][keep["model"].sp.X[:, 1] > a - 1e-6][:, 1].mean())
+        return [_row("stress in a bar that cannot expand", E * al * dT, res["peak_von_mises_MPa"], 0.005, "MPa", "E alpha dT"),
+                _row("sideways growth of the free faces", (1 + nu) * al * dT * a, top, 0.005, "mm", "(1 + nu) alpha dT a")]
+    return shape, spec, check
+
+
+def thermal_stress_cylinder():
+    """The thick cylinder (20 / 40 mm) with 200 C inside and 50 C outside, plane strain: the hoop stress at the bore
+    and at the outside from the radial temperature gradient. alpha = 12e-6 1/K."""
+    from netgen.occ import Box, Cylinder, Pnt, Z
+    ri, ro, Lz, Ti, To, al = 20.0, 40.0, 10.0, 200.0, 50.0, 12e-6
+    shape = (Cylinder(Pnt(0, 0, 0), Z, r=ro, h=Lz) - Cylinder(Pnt(0, 0, -1), Z, r=ri, h=Lz + 2)) * Box(Pnt(0, 0, 0), Pnt(50, 50, Lz))
+    c = math.cos(math.pi / 4)
+    spec = {"kind": "static", "materials": _mat(k=50.0, cte=al, **{"yield": 800.0}), "mesh": {"tol_stress": 0.02},
+            "fixtures": [{"type": "roller", "faces": [_face((0, 30, 5))]}, {"type": "roller", "faces": [_face((30, 0, 5))]},
+                         {"type": "roller", "faces": [_face((30 * c, 30 * c, 0))]},
+                         {"type": "roller", "faces": [_face((30 * c, 30 * c, Lz))]}],
+            "loads": [],
+            "thermal": {"reference": 50.0, "conditions": [{"type": "temperature", "faces": [_face((ri * c, ri * c, 5))], "value": Ti},
+                                                          {"type": "temperature", "faces": [_face((ro * c, ro * c, 5))], "value": To}]}}
+
+    def check(res, keep):
+        E, nu = STEEL["E"], STEEL["nu"]
+        ln = math.log(ro / ri)
+        C = E * al * (Ti - To) / (2 * (1 - nu) * ln)
+        hoop_i = C * (1 - 2 * ro ** 2 / (ro ** 2 - ri ** 2) * ln)
+        hoop_o = C * (1 - 2 * ri ** 2 / (ro ** 2 - ri ** 2) * ln)
+        X = keep["model"].sp.X
+        r = np.hypot(X[:, 0], X[:, 1])
+        s = keep["stress"]
+
+        def hoop(mask):                                         # on the plane y = 0 the hoop stress is syy
+            sel = mask & (np.abs(X[:, 1]) < 1e-6) & (X[:, 2] > 2) & (X[:, 2] < 8)
+            return float(s[sel, 1].mean())
+        return [_row("hoop stress at the bore (hot side, compression)", hoop_i, hoop(np.abs(r - ri) < 1e-6), 0.02, "MPa",
+                     "Timoshenko and Goodier, Theory of Elasticity, art. 151: long cylinder, steady radial heat flow"),
+                _row("hoop stress at the outside (cold side, tension)", hoop_o, hoop(np.abs(r - ro) < 1e-6), 0.02, "MPa",
+                     "the same solution at r = ro")]
+    return shape, spec, check
+
+
 def sharp_corner():
     """An L-bracket with a sharp inside corner: the study must name the corner and leave its stress out."""
     from netgen.occ import Box, Pnt
@@ -323,13 +423,17 @@ CASES = {"cantilever": cantilever, "plate_with_hole": plate_with_hole, "thick_cy
          "self_weight": self_weight, "bonded_bar": bonded_bar, "preload_block": preload_block,
          "nafems_le1": nafems_le1, "nafems_le10": nafems_le10,
          "modal_cantilever": modal_cantilever, "modal_free": modal_free, "euler_column": euler_column,
-         "sharp_corner": sharp_corner}
+         "thermal_slab": thermal_slab, "thermal_cylinder": thermal_cylinder, "thermal_stress_bar": thermal_stress_bar,
+         "thermal_stress_cylinder": thermal_stress_cylinder, "sharp_corner": sharp_corner}
 TITLES = {"cantilever": "Cantilever beam, end load", "plate_with_hole": "Plate with a hole in tension",
           "thick_cylinder": "Thick cylinder under internal pressure", "self_weight": "Cantilever under its own weight",
           "bonded_bar": "Two bonded solids in series", "preload_block": "Block under a bolt preload",
           "nafems_le1": "NAFEMS LE1: elliptic membrane", "nafems_le10": "NAFEMS LE10: thick plate under pressure",
           "modal_cantilever": "Natural frequencies of a cantilever", "modal_free": "Natural frequencies of a free beam",
-          "euler_column": "Euler buckling of a column", "sharp_corner": "Sharp inside corner (singularity)"}
+          "euler_column": "Euler buckling of a column", "sharp_corner": "Sharp inside corner (singularity)",
+          "thermal_slab": "Heat through a wall with convection", "thermal_cylinder": "Heat through a pipe wall",
+          "thermal_stress_bar": "Thermal stress in a bar that cannot expand",
+          "thermal_stress_cylinder": "Thermal stress in a thick cylinder"}
 
 
 def bracket():

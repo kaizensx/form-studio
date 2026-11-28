@@ -107,6 +107,24 @@ class Definitions(unittest.TestCase):
             study.clean({"fixtures": [{"type": "hold", "faces": [[0, 0, 0]]}], "loads": [{"type": "gravity"}]})
         self.assertIn("directions", str(cm.exception))
 
+    def test_a_heat_study_takes_thermal_conditions_and_needs_a_temperature_level(self):
+        d = study.clean({"kind": "thermal", "thermal": [{"type": "temperature", "faces": [[0, 0, 0]], "value_C": 80},
+                                                        {"type": "convection", "at": [1, 1, 1], "h_W_m2K": 10, "ambient_C": 20},
+                                                        {"type": "heat", "faces": [[2, 2, 2]], "value_W": 5}]})
+        self.assertEqual([c["type"] for c in d["thermal"]], ["temperature", "convection", "heat"])
+        self.assertEqual((d["thermal"][1]["h"], d["thermal"][1]["ambient"], d["reference_C"], d["fixtures"]), (10.0, 20.0, 20.0, []))
+        for body, word in (({"kind": "thermal", "thermal": [{"type": "heat", "faces": [[0, 0, 0]], "value_W": 5}]}, "held at a temperature"),
+                           ({"kind": "thermal_stress", "thermal": [{"type": "temperature", "faces": [[0, 0, 0]], "value_C": 80}]},
+                            "needs supports"),
+                           ({"kind": "modal", "thermal": [{"type": "temperature", "faces": [[0, 0, 0]], "value_C": 80}]}, "belong to"),
+                           ({"kind": "thermal", "thermal": [{"type": "radiation", "faces": [[0, 0, 0]]}]}, "unknown type"),
+                           ({"kind": "thermal", "thermal": [{"type": "convection", "faces": [[0, 0, 0]], "h_W_m2K": 10}]}, "ambient_C")):
+            with self.assertRaises(StudioError, msg=str(body)) as cm:
+                study.clean(body)
+            self.assertIn(word, str(cm.exception))
+        body, _ = fea_cli.parse("thermal", ["--temperature", "0,0,0:80", "--convection", "1,1,1:10:20", "--heat", "2,2,2:5"])
+        self.assertEqual(study.clean(body)["thermal"], d["thermal"])
+
     def test_a_modal_study_needs_no_load_and_ignores_one(self):
         d = study.clean({"kind": "modal", "loads": [{"type": "gravity"}]})
         self.assertEqual((d["loads"], d["fixtures"], d["modes"]), ([], [], 6))
@@ -212,6 +230,18 @@ class Materials(unittest.TestCase):
             with self.assertRaises(StudioError) as cm:
                 material.resolve(bad)
             self.assertIn(word, str(cm.exception))
+
+    def test_a_heat_study_needs_the_conductivity_and_thermal_stress_the_expansion_too(self):
+        m = material.resolve({"k_W_mK": 167, "source": "datasheet"}, need=("k",))
+        self.assertEqual((m["k"], m["E"], m["sources"]["k"]["unit"]), (167.0, None, "W/(m K)"))
+        with self.assertRaises(StudioError) as cm:
+            material.resolve(ALU, need=("E", "poisson", "k", "cte"))
+        self.assertIn("thermal conductivity", str(cm.exception))
+        self.assertIn("expansion", str(cm.exception))
+        self.assertIn("k_W_mK", cm.exception.hint)
+        m = material.resolve({**ALU, "k_W_mK": 167, "cte_per_K": 23.6e-6}, need=("E", "poisson", "k", "cte"))
+        self.assertEqual((m["k"], m["cte"]), (167.0, 23.6e-6))
+        self.assertEqual(study.NEED["thermal"], ("k",))
 
     def _library(self, props, kind="engineering", density=2700.0, knock=None):
         def prop(key, name, direction=""):
@@ -520,6 +550,37 @@ class RealStudies(WithStudio):
         self.assertEqual(lt["candidates"], [])                                   # nothing lighter is that strong
         self.assertTrue(any("fea.safety_factor >= 50" in x["why"] for x in lt["rejected"]), lt["rejected"])
         self.assertEqual(lt["require"], ["fea.safety_factor >= 50"])
+
+    def test_87_heat_and_thermal_stress(self):
+        hot = {**ALU, "k_W_mK": 167, "cte_per_K": 23.6e-6}
+        th = [{"type": "temperature", "faces": [[33, 20, 3], [65, 20, 3]], "value_C": 90},
+              {"type": "convection", "faces": [[3, 20, 60]], "h_W_m2K": 50, "ambient_C": 20}]
+        d = study.define(self.st, self.load(), {"kind": "thermal", "material": hot, "thermal": th, "mesh": {"budget_s": LIMIT_S}})
+        r = study.run(self.st, self.p["id"], d["id"])["result"]
+        self.assertTrue(r["converged"], r.get("not_converged_because"))
+        self.assertRegex(r["evidence"], r"^simulated \(FEA, steady heat, converged to")
+        self.assertTrue(20 < r["t_min_C"] < r["t_max_C"] <= 90.0 + 1e-6)
+        self.assertTrue(r["heat_balance"]["balanced"])
+        by = {c["type"]: c for c in r["conditions"]}
+        self.assertAlmostEqual(by["temperature"]["heat_W"], -by["convection"]["heat_W"], delta=1e-6 * abs(by["temperature"]["heat_W"]))
+        self.assertGreater(by["temperature"]["heat_W"], 0)                 # heat goes in at the hot holes, out by convection
+        self.assertIn("°C", r["headline"])
+        f = study.field(self.st, self.load(), d["id"])
+        T = decode(f, "temperature")
+        self.assertAlmostEqual(float(T.max()), r["t_max_C"], delta=0.5)
+        self.assertEqual(f["units"]["temperature"], "degC")
+        self.assertEqual(r["materials"]["design"]["sources"]["k"]["source"], "test fixture")
+        with self.assertRaises(StudioError) as cm:                       # no conductivity: refused, nothing assumed
+            study.run(self.st, self.p["id"], study.define(self.st, self.load(), {"kind": "thermal", "material": ALU, "thermal": th})["id"])
+        self.assertIn("thermal conductivity", str(cm.exception))
+        ts = study.define(self.st, self.load(), {"kind": "thermal_stress", "material": hot, "thermal": th, "reference_C": 20,
+                                                 "fixtures": STATIC["fixtures"], "mesh": {"budget_s": LIMIT_S}})
+        rs = study.run(self.st, self.p["id"], ts["id"])["result"]
+        self.assertEqual(rs["thermal"]["reference_C"], 20.0)
+        self.assertIn("thermal stress", rs["evidence"])
+        self.assertGreater(rs["peak_von_mises_MPa"], 1.0)                 # held holes fight the expansion
+        self.assertIn("steady state", " ".join(rs["assumptions"]))
+        self.assertIn("temperature", study.field(self.st, self.load(), ts["id"])["fields"])
 
     def test_9_modal_buckling_and_cancel(self):
         m = study.define(self.st, self.load(), {"kind": "modal", "material": ALU, "modes": 3,

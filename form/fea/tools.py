@@ -23,13 +23,15 @@ def digest(r: dict, full: bool = False) -> dict:
             "max_displacement_mm", "max_displacement_at", "peak_von_mises_MPa", "peak_at", "safety_factor",
             "safety_factor_withheld", "discretisation_error", "singularities", "equilibrium", "loads", "hand_estimate",
             "frequencies_Hz", "modes", "free_body", "mass_g", "load_factor", "load_factor_extrapolated", "load_factors",
+            "thermal", "t_max_C", "t_min_C", "t_max_at", "t_min_at", "heat_through_W", "conditions", "heat_balance",
             "meaning", "mesh", "materials", "material_notes", "units", "faces", "versions")
     out = {k: r[k] for k in keep if k in r}
     conv = r.get("convergence") or {}
     out["convergence"] = {"method": conv.get("method"), "tolerance": conv.get("tolerance"),
                           "levels": [{k: lv.get(k) for k in ("level", "unknowns", "h_mean_mm", "max_displacement_mm",
                                                                "peak_von_mises_MPa", "strain_energy_mJ", "error_indicator",
-                                                               "frequencies_Hz", "load_factors", "seconds") if k in lv}
+                                                               "frequencies_Hz", "load_factors", "t_max_C", "t_min_C",
+                                                               "heat_through_W", "seconds") if k in lv}
                                      for lv in conv.get("levels") or []]}
     return out
 
@@ -101,11 +103,18 @@ def register_tools(mcp, studio, run, RO, RW, origin) -> None:
                              loads: list[dict] | None = None, material: str | dict | None = None,
                              materials: dict | None = None, modes: int | None = None, mesh: dict | None = None,
                              name: str = "", study: str = "", run_now: bool = True, force: bool = False,
-                             remove: bool = False, ctx: Context = None) -> dict:
+                             remove: bool = False, thermal: list[dict] | None = None, reference_C: float = 20.0,
+                             ctx: Context = None) -> dict:
         """Run a strength study on the design: will it hold? Finite elements on the B-rep (quadratic tetrahedra, Netgen
         mesh), refined until the answer stops changing, with the discretisation error stated. kind: "static" (stress,
         displacement, safety factor against the material's yield), "modal" (natural frequencies; no supports = free
-        body; loads ignored) or "buckling" (the factor on the loads at which it buckles).
+        body; loads ignored), "buckling" (the factor on the loads at which it buckles), "thermal" (steady heat conduction:
+        temperatures and the heat through the part) or "thermal_stress" (the stress from that temperature field, with
+        any loads; reference_C is the temperature at which the part is stress free).
+        thermal: [{"type": "temperature", "faces": [...], "value_C": 80}, {"type": "convection", "faces": [...],
+        "h_W_m2K": 10, "ambient_C": 20}, {"type": "heat", "faces": [...], "value_W": 5}, {"type": "heat_flux", "faces":
+        [...], "value_W_m2": 2000}]; a face with none is insulated. A heat study needs the material's conductivity
+        ("k_W_mK"), thermal stress also its expansion ("cte_per_K").
         Faces are picked as points on the part, [x, y, z] in design millimetres, each part as printed (as for
         analyze_selection, which shows the face a point lands on).
         fixtures: [{"type": "fixed" | "roller" | "pin" | "hold", "faces": [[x, y, z], ...]}]. fixed: no movement. roller: slides
@@ -130,9 +139,10 @@ def register_tools(mcp, studio, run, RO, RW, origin) -> None:
         (setup_status); without it nothing is computed and the call says so."""
         st = studio()
         body = None
-        if fixtures is not None or loads is not None:
+        if fixtures is not None or loads is not None or thermal is not None:
             body = {"kind": kind, "fixtures": fixtures or [], "loads": loads or [], "material": material,
-                    "materials": materials or {}, "modes": modes, "mesh": mesh or {}, "name": name}
+                    "materials": materials or {}, "modes": modes, "mesh": mesh or {}, "name": name,
+                    "thermal": thermal or [], "reference_C": reference_C}
         by = origin(ctx).replace("agent:", "") or "agent"
         return await run(study_call, st, project, body, study, run_now, force, remove, by)
 

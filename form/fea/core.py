@@ -4,8 +4,10 @@
 
 `spec` (millimetres, newtons, MPa; every face is {"samples": [[x, y, z], ...], "area": mm2}, points on the face):
 
-    {"kind": "static" | "modal" | "buckling",
-     "materials": [{"name", "E": MPa, "nu", "density": kg/m3, "yield": MPa | None, "centre": [x, y, z]}],   # one per solid
+    {"kind": "static" | "modal" | "buckling" | "thermal",
+     "materials": [{"name", "E": MPa, "nu", "density": kg/m3, "yield": MPa | None, "k": W/(m K), "cte": 1/K,
+                    "centre": [x, y, z]}],   # one per solid
+     "thermal": {"reference": C, "conditions": [...]},   # form/fea/thermal.py; with kind "static": thermal stress
      "fixtures": [{"type": "fixed" | "roller" | "pin", "faces": [...], "axis": [x, y, z] (pin)},
                   {"type": "hold", "faces": [...], "directions": [[x, y, z], ...]}],   # no movement along these;
                                                 # with "faces_b": only on the edge the two face sets share
@@ -56,7 +58,7 @@ from . import solve as S
 ENGINE_VERSION = 1
 G0 = 9806.65                                   # standard gravity, mm/s2
 DEFAULTS = {"levels_min": 3, "levels_max": 7, "dof_max": 600_000, "budget_s": 90.0, "tol_disp": 0.01,
-            "tol_stress": 0.05, "tol_freq": 0.01, "tol_buckling": 0.02, "growth": 2.4, "balance": 1e-6}
+            "tol_stress": 0.05, "tol_freq": 0.01, "tol_buckling": 0.02, "tol_temp": 0.01, "growth": 2.4, "balance": 1e-6}
 EIG_DOF_MAX = 160_000                          # modal and buckling: many solves with one matrix, factored once
 GLOBAL_SHRINK = 0.85                           # the largest element allowed shrinks by this at every refinement
 MIN_GROWTH = 1.5                               # a refinement has at least this many times the elements of the last
@@ -70,6 +72,11 @@ ASSUMPTIONS = ["linear elastic material (stress proportional to strain; no yield
                "curved faces are followed by quadratic element sides, not exactly",
                "supports are rigid and loads are spread evenly over the picked faces",
                "several solids are bonded where they touch; sliding or opening contact is not modelled"]
+
+
+THERMAL_ASSUMPTIONS = ["steady state: temperatures no longer change with time",
+                       "conductivity and expansion do not change with temperature and are the same in every direction",
+                       "no radiation; a face with no thermal condition is insulated"]
 
 
 class StudyError(RuntimeError):
@@ -103,6 +110,10 @@ class Model:
         self.yld = np.array([float(y) if y else np.nan for y in ys])[md]
         self.lam, self.mu = S.lame(self.E, self.nu)
         self.dom = m.dom if len(np.unique(m.dom)) > 1 else None
+        # thermal: conductivity W/(mm K) and expansion 1/K per element (0 where the material has none sourced)
+        self.k = np.array([(mats[i].get("k") or 0.0) * 1e-3 for i in range(len(mats))], float)[md]
+        self.alpha = np.array([(mats[i].get("cte") or 0.0) for i in range(len(mats))], float)[md]
+        self.has_cte = all(mats[i].get("cte") for i in range(len(mats)))
 
     def _domains(self, mats) -> np.ndarray:
         """Material number of each mesh solid: the material whose solid centre is nearest."""
@@ -227,7 +238,8 @@ def _resolve_faces(geo, m, spec) -> dict:
             ld.append([])
         else:
             ld.append(many(ld_.get("faces")))
-    return {"fixtures": fx, "loads": ld}
+    th = [many(c.get("faces")) for c in (spec.get("thermal") or {}).get("conditions") or []]
+    return {"fixtures": fx, "loads": ld, "thermal": th}
 
 
 def _free_rigid_motions(model: Model, con: S.Constraints) -> int:
@@ -329,6 +341,16 @@ def _static_level(model: Model, cancelled, direct: bool | None = None) -> dict:
     sp = model.sp
     K = sp.stiffness(model.lam, model.mu)
     f, loads = model.load_vector()
+    thermal_info = T = th_el = None
+    if model.spec.get("thermal"):                        # the temperature field first, then its expansion as a load
+        from . import thermal as thermal_mod
+        if not model.has_cte:
+            raise StudyError("Thermal stress needs the thermal expansion coefficient of every solid's material.")
+        T, thermal_info = thermal_mod.solve(model, model.faces)
+        dT = T - float(model.spec["thermal"].get("reference", 20.0))
+        beta = (3 * model.lam + 2 * model.mu) * model.alpha
+        f = f + sp.thermal_load(beta, dT)
+        th_el = beta[:, None] * dT[sp.edofs.T]
     con = model.constraints()
     free = _free_rigid_motions(model, con)
     if free:
@@ -337,19 +359,20 @@ def _static_level(model: Model, cancelled, direct: bool | None = None) -> dict:
                          "Add a fixed face, or rollers and pins that together stop it sliding and turning in every "
                          "direction.", kind="unconstrained")
     if not np.any(f):
-        raise StudyError("No load: every load is zero.", "Give a force, a pressure, a preload or gravity.")
+        raise StudyError("No load: every load is zero.", "Give a force, a pressure, a preload or gravity." if T is None
+                         else "The temperature equals the reference temperature everywhere, so nothing expands.")
     t1 = time.perf_counter()
     system = S.System(sp, K, con, cancelled)
     if direct is not None:
         system.prepare(direct=direct)
     r = S.solve_static(system, f)
     t2 = time.perf_counter()
-    st = sp.stress(r["u"], model.lam, model.mu, model.dom)
+    st = sp.stress(r["u"], model.lam, model.mu, model.dom, thermal=th_el)
     vm = S.von_mises(st["nodal"])
     unorm = np.linalg.norm(r["u"].reshape(-1, 3), axis=1)
     eta_rel = float(np.sqrt((st["eta"] ** 2).sum() / max(2 * r["energy"] + (st["eta"] ** 2).sum(), 1e-300)))
     return {"system": system, "K": K, "f": f, "loads": loads, "sol": r, "stress": st, "vm": vm, "unorm": unorm,
-            "eta_rel": eta_rel, "seconds": {"assemble": t1 - t0, "solve": t2 - t1, "stress": time.perf_counter() - t2}}
+            "eta_rel": eta_rel, "T": T, "thermal": thermal_info, "seconds": {"assemble": t1 - t0, "solve": t2 - t1, "stress": time.perf_counter() - t2}}
 
 
 def _utilisation(model: Model, st: dict) -> np.ndarray | None:
@@ -474,6 +497,8 @@ def run_static(geo, spec, progress, cancelled) -> tuple[dict, dict]:
                         "iterations": int(lv["system"].iterations),
                         "seconds": round(time.perf_counter() - tl, 3), "mesh_seconds": round(m.seconds, 3),
                         "mesh_quality_min": round(m.info["quality_min"], 4), "curved_elements": bool(model.sp.curved)}
+        if lv.get("T") is not None:
+            lv["record"].update({"t_max_C": lv["thermal"]["t_max_C"], "t_min_C": lv["thermal"]["t_min_C"]})
         for old in levels:                                       # only the finest level keeps its matrices
             for k in ("system", "K", "f", "model", "stress", "sol"):
                 old.pop(k, None)
@@ -593,18 +618,29 @@ def _static_result(geo, spec, opt, rz, levels, stop, seconds, left_out) -> tuple
         out["hand_estimate"] = hand.estimate(model, spec, model.faces, sol["u"].reshape(-1, 3), out["peak_von_mises_MPa"])
     except Exception as e:                               # noqa: BLE001 - the estimate is an extra, never a failure
         out["hand_estimate"] = {"applies": False, "why": f"the estimate could not be made ({type(e).__name__}: {e})"}
-    fld = _surface_field(model, {"displacement": sol["u"].reshape(-1, 3), "von_mises": lv["vm"],
-                                 "safety_factor": sf_field, "singular": ~ok_nodes})
+    data = {"displacement": sol["u"].reshape(-1, 3), "von_mises": lv["vm"], "safety_factor": sf_field, "singular": ~ok_nodes}
+    if lv.get("T") is not None:
+        out["thermal"] = {**lv["thermal"], "reference_C": float(spec["thermal"].get("reference", 20.0)),
+                          "temperature_by_refinement": [x["record"].get("t_max_C") for x in levels]}
+        out["model"] = "linear static with thermal strain from a steady temperature field"
+        out["assumptions"] = out["assumptions"] + THERMAL_ASSUMPTIONS
+        out["equilibrium"]["note"] = ("Thermal expansion is a self-balanced load: the applied resultant counts the "
+                                      "mechanical loads only.")
+        data["temperature"] = lv["T"]
+        out["evidence"] = evidence(out)
+    fld = _surface_field(model, data)
     return out, fld
 
 
 def evidence(r: dict) -> str:
-    kind = {"static": "linear static", "modal": "modal", "buckling": "linear buckling"}[r["kind"]]
+    kind = {"static": "thermal stress" if r.get("thermal") else "linear static", "modal": "modal",
+            "buckling": "linear buckling", "thermal": "steady heat"}[r["kind"]]
     if not r.get("converged"):
         return f"simulated (FEA, {kind}, not converged)"
     e = {"static": (r.get("discretisation_error") or {}).get("stress"),
          "modal": (r.get("discretisation_error") or {}).get("frequency"),
-         "buckling": (r.get("discretisation_error") or {}).get("load_factor")}[r["kind"]]
+         "buckling": (r.get("discretisation_error") or {}).get("load_factor"),
+         "thermal": (r.get("discretisation_error") or {}).get("temperature")}[r["kind"]]
     return f"simulated (FEA, {kind}, converged to {max(100 * (e or 0), 0.1):.1f} %)"
 
 
@@ -814,6 +850,59 @@ def run_buckling(geo, spec, progress, cancelled) -> tuple[dict, dict]:
     return out, fld
 
 
+def run_thermal(geo, spec, progress, cancelled) -> tuple[dict, dict]:
+    """Steady heat conduction: the temperature field, the heat through each condition and the heat balance."""
+    from . import thermal as thermal_mod
+    opt = {**DEFAULTS, "dof_max": 900_000, **(spec.get("mesh") or {})}
+
+    def level(model: Model):
+        T, info = thermal_mod.solve(model, model.faces)
+        span = info["t_max_C"] - info["t_min_C"]
+        return {"values": [span, info["heat_through_W"]], "T": T, "info": info,
+                "record": {"t_max_C": info["t_max_C"], "t_min_C": info["t_min_C"], "heat_through_W": info["heat_through_W"],
+                           "balance_residual": info["balance_residual"], "unknowns_scalar": int(model.sp.N)}}
+    levels, stop, seconds = _uniform_levels(geo, spec, opt, progress, cancelled, level, opt["tol_temp"], 2)
+    lv = levels[-1]
+    model = lv["model"]
+    vals = np.array([x["values"] for x in levels], float)
+    ss = [series(vals[:, i]) for i in range(2)]
+    errs = [s["error"] for s, v in zip(ss, vals[-1]) if abs(v) > 1e-12]
+    worst = max(errs) if errs and all(e is not None for e in errs) else (0.0 if not errs else np.inf)
+    balanced = lv["info"]["balance_residual"] <= 1e-6
+    converged = len(levels) >= 3 and worst <= opt["tol_temp"] and balanced
+    info = lv["info"]
+    out = {"kind": "thermal", "engine_version": ENGINE_VERSION, "converged": bool(converged), "seconds": round(seconds, 2),
+           "stopped_because": stop or "every tolerance was met",
+           "t_max_C": info["t_max_C"], "t_min_C": info["t_min_C"],
+           "t_max_at": _where(model, int(np.argmax(lv["T"])))["at"], "t_min_at": _where(model, int(np.argmin(lv["T"])))["at"],
+           "heat_through_W": info["heat_through_W"], "conditions": info["conditions"],
+           "heat_balance": {"residual": info["balance_residual"], "balanced": bool(balanced),
+                            "note": "heat in through the conditions against heat out, as a share of the heat through"},
+           "convergence": {"levels": [x["record"] for x in levels], "temperature_span": ss[0], "heat_through": ss[1],
+                           "tolerance": {"temperature": opt["tol_temp"]},
+                           "method": "h-refinement: the solid is meshed again at 0.72 x the size, everywhere; the stated "
+                                     "error is twice the last change (or Aitken's remaining change, when larger) "
+                                     "where the levels shrink steadily, and twice the larger of the last two changes "
+                                     "where they go up and down. An estimate with a margin, not a bound."},
+           "discretisation_error": {"temperature": None if not np.isfinite(worst) else float(worst)},
+           "mesh": {"element": _element(model), "mesher": "Netgen", "tets": lv["record"]["tets"], "nodes": lv["record"]["nodes"],
+                    "unknowns": int(model.sp.N), "h_mean_mm": lv["record"]["h_mean_mm"], "solids": geo.solids,
+                    "bonded": bool(geo.glued)},
+           "model": "steady heat conduction", "assumptions": THERMAL_ASSUMPTIONS +
+           ["several solids are in perfect thermal contact where they touch"]}
+    if not converged:
+        out["not_converged_because"] = (("the heat balance does not close" if not balanced else
+                                         f"the temperature span or the heat flow still changes by {100 * worst:.2f} % per refinement"
+                                         if np.isfinite(worst) else "fewer than three refinements were solved")
+                                        + (f". Stopped because {stop}." if stop else "."))
+    out["evidence"] = evidence(out)
+    if _KEEP is not None:
+        _KEEP.update(model=model, T=lv["T"])
+    fld = _surface_field(model, {"temperature": lv["T"], "heat_flux": thermal_mod.flux(model, lv["T"]) * 1e6})
+    fld["units"]["temperature"], fld["units"]["heat_flux"] = "degC", "W/m2"
+    return out, fld
+
+
 def run(geo, spec: dict, progress=None, cancelled=None, keep: dict | None = None) -> tuple[dict, dict]:
     """Solve a study on a mesh_mod.Geometry. Returns (result, field). Raises StudyError when the study cannot be set
     up (no such face, a part that is not held) and mesh_mod.MeshError when the solid cannot be meshed.
@@ -826,12 +915,17 @@ def run(geo, spec: dict, progress=None, cancelled=None, keep: dict | None = None
     if not spec.get("materials"):
         raise StudyError("A study needs a material (E and Poisson's ratio at least).")
     for mt in spec["materials"]:
-        if not (mt.get("E") and mt["E"] > 0) or mt.get("nu") is None or not (-1 < mt["nu"] < 0.5):
+        if kind == "thermal":
+            if not (mt.get("k") and mt["k"] > 0):
+                raise StudyError(f"Material “{mt.get('name', '?')}” needs a thermal conductivity k > 0.")
+            mt.setdefault("E", 1.0)                      # not used by a heat study; the model carries the fields
+            mt.setdefault("nu", 0.0)
+        elif not (mt.get("E") and mt["E"] > 0) or mt.get("nu") is None or not (-1 < mt["nu"] < 0.5):
             raise StudyError(f"Material “{mt.get('name', '?')}” needs Young's modulus E > 0 and Poisson's ratio below 0.5.")
     try:
-        fn = {"static": run_static, "modal": run_modal, "buckling": run_buckling}[kind]
+        fn = {"static": run_static, "modal": run_modal, "buckling": run_buckling, "thermal": run_thermal}[kind]
     except KeyError:
-        raise StudyError(f"Unknown study kind “{kind}” (static, modal, buckling).") from None
+        raise StudyError(f"Unknown study kind “{kind}” (static, modal, buckling, thermal).") from None
     try:
         return fn(geo, spec, progress, cancelled)
     except S.SolveError as e:

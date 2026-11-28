@@ -1,4 +1,5 @@
-"""Strength studies with a stated error: linear static, modal and linear buckling on a design's B-rep.
+"""Strength studies with a stated error: linear static, modal, linear buckling, steady heat and thermal stress on a
+design's B-rep.
 
     form/fea/study.py     define, run (in the background, with progress and cancel), read; results stored beside the
                           revision under a key of the geometry, the material's numbers, the loads and the engine,
@@ -10,6 +11,9 @@
                           named, equilibrium checked
     form/fea/mesh.py      Netgen: tetrahedra from the B-rep, finer on fillets and holes
     form/fea/solve.py     quadratic tetrahedra, sparse solvers (scikit-fem shape functions, SciPy, PyAMG)
+    form/fea/thermal.py   steady heat conduction, and the temperature field as a load (thermal stress)
+    form/fea/hand.py      a closed-form estimate beside a static result, where the part reads as a beam
+    form/fea/constraint.py  a study as a constraint in optimize and make_lighter (fea.safety_factor >= 2)
     form/fea/verify.py    the verification suite: textbook cases with the reference value and accepted error
     form/fea/cli.py       `form strength ...` and `form study strength|modal|buckling ...` (JSON)
     form/fea/bench.py     the Bench entry (form/studies.py)
@@ -26,8 +30,11 @@ import sys
 from pathlib import Path
 
 ENGINE = "fea"
-KINDS = ("static", "modal", "buckling")
-KIND_LABEL = {"static": "linear static", "modal": "modal", "buckling": "linear buckling"}
+KINDS = ("static", "modal", "buckling", "thermal", "thermal_stress")
+KIND_LABEL = {"static": "linear static", "modal": "modal", "buckling": "linear buckling", "thermal": "steady heat",
+              "thermal_stress": "thermal stress"}
+ENGINE_KIND = {"thermal_stress": "static"}        # what the solver runs: thermal stress is a static study with a
+                                                  # temperature field as a load
 NEEDS = ("netgen", "skfem", "scipy", "pyamg", "numpy")
 HOW_TO_GET = ("The strength solver is an optional engine: install “Strength studies (FEA)” in Settings, Engines & "
               "software (or `form setup`). It gets a Python of its own with Netgen, scikit-fem, SciPy and PyAMG.")
