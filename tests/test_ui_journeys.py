@@ -179,8 +179,29 @@ class Journeys(unittest.TestCase):
     def test_isolation(self):              # another conversation never takes over; concepts in the feed; the printer on top
         self.journey("isolation.py")
 
+    def test_bench(self):                  # the Bench: every study, route and document with its state; run, open, stale, palette
+        self.journey("bench.py", env_extra={"FORM_APPEARANCE": "dark"})
+
+    def test_bench_small_light(self):      # the same in the smallest window, on paper
+        self.journey("bench.py", size="1100x700", env_extra={"FORM_APPEARANCE": "light"})
+
     def test_maker_tools(self):
         self.journey("maker_tools.py")
+
+    def test_modelling(self):               # the Program by hand: roll back, suppress, rename, depends, moves; a fillet on a picked edge
+        self.journey("modelling.py", env_extra={"FORM_APPEARANCE": "dark"})
+
+    def test_modelling_light(self):         # the same on paper
+        self.journey("modelling.py", env_extra={"FORM_APPEARANCE": "light"})
+
+    def test_modelling_small(self):         # the smallest window: Preview and Add stay in view, pinned at the pane's foot
+        self.journey("modelling.py", size="1120x700", env_extra={"FORM_APPEARANCE": "dark"})
+
+    def test_bracket_by_hand(self):         # Wave B acceptance: the bracket from Start blank, by hand, timed (< 120 s)
+        self.journey("bracket_by_hand.py", env_extra={"FORM_APPEARANCE": "dark"})
+
+    def test_bracket_by_hand_light(self):
+        self.journey("bracket_by_hand.py", env_extra={"FORM_APPEARANCE": "light"})
 
     def test_new_tools(self):              # 12.3: a boss at a face, every printer compared, a turntable, Open in <Slicer>
         # real slicers where they are installed (macOS here); elsewhere a stand-in OrcaSlicer that copies a fixture G-code

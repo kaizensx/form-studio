@@ -3,7 +3,9 @@
 Dialects (`DIALECTS`), each with what it accepts:
 
     grbl       Grbl 1.1. No tool changer (M6 is an error there) and no canned cycles: a tool change is M5 and a
-               program pause (M0) with the tool named in a comment; drilling is written out as G0/G1.
+               program pause (M0) with the tool named in a comment; drilling is written out as G0/G1. The program
+               ends at its clearance height: no move in machine coordinates, since a Grbl machine that was not
+               homed has no known machine zero.
     linuxcnc   LinuxCNC (RS274/NGC). T.. M6 and G43 H.., path blending G64 P0.01, canned G81/G83 with G98,
                a machine-coordinate retract G53 G0 Z0, M2.
     fanuc      A generic Fanuc mill. % and an O number, T.. M6, G43 H.. on the first Z move, canned G81/G83 with
@@ -35,7 +37,7 @@ _COMMON_G = {0, 1, 2, 3, 4, 20, 21, 90}
 DIALECTS = {
     "grbl": {"label": "Grbl 1.1", "ext": ".nc", "comment": "paren", "canned": False, "m6": False, "tlo": False,
              "g": _COMMON_G | {17, 28, 40, 49, 53, 54, 55, 56, 57, 58, 59, 80, 91, 94},
-             "m": {0, 2, 3, 5, 7, 8, 9, 30}, "dwell": "P_s", "end": ["M2"], "home": "G53 G0 Z0",
+             "m": {0, 2, 3, 5, 7, 8, 9, 30}, "dwell": "P_s", "end": ["M2"], "home": None,
              "safety": "G17 G40 G49 G80 G94"},
     "linuxcnc": {"label": "LinuxCNC", "ext": ".ngc", "comment": "paren", "canned": True, "m6": True, "tlo": True,
                  "g": _COMMON_G | {17, 28, 40, 43, 49, 53, 54, 55, 56, 57, 58, 59, 61, 64, 80, 81, 83, 91, 94, 98, 99},

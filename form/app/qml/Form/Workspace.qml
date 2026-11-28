@@ -261,6 +261,7 @@ Item {
             analysis: Store.hasDraft || Store.compare ? null : Store.analysis
             measuring: Store.measuring; measures: Store.measures; measureFrom: Store.measureFrom
             onProbed: function (hit, reach) { Store.measureClick(hit, reach) }
+            massTotal: Store.massOn && Store.massShown ? Store.mass.total || null : null          // MassLayer: centre of mass, principal axes
             // selecting and annotations (form/selection.py)
             selecting: Store.selecting; selectMode: Store.selMode; brushMm: Store.brushMm
             selection: Store.selection ? Store.selection.items : []
@@ -414,6 +415,14 @@ Item {
                     active: ws.tool === "assembly" && !ws.sim; marked: Store.asmMode !== "print"; onClicked: ws.setTool("assembly") }
                 RailBtn { icon: "history"; label: "History"; keys: "T"; hint: "Scrub through the revisions. Looking changes nothing."
                     active: ws.tool === "history" && !ws.sim; marked: !!Store.scrub; onClicked: ws.setTool("history") }
+                // modelling by hand (form/modelling.py): each becomes a feature in the design's code
+                Item { width: 36; height: 9; Rectangle { x: 8; y: 4; width: 20; height: 1; color: Theme.rule } }
+                RailBtn { objectName: "railSketch"; icon: "pen_tool"; label: "Sketch"; hint: "Draw a profile on a plane and extrude, cut or revolve it. On a face: pick it with Annotate, then Sketch here…"
+                    enabled: !ws.sim && !Store.hasDraft; onClicked: Store.openSheet("handsketch", { mode: "add", plane: { datum: "XY", offset: 0 } }) }
+                RailBtn { objectName: "railRound"; icon: "radius"; label: "Fillet or chamfer"; hint: "Pick the edges to round or bevel."
+                    enabled: !ws.sim; active: ws.tool === "annotate" && Store.selMode === "edge"; onClicked: { if (ws.tool !== "annotate") ws.setTool("annotate"); Store.selMode = "edge" } }
+                RailBtn { objectName: "railHole"; icon: "circle_dot"; label: "Hole, shell or sketch on a face"; hint: "Pick a flat face: a hole to a standard size, a shell open there, or a sketch on it."
+                    enabled: !ws.sim; active: ws.tool === "annotate" && Store.selMode === "face"; onClicked: { if (ws.tool !== "annotate") ws.setTool("annotate"); Store.selMode = "face" } }
                 Item { width: 36; height: 9; Rectangle { x: 8; y: 4; width: 20; height: 1; color: Theme.rule } }
                 RailBtn { icon: "layers"; label: "Simulate the print"; hint: ws.d && ws.d.slice ? "Play the slicer’s toolpaths. Simulated, not a print." : "Needs a current slice of this revision."
                     enabled: !!ws.d && !!ws.d.slice; active: ws.sim
@@ -493,6 +502,9 @@ Item {
                     onPicked: function (v) { Store.setAnalysis(v === Store.analysisMap ? "" : v) } }
                 Pick { visible: ws.compact; width: 150; height: 26; model: Store.analysisMaps; value: Store.analysisMap; onPicked: function (v) { Store.setAnalysis(v) } }
                 Btn { small: true; height: 26; text: "Clear map"; visible: !!Store.analysisMap && !ws.compact; onClicked: Store.setAnalysis("") }
+                Btn { objectName: "massToggle"; small: true; height: 26; icon: "weight"; text: ws.compact ? "" : "Centre of mass"; active: Store.massOn
+                    tip: (Store.massOn ? "Hide" : "Show") + " the centre of mass and the principal axes, with the mass and inertia (computed on the B-rep)"
+                    onClicked: Store.massOn = !Store.massOn }
             }
             HudBar { id: asmBar; objectName: "asmBar"; shown: ws.tool === "assembly" && !!Store.assembly; maxWidth: opts.room
                 Seg { visible: !ws.compact; model: ws.asmModes
@@ -620,8 +632,9 @@ Item {
                 Row { id: sn; x: 10; anchors.verticalCenter: parent.verticalCenter; spacing: 8
                     Txt { mono: true; font.pixelSize: 12; color: Theme.blueprint; text: Store.scrub ? F.pad(Store.scrub.rev) : ""; anchors.verticalCenter: parent.verticalCenter }
                     Txt { font.pixelSize: 12; tone: 2; anchors.verticalCenter: parent.verticalCenter; wrapMode: Text.NoWrap
-                        text: Store.morphing ? "Playing the history · head is " + (Store.project ? F.pad(Store.project.head) : "") : "Viewing only · head is still " + (Store.project ? F.pad(Store.project.head) : "") }
-                    Btn { small: true; kind: "quiet"; text: "Back to head"; anchors.verticalCenter: parent.verticalCenter; onClicked: Store.endScrub() } } }
+                        text: Store.scrub && Store.scrub.upto ? "Rolled back to " + (Store.featureById(Store.scrub.upto) || { label: Store.scrub.upto }).label + " · viewing only"
+                              : Store.morphing ? "Playing the history · head is " + (Store.project ? F.pad(Store.project.head) : "") : "Viewing only · head is still " + (Store.project ? F.pad(Store.project.head) : "") }
+                    Btn { objectName: "backToHead"; small: true; kind: "quiet"; text: Store.scrub && Store.scrub.upto ? "Show every feature" : "Back to head"; anchors.verticalCenter: parent.verticalCenter; onClicked: Store.endScrub() } } }
             Rectangle { visible: Store.hasDraft && !!Store.preview && !Store.scrub; width: b1.implicitWidth + 20; height: 26; radius: Theme.rSm
                 color: Theme.alpha(Theme.blueprint, 0.14); border.color: Theme.alpha(Theme.blueprint, 0.3)
                 Txt { id: b1; anchors.centerIn: parent; font.pixelSize: 12; color: Theme.strong(Theme.blueprint); wrapMode: Text.NoWrap
@@ -644,6 +657,7 @@ Item {
             // same numbers as the dimension lines on the part), and there is no volume yet.
             Column { id: ro; objectName: "readout"; spacing: 3
                 readonly property bool asm: !!Store.assembly && Store.asmMode !== "print"
+                readonly property bool mass: !sofar && Store.massShown && !!Store.mass.total
                 // a streamed stage carries its own bounds; a build-up playing here is measured by the view (the bounds of
                 // what is drawn so far, which the dimension lines on the part use too)
                 readonly property bool staged: !!vp.model && !!vp.model.stage && !!vp.model.bbox
@@ -657,12 +671,28 @@ Item {
                     Txt { text: "×"; tone: 1; mono: true; font.pixelSize: 12; anchors.verticalCenter: parent.verticalCenter }
                     Tick { font.pixelSize: 12; tone: 1; value: ro.bb ? ro.bb[1][2] - ro.bb[0][2] : 0; unit: " mm"; anchors.verticalCenter: parent.verticalCenter }
                     Txt { visible: !ro.sofar; text: "·"; tone: 3; leftPadding: 4; rightPadding: 4; anchors.verticalCenter: parent.verticalCenter }
-                    Tick { visible: !ro.sofar; font.pixelSize: 12; tone: 1; value: Store.shown ? Store.shown.volume_mm3 / 1000 : 0; unit: " cm³"; anchors.verticalCenter: parent.verticalCenter } }
+                    Tick { visible: !ro.sofar; font.pixelSize: 12; tone: 1; value: Store.shown ? Store.shown.volume_mm3 / 1000 : 0; unit: " cm³"; anchors.verticalCenter: parent.verticalCenter }
+                    // the head's mass in its material (form/massprops.py): pressed, the centre of mass and the readout
+                    Txt { visible: ro.mass; text: "·"; tone: 3; leftPadding: 4; rightPadding: 4; anchors.verticalCenter: parent.verticalCenter }
+                    Tick { objectName: "readoutMass"; visible: ro.mass; font.pixelSize: 12; anchors.verticalCenter: parent.verticalCenter
+                        color: Store.massOn || rmm.containsMouse ? Theme.datum : Theme.ink
+                        value: ro.mass ? Store.mass.total.mass_g : 0; decimals: ro.mass && Store.mass.total.mass_g < 100 ? 1 : 0; unit: " g"
+                        MouseArea { id: rmm; anchors.fill: parent; anchors.margins: -4; hoverEnabled: true; cursorShape: Qt.PointingHandCursor
+                            onClicked: Store.massOn = !Store.massOn }
+                        Tip { show: rmm.containsMouse; text: (Store.massOn ? "Hide" : "Show") + " the centre of mass and inertia. " + (Store.mass ? Store.mass.headline : "") } } }
                 Txt { objectName: "readoutNote"; font.pixelSize: 12; tone: 3; wrapMode: Text.NoWrap; visible: text !== ""
                     text: ro.sofar ? "as modelled so far"
                         : !Store.assembly ? (Store.plateWanted ? "on a " + ws.bed + " mm plate" : "")
                         : Store.asmMode === "assembled" ? "assembled" : Store.asmMode === "exploded" ? (Store.assembly.derived ? "as modelled, shown pulled apart" : "assembled size, shown exploded")
                         : (Store.assembly.derived || !Store.printUi ? "as modelled, " : "as printed, ") + F.plural(Store.assembly.parts.length, "part") } }
+        }
+
+        // mass and inertia, over the size line while the centre of mass is shown (the grams on the size line toggle it);
+        // right of the tool dock when the dock reaches down that far
+        MassReadout {
+            visible: Store.massOn && Store.massShown && !ws.sim; source: studio; z: 4
+            y: status.y - height - 40                        // over the floor scale, which stands just above the size line
+            x: y < rail.y + rail.height + 8 ? rail.x + rail.width + 12 : status.x
         }
 
         // ── top centre, under the stages: the revisions, while History is the tool ──

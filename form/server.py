@@ -11,7 +11,7 @@ import time
 import traceback
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
-from urllib.parse import parse_qs, quote, urlparse
+from urllib.parse import parse_qs, quote, unquote, urlparse
 
 from . import advisor, config
 from .cad_bridges import open_output
@@ -204,6 +204,12 @@ def make_handler(st: Studio):
             if path == "/api/materials":                   # colours and materials (form/materials.py)
                 from . import materials
                 return self._json(materials.catalogue())
+            if path.startswith("/api/materials/"):         # one material's sourced record (form/material_library.py)
+                from . import material_library as ml
+                try:
+                    return self._json(ml.record(unquote(path[len("/api/materials/"):])))
+                except KeyError as e:
+                    raise StudioError(str(e).strip("'\""), status=404)
             if path == "/api/refine/host":                 # which process runs refinement jobs (form/refine/jobs.py)
                 return self._json({"data_dir": str(st.root), "pid": os.getpid()})
             if path == "/api/photos":                      # Blender renders: newest current one per project
@@ -216,6 +222,10 @@ def make_handler(st: Studio):
             if rest == "":
                 return self._json(st.state(pid))
             p = st.load(pid)
+            from . import modelling_api                    # the feature tree and the rollback view (form/modelling.py)
+            got = modelling_api.route_get(st, p, rest, q)
+            if got is not None:
+                return self._json(got)
             if rest == "/refine":                          # the refinement job and the head's refine changes
                 from .refine import jobs as refine_jobs
                 return self._json(refine_jobs.status(st, pid))
@@ -229,6 +239,12 @@ def make_handler(st: Studio):
             if rest == "/colour.3mf":
                 from . import materials
                 return self._send(200, materials.threemf(st, p), "model/3mf")
+            if rest == "/mass":                            # mass properties (form/massprops.py); pose is JSON
+                from . import massprops
+                pose = json.loads(q["pose"]) if q.get("pose") else None
+                r = massprops.compute(st, p, part=q.get("part") or "", pose=pose, frame=q.get("frame") or None,
+                                      material=q.get("material") or None)
+                return self._json({**r, "headline": massprops.headline(r)})
             # -- analysis on the model (form/analysis.py): maps, orientations --
             if rest == "/analysis":
                 from . import analysis
@@ -293,6 +309,10 @@ def make_handler(st: Studio):
                                        "width", "lip", "lip_height") if q.get(k) not in (None, "")}
                 return self._json(feature_helpers.preview(q.get("kind") or "boss", nozzle=st.slicer_info(p=p).get("nozzle_mm"),
                                                           allow_strain=float(q["allow_strain"]) if q.get("allow_strain") else None, **o))
+            if rest == "/bench" or rest.startswith("/bench/"):     # the Bench: every study, route and document (form/studies.py)
+                from . import studies
+                sid = rest[len("/bench/"):] if rest.startswith("/bench/") else ""
+                return self._json(studies.show(st, p, sid) if sid else studies.listing(st, p, q.get("group") or None))
             if rest == "/slicecompare":
                 from . import slicecompare
                 return self._json(slicecompare.cached(st, p) or {"rows": [], "cached": False})
@@ -637,6 +657,10 @@ def make_handler(st: Studio):
                 owned = printers_mod.route_post(st, path, body)
                 if owned is not None:
                     return self._json(owned)
+            from . import modelling_api                    # sketches drawn by hand, before a project exists
+            got = modelling_api.route_global_post(st, path, body)
+            if got is not None:
+                return self._json(got)
             m = re.fullmatch(r"/api/projects/([a-z0-9-]+)/([a-z_]+)", path)
             if not m:
                 raise StudioError("Not found.", status=404)
@@ -657,6 +681,10 @@ def make_handler(st: Studio):
                 st.activity(None, "project", f"Moved {pid} to the trash folder.", by="you")
                 return self._json(res)
             p = st.load(pid)
+            from . import modelling_api                    # the feature tree and picked features (form/modelling.py)
+            got = modelling_api.route_post(st, p, action, body)
+            if got is not None:
+                return self._json(got)
             recipe = st.recipe(p)
             auto = lambda proj: st.run(pid) if proj.get("auto_run", True) else None
             # -- the game asset (form/game/app.py): build, validate or export; reads the project, never changes it --
@@ -795,6 +823,12 @@ def make_handler(st: Studio):
                 from . import slicer_open
                 out = slicer_open.run(st, p, body.get("printer") or None, open_app=body.get("open", True) is not False)
                 st.activity(pid, "look", f"Opened in {out['slicer']} with settings chosen for this part.", by="you")
+                return self._json(out)
+            if action == "study":                          # run one Bench entry; the app tracks its job (form/studies.py)
+                from . import studies
+                out = studies.start(st, pid, str(body.get("id") or ""), force=bool(body.get("force")), open=bool(body.get("open")))
+                if out.get("job") and isinstance(out["job"], str):
+                    st.activity(pid, "study", f"Bench: {studies.get(body['id']).label}.", by="you")
                 return self._json(out)
             if action == "slicecompare":
                 from . import slicecompare

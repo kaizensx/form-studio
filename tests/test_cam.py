@@ -258,7 +258,9 @@ class Posts(unittest.TestCase):
         self.assertNotIn("G83", g)
         self.assertIn("\nM0\n", g)                                            # it waits for the person instead
         self.assertIn("\nG54\n", g)
-        self.assertTrue(g.rstrip().endswith("M2"))
+        self.assertTrue(g.rstrip().endswith("G0 Z5.000\nM5\nM2"))               # up at the clearance height, and no
+        self.assertNotIn("G53", g)                                            # move in machine coordinates
+        self.assertNotIn("G28", g)
         lc = t["linuxcnc"]
         for w in ("T1 M6", "G43 H1", "T2 M6", "G43 H2", "G64 P0.01", "G98 G83", "G98 G81", "G80", "G53 G0 Z0"):
             self.assertIn(w, lc)
@@ -804,6 +806,8 @@ class Project(unittest.TestCase):
         self.assertEqual(s["state"], "stale")
         self.assertIn("changed after it was posted", " ".join(s["why"]))
         self.assertTrue(any("no current simulation" in r for r in st.gate(self.load())["reasons"]))
+        with self.assertRaises(StudioError):                                  # the stored result is not this file's
+            cam.simulate(st, self.load())
         f.write_text(text)
         self.assertEqual(cam.status(st, self.load())["state"], "current")
         # another post: its own program and its own simulation

@@ -224,7 +224,7 @@ def simulate(st, p: dict, sim_cell: float | None = None, force: bool = False, fu
     if not c.get("programs"):
         raise cam._err("Nothing has been posted yet.", "Post the plan first: cam_post, or `form cam post <project> --machine grbl`.")
     stt = status(st, p)
-    if stt["state"] == "stale" and stt.get("plan_stale"):
+    if stt["state"] == "stale":                       # another solid, other tools or options, or a file changed by hand
         raise cam._err("The posted program is stale: " + "; ".join(stt["why"]) + ".", "Post again: cam_post.", status=409)
     d = _dir(st, p)
     sk = sim_key(c, sim_cell)
@@ -454,8 +454,8 @@ def register_studies(register) -> None:
 
     def key(ctx):
         c = ctx.p.get("cam") or {}
-        return _cam().H("cam-bench", plan_key(ctx.keys["geometry"], c.get("options") or {}), c.get("dialect"),
-                        c.get("units"), c.get("wcs"))
+        return _cam().H("cam-bench", plan_key(ctx.keys["geometry"], c.get("options") or {}), c.get("dialect") or "grbl",
+                        c.get("units") or "mm", c.get("wcs") or "G54")
     register(Study("cam_3axis", "study", "CNC, 3-axis",
                    "Toolpaths for a 3-axis mill or router, posted for your controller, read back and run on a stock "
                    "model: gouge, leftover material, collisions and cycle time, measured against the design.",

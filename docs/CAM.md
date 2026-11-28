@@ -131,7 +131,7 @@ could not be installed without building it. Nothing of it is in Form Studio.
 
 | Post | Tool change | Drilling | Ends with | Notes |
 |---|---|---|---|---|
-| `grbl` (Grbl 1.1) | `T n`, `M5`, a pause `M0` (no M6 there) | written out as G0/G1 | `M2` | |
+| `grbl` (Grbl 1.1) | `T n`, `M5`, a pause `M0` (no M6 there) | written out as G0/G1 | `M5`, `M2` at the clearance height | no move in machine coordinates: an unhomed machine has no known machine zero |
 | `linuxcnc` | `T n M6`, `G43 H n` | `G98 G81` / `G83 Q` | `G53 G0 Z0`, `M2` | `G64 P0.01` |
 | `fanuc` (generic mill) | `T n M6`, `G43 H n` on the first Z move | `G98 G81` / `G83 Q` | `G91 G28 Z0`, `M30`, `%` | `%`, `O1000`, comments in capitals |
 | `haas` | as Fanuc | as Fanuc | `G53 G0 Z0`, `M30`, `%` | `%`, `O00001` |
