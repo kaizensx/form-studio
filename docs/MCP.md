@@ -116,7 +116,7 @@ instead.
 
 ## Tools at a glance
 
-100 tools. Read-only tools never change a project.
+103 tools. Read-only tools never change a project.
 
 | Tool | Access | What it does |
 |---|---|---|

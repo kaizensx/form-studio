@@ -823,3 +823,36 @@ def commit(st, p: dict, ops: list, expect_head: int | None = None, origin: str =
     r["preview"] = {k: pv[k] for k in ("volume_mm3", "bbox_mm", "faces", "craft_notes", "evidence") if k in pv}
     r["said"] = note or describe(ops, planned)
     return r
+
+
+# ---- the Bench (form/studies.py PROVIDERS) -------------------------------------------------------------------------
+
+def _head_log(ctx) -> list:
+    return list(ctx.rev.get("build_log") or [])
+
+
+def _features_live(ctx) -> dict:
+    """The head's features from its own build log: built, suppressed by hand, and left out (a picked edge or face a
+    rebuild could not find, or a feature that failed), each named. Read, never computed: nothing is built here."""
+    log = _head_log(ctx)
+    by = {k: [e["feature"] for e in log if e.get("status") == k] for k in ("suppressed", "skipped")}
+    built = [e["feature"] for e in log if e.get("status") not in ("suppressed", "skipped")]
+    bits = [f"{len(built)} built"] + ([f"{len(by['suppressed'])} suppressed"] if by["suppressed"] else []) \
+        + ([f"{len(by['skipped'])} left out"] if by["skipped"] else [])
+    why = {x.get("feature"): x for x in (ctx.rev.get("partial") or {}).get("skipped") or [] if isinstance(x, dict)}
+    detail = " ".join(f"{f}: {(why.get(f) or {}).get('message') or 'left out of the build'}." for f in by["skipped"])
+    if by["suppressed"]:
+        detail = (detail + " " if detail else "") + "Suppressed by hand: " + ", ".join(by["suppressed"]) + "."
+    return {"headline": " · ".join(bits), "evidence": "computed (the head's build log)", "detail": detail,
+            "data": {"built": built, **by}}
+
+
+def register_studies(register) -> None:
+    """Wave B's entry on the Bench: the feature tree's state, so a hand edit that leaves a feature out shows there."""
+    from . import studies
+    studies.APPLIES.setdefault("features", (lambda c: bool(_head_log(c)),
+                                            "Only for a design written as features (a FeatureDesign)."))
+    register(studies.Study("features", "study", "Features", "Every feature of the head as its build log records it: "
+                           "built, suppressed by hand, or left out with the reason.", "computed (the head's build log)",
+                           run=_features_live, live=True, needs=("features",), inputs=("design code", "values"),
+                           app="tree", tool="get_design_source", order=5))

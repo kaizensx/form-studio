@@ -445,8 +445,10 @@ current, stale, failed, running, unavailable with why, n/a with why), the revisi
 with its evidence class, and a run action wired to the same code as its own tool. Results are stored beside the
 revision under a key of its inputs, so a new revision makes them stale by construction and nothing is ever marked
 current by hand. The same listing is `list_studies` / `run_study` / `get_study` over MCP and `form study` in the
-terminal; later studies (mass properties, strength, manufacturability, drawings) register into it and appear
-everywhere at once.
+terminal; later studies register into it (`studies.PROVIDERS`) and appear everywhere at once. Mass and inertia, the
+materials with the document each value comes from (`form/massprops.py`) and the feature tree's state (`Features`:
+built, suppressed by hand, left out with the reason; `form/modelling.py`) are registered this way. A change made by
+hand is one revision of the design's code, so the studies of the revision before it show stale.
 
 ## Checks and evidence
 
@@ -635,7 +637,7 @@ either. A real thin fin still fails.
 | OpenSCAD | Builds `.scad` designs; Customizer ranges become parameters |
 | Blender | Photoreal renders; its 3D-Print Toolbox checks when the add-on is installed |
 | Your slicer | Slices, and opens the 3MF or G-code in it |
-| Any MCP client | The full engine over 100 tools ([MCP reference](MCP.md)) |
+| Any MCP client | The full engine over 103 tools ([MCP reference](MCP.md)) |
 
 When a program's version outside the supported range is why something failed, the error names the supported versions
 and what to do.

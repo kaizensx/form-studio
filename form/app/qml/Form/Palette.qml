@@ -46,6 +46,11 @@ Item {
             add("Tools", "dims", "ruler", (Store.dims ? "Hide" : "Show") + " overall dimensions", "Viewport", function () { Store.toggleDims() })
             add("Tools", "measure", "ruler", Store.measuring ? "Stop measuring" : "Measure", "Distance, angle, radius on the solid", function () { Store.setMeasuring(!Store.measuring) }, "M")
             add("Tools", "annotate", "map_pin", Store.selecting ? "Stop annotating" : "Annotate", "Pick or paint on the part, keep a note, ask the agent", function () { Store.setSelecting(!Store.selecting) }, "N")
+            // modelling by hand (form/modelling.py): the same as the tool dock's group; each becomes a feature in the code
+            if (!Store.hasDraft) add("Tools", "hand.sketch", "pen_tool", "Sketch on a plane", "Extrude, cut or revolve a profile you draw", function () { Store.openSheet("handsketch", { mode: "add", plane: { datum: "XY", offset: 0 } }) })
+            add("Tools", "hand.round", "radius", "Fillet or chamfer edges", "Pick the edges to round or bevel", function () { if (!Store.selecting) Store.setSelecting(true); Store.selMode = "edge" })
+            add("Tools", "hand.face", "circle_dot", "Hole, shell or sketch on a face", "Pick a flat face", function () { if (!Store.selecting) Store.setSelecting(true); Store.selMode = "face" })
+            add("Tools", "hand.tree", "list_filter", "Feature tree", "Roll back, suppress, rename or reorder features", function () { Store.setStage("shape") })
             Store.analysisMaps.forEach(function (m) { if (m.value) add("Tools", "map." + m.value, "layers", "Analysis map: " + m.text, Store.analysisMap === m.value ? "Showing now" : "Colour the part by " + m.text.toLowerCase(), function () { Store.setAnalysis(m.value) }) })
             if (Store.analysisMap) add("Tools", "map.off", "layers", "Hide the analysis map", Store.analysisLabel(Store.analysisMap), function () { Store.setAnalysis("") })
             add("Tools", "orient", "move_3d", "Find a print orientation", "Ranks the ways it can sit on the plate", function () { Store.setStage("prove"); Store.findOrientation() })

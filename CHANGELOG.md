@@ -13,8 +13,11 @@
   or why it cannot run here), its headline number with its evidence, and runs on click; a current one opens what it
   made. States come from keys of the head revision's inputs, never set by hand. The command palette finds every
   entry.
-- **`list_studies`, `run_study`, `get_study`** (MCP) and **`form study list|run|show <project> [id]`** (terminal):
-  the same Bench, headless. 100 MCP tools.
+- **`list_studies`, `run_study`, `get_study`** (MCP) and **`form study list|run|show <project> [id]`** (terminal): the
+  same Bench, headless. 103 MCP tools. Mass & inertia, Materials & sources (each value with its document) and Features
+  (built, suppressed by hand, left out with the reason) are Bench studies too; a change made by hand is a new
+  revision, so every study of the revision before it shows stale. The command palette also finds the hand tools:
+  Sketch on a plane, Fillet or chamfer, Hole, shell or sketch on a face, Feature tree.
 - **Model by hand, in the same code the agent writes.** The Program pane is a feature tree you can work in: drag
   the rollback bar up to any feature and the part shows as it stood then, from the feature checkpoints (a few
   milliseconds; nothing is saved); a line's menu suppresses and restores it, renames it in place, moves it up or
