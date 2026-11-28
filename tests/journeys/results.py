@@ -340,36 +340,59 @@ def journey_drawing(ui):
 
 
 class Frames:
-    """Counts the frames the window swaps (QQuickWindow.frameSwapped) and the time between them."""
+    """What a frame costs while the view turns. Three numbers, because the time between swapped frames alone misleads:
+    a view that swaps an extra frame per step (a HUD settling) has a shorter mean interval without being faster.
+
+    render  the render thread's own milliseconds per frame (beforeRendering to afterRendering, the scene graph's
+            and Qt Quick 3D's command recording), read on that thread
+    fps     frames per second when every swapped frame turns the view a degree (as fast as the window can draw;
+            the display's refresh is the ceiling)
+    idle    frames swapped in 1.2 s of a still view"""
 
     def __init__(self, ui):
         import time
-        self.ui, self.t, self.clock = ui, [], time.perf_counter
-        ui.win.frameSwapped.connect(self._tick)
 
-    def _tick(self):
-        self.t.append(self.clock())
+        from PySide6.QtCore import Qt
+        self.ui, self.t, self.rb, self.ra, self.clock = ui, [], [], [], time.perf_counter
+        self._hooks = [(ui.win.frameSwapped, lambda: self.t.append(self.clock())),
+                       (ui.win.beforeRendering, lambda: self.rb.append(self.clock())),
+                       (ui.win.afterRendering, lambda: self.ra.append(self.clock()))]
+        for sig, fn in self._hooks:
+            sig.connect(fn, Qt.DirectConnection)          # on the render thread: its own time, not the GUI's
+
+    def _clear(self):
+        self.t.clear()
+        self.rb.clear()
+        self.ra.clear()
 
     def idle(self, ms=1200):
         self.ui.settle(400)
-        self.t.clear()
+        self._clear()
         self.ui.wait(ms)
         return len(self.t)
 
-    def orbit(self, steps=90):
-        """Turn the view two degrees a frame; the mean and the worst milliseconds between frames."""
+    def orbit(self, secs=2.0):
+        """Turn the view a degree on every swapped frame for `secs`: frames per second, and the render thread's mean
+        and 95th-percentile milliseconds a frame."""
         self.ui.settle(300)
-        self.t.clear()
-        for _ in range(steps):
-            n = len(self.t)
-            self.ui.run_js("Store.viewer.tween = false; Store.viewer.az += 2")
-            self.ui.wait_until(lambda: len(self.t) > n, 2, "a frame")
-        d = [1000 * (b - a) for a, b in zip(self.t, self.t[1:])]
-        d.sort()
-        return sum(d) / len(d), d[int(len(d) * 0.95)]
+        self._clear()
+        on = [True]
+
+        def step():
+            if on[0]:
+                self.ui.run_js("Store.viewer.tween = false; Store.viewer.az += 1")
+        self.ui.win.frameSwapped.connect(step)               # queued: the GUI thread turns the view after each frame
+        self.ui.run_js("Store.viewer.tween = false; Store.viewer.az += 1")
+        self.ui.wait(int(secs * 1000))
+        on[0] = False
+        self.ui.win.frameSwapped.disconnect(step)
+        n = min(len(self.rb), len(self.ra))
+        d = sorted(1000 * (self.ra[i] - self.rb[i]) for i in range(n)) or [0.0]
+        return len(self.t) / secs, sum(d) / len(d), d[int(len(d) * 0.95)]
 
     def close(self):
-        self.ui.win.frameSwapped.disconnect(self._tick)
+        for sig, fn in self._hooks:
+            sig.disconnect(fn)
 
 
 def journey_perf(ui):
@@ -388,14 +411,15 @@ def journey_perf(ui):
         show(ui, pid, key, row, kind)
         out[name] = (fr.idle(), *fr.orbit())
     fr.close()
-    for k, (idle, mean, p95) in out.items():
-        print(f"PERF {k:9s} idle frames in 1.2 s: {idle:3d}   orbit: {mean:5.1f} ms mean, {p95:5.1f} ms 95th")
+    for k, (idle, fps, mean, p95) in out.items():
+        print(f"PERF {k:9s} idle frames in 1.2 s: {idle:3d}   orbit: {fps:5.1f} fps, render thread {mean:4.2f} ms mean, {p95:4.2f} ms 95th", flush=True)
     base = out["part"]
-    for k, (idle, mean, p95) in out.items():
+    for k, (idle, fps, mean, p95) in out.items():
         if k == "part":
             continue
         ui.check(idle <= base[0] + 2, f"{k}: a still result is not redrawn ({idle} frames, the part alone {base[0]})")
-        ui.check(mean <= max(base[1] * 1.5, base[1] + 6), f"{k}: turning the view is not slowed ({mean:.1f} ms a frame, the part alone {base[1]:.1f})")
+        ui.check(fps >= base[1] * 0.8, f"{k}: turning the view is not slowed ({fps:.0f} fps, the part alone {base[1]:.0f})")
+        ui.check(mean <= max(base[2] * 2.5, base[2] + 2), f"{k}: the render thread's frame is not heavier ({mean:.2f} ms, the part alone {base[2]:.2f})")
 
 
 def run(ui):

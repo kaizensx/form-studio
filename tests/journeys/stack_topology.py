@@ -32,24 +32,7 @@ def res(ui, expr="Results.kind"):
 
 
 def crop(ui, name):
-    out = os.environ.get("FORM_RESULT_CROPS")
-    shot = ui.shot(name)
-    if not out:
-        return
-    from PIL import Image
-    img = Image.open(shot)
-    k = img.width / ui.win.width()
-    tag = "%s-%d-%s" % (os.environ.get("FORM_APPEARANCE", "dark"), ui.win.width(), "col" if ui.js("Store.talkCol > 0") else "folded")
-    Path(out).mkdir(parents=True, exist_ok=True)
-    for nm in ("viewport", "legendStrip", "benchCard"):
-        it = ui.find(name=nm)
-        if it is None or it.width() < 4:
-            continue
-        p = it.mapToScene(it.boundingRect().topLeft())
-        box = tuple(int(v * k) for v in (p.x(), p.y(), p.x() + it.width(), p.y() + it.height()))
-        c = img.crop(box)
-        f = 2 / k
-        c.resize((int(c.width * f), int(c.height * f)), Image.LANCZOS).save(str(Path(out) / f"{name}-{nm}-{tag}.png"))
+    R.stage_crops(ui, name)
 
 
 def journey_stack(ui):
@@ -71,9 +54,14 @@ def journey_stack(ui):
     d = res(ui, "Results.r")
     ui.eq(round(d["gap"]["nominal"], 6), round(r["gap"]["nominal"], 6), "the gap is the engine's")
     ui.eq(len(d["draw"]["segments"]), len(r["draw"]["segments"]), "every segment of the engine's loop")
+    ui.check(all(f.get("mesh") for f in r["draw"]["faces"]), "the engine gives each face of the loop its triangles")
+    ui.eq(res(ui, "Store.viewer.resultLayer.stackLit.length"), len(r["draw"]["faces"]), "every face of the loop is lit on the part")
+    from form.stack import tools as stack_tools
+    ui.check(not any("mesh" in f for f in stack_tools.lean(r)["draw"]["faces"]), "an agent reads the loop without the triangles")
     gl = ui.find(name="stackGapLabel")
     ui.check(gl is not None and gl.isVisible() and "3.00 mm" in " ".join(ui.texts(gl)), "the gap's length stands at its middle")
     ui.check("RSS" in " ".join(ui.texts(ui.item("legendStrip"))), "the strip says RSS")
+    ui.check("Not told here" in str(ui.item("legendLimits").property("text")), "the strip says what the loop does not tell")
     ui.check(ui.sees("Worst case", within=ui.item("benchCard")), "the card has the numbers")
     crop(ui, "stack")
     # labels never sit on one another
@@ -102,19 +90,34 @@ def journey_topology(ui):
         return
     from form.topo import study as T
     R.strength(st, pid, R.STATIC)
-    T.run(st, pid, {"volfrac": 0.55, "max_iter": 24})
+    T.run(st, pid, {"volfrac": 0.55, "max_iter": 24, "mode": "free"})
     open_project(ui, pid)
     ui.key("Ctrl+1")
-    ui.wait_until(lambda: ui.find(name="bench-topology"), 15, "the topology row")
-    ui.click("bench-topology", 0.3, 0.5)
+    ui.settle(300)
+    # a Design entry: the pane in Design is the tree, so it is opened from the Bench sheet
+    ui.key("Ctrl+B")
+    ui.wait_until(lambda: ui.find(name="sheet-topology"), 15, "the topology row in the sheet")
+    ui.settle(400)
+    ui.click("sheet-topology", 0.3, 0.5)
+    ui.click(ui.wait_until(lambda: ui.find(name="benchFootOpen"), 3, "Open in Design"))
     ui.wait_until(lambda: res(ui) == "topology", 20, "the density drawn")
+    ui.eq(ui.store.get("stage"), "shape", "it opens in Design")
+    ui.check(ui.find(name="benchCard") is not None, "its card opens in the pane, over the tree")
     n0 = res(ui, "Results.developed")
     ui.wait_until(lambda: not res(ui, "Results.developing") and res(ui, "Results.settle") == 1, 5, "the run to play")
     ui.check(res(ui, "Results.developed") >= n0, "the run played once")
     ui.eq(res(ui, "Results.iteration"), res(ui, "Results.duration"), "it rests on the last iteration")
+    ui.check(ui.find(name="benchCard") is not None and ui.item("benchCard").isVisible() and ui.item("benchCard").height() > 40, "its card shows in the pane")
+    ui.check("compliance" in " ".join(ui.texts(ui.item("legendStrip"))), "the timeline plots the compliance of every iteration")
+    ui.check("Not told here" in str(ui.item("legendLimits").property("text")), "the strip says what the layout does not tell")
+    ui.settle(300)
+    crop(ui, "topology-end")
     ui.click("scrubArea", 0.0, 0.5)
     ui.eq(res(ui, "Results.iteration"), 0, "the timeline scrubs to the even start")
-    crop(ui, "topology")
+    ui.settle(300)
+    crop(ui, "topology-start")
+    ui.click("bench-topology", 0.3, 0.5)          # its row in the pane again: back to the tree and the clay part
+    ui.wait_until(lambda: res(ui) == "", 5, "the density to go")
 
 
 def run(ui):

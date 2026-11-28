@@ -175,5 +175,24 @@ class Geometry(unittest.TestCase):
             self.assertEqual((round(at.x(), 5), round(at.y(), 5)), (10.0, 5.0))
 
 
+class Small(unittest.TestCase):
+    def test_an_engine_clause_ends_as_a_sentence(self):
+        self.assertEqual(resultview._sentence("members thinner than 5 mm are not resolved"), "members thinner than 5 mm are not resolved.")
+        self.assertEqual(resultview._sentence("Done."), "Done.")
+        self.assertEqual(resultview._sentence(""), "")
+
+    def test_an_agent_reads_the_loop_without_its_triangles(self):
+        from form.stack import tools
+        out = {"gap": {"nominal": 3}, "draw": {"faces": [{"part": "lid", "model_face": 4, "mesh": {"positions": "AAAA"}}], "segments": []}}
+        lean = tools.lean(out)
+        self.assertNotIn("mesh", lean["draw"]["faces"][0])
+        self.assertIn("mesh", out["draw"]["faces"][0], "the stored result keeps them")
+        self.assertEqual(tools.lean({"stacks": []}), {"stacks": []})
+
+    def test_every_result_says_what_it_does_not_tell_under_one_key(self):
+        src = Path(resultview.__file__).read_text(encoding="utf-8")
+        self.assertNotIn('"not_told"', src, "the strip reads `not`")
+
+
 if __name__ == "__main__":
     unittest.main()

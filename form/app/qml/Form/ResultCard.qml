@@ -22,6 +22,7 @@ Column {
         : kind === "drawing" ? [r.name || "Sheet", r.dims.length + " dimensions, " + r.dims.filter(function (d) { return d.editable }).length + " bound to a parameter"]
         : kind === "stack" ? [Results.fmt(r.gap.nominal, ""), "mm gap, RSS " + Results.fmt(r.rss[0], "") + " to " + Results.fmt(r.rss[1], "mm")]
         : kind === "topology" ? [String(Math.max(0, (r.history || []).length - 1)), "iterations" + (r.converged ? ", converged" : ", stopped before converging")]
+        : kind === "lattice" ? [Results.fmt(r.density.measured !== null && r.density.measured !== undefined ? r.density.measured : r.density.computed, ""), "relative density, " + r.label]
         : kind === "front" ? [String(r.front.length), r.app === "inverse" ? "variants on the front" : "orientations on the front"]
         : kind === "motion" && r.clearance && r.clearance.min ? [Results.fmt(r.clearance.min.clearance_mm, ""), "mm smallest gap, at " + Results.fmt(r.clearance.min.t, "s")] : null
     spacing: 10
@@ -167,6 +168,12 @@ Column {
     }
 
     // ── topology: the run, iteration by iteration ──
+    // ── a lattice: its density three ways, and what was built ──
+    Column { width: parent.width; spacing: 2; visible: rc.kind === "lattice"
+        readonly property var dn: rc.kind === "lattice" ? rc.r.density : ({})
+        Line { k: "Relative density, the cell"; v: Results.fmt(parent.dn.computed, ""); ev: "computed" }
+        Line { visible: parent.dn.measured !== null && parent.dn.measured !== undefined; k: "The built solid"; v: Results.fmt(parent.dn.measured, ""); ev: "measured" }
+        Line { k: "Drawn here"; v: Results.fmt(parent.dn.drawn, ""); ev: "computed"; note: rc.kind === "lattice" ? rc.r.representation : "" } }
     Column { width: parent.width; spacing: 2; visible: rc.kind === "topology"
         readonly property var h: rc.kind === "topology" ? (rc.r.history || []) : []
         readonly property var at: h.length ? h[Math.min(h.length - 1, Results.iteration)] : null
@@ -184,6 +191,13 @@ Column {
             Line { required property var modelData; required property int index; k: modelData.label; v: Results.fmt(parent.pt.at[index], modelData.unit); ev: rc.r.app === "inverse" ? "simulated" : index === 0 ? "computed" : "modelled" } }
         Line { visible: !!parent.pt && rc.r.app === "printOrient"; k: "Tips over at"; v: parent.pt && parent.pt.tip_over_deg !== undefined && parent.pt.tip_over_deg !== null ? F.fmt(parent.pt.tip_over_deg, 0) + "°" : ""; ev: "computed"
             note: parent.pt ? (parent.pt.label || "") : "" }
+        // the part on the stage lies this way (a preview); the print setup changes only with Use this
+        Row { visible: !!parent.pt && rc.r.app === "printOrient"; spacing: 8; topPadding: 6
+            readonly property var pt: parent.pt
+            Btn { objectName: "orientUseThis"; small: true; kind: "primary"; enabled: !Results.picking && !!Results.previewId && !(parent.pt && parent.pt.current)
+                busy: Results.picking; text: parent.pt && parent.pt.current ? "In the print setup" : "Use this"
+                tip: "Write this orientation to the print setup: exports, checks and the slice follow it"; onClicked: Results.useOrientation() }
+            Btn { objectName: "orientAsDesigned"; small: true; kind: "quiet"; text: "As designed"; onClicked: Results.clearPoint() } }
     }
     Txt { visible: rc.kind === "front"; width: parent.width; kind: "fine"; tone: 3; text: rc.kind === "front" ? rc.r.open + " " + rc.r.note : "" }
 

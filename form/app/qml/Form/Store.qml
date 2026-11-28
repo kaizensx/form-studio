@@ -2654,7 +2654,10 @@ QtObject {
     }
     // a row was clicked: it is the chapter's selected row. A current map also goes onto the part; Fit opens its study.
     function benchPick(ch, e) {
-        var m = Object.assign({}, benchSel); m[ch] = e.id; benchSel = m
+        var m = Object.assign({}, benchSel)
+        // Design's own list is the tree: a Design entry opened from the sheet closes when its row is clicked again
+        if (ch === "design" && m.design === e.id) { delete m.design; benchSel = m; return }
+        m[ch] = e.id; benchSel = m
         var a = e.app || ""
         if (a.indexOf("map.") === 0 && e.state === "current") { openStudy(e); return }
         if (analysisMap && a.indexOf("map.") !== 0) setAnalysis("")

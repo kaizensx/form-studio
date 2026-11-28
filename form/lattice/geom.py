@@ -30,6 +30,7 @@ from __future__ import annotations
 import hashlib
 import json
 import math
+import os
 import time
 
 import numpy as np
@@ -749,4 +750,65 @@ def op_lattice_report(key, recipe_id, values, tol=0.05):
     return {"spec": spec, "report": REPORTS.get(k)}
 
 
-KERNEL_OPS = {"lattice_plan": op_lattice_plan, "lattice_report": op_lattice_report}
+VIEW_TRIANGLES = 600_000                                   # more than this is drawn as its first cells only
+
+
+def view(shape, spec: dict) -> dict:
+    """The lattice alone, clipped to its region (the inner region, inside the skin), as a triangle mesh for the
+    viewport: the same struts or level set the build cut into the body, kept where the material is. Per vertex the
+    relative density the specification asks there (graded or not). Needs manifold3d."""
+    if not _has_manifold():
+        raise LatticeError("Drawing the lattice needs manifold3d, which is not installed.", "pip install 'form-studio[organic]'.")
+    import manifold3d as m3
+    body, zone, inner = region_of(shape, spec)
+    lo, hi = _bbox(inner)
+    inner_m = _mesh_of(inner)
+    if not C.is_tpms(spec["kind"]):
+        S, r = _struts_in(spec, lo, hi)
+        if not len(S):
+            raise LatticeError("No strut falls inside the region.", "Use a smaller cell.", ["cell"])
+        lat = _strut_mesh(S, r, float(spec["node"])) ^ inner_m
+    else:
+        level = None if spec.get("grading") else facet_level(spec, _tpms_grid(spec, lo, hi)[0])
+        V, F, _h, _note, _info = _tpms_mesh(spec, lo, hi, False, level)
+        lat = inner_m - (_manifold(V, F, m3) ^ inner_m)
+    V, F = _arrays(lat)
+    clipped = False
+    if len(F) > VIEW_TRIANGLES:                           # a very fine lattice: the triangles nearest the region's corner
+        c = V[F].mean(axis=1)
+        keep = np.argsort(np.linalg.norm(c - lo, axis=1))[:VIEW_TRIANGLES]
+        V, F = _compact(V, F[np.sort(keep)])
+        clipped = True
+    rho = density_at(spec, V, lo, hi)
+    graded = rho is not None
+    if rho is None:                                        # uniform: the drawn lattice's own volume over the region's
+        rho = np.full(len(V), float(lat.volume()) / max(float(inner.volume), 1e-12))
+    return {"positions": V.astype(np.float32), "indices": F.astype(np.uint32), "density": np.asarray(rho, np.float32),
+            "region": {"lo": [float(x) for x in lo], "hi": [float(x) for x in hi]}, "clipped": clipped, "graded": graded,
+            "triangles": int(len(F)), "volume_mm3": float(lat.volume()), "inner_volume_mm3": float(inner.volume)}
+
+
+def op_lattice_view(key, recipe_id, values, out, tol=0.05):
+    """The lattice of the head revision alone, written to `out` (worker): positions, indices and per-vertex density
+    as base64, the region it fills. Returns the numbers without the arrays."""
+    import base64
+    from .. import kernel
+    model = kernel._get_near(key, recipe_id, values, tol)
+    recipe = model["recipe"]
+    spec = getattr(recipe, "_form_lattice", None)
+    if not spec:
+        return {"error": "This design carries no lattice."}
+    try:
+        v = view(recipe._form_lattice_base(model["values"]), spec)
+    except LatticeError as e:
+        return {"error": str(e), "hint": e.hint}
+    data = {"format": "form-lattice-view/1", **{k: v[k] for k in ("region", "clipped", "graded", "triangles", "volume_mm3", "inner_volume_mm3")},
+            **{k: base64.b64encode(np.ascontiguousarray(v[k]).tobytes()).decode() for k in ("positions", "indices", "density")}}
+    tmp = out + ".tmp"
+    with open(tmp, "w", encoding="utf-8") as fh:
+        json.dump(data, fh)
+    os.replace(tmp, out)
+    return {k: data[k] for k in ("region", "clipped", "graded", "triangles", "volume_mm3", "inner_volume_mm3")}
+
+
+KERNEL_OPS = {"lattice_plan": op_lattice_plan, "lattice_report": op_lattice_report, "lattice_view": op_lattice_view}

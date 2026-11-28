@@ -214,3 +214,59 @@ def seed(st, fea=None) -> dict:
     ids["fourbar"] = design(st, "Four-bar", FOURBAR)
     bench(st, ids["fourbar"], "motion", drivers=[{"joint": "crank", "from": 0, "to": 360}], frames=37)
     return ids
+
+
+def stage_crops(ui, name, items=("viewport", "legendStrip", "benchCard")):
+    """200 % crops of the stage (the free area between the panes, round the part) and of named items, saved under
+    $FORM_RESULT_CROPS as <name>-<item>-<theme>-<width>-<folded|col>.png. With FORM_CROP_COLUMN=1 the same crops are
+    taken again with the conversation column the other way, then it is put back as it was."""
+    import os
+    from pathlib import Path
+    out = os.environ.get("FORM_RESULT_CROPS")
+    if not out:
+        ui.shot(name)
+        return
+
+    def take(state):
+        from PIL import Image
+        from PySide6.QtCore import QPointF
+        img = Image.open(ui.shot(f"{name}-{state}"))
+        k = img.width / ui.win.width()
+        tag = "%s-%d-%s" % (os.environ.get("FORM_APPEARANCE", "dark"), ui.win.width(), state)
+        Path(out).mkdir(parents=True, exist_ok=True)
+        for nm in items:
+            it = ui.find(name=nm)
+            if it is None or it.width() < 4 or not it.isVisible():
+                continue
+            p = it.mapToItem(ui.win.contentItem(), QPointF(0, 0))
+            box = [p.x(), p.y(), p.x() + it.width(), p.y() + it.height()]
+            if nm == "viewport":
+                pane = ui.find(name="programPane")
+                left = max(ui.js("Store.talkCol") or 0, 72)
+                right = pane.mapToItem(ui.win.contentItem(), QPointF(0, 0)).x() if pane is not None and pane.isVisible() else ui.win.width()
+                box = [left, 84, right - 8, ui.win.height() * 0.86]
+            c = img.crop(tuple(int(v * k) for v in box))
+            c.resize((int(c.width * 2 / k), int(c.height * 2 / k)), Image.LANCZOS).save(str(Path(out) / f"{name}-{nm}-{tag}.png"))
+
+    was = bool(ui.js("Store.talkCol > 0"))
+    take("col" if was else "folded")
+    if os.environ.get("FORM_CROP_COLUMN") != "1":
+        return
+    # an empty conversation has no column: a local note of what was done stands in for one (the window's own kind
+    # of item for a hand action, never sent anywhere), and goes again after
+    seeded = not was and ui.js("Store.chatItems.length") == 0
+    if seeded:
+        ui.run_js("Store.chatItems = [{ t: 'user', text: 'Show the result on the part', local: true }]")
+    ui.run_js("Store.talkOpen = %s; Store.talkCalm = false" % ("false" if was else "true"))
+    try:
+        ui.wait_until(lambda: bool(ui.js("Store.talkCol > 0")) != was, 4, "the column to change")
+    except Exception:                                   # noqa: BLE001 - a window too narrow for the column
+        print(f"NOTE: {name}: the column did not change at {ui.win.width()} px", flush=True)
+    else:
+        ui.settle(900)
+        take("folded" if was else "col")
+    if seeded:
+        ui.run_js("Store.chatItems = []")
+    ui.run_js("Store.talkOpen = %s" % ("true" if was else "false"))
+    ui.wait_until(lambda: bool(ui.js("Store.talkCol > 0")) == was, 4, "the column back as it was")
+    ui.settle(600)

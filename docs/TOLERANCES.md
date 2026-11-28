@@ -201,7 +201,9 @@ hint, a design change, is assumed.
 `draw` is what the viewport needs to light the loop on the parts:
 
 - `faces`: each face's model face index, its part, its role (`gap_a`, `gap_b`, `interface`), its feature, its centre
-  (assembled and as built) and its normal, or its axis and radius.
+  (assembled and as built) and its normal, or its axis and radius, and `mesh`: the face's own triangles in the
+  assembled frame (the kernel's tessellation, base64 float32 positions and uint32 indices), which the viewport tints.
+  The MCP tools return `draw` without the triangles; the stored result keeps them.
 - `segments`: one per link, one per interface and one for the gap. Each runs from one level to the next along the
   direction, on a line through face A's centre, in the assembled frame at rest, with its length.
 

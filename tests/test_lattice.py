@@ -234,6 +234,23 @@ class Geometry(unittest.TestCase):
             out = geom._fill(shape, spec)
         return out, geom.REPORTS[geom.spec_key(spec)], spec
 
+    def test_the_view_is_the_built_lattice_inside_the_skin(self):
+        """What the stage draws (geom.view): the same struts kept where the inner region is, as dense as the build."""
+        from build123d import Box
+        from form.lattice import geom
+        if not geom._has_manifold():
+            self.skipTest("manifold3d is not installed")
+        _out, rep, spec = self.fill(Box(18, 18, 18), kind="bcc", cell=8, strut_d=1.2, skin=1.0)
+        v = geom.view(Box(18, 18, 18), spec)
+        lo, hi = v["region"]["lo"], v["region"]["hi"]
+        self.assertTrue(all(abs(a + 8.0) < 1e-6 for a in lo) and all(abs(b - 8.0) < 1e-6 for b in hi), "the box less the 1 mm skin")
+        P = v["positions"]
+        self.assertTrue((P.min(axis=0) >= -8.0 - 1e-4).all() and (P.max(axis=0) <= 8.0 + 1e-4).all(), "nothing outside the region")
+        drawn = v["volume_mm3"] / v["inner_volume_mm3"]
+        self.assertAlmostEqual(drawn, rep["relative_density_measured"], delta=0.02)
+        self.assertFalse(v["graded"])
+        self.assertTrue(abs(float(v["density"][0]) - drawn) < 1e-6, "a uniform lattice carries the drawn density")
+
     def test_struts_as_exact_brep(self):
         from build123d import Box, GeomType
         out, rep, spec = self.fill(Box(18, 18, 18), kind="octet", cell=8, strut_d=1.0, skin=1.0)

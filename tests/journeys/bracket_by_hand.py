@@ -44,6 +44,26 @@ def crop(ui, item, name, pad=8):
     c.save(str(Path(out) / f"{name}-{size}-{os.environ.get('FORM_APPEARANCE', 'dark')}.png"))
 
 
+def clear_symbols(ui, when):
+    """The constraint symbols on the sketch cover neither each other nor a dimension's tag (greedy seats, SketchOnPart)."""
+    lay = ui.js("Store.sketchHost.lay")
+    gs = [(g["x"] - 9, g["y"] - 9, 18, 18) for g in lay["glyphs"]]
+    tags = []
+    for i in range(len(ui.js("Store.sketchHost.sk.constraints"))):
+        t = ui.find(name=f"sketchDim-{i}")
+        if t is not None and t.isVisible():
+            tags.append((t.x(), t.y(), t.width(), t.height()))
+
+    def hit(a, b):
+        return a[0] < b[0] + b[2] and b[0] < a[0] + a[2] and a[1] < b[1] + b[3] and b[1] < a[1] + a[3]
+    for i, a in enumerate(gs):
+        for b in gs[i + 1:]:
+            ui.check(not hit(a, b), f"{when}: two constraint symbols overlap at {a[:2]} and {b[:2]}")
+        for b in tags:
+            ui.check(not hit(a, b), f"{when}: a constraint symbol at {a[:2]} covers a dimension at {b[:2]}")
+    return len(gs)
+
+
 def frames(ui, ms):
     """How many frames the window swaps in ms while nothing is touched."""
     n = [0]
@@ -155,6 +175,7 @@ def journey_bracket(ui):
     ui.type("40")
     ui.settle(300)
     ui.shot("bracket-1-sketch")
+    clear_symbols(ui, "the L profile")
     crop(ui, stage_rect(ui), "sketch-new")
     crop(ui, "sketchCapsule", "sketch-capsule")
     crop(ui, "sketchFoot", "sketch-foot")
@@ -200,6 +221,7 @@ def journey_bracket(ui):
     ui.check(ui.item("sketchSay").property("text").startswith("−384.0"), f"the preview says what the cut removes: {ui.item('sketchSay').property('text')}")
     ui.settle(300)
     ui.shot("bracket-2-pocket")
+    clear_symbols(ui, "the pocket on the face")
     crop(ui, stage_rect(ui), "sketch-face")
     # nothing touched: what the window draws in 2 s with the sketch open, against the same 2 s before it was opened
     # (the keyboard is back on the plane, so no caret is blinking in the depth field)

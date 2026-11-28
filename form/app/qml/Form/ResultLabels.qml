@@ -164,7 +164,7 @@ Item {
             Item { id: sk; required property var modelData
                 readonly property var mid: [(modelData.from[0] + modelData.to[0]) / 2, (modelData.from[1] + modelData.to[1]) / 2, (modelData.from[2] + modelData.to[2]) / 2]
                 Pill { objectName: sk.modelData.kind === "gap" ? "stackGapLabel" : "stackLinkLabel"; p: root.at(sk.mid); dx: 12; dy: 0
-                    tint: sk.modelData.kind === "gap" ? "#3ee6ff" : Theme.ink
+                    tint: sk.modelData.kind === "gap" ? (Theme.dark ? "#3ee6ff" : Theme.datum) : Theme.ink
                     shown: sk.modelData.kind === "gap" || Math.abs(sk.modelData.length) > 1e-6
                     text: Results.fmt(sk.modelData.length, "mm"); sub: sk.modelData.kind === "gap" ? "gap" : (sk.modelData.part || "") } } }
     }

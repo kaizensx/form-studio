@@ -30,6 +30,14 @@ def call(st, project: str, a=None, b=None, save: bool = False, stack: str = "", 
         raise _serr(e) from None
 
 
+def lean(out):
+    """What an agent reads: the loop's faces without their triangles (those are for the viewport)."""
+    d = out.get("draw") if isinstance(out, dict) else None
+    if isinstance(d, dict) and d.get("faces"):
+        out = {**out, "draw": {**d, "faces": [{k: v for k, v in f.items() if k != "mesh"} for f in d["faces"]]}}
+    return out
+
+
 def read(st, project: str, stack: str = "") -> dict:
     try:
         p = st.load(project)
@@ -72,9 +80,9 @@ def register_tools(mcp, studio, run_async, RO, RW, origin) -> None:
         assumed), thermal, and draw (the loop's faces and segments for the viewport). save=True keeps it with the
         design (the Bench entry 'stack'); stack= alone runs a kept one for the head."""
         st = studio()
-        return await run_async(call, st, project, a, b, save, stack, direction=direction, tolerances=tolerances,
+        return lean(await run_async(call, st, project, a, b, save, stack, direction=direction, tolerances=tolerances,
                                dist=dist, spec=spec, t_min=t_min, t_max=t_max, alpha=alpha, samples=samples, seed=seed,
-                               params=params, exclude=exclude, name=name)
+                               params=params, exclude=exclude, name=name))
 
     @mcp.tool(annotations=RO)
     async def get_tolerance_stack(project: str, stack: str = "") -> dict:
@@ -82,7 +90,7 @@ def register_tools(mcp, studio, run_async, RO, RW, origin) -> None:
         stale with the revision it describes, never). stack=: its stored result (as tolerance_stack returns it).
         Reads only."""
         st = studio()
-        return await run_async(read, st, project, stack)
+        return lean(await run_async(read, st, project, stack))
 
 
 __all__ = ["call", "read", "register_tools"]

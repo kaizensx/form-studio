@@ -853,7 +853,8 @@ Item {
         // as tall as what it holds, down to the foot of the window or the legends' dock under it
         readonly property real room_: ws.colFoot - y - dock.reserve
         // In Design, with no feature open, that is the listing: the general parameters, colours and Explore are a scroll below it.
-        readonly property real listing: panel.item && panel.item.paneHeight !== undefined && panel.item.paneHeight > 0 && !foot.on ? panel.item.paneHeight : -1
+        // A Design entry opened from the Bench sheet (topology, inverse design) puts its row and card over the tree: then all of it.
+        readonly property real listing: panel.item && panel.item.paneHeight !== undefined && panel.item.paneHeight > 0 && !foot.on && !chap.visible ? panel.item.paneHeight : -1
         height: Math.round(Math.max(120, Math.min(room_, stageHead.height + (listing > 0 ? listing + 8 : body.implicitHeight + 22) + foot.height + pipeRow.height)))
         Behavior on height { enabled: insp.settled; NumberAnimation { duration: Theme.move(Theme.cross); easing.type: Easing.BezierSpline; easing.bezierCurve: Theme.easeOut } }
         property bool settled: false
@@ -891,8 +892,8 @@ Item {
                 // the mode's chapter of the Bench (Check: studies, Make: routes, Document: documents), one row grammar;
                 // under it the selected row, opened. The row that is the mode's own subject (the checks in Check,
                 // the release in Make) opens as the mode's panel below.
-                Bench { id: chap; x: 6 - body.x; width: insp.width - 12; visible: Store.stage === "prove" || Store.stage === "release" || Store.stage === "document"
-                    chapter: Store.stage === "release" ? "make" : Store.stage === "document" ? "document" : "check" }
+                Bench { id: chap; x: 6 - body.x; width: insp.width - 12; visible: Store.stage === "prove" || Store.stage === "release" || Store.stage === "document" || (Store.stage === "shape" && !!Store.benchSel.design)
+                    chapter: Store.stage === "release" ? "make" : Store.stage === "document" ? "document" : Store.stage === "shape" ? "design" : "check" }
                 BenchCard { id: opened; x: 6 - body.x; width: insp.width - 12
                     readonly property var pick: chap.visible ? Store.benchSelected(chap.chapter) : null
                     readonly property bool home: !pick || pick.id === Store.benchHome[chap.chapter]

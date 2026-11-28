@@ -395,7 +395,37 @@ def _face_out(rec: dict, n) -> dict:
         out.update({"axis": [round(float(x), 9) for x in rec["axis"]], "origin": [round(float(x), 6) for x in rec["origin"]],
                     "radius": round(rec["radius"], 6)})
     out["level"] = round(_level(rec, n, rec.get("side") or "mid"), 9)
+    m = _face_mesh(rec.get("face"))
+    if m:
+        out["mesh"] = m
     return out
+
+
+_MESHES: dict = {}
+
+
+def _face_mesh(face, tol: float = 0.05) -> dict | None:
+    """The face's own triangles in the assembled frame, for the viewport to light it (base64 float32 xyz, uint32)."""
+    if face is None:
+        return None
+    k = id(face)
+    if k in _MESHES and _MESHES[k][0] is face:
+        return _MESHES[k][1]
+    import base64
+    try:
+        vs, ts = face.tessellate(tol, 0.3)
+    except Exception:                                    # noqa: BLE001 - a face that does not mesh is drawn as a cross
+        return None
+    if not vs or not ts:
+        return None
+    P = np.asarray([[v.X, v.Y, v.Z] for v in vs], np.float32)
+    T = np.asarray(ts, np.uint32).reshape(-1, 3)
+    m = {"positions": base64.b64encode(P.tobytes()).decode(), "indices": base64.b64encode(T.tobytes()).decode(),
+         "triangles": int(len(T))}
+    if len(_MESHES) > 64:
+        _MESHES.clear()
+    _MESHES[k] = (face, m)
+    return m
 
 
 def op_stack_loop(key, recipe_id, values, a, b, direction=None, params=None, budget_s: float = 90.0, tol: float = 0.1):

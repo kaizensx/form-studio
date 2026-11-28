@@ -944,6 +944,10 @@ def make_handler(st: Studio):
             if action == "settings":
                 p = st.settings(p, body)
                 return self._json({"job": auto(p)})
+            if action == "orient_pick":                    # an orientation of the front, picked in the card: the print setup
+                from .printphys import orient
+                out = orient.pick(st, p, str(body.get("orientation") or ""))
+                return self._json({**out, "job": auto(st.load(p["id"]))})
             if action == "part":                           # per-part orientation, material, colour (form/plates.py, materials.py)
                 st.set_part(pid, str(body.get("part") or ""), **{k: body.get(k) for k in ("orientation", "material", "color")})
                 return self._json({"job": auto(st.load(pid))})

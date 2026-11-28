@@ -84,5 +84,5 @@ Glass {
                 onClicked: { var e = bs.sel; if (e.by !== "engine") Store.benchOpen = false; Store.runStudy(e.id, e.state === "current") } }
             Btn { kind: "quiet"; visible: !!bs.sel && bs.sel.state === "running"; busy: true; text: "Running…"; enabled: false }
             Btn { objectName: "benchFootOpen"; visible: !!bs.sel; text: "Open in " + (bs.sel ? ({ design: "Design", check: "Check", make: "Make", document: "Document" })[Store.benchChapter(bs.sel)] : "")
-                onClicked: { var e = bs.sel, ch = Store.benchChapter(e); Store.benchOpen = false; Store.setStage(Store.benchModeOf(ch)); if (ch !== "design") Store.benchPick(ch, e); else Store.openStudy(e) } } } }
+                onClicked: { var e = bs.sel, ch = Store.benchChapter(e); Store.benchOpen = false; Store.setStage(Store.benchModeOf(ch)); if (ch !== "design" || Results.draws(e)) Store.benchPick(ch, e); else Store.openStudy(e) } } } }
 }

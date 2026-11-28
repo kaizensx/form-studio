@@ -108,6 +108,30 @@ Item {
     // results drawn on the part (ResultLayer, ResultLabels): on in the workspace's view only, never in a thumbnail
     property bool results: false
     readonly property alias resultLayer: rlayer
+    // a print orientation picked on the front (Results.previewDown, design frame): the part turns, about its middle,
+    // until that direction faces the floor, and rests on it. A preview: the print setup changes only with Use this.
+    readonly property var _pd: results && !lite && Results.previewDown ? Results.previewDown : null
+    property var _pdShown: [0, 0, -1]
+    on_PdChanged: if (_pd) _pdShown = _pd
+    property real orientK: _pd ? 1 : 0
+    Behavior on orientK { NumberAnimation { duration: Motion.move(Theme.panel); easing.type: Easing.BezierSpline; easing.bezierCurve: Theme.easeFold } }
+    readonly property var _orientAA: {             // the turn that takes the picked direction to -Z, as axis and angle
+        var d = Qt.vector3d(_pdShown[0], _pdShown[1], _pdShown[2]).normalized(), t = Qt.vector3d(0, 0, -1)
+        var c = Math.max(-1, Math.min(1, d.dotProduct(t))), ax = d.crossProduct(t)
+        if (ax.length() < 1e-6) return { axis: Qt.vector3d(1, 0, 0), angle: c > 0 ? 0 : 180 }
+        return { axis: ax.normalized(), angle: Math.acos(c) * 180 / Math.PI }
+    }
+    readonly property quaternion orientQ: Quaternion.fromAxisAndAngle(_orientAA.axis, _orientAA.angle * orientK)
+    readonly property vector3d _orientMid: { var b = model ? model.bbox : null
+        return b ? Qt.vector3d((b[0][0] + b[1][0]) / 2, (b[0][1] + b[1][1]) / 2, (b[0][2] + b[1][2]) / 2) : Qt.vector3d(0, 0, 0) }
+    readonly property real _orientLift: {          // how far to raise the turned part so its lowest corner is on the floor again
+        var b = model ? model.bbox : null
+        if (!b || orientK <= 0) return 0
+        var lo = Infinity
+        for (var i = 0; i < 8; i++) { var p = Qt.vector3d(b[i & 1][0], b[(i >> 1) & 1][1], b[(i >> 2) & 1][2]).minus(_orientMid)
+            lo = Math.min(lo, orientQ.times(p).z) }
+        return b[0][2] - (_orientMid.z + lo)
+    }
     Behavior on mapMix { NumberAnimation { duration: Motion.slow; easing.type: Easing.OutCubic } }
     onAnalysisChanged: { if (analysis) { mapOff.stop(); _map = analysis; mapMix = 1 } else { mapMix = 0; mapOff.restart() } }
     Timer { id: mapOff; interval: 300; onTriggered: if (!vp.analysis) vp._map = null }
@@ -1009,7 +1033,11 @@ Item {
 
             Node {
                 id: design
-                position: vp.shift
+                objectName: "designNode"
+                // turned only while a print orientation is previewed (vp.orientK); otherwise the identity, about the middle
+                pivot: vp._orientMid
+                position: vp.shift.plus(vp._orientMid).plus(Qt.vector3d(0, 0, vp._orientLift))
+                rotation: vp.orientQ
                 InkLine { points: vp.inkLines; color: Theme.datum; weight: 2; port: vp; visible: vp.sketching }
                 InkLine { points: vp.inkLit; color: Theme.datumHi; weight: 3; port: vp; visible: vp.sketching; bias: 2 }
                 Repeater3D {
@@ -1131,7 +1159,7 @@ Item {
                     FeatureEdges { required property var modelData; required property int index
                         host: vp; mesh: modelData; last: !(vp.model && vp.model.stage) || index >= partEdges.count - 1 }
                 }
-                Model { visible: !!(vp.model && vp.model.edges) && !vp.asm && !vp._trace && vp._altMix < 0.5; pickable: false; castsShadows: false; depthBias: -2
+                Model { visible: !!(vp.model && vp.model.edges) && !vp.asm && !vp._trace && vp._altMix < 0.5 && rlayer.kind !== "lattice"; pickable: false; castsShadows: false; depthBias: -2
                     geometry: LineGeometry { segments: vp.model && vp.model.edges ? vp.model.edges : "" }
                     materials: CustomMaterial { shadingMode: CustomMaterial.Unshaded; fragmentShader: "shaders/wipeline.frag"; vertexShader: "shaders/line.vert"
                         property real uWipe: vp._wipePx; property real uWipeSide: 1
@@ -1520,7 +1548,7 @@ Item {
     // dimension numbers, on the 3D dimension lines: small capsules, the number in mono
     Repeater {
         id: dimLabels
-        model: vp.showDims && !vp.sketching && rlayer.kind === "" && vp.model && !(vp.asmOn && vp.asmMode === "exploded") && !vp.platesOn && !vp.dimsHeld && vp._altMix < 0.5 ? 3 : 0
+        model: vp.showDims && !vp.sketching && rlayer.kind === "" && vp.orientK === 0 && vp.model && !(vp.asmOn && vp.asmMode === "exploded") && !vp.platesOn && !vp.dimsHeld && vp._altMix < 0.5 ? 3 : 0
         Rectangle {
             id: dl
             objectName: "dimLabel"

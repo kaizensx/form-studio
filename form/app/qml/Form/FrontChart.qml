@@ -9,10 +9,11 @@ Item {
     property var r: null
     readonly property var axes: r ? r.axes : []
     readonly property var pts: r ? r.points : []
-    readonly property real padL: 40
+    readonly property real padL: 16
     readonly property real padB: 30
-    readonly property real w: width - padL - 8
-    readonly property real h: height - padB - 6
+    readonly property real padT: 26                 // the second axis's name sits on one line above the plot
+    readonly property real w: width - padL - 16
+    readonly property real h: height - padB - padT
     function span(k) {
         var lo = Infinity, hi = -Infinity
         for (var i = 0; i < pts.length; i++) { var v = pts[i].at[k]; if (v === null || v === undefined) continue; lo = Math.min(lo, v); hi = Math.max(hi, v) }
@@ -23,7 +24,7 @@ Item {
     readonly property var sx: span(0)
     readonly property var sy: span(1)
     function xAt(v) { return padL + (v - sx[0]) / (sx[1] - sx[0]) * w }
-    function yAt(v) { return 6 + h - (v - sy[0]) / (sy[1] - sy[0]) * h }
+    function yAt(v) { return padT + h - (v - sy[0]) / (sy[1] - sy[0]) * h }
     function colorOf(p) { return p.state === "front" ? "#3ee6ff" : p.state === "feasible" ? Theme.ink2 : p.state === "failed" ? Theme.signal : Theme.ink3 }
     property int hot: -1
     onRChanged: plot.requestPaint()
@@ -38,11 +39,11 @@ Item {
             var g = getContext("2d"); g.reset()
             if (!fc.r || !fc.pts.length) return
             g.strokeStyle = Theme.rule2; g.lineWidth = 1
-            g.beginPath(); g.moveTo(fc.padL + 0.5, 6); g.lineTo(fc.padL + 0.5, 6 + fc.h + 0.5); g.lineTo(fc.padL + fc.w, 6 + fc.h + 0.5); g.stroke()
+            g.beginPath(); g.moveTo(fc.padL + 0.5, fc.padT); g.lineTo(fc.padL + 0.5, fc.padT + fc.h + 0.5); g.lineTo(fc.padL + fc.w, fc.padT + fc.h + 0.5); g.stroke()
             // the front, in the order of the first axis
             var fr = fc.pts.filter(function (p) { return p.state === "front" }).sort(function (a, b) { return a.at[0] - b.at[0] })
             if (fr.length > 1) {
-                g.strokeStyle = Theme.alpha("#3ee6ff", 0.55); g.lineWidth = 1.5; g.beginPath()
+                g.strokeStyle = Qt.rgba(0.243, 0.902, 1, 0.55); g.lineWidth = 1.5; g.beginPath()
                 for (var i = 0; i < fr.length; i++) { var x = fc.xAt(fr[i].at[0]), y = fc.yAt(fr[i].at[1]); if (i) g.lineTo(x, y); else g.moveTo(x, y) }
                 g.stroke()
             }
@@ -56,8 +57,8 @@ Item {
     // the axes' names, each with which way is better
     Txt { x: fc.padL; y: fc.height - 18; font.pixelSize: 11; tone: 3; wrapMode: Text.NoWrap
         text: fc.axes.length ? fc.axes[0].label + (fc.axes[0].unit ? ", " + fc.axes[0].unit : "") + " · " + fc.axes[0].better + " is better" : "" }
-    Txt { x: 8; y: 6; width: fc.padL - 12; font.pixelSize: 11; tone: 3; wrapMode: Text.WordWrap
-        text: fc.axes.length > 1 ? fc.axes[1].label + (fc.axes[1].unit ? ", " + fc.axes[1].unit : "") : "" }
+    Txt { x: fc.padL; y: 6; width: fc.w; font.pixelSize: 11; tone: 3; wrapMode: Text.NoWrap; elide: Text.ElideRight
+        text: fc.axes.length > 1 ? fc.axes[1].label + (fc.axes[1].unit ? ", " + fc.axes[1].unit : "") + (fc.axes[1].better ? " · " + fc.axes[1].better + " is better" : "") : "" }
     Txt { objectName: "frontHot"; visible: fc.hot >= 0; x: Math.min(fc.width - width - 8, Math.max(fc.padL, hm.mouseX + 10)); y: Math.max(4, hm.mouseY - 26)
         font.pixelSize: 11; mono: true; wrapMode: Text.NoWrap
         text: { if (fc.hot < 0 || !fc.pts[fc.hot]) return ""; var p = fc.pts[fc.hot]

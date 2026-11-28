@@ -115,6 +115,18 @@ Given `process=` (fdm, sla, sls, mjf, lpbf):
 - **Pores** (the largest sphere that fits in the open space) against the escape hole the table asks for.
 - A sheet TPMS divides the space into **two channel systems that never meet**: each needs its own way out.
 
+## On the stage
+
+Selecting *Lattice infill* in Check draws the lattice alone, in place of the clay part: the same struts or level set
+the build used, intersected with the inner region (manifold3d), so what shows is the material inside the skin, cut
+off where the region ends (kernel op `lattice_view`, written once per geometry to
+`artifacts/lattice/view-<key>.json`, format `form-lattice-view/1`). The region's box is a hairline round it. The
+colour is the relative density on the field's ramp: a graded lattice spans its range (the density the grading asks
+at each vertex), a uniform one sits at the middle of the scale with its value. The strip says what was built (B-rep
+or a mesh body, inside a skin of so much), the cell's computed density and the density measured on the built solid;
+the card adds the density of the drawn lattice itself (its volume over the region's). Above 600,000 triangles only
+the ones nearest the region's corner are drawn, and the strip says so.
+
 ## Verification
 
 `tests/test_lattice.py`. Numbers measured on this machine on 2026-11-28:

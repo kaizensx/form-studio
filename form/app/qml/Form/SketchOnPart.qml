@@ -519,17 +519,38 @@ Item {
             }
         }
         // the symbols: beside what they hold, on the outer side first, clear of the lines, the tags and each other
+        // Greedy, one symbol at a time, each at the cheapest seat round what it holds: a seat that covers nothing
+        // (no line, tag, pill or symbol) costs its distance from the anchor, more on the profile's inner side and
+        // inside the view's edge; when every seat covers something, the one that covers least (area of tags and
+        // symbols, then lines crossed). A small profile has few free seats, so the rings reach further out.
+        var cpx = px([cx, cy]), vw = so.width, vh = so.height
+        function overlap(r) {
+            var a = 0
+            for (var q = 0; q < rects.length; q++) { var o = rects[q], ix = Math.min(r.x + r.w, o.x + o.w) - Math.max(r.x, o.x), iy = Math.min(r.y + r.h, o.y + o.h) - Math.max(r.y, o.y)
+                if (ix > 0 && iy > 0) a += ix * iy }
+            return a
+        }
         function seat(kind, cands, ax, ay) {
-            var pick = null
-            for (var t = 0; t < cands.length && !pick; t++) { var r = { x: cands[t][0] - 11, y: cands[t][1] - 11, w: 22, h: 22 }; if (free(r)) pick = cands[t] }
-            if (!pick) for (t = 0; t < cands.length && !pick; t++) { var r2 = { x: cands[t][0] - 11, y: cands[t][1] - 11, w: 22, h: 22 }; if (!so._hit(r2, rects)) pick = cands[t] }
-            if (!pick) pick = cands[0]
+            var best = null, bestC = Infinity, least = null, leastC = Infinity
+            var ix = cpx.x - ax, iy = cpx.y - ay, il = Math.max(1e-6, Math.hypot(ix, iy))
+            for (var t = 0; t < cands.length; t++) {
+                var x = cands[t][0], y = cands[t][1], r = { x: x - 11, y: y - 11, w: 22, h: 22 }
+                var d = Math.hypot(x - ax, y - ay), inward = ((x - ax) * ix + (y - ay) * iy) / il
+                var edge = x < 14 || y < 14 || x > vw - 14 || y > vh - 14 ? 400 : 0
+                var cost = d + Math.max(0, inward) * 0.8 + edge
+                if (free(r)) { if (cost < bestC) { bestC = cost; best = cands[t] } continue }
+                var cover = overlap(r) * 4 + (so._cuts(r, segs) ? 300 : 0) + cost
+                if (cover < leastC) { leastC = cover; least = cands[t] }
+            }
+            var pick = best || least || cands[0]
             rects.push({ x: pick[0] - 11, y: pick[1] - 11, w: 22, h: 22 })
             L.glyphs.push({ x: pick[0], y: pick[1], kind: kind, ax: ax, ay: ay })
         }
         function around(q) {
-            var out = [], dirs = [[1, -1], [-1, -1], [1, 1], [-1, 1], [1, 0], [0, -1], [-1, 0], [0, 1]]
-            for (var d = 0; d < 3; d++) for (var t = 0; t < dirs.length; t++) out.push([q.x + dirs[t][0] * (15 + 13 * d), q.y + dirs[t][1] * (15 + 13 * d)])
+            var out = []
+            for (var d = 0; d < 6; d++) for (var t = 0; t < 16; t++) {
+                var an = t * Math.PI / 8 + (d % 2) * Math.PI / 16, rr = 16 + 12 * d
+                out.push([q.x + Math.cos(an) * rr, q.y + Math.sin(an) * rr]) }
             return out
         }
         for (i = 0; i < sk.constraints.length; i++) {
@@ -538,9 +559,11 @@ Item {
             if (c2.e && c2.e.length && !(c2.p && c2.p.length)) {
                 var m = midOf(c2.e[c2.e.length > 1 ? 1 : 0])
                 if (!m) continue
-                var cs = [], tx2 = -m.ny, ty2 = m.nx, sh = [0, 1, -1, 2, -2]
-                for (var d2 = 0; d2 < 5; d2++) for (var s2 = 0; s2 < sh.length; s2++) cs.push([m.x + m.nx * (16 + 13 * d2) + tx2 * 23 * sh[s2], m.y + m.ny * (16 + 13 * d2) + ty2 * 23 * sh[s2]])
-                seat(c2.k, cs, m.x, m.y)
+                var cs = [], tx2 = -m.ny, ty2 = m.nx, sh = [0, 1, -1, 2, -2, 3, -3]
+                // along the entity on its outer side first, then on the inner side, then round its middle
+                for (var d2 = 0; d2 < 6; d2++) for (var s2 = 0; s2 < sh.length; s2++) for (var side2 = 1; side2 >= -1; side2 -= 2)
+                    cs.push([m.x + side2 * m.nx * (16 + 12 * d2) + tx2 * 23 * sh[s2], m.y + side2 * m.ny * (16 + 12 * d2) + ty2 * 23 * sh[s2]])
+                seat(c2.k, cs.concat(around(Qt.point(m.x, m.y))), m.x, m.y)
             } else if (c2.p && c2.p.length === 2 && sk.points[c2.p[0]] && sk.points[c2.p[1]]) {
                 var pa = px(sk.points[c2.p[0]]), pb = px(sk.points[c2.p[1]])
                 seat(c2.k, around(Qt.point((pa.x + pb.x) / 2, (pa.y + pb.y) / 2)), (pa.x + pb.x) / 2, (pa.y + pb.y) / 2)
@@ -548,7 +571,7 @@ Item {
         }
         for (i = 0; i < sk.fixed.length; i++) if (sk.points[sk.fixed[i]]) {
             var qf = px(sk.points[sk.fixed[i]]), cf = around(qf)
-            seat("fix", [[qf.x - 15, qf.y + 15]].concat(cf), qf.x, qf.y)
+            seat("fix", cf, qf.x, qf.y)
         }
         return L
     }

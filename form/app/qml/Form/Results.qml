@@ -11,7 +11,7 @@ import QtQuick
 // LegendStrip is its legend under the part, ResultCard its numbers in the opened row, DrawingPane the sheet.
 QtObject {
     id: rs
-    readonly property var apps: ["strength", "dfm", "cam", "sheet", "drawing", "motion", "stack", "topology", "inverse", "printOrient"]
+    readonly property var apps: ["strength", "dfm", "cam", "sheet", "drawing", "motion", "stack", "topology", "inverse", "printOrient", "lattice"]
     // engines that are not on this branch yet: their entries will name these apps (form/resultview.py LATER)
     readonly property var later: []
     function draws(e) { return !!e && apps.indexOf(e.app || "") >= 0 }
@@ -95,7 +95,7 @@ QtObject {
         _seq++; id = ""; r = null; busy = false; _resetView()
     }
     function _resetView() {
-        playing = false; t = 0; setup = 0; point = -1; litRule = ""; flat = false; mode = 0; deformed = false; deformK = 0; hoverValue = NaN; selDim = ""
+        playing = false; t = 0; setup = 0; point = -1; previewDown = null; previewId = ""; litRule = ""; flat = false; mode = 0; deformed = false; deformK = 0; hoverValue = NaN; selDim = ""
         if (fix) dropFix()
         if (_posed) { Store.pose = ({}); Store.setAsmMode("print"); _posed = false }
     }
@@ -121,14 +121,36 @@ QtObject {
     readonly property int iteration: kind === "topology" ? Math.max(0, Math.min(duration, Math.round(t))) : 0
     // a front (inverse design, print orientation): the point whose numbers the card shows
     property int point: -1
+    // print orientation: the picked point's down direction (design frame); the viewport turns the part to lie that
+    // way, a preview only. Use this writes it to the print setup (form/printphys/orient.pick).
+    property var previewDown: null
+    property string previewId: ""
+    property bool picking: false
     function openPoint(pt) {
         point = pt.index
         if (r && r.app === "inverse" && pt.values) Store.loadDraft(pt.values, "inverse design", "Inverse design " + (r.run || "") + ", point " + pt.index)
+        if (r && r.app === "printOrient") { previewDown = pt.down && pt.down.length === 3 ? pt.down : null; previewId = pt.id || "" }
+    }
+    function clearPoint() { point = -1; previewDown = null; previewId = "" }
+    function useOrientation() {
+        if (!previewId || picking) return
+        var oid = previewId
+        picking = true
+        Store.ppost("/orient_pick", { orientation: oid }).then(function (d) {
+            rs.picking = false
+            Store.toast(d.changed ? "Print orientation set" : "Already the print orientation", (d.label || oid) + ". " + (d.note || ""), false)
+            if (d.job) Store.track(d.job)
+            rs.clearPoint()
+            Store.refresh(true); Store.loadBench()
+        }, function (e) { rs.picking = false; Store.fail(e) })
     }
     function setStudy(sid) { if (sid === study) return; study = sid; mode = 0; playing = false; deformed = false; deformK = 0; load() }
 
     // the Bench decides what is shown: the selected row of the mode's chapter
-    readonly property string chapter: Store.stage === "prove" ? "check" : Store.stage === "release" ? "make" : Store.stage === "document" ? "document" : ""
+    // In Design the pane is the tree; a Design entry that draws (topology, inverse design) is shown once it is opened
+    // from the Bench sheet, and until its row is clicked again
+    readonly property string chapter: Store.stage === "prove" ? "check" : Store.stage === "release" ? "make" : Store.stage === "document" ? "document"
+        : Store.stage === "shape" && !!Store.benchSel.design ? "design" : ""
     readonly property var want: chapter && Store.bench && Store.data ? Store.benchSelected(chapter) : null
     readonly property string wantKey: want && draws(want) ? want.id + "|" + want.state + "|" + (want.rev || 0) + "|" + (want.head || 0) + "|" + (want.headline || "") : ""
     onWantKeyChanged: { if (wantKey === "") clear(); else show(want) }

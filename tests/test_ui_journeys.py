@@ -215,6 +215,12 @@ class Journeys(unittest.TestCase):
     def test_stack_topology(self):          # the tolerance loop and the topology run on the part, from real engine runs
         self.journey("stack_topology.py")
 
+    def test_fronts(self):                  # the orientation front turns the part and writes the pick; the inverse front opens a draft
+        self.journey("fronts.py", timeout=1200)
+
+    def test_lattice(self):                 # a lattice drawn inside its region, with its relative density in the strip
+        self.journey("lattice.py", timeout=1200)
+
     def test_stage_idle(self):              # a still workspace draws nothing, active or not, in every mode; the caret alone blinks
         self.journey("stage_idle.py")
 

@@ -20,7 +20,7 @@ Node {
     readonly property var r: live && Results.onPart ? Results.r : null
     readonly property string kind: r ? r.kind : ""
     // whether the result stands in for the clay part (the part is then not drawn under it)
-    readonly property bool covers: kind === "field" || kind === "dfm" || kind === "cam" || kind === "topology" || (kind === "flat" && foldK < 0.5)
+    readonly property bool covers: kind === "field" || kind === "dfm" || kind === "cam" || kind === "topology" || kind === "lattice" || (kind === "flat" && foldK < 0.5)
     readonly property real px: port ? port.dist * 0.00044 : 1        // about one pixel at the part, in millimetres
     property alias fieldGeo: fgeo
     property alias fieldModel: fmodel
@@ -84,6 +84,33 @@ Node {
             property real uClip: lay.port && lay.port.clipOn ? 1 : 0
         }
     }
+    // ── lattice infill: the lattice alone, clipped to its region inside the skin (the part's edges stay drawn round
+    //    it), coloured by the relative density on the legend's scale; the region's box in a hairline ──
+    readonly property bool isLattice: kind === "lattice"
+    property alias latticeGeo: lgeo
+    Model {
+        visible: lay.isLattice; pickable: false
+        geometry: ResultGeometry { id: lgeo; source: lay.isLattice ? ({ file: lay.r.file, kind: "lattice", lo: lay.r.density.range[0], hi: lay.r.density.range[1] }) : ({}) }
+        materials: CustomMaterial {
+            shadingMode: CustomMaterial.Shaded; cullMode: Material.NoCulling
+            vertexShader: "shaders/field.vert"; fragmentShader: "shaders/field.frag"
+            property real uDeform: 0; property real uScale: 0; property real uDevelop: 1; property real uMix: 1
+            property real uGlow: Theme.dark ? 0.85 : 0.0
+            property color uLow: Results.rampLow; property color uMid: Results.rampMid; property color uHigh: Results.rampHigh
+            property real uDither: lay.port ? lay.port.ditherK : 1; property real uFilmic: Theme.dark ? 1 : 0
+            property vector3d uClipN: lay.port ? lay.port.clipN : Qt.vector3d(0, 1, 0)
+            property real uClipD: lay.port ? lay.port.clipD : 0
+            property real uClip: lay.port && lay.port.clipOn ? 1 : 0
+        }
+    }
+    OverLine { objectName: "latticeRegion"; visible: lay.isLattice && !!lay.r.region; port: lay.port; depth: 0.2; weight: 1
+        points: { if (!lay.isLattice || !lay.r.region) return []
+            var a = lay.r.region.lo, b = lay.r.region.hi, out = [], i
+            function c(k) { return [k & 1 ? b[0] : a[0], k & 2 ? b[1] : a[1], k & 4 ? b[2] : a[2]] }
+            for (i = 0; i < 8; i++) for (var bit = 1; bit < 8; bit <<= 1) if (!(i & bit)) { var p = c(i), q = c(i | bit); out.push(p[0], p[1], p[2], q[0], q[1], q[2]) }
+            return out }
+        color: Theme.alpha(Theme.ink, 0.45) }
+
     // ── tolerance stack-up: the loop through the mates (docs/TOLERANCES.md, `draw`): each link along the gap's
     //    direction, the gap itself lit, a tick on every face of the loop along its normal ──
     readonly property bool isStack: kind === "stack"
@@ -97,12 +124,24 @@ Node {
     OverLine { objectName: "stackLinks"; visible: lay.isStack; port: lay.port; depth: 0.2; weight: 2
         points: lay._segs("link"); color: Theme.dark ? "#ffffff" : "#161616" }
     OverLine { objectName: "stackGap"; visible: lay.isStack; port: lay.port; depth: 0; weight: 3
-        points: lay._segs("gap"); color: "#3ee6ff" }
+        points: lay._segs("gap"); color: Theme.dark ? "#3ee6ff" : Theme.datum }
+    // each face of the loop lit on the part: its own triangles (the kernel's tessellation, draw.faces[].mesh), the gap's
+    // two faces in the accent, the faces the chain passes through in amber
+    readonly property var stackLit: isStack ? (r.draw.faces || []).filter(function (f) { return !!f.mesh }) : []
+    Repeater3D { model: lay.stackLit
+        Model { id: sf; required property var modelData; objectName: "stackFace"; pickable: false; castsShadows: false; receivesShadows: false
+            readonly property bool gap: modelData.role === "gap_a" || modelData.role === "gap_b"
+            geometry: MeshGeometry { positions: modelData.mesh.positions; indices: modelData.mesh.indices }
+            materials: CustomMaterial { shadingMode: CustomMaterial.Unshaded; fragmentShader: "shaders/companion.frag"; vertexShader: "shaders/line.vert"
+                cullMode: Material.NoCulling; depthDrawMode: Material.NeverDepthDraw
+                sourceBlend: CustomMaterial.One; destinationBlend: CustomMaterial.OneMinusSrcAlpha
+                property color uColor: sf.gap ? (Theme.dark ? Qt.rgba(0.243, 0.902, 1, 0.46) : Theme.alpha(Theme.datum, 0.42)) : Theme.alpha(Theme.amber, Theme.dark ? 0.3 : 0.26)
+                property real uFade0: 1e9; property real uFade1: 2e9 } } }
     OverLine { objectName: "stackFaces"; visible: lay.isStack; port: lay.port; depth: 0.1; weight: 2
         points: { var out = [], fs = lay.isStack ? (lay.r.draw.faces || []) : [], L = Math.max(4, 14 * lay.px)
-            // a cross lying in each face of the loop (the normal runs along the chain, which the links already draw)
+            // a face stored without its triangles (an older result): a cross lying in it, as before
             for (var i = 0; i < fs.length; i++) { var f = fs[i], c = f.center, nn = f.normal || f.axis
-                if (!c || !nn) continue
+                if (!c || !nn || f.mesh) continue
                 var n = Qt.vector3d(nn[0], nn[1], nn[2]).normalized(), a = Math.abs(n.z) < 0.9 ? Qt.vector3d(0, 0, 1) : Qt.vector3d(1, 0, 0)
                 var u = n.crossProduct(a).normalized(), v = n.crossProduct(u), o = Qt.vector3d(c[0], c[1], c[2])
                 ;[u, v].forEach(function (d) { var p = o.minus(d.times(L)), q = o.plus(d.times(L)); out.push(p.x, p.y, p.z, q.x, q.y, q.z) }) }

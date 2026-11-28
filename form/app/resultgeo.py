@@ -12,6 +12,10 @@ manufacturability overlay of 660,000 vertices never passes through QML as text. 
         With faces: only the triangles of those B-rep faces (what a rule's row lights).
     {"file", "kind": "stock", "setup": i}
         the simulated stock of a CNC setup (form-cam-view/1), coloured by the engine, UV1 = (0, status).
+    {"file", "kind": "topology", "frame": i}
+        one iteration of a topology run: UV0.x = the material taken away at the surface.
+    {"file", "kind": "lattice", "lo", "hi"}
+        the lattice alone, clipped to its region (form-lattice-view/1): UV0.x = relative density on lo..hi.
 
 PathGeometry draws a setup's toolpaths as lines: colour per operation, UV0 = (seconds at the segment's end, 1 for a
 rapid), so the scrubber moves a uniform and never the buffer.
@@ -189,6 +193,20 @@ class ResultGeometry(QQuick3DGeometry):
             uv1 = np.zeros((n, 2), np.float32)
             uv0[:, 0] = vals
             uv0[:, 1] = 0.0                              # the "develops" front is the iterations here, not a radius
+        elif kind == "lattice":
+            # the lattice alone, clipped to its region (form/lattice/geom.py view, form-lattice-view/1): per vertex the
+            # relative density on the legend's lo..hi (a uniform lattice sits at the scale's middle)
+            pos = _b64(f.get("positions"), "<f4").reshape(-1, 3)
+            tri = _b64(f.get("indices"), "<u4").reshape(-1, 3)
+            rho = _b64(f.get("density"), "<f4")
+            n = len(pos)
+            lo, hi = float(s.get("lo") or 0.0), float(s.get("hi") or 0.0)
+            uv0 = np.zeros((n, 2), np.float32)
+            uv1 = np.zeros((n, 2), np.float32)
+            if len(rho) == n and hi - lo > 1e-9:
+                uv0[:, 0] = np.clip((rho - lo) / (hi - lo), 0.0, 1.0)
+            else:
+                uv0[:, 0] = 0.5
         else:
             return self._empty()
         if not len(pos) or not len(tri) or int(tri.max()) >= len(pos):

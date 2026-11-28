@@ -4,6 +4,24 @@
 
 ### Added
 
+- **A picked print orientation turns the part on the stage.** A point of the *Orientation front* turns the part,
+  about its middle, until that side faces the floor, and rests it there: a preview, nothing written. **Use this**
+  writes it to the print setup (the same pick as `print_orient(pick=)`, with what it replaced); **As designed** turns
+  it back. The size dimensions step aside while it is turned.
+- **The faces of the tolerance loop are lit** instead of a cross in each: the two faces of the gap in the accent, the
+  faces the chain passes through in amber, each from its own triangles. The stack-up stores each face's tessellation
+  in `draw.faces[].mesh`; the MCP tools leave it out. An older stored stack still shows the crosses.
+- **The lattice is drawn on the stage** (docs/LATTICES.md, *On the stage*). *Lattice infill* in Check shows the
+  lattice alone, clipped to its region inside the skin, with the region's box; its colour is the relative density on
+  the field's ramp (a graded lattice spans its range). The strip says what was built and the density computed for the
+  cell and measured on the built solid; the card adds the density of the drawn lattice.
+- **The topology timeline plots the compliance of every iteration**, lit up to the iteration shown.
+- **Constraint symbols on small sketches keep clear** of each other and of the dimension tags: each is seated at the
+  cheapest free place round what it holds, the outer side first, the rings reaching further out when the profile is
+  small; when no place is free, the one that covers least.
+- Journeys `fronts.py` (both fronts from real runs) and `lattice.py` (an octet and a graded gyroid); the topology
+  journey now runs with the strength engine and opens the run from the Bench sheet.
+
 - **Home, as drawn for direction I.** The agent and model that design the next request are chosen under the
   composer, at the right end of the *Make it for* line, not inside the prompt well. The makers' generators are one
   quiet line under it (*Or make*: the ones that fit, then *More* with the rest and *Generate from words or a
@@ -33,7 +51,8 @@
   start to its last iteration (the engine's own frames), then scrubs on the strip's timeline. *Inverse design* and the
   print *Orientation front* show their front as a chart in the card: a point under the pointer names itself; an
   inverse design point opens as the draft (built and previewed, nothing kept until committed), an orientation shows
-  its numbers. The topology playback has not been run on a machine with the FEA engine yet.
+  its numbers. The playback has since been run with the FEA engine (a free 3D layout of the journeys' bracket, 24
+  iterations).
 - **A Bench row shows a short number** (`row`: `SF 2.41`, `gap 3.000 mm`, `38 % lighter`); the card keeps the
   engine's sentence. An engine may give its own `row`.
 
@@ -110,6 +129,22 @@
   (that fade was about ten redraws a second on a Home nobody touched). They rest while the window is in the background.
 
 ### Fixed
+
+- **The print orientation front showed no points.** The window read the stored search, which holds every candidate
+  but not the ranked front; it now ranks the cached search as the Bench entry does.
+- **Topology optimisation and inverse design could not be drawn.** They are Design entries and Results followed only
+  Check, Make and Document. *Open in Design* on the Bench sheet now draws them, with their row and card over the tree;
+  clicking the row again goes back to the tree and the clay part.
+- **The tolerance loop and the topology run did not say what they do not tell**: their description used a key the
+  strip does not read. They now carry the *Not told here* line like every other result.
+- **The orientation and inverse fronts drew the front as a dark line** (a colour given as text to a function that
+  needs a colour), and the second axis's name wrapped into the plot. The front is cyan and the axis name is one line
+  above the plot.
+- **The results journey measured orbit cost wrongly.** It took the mean time between swapped frames while stepping
+  the view from a script; a view that swaps an extra frame per step (the HUD settling) looked faster. With a result
+  on the part the render thread records a frame in 1.0 to 1.7 ms against 1.0 ms for the part alone, and a view
+  turned on every frame runs at the display's 120 fps either way (measured, `tests/journeys/results.py` `Frames`). The
+  16 ms against 10.8 ms of the last pass was that artefact, not a cost.
 
 - **A hand edit's revision card reads the revision before the edit** (r04 → r05): the engine took the head after the
   commit. A note without a new revision has no card.

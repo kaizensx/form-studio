@@ -22,7 +22,7 @@ import math
 from pathlib import Path
 
 KINDS = {"strength": "field", "cam": "cam", "dfm": "dfm", "sheet": "flat", "drawing": "drawing", "motion": "motion",
-         "stack": "stack", "topology": "topology", "inverse": "front", "printOrient": "front"}
+         "stack": "stack", "topology": "topology", "inverse": "front", "printOrient": "front", "lattice": "lattice"}
 # Hooks of engines that are not on this branch yet: their Bench entries will name these apps. Until then `describe`
 # answers {"kind": "none", "state": "unavailable"} for them and the window draws nothing.
 LATER: dict = {}
@@ -56,6 +56,12 @@ def _entry(st, p, sid: str) -> dict:
     return studies.show(st, p, sid)
 
 
+def _sentence(t: str) -> str:
+    """A clause from an engine, ended as a sentence."""
+    t = (t or "").strip()
+    return t + "." if t and t[-1] not in ".!?)" else t
+
+
 def _none(e: dict | None, kind: str, why: str = "") -> dict:
     e = e or {}
     return {"kind": kind, "id": e.get("id", ""), "state": e.get("state", "never"), "title": e.get("label", ""),
@@ -81,7 +87,7 @@ def describe(st, p: dict, sid: str, opts: dict | None = None) -> dict:
         out = (_inverse if app == "inverse" else _orient)(st, p, e, opts)
     else:
         out = {"field": _strength, "dfm": _dfm, "cam": _cam, "flat": _flat, "drawing": _drawing, "motion": _motion,
-               "stack": _stack, "topology": _topology}[kind](st, p, e, opts)
+               "stack": _stack, "topology": _topology, "lattice": _lattice}[kind](st, p, e, opts)
     out.setdefault("kind", kind)
     out.setdefault("id", sid)
     out.setdefault("head", p.get("head"))
@@ -520,8 +526,8 @@ def _stack(st, p: dict, e: dict, opts: dict) -> dict:
             "worst_case": [wc["min"], wc["max"]], "rss": [rs["min"], rs["max"]],
             "spec": res.get("spec") or {}, "cpk": cap.get("cpk") if isinstance(cap.get("cpk"), (int, float)) and math.isfinite(cap["cpk"]) else None,
             "chart": (res.get("chart") or [])[:6],
-            "not_told": "Not told here: tolerances on angles beyond the linear range, form errors not declared as GD&T, "
-                        "wear, load and assembly forces. " + ((res.get("caveats") or [""])[0])}
+            "not": "Not told here: tolerances on angles beyond the linear range, form errors not declared as GD&T, "
+                        "wear, load and assembly forces. " + _sentence((res.get("caveats") or [""])[0])}
 
 
 # ---- topology optimisation: the density of every iteration (docs/OPTIMISATION.md, frames) --------------------------
@@ -549,8 +555,52 @@ def _topology(st, p: dict, e: dict, opts: dict) -> dict:
             "headline": r.get("headline") or "", "evidence": r.get("evidence") or e.get("evidence") or "simulated",
             "converged": bool(r.get("converged")), "volfrac": st_.get("volfrac"), "resolution": r.get("resolution") or "",
             "history": hist,
-            "not_told": "Not told here: the density field is a layout, not a part; the pockets built from it are studied "
-                        "again, and their own study is what the safety factor is. " + (r.get("resolution") or "")}
+            "not": "Not told here: the density field is a layout, not a part; the pockets built from it are studied "
+                        "again, and their own study is what the safety factor is. " + _sentence(r.get("resolution") or "")}
+
+
+# ---- lattice infill: the lattice alone, clipped to its region (docs/LATTICES.md) ------------------------------------
+
+def _lattice(st, p: dict, e: dict, opts: dict) -> dict:
+    """The lattice the head carries, drawn inside the part: its struts or level set kept where the material is, inside
+    the skin (a mesh the kernel writes once per geometry, form/lattice/geom.py view), with the relative density per
+    vertex (asked, for a graded lattice; measured on the drawn lattice, for a uniform one) and the build's numbers."""
+    from . import lattice as LT
+    from .studio import H
+    spec = LT.current(st, p)
+    if not spec:
+        return _none(e, "lattice", "No lattice in this design: lattice_fill puts one in a region, with a skin.")
+    if e.get("state") != "current":
+        return {**_none(e, "lattice", e.get("why") or ""), "state": e.get("state") or "never"}
+    try:
+        r = LT.read(st, p)
+    except Exception as ex:                             # noqa: BLE001 - say why, draw nothing
+        return {**_none(e, "lattice", str(ex)), "state": "failed"}
+    f = LT._dir(st, p) / ("view-" + H("lattice-view", 1, st.keys(p)["geometry"], spec)[:20] + ".json")
+    info = None
+    if f.is_file():
+        d = _read(f) or {}
+        info = {k: d.get(k) for k in ("region", "clipped", "graded", "triangles", "volume_mm3", "inner_volume_mm3")} if d else None
+    if info is None:
+        rev = st.rev(p)
+        f.parent.mkdir(parents=True, exist_ok=True)
+        info = st._k("lattice_view", timeout=900, key=st.keys(p)["geometry"], recipe_id=st.rid(p), values=rev["values"], p=p, out=str(f))
+        if info.get("error"):
+            return {**_none(e, "lattice", info["error"] + (" " + info["hint"] if info.get("hint") else "")), "state": "failed"}
+    dens = r.get("relative_density") or {}
+    built = r.get("built") or {}
+    g = spec.get("grading") or {}
+    rng = sorted(float(x) for x in g["density"]) if g.get("density") else None
+    drawn = (info.get("volume_mm3") or 0.0) / max(info.get("inner_volume_mm3") or 0.0, 1e-12)
+    return {"kind": "lattice", "state": "current", "rev": r.get("rev") or e.get("rev"), "file": str(f),
+            "label": r.get("label") or "", "cell": spec.get("cell"), "skin": spec.get("skin"), "grading": g.get("mode") or "uniform",
+            "region": info.get("region"), "triangles": info.get("triangles"), "clipped": bool(info.get("clipped")),
+            "density": {"computed": dens.get("value"), "measured": built.get("relative_density_measured"), "drawn": drawn,
+                        "range": rng or [drawn, drawn]},
+            "representation": built.get("representation") or "", "output": built.get("output") or "",
+            "headline": r.get("headline") or "", "evidence": e.get("evidence") or "computed; measured on the built solid",
+            "not": "Not told here: how the lattice fails (buckling of struts, a wall's local yield), fatigue, and "
+                        "powder or resin left inside (printability says where it can drain)."}
 
 
 # ---- fronts: inverse design and print orientation (a Pareto chart in the card) -----------------------------------
@@ -574,13 +624,19 @@ def _inverse(st, p: dict, e: dict, opts: dict) -> dict:
 
 def _orient(st, p: dict, e: dict, opts: dict) -> dict:
     from .printphys import orient as O
-    r = O.cached(st, p)
-    if r is None:
+    if O.cached(st, p) is None:                         # what is stored is the search (its rows), not the ranked front
         return _none(e, "front", "Not run yet.")
+    o = O.stored_options(p)
+    try:                                                # the search is cached: this only ranks it (as the Bench entry does)
+        r = O.run(st, p, cosmetic=o.get("cosmetic"), study=o.get("study") or "", load_direction=o.get("load_direction"),
+                  level=o.get("level") or 2, critical_deg=o.get("critical_deg"), settings=o.get("settings"),
+                  free=bool(o.get("free")), remember=False, strict=False)
+    except Exception as ex:                             # noqa: BLE001 - say why, never draw a front that is not there
+        return {**_none(e, "front", str(ex)), "state": "failed"}
     front = r.get("front") or []
     axes = [{"metric": "support_mm3", "label": "Support", "unit": "mm³", "better": "lower"},
             {"metric": "time_s", "label": "Print time", "unit": "min", "better": "lower"}]
-    pts = [{"index": i, "at": [x.get("support_mm3"), (x.get("time_s") or 0) / 60.0], "state": "front", "label": x.get("label"),
+    pts = [{"index": i, "id": x.get("id"), "at": [x.get("support_mm3"), (x.get("time_s") or 0) / 60.0], "state": "front", "label": x.get("label"),
             "current": bool(x.get("current")), "tip_over_deg": x.get("tip_over_deg"), "height_mm": x.get("height_mm"),
             "down": x.get("down")} for i, x in enumerate(front) if x.get("support_mm3") is not None and x.get("time_s") is not None]
     cal = (r.get("calibration") or {}).get("factors")
@@ -589,4 +645,5 @@ def _orient(st, p: dict, e: dict, opts: dict) -> dict:
             "axes": axes, "points": pts, "front": [q["index"] for q in pts],
             "note": "The orientations no other one beats on every objective at once; two of them drawn here. "
                     + ("Time calibrated on a real slice." if cal else "Time uncalibrated: it ranks orientations and little more."),
-            "open": "A point shows its numbers. The pick is yours: print_orient(pick=) writes it to the print setup."}
+            "open": "A point turns the part on the stage to lie that way, and shows its numbers; Use this writes it to the "
+                    "print setup."}

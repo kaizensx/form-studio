@@ -257,6 +257,13 @@ def compute(st, p: dict, a: dict, b: dict, direction=None, tolerances: dict | No
                 budget_s=budget_s)
     if raw.get("error"):
         raise StackError(raw["error"], raw.get("hint", ""))
+    # each face's triangles go to `draw` only (the viewport lights the faces of the loop); the rest stays plain numbers
+    meshes = {}
+    for f in [raw["a"], raw["b"]] + [L[k] for L in raw["links"] for k in ("entry", "exit")] \
+            + [it[k] for it in raw["interfaces"] for k in ("x", "e")]:
+        m = f.pop("mesh", None)
+        if m:
+            meshes[(f["part"], f["model_face"])] = m
     nominal = float(raw["gap"])
     # contributors -------------------------------------------------------------------------------------------
     contributors, flat = [], []
@@ -312,7 +319,7 @@ def compute(st, p: dict, a: dict, b: dict, direction=None, tolerances: dict | No
            "t_fd_s": raw.get("t_fd"), "t_s": round(time.perf_counter() - t0, 3)}
     out["thermal"] = _thermal(p, raw, nominal, wc, rs, _num(t_min, "t_min"), _num(t_max, "t_max"), alpha or {})
     out["suggestions"] = _suggest(nominal, contributors, shares, rs, wc, lsl, usl, ctx, raw)
-    out["draw"] = _draw(raw)
+    out["draw"] = _draw(raw, meshes)
     out["headline"] = headline(out)
     out["caveats"] = _caveats(out, ctx)
     return out
@@ -476,7 +483,7 @@ def _suggest(nominal, cs, shares, rs, wc, lsl, usl, ctx, raw) -> list:
     return out
 
 
-def _draw(raw: dict) -> dict:
+def _draw(raw: dict, meshes: dict | None = None) -> dict:
     """The loop for the viewport: faces to light (model face index, part, role) and the chain as segments along the
     direction. Points are in the assembled frame, at rest; each face also has its centre as built."""
     import numpy as np
@@ -500,6 +507,11 @@ def _draw(raw: dict) -> dict:
         segs.append({"kind": it["kind"], "parts": [it["from"], it["to"]], "from": at(it["x"]["level"]),
                      "to": at(it["e"]["level"]), "length": it["offset"]})
     segs.append({"kind": "gap", "from": at(raw["a"]["level"]), "to": at(raw["b"]["level"]), "length": raw["gap"]})
+    # the face itself, as triangles in the assembled frame (the kernel's tessellation), for the viewport to tint
+    for f in faces:
+        m = (meshes or {}).get((f["part"], f["model_face"]))
+        if m:
+            f["mesh"] = m
     return {"frame": "assembled, at rest", "direction": raw["n"], "faces": faces, "segments": segs,
             "parts": raw["chain"]}
 

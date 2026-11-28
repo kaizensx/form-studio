@@ -28,7 +28,7 @@ Glass {
 
     readonly property string title: !d ? "" : dk === "field" ? (d.quantity ? d.quantity.charAt(0).toUpperCase() + d.quantity.slice(1) : d.title)
         : dk === "dfm" ? "Manufacturability" : dk === "cam" ? "CNC, 3-axis" : dk === "flat" ? "Flat pattern" : dk === "motion" ? "Motion"
-        : dk === "stack" ? "Tolerance loop" : dk === "topology" ? "Material removed" : d.title || ""
+        : dk === "stack" ? "Tolerance loop" : dk === "topology" ? "Material removed" : dk === "lattice" ? "Relative density" : d.title || ""
     readonly property string sub: {
         if (!d) return ""
         var rev = F.pad(d.rev), bits = []
@@ -38,6 +38,7 @@ Glass {
         else if (dk === "flat") { bits.push(rev); if (d.size_mm) bits.push(F.fmt(d.size_mm[0], 1) + " × " + F.fmt(d.size_mm[1], 1) + " mm"); bits.push(d.bends.length + " bends"); bits.push("t " + d.t + " mm") }
         else if (dk === "motion") { bits.push(rev); bits.push((d.drivers || []).join("; ")) }
         else if (dk === "stack") { bits.push(rev); if (d.name) bits.push(d.name); bits.push("gap " + Results.fmt(d.gap.nominal, "mm")) }
+        else if (dk === "lattice") { bits.push(rev); bits.push(d.label); bits.push(F.fmt(d.cell, 1) + " mm cell") }
         else if (dk === "topology") { bits.push(rev); bits.push("iteration " + Results.iteration + " of " + Results.duration); if (d.volfrac) bits.push(Math.round(d.volfrac * 100) + " % of the material kept") }
         return bits.filter(function (x) { return !!x }).join(" · ")
     }
@@ -63,6 +64,10 @@ Glass {
         if (dk === "flat") return d.verify && d.verify.max_mm !== undefined && d.verify.max_mm !== null ? "Folded back onto the part: largest difference " + Number(d.verify.max_mm).toExponential(1) + " mm over " + d.verify.samples + " points." : ""
         if (dk === "motion") return d.clearance ? d.clearance.detail : ""
         if (dk === "stack") return "Worst case " + Results.fmt(d.worst_case[0], "") + " to " + Results.fmt(d.worst_case[1], "mm") + ", RSS " + Results.fmt(d.rss[0], "") + " to " + Results.fmt(d.rss[1], "mm") + (d.cpk !== null && d.cpk !== undefined ? ", Cpk " + d.cpk.toFixed(2) : "") + "."
+        if (dk === "lattice") { var dn = d.density || {}
+            return "Built as " + (d.output === "mesh" ? "a mesh body" : "B-rep") + (d.skin ? " inside a " + F.fmt(d.skin, 1) + " mm skin" : "") + ". "
+                + "Computed for the cell " + Results.fmt(dn.computed, "") + (dn.measured !== null && dn.measured !== undefined ? ", measured on the built solid " + Results.fmt(dn.measured, "") : "")
+                + (d.clipped ? "; the first " + d.triangles + " triangles are drawn" : "") + "." }
         if (dk === "topology") { var h = d.history || [], a = h.length > 1 ? h[1] : null, b = h.length ? h[h.length - 1] : null
             return (d.converged ? "Converged" : "Stopped before converging") + " after " + Math.max(0, h.length - 1) + " iterations" + (a && b && a.compliance && b.compliance ? "; compliance " + Results.fmt(a.compliance, "") + " to " + Results.fmt(b.compliance, "") : "") + "." }
         return ""
@@ -88,6 +93,23 @@ Glass {
                     g.fillStyle = gr; g.beginPath(); g.roundedRect(0, 0, width, height, 4, 4); g.fill() } }
             Txt { y: 14; font.pixelSize: 11; tone: 3; wrapMode: Text.NoWrap; text: "kept (density 1)" }
             Txt { y: 14; anchors.right: parent.right; font.pixelSize: 11; tone: 3; wrapMode: Text.NoWrap; text: "removed (density 0)" } }
+        // lattice: the relative density on the ramp the lattice is drawn in; a graded lattice spans its range, a uniform
+        // one is one value at the scale's middle
+        Item { objectName: "latticeScale"; width: parent.width; height: 26; visible: ls.dk === "lattice"
+            readonly property var rg: ls.dk === "lattice" ? ls.d.density.range : [0, 0]
+            readonly property bool graded: ls.dk === "lattice" && ls.d.grading !== "uniform" && rg[1] - rg[0] > 1e-9
+            Canvas { id: lbar; width: parent.width; height: 8; y: 2
+                readonly property bool g: parent.graded
+                onGChanged: requestPaint(); onWidthChanged: requestPaint(); Component.onCompleted: requestPaint()
+                Connections { target: Theme; function onDarkChanged() { lbar.requestPaint() } }
+                onPaint: { var c = getContext("2d"), gr = c.createLinearGradient(0, 0, width, 0); c.reset()
+                    for (var i = 0; i <= 16; i++) gr.addColorStop(i / 16, Results.rampAt(i / 16))
+                    c.fillStyle = gr; c.globalAlpha = g ? 1 : 0.35; c.beginPath(); c.roundedRect(0, 0, width, height, 4, 4); c.fill()
+                    if (!g) { c.globalAlpha = 1; c.fillStyle = Theme.ink; c.fillRect(Math.round(width / 2) - 1, -3, 2, height + 6) } } }
+            Txt { visible: parent.graded; y: 14; mono: true; font.pixelSize: 11; tone: 3; wrapMode: Text.NoWrap; text: Results.fmt(parent.rg[0], "") + "  " + (ls.d ? ls.d.grading : "") }
+            Txt { visible: parent.graded; y: 14; anchors.right: parent.right; mono: true; font.pixelSize: 11; tone: 3; wrapMode: Text.NoWrap; text: Results.fmt(parent.rg[1], "") }
+            Txt { objectName: "latticeValue"; visible: !parent.graded; y: 14; x: Math.round(parent.width / 2 - width / 2); mono: true; font.pixelSize: 11; tone: 1; wrapMode: Text.NoWrap
+                text: Results.fmt(parent.rg[0], "") + " of solid, uniform" } }
         // stack: what each tolerance adds to the gap's spread
         Row { objectName: "stackShares"; width: parent.width; spacing: 14; visible: ls.dk === "stack"
             Repeater { model: ls.dk === "stack" ? ls.d.chart.slice(0, 3) : []
@@ -144,11 +166,11 @@ Glass {
                 model: [{ value: false, text: "Folded" }, { value: true, text: "Flat" }]; value: Results.flat; onPicked: function (v) { Results.flat = v } } }
 
         // ── a timeline: the operations of a CNC setup, or a mechanism's smallest gap over its cycle ──
-        Item { id: tl; objectName: "timeline"; width: parent.width; height: ls.dk === "motion" ? 54 : 34; visible: ls.dk === "cam" || ls.dk === "motion" || ls.dk === "topology"
+        Item { id: tl; objectName: "timeline"; width: parent.width; height: ls.dk === "motion" || ls.dk === "topology" ? 54 : 34; visible: ls.dk === "cam" || ls.dk === "motion" || ls.dk === "topology"
             readonly property real dur: Math.max(1e-9, Results.duration)
             readonly property real x0: 34
             readonly property real w: width - x0
-            Rectangle { objectName: "playButton"; width: 26; height: 26; radius: 13; y: ls.dk === "motion" ? 14 : -4; color: pm.containsMouse ? Theme.washHover : Theme.alpha(Theme.lineBase, 0.06); border.color: Theme.rule
+            Rectangle { objectName: "playButton"; width: 26; height: 26; radius: 13; y: ls.dk === "motion" || ls.dk === "topology" ? 14 : -4; color: pm.containsMouse ? Theme.washHover : Theme.alpha(Theme.lineBase, 0.06); border.color: Theme.rule
                 Icon { anchors.centerIn: parent; name: Results.playing ? "pause" : "play"; size: 12; color: Theme.ink }
                 MouseArea { id: pm; anchors.fill: parent; hoverEnabled: true; onClicked: Results.toggle() } }
             // CNC: one span per operation, in its colour, as long as it runs
@@ -174,15 +196,37 @@ Glass {
                         if (pen) g.lineTo(x, y); else g.moveTo(x, y); pen = true }
                     g.stroke()
                     if (c.first_contact_t !== null && c.first_contact_t !== undefined) { var fx = c.first_contact_t / tl.dur * W; g.strokeStyle = Theme.signal; g.lineWidth = 1.5; g.beginPath(); g.moveTo(fx, 0); g.lineTo(fx, H); g.stroke() } } }
+            // topology: the compliance of every iteration the engine stored (falling as the layout finds the load path),
+            // the iterations drawn up to the one shown
+            Canvas { id: tplot; x: tl.x0; width: tl.w; height: 40; visible: ls.dk === "topology"
+                readonly property var h: ls.dk === "topology" ? (ls.d.history || []).filter(function (x) { return x.compliance !== null && x.compliance !== undefined }) : []
+                readonly property real lo: { var m = Infinity; for (var i = 0; i < h.length; i++) m = Math.min(m, h[i].compliance); return isFinite(m) ? m : 0 }
+                readonly property real hi: { var m = -Infinity; for (var i = 0; i < h.length; i++) m = Math.max(m, h[i].compliance); return isFinite(m) ? m : 1 }
+                readonly property int upto: Results.iteration
+                onHChanged: requestPaint(); onWidthChanged: requestPaint(); onUptoChanged: requestPaint(); Component.onCompleted: requestPaint()
+                Connections { target: Theme; function onDarkChanged() { tplot.requestPaint() } }
+                function px(i) { return tplot.h.length > 1 ? i / (tplot.h.length - 1) * width : 0 }
+                function py(c) { var sp = Math.max(1e-12, Math.log(hi) - Math.log(Math.max(1e-12, lo))); return 3 + (1 - (Math.log(Math.max(1e-12, c)) - Math.log(Math.max(1e-12, lo))) / sp) * (height - 6) }
+                onPaint: { var g = getContext("2d"); g.reset(); if (h.length < 2) return
+                    var W = width, H = height, i
+                    g.strokeStyle = Theme.rule2; g.lineWidth = 1; g.beginPath(); g.moveTo(0, H - 0.5); g.lineTo(W, H - 0.5); g.stroke()
+                    g.strokeStyle = Theme.alpha(Theme.ink, 0.28); g.lineWidth = 1.5; g.beginPath()
+                    for (i = 0; i < h.length; i++) { if (i) g.lineTo(px(i), py(h[i].compliance)); else g.moveTo(px(i), py(h[i].compliance)) }
+                    g.stroke()
+                    g.strokeStyle = Theme.datum; g.lineWidth = 1.5; g.beginPath()
+                    for (i = 0; i <= Math.min(upto, h.length - 1); i++) { if (i) g.lineTo(px(i), py(h[i].compliance)); else g.moveTo(px(i), py(h[i].compliance)) }
+                    g.stroke() } }
+            Txt { visible: ls.dk === "topology" && tplot.h.length > 1; anchors.right: parent.right; y: parent.height - 14; lineHeight: 1; topPadding: 0; bottomPadding: 0; mono: true; font.pixelSize: 11; tone: 3; wrapMode: Text.NoWrap
+                text: tplot.h.length > 1 ? "compliance " + Results.fmt(tplot.h[0].compliance, "") + " → " + Results.fmt(tplot.h[tplot.h.length - 1].compliance, "N·mm") : "" }
             Txt { visible: ls.dk === "motion" && !!plot.c; anchors.right: parent.right; y: parent.height - 14; lineHeight: 1; topPadding: 0; bottomPadding: 0; mono: true; font.pixelSize: 11; tone: 3; wrapMode: Text.NoWrap
                 text: plot.c ? "smallest gap, 0 to " + Results.fmt(plot.span, "mm") + (plot.c.first_contact_t !== null && plot.c.first_contact_t !== undefined ? " · first contact " + Results.fmt(plot.c.first_contact_t, "s") : " · no contact") : "" }
             // the moment shown
-            Rectangle { objectName: "scrubHandle"; x: Math.round(tl.x0 + Results.t / tl.dur * tl.w - 1); y: ls.dk === "motion" ? 0 : -4; width: 2; height: ls.dk === "motion" ? 40 : 18; radius: 1; color: Theme.ink }
+            Rectangle { objectName: "scrubHandle"; x: Math.round(tl.x0 + Results.t / tl.dur * tl.w - 1); y: ls.dk === "motion" || ls.dk === "topology" ? 0 : -4; width: 2; height: ls.dk === "motion" || ls.dk === "topology" ? 40 : 18; radius: 1; color: Theme.ink }
             MouseArea { objectName: "scrubArea"; x: tl.x0; width: tl.w; y: -6; height: parent.height - 8; cursorShape: Qt.SizeHorCursor
                 function go(mx) { Results.scrub(Math.max(0, Math.min(1, mx / width)) * tl.dur) }
                 onPressed: function (e) { go(e.x) } onPositionChanged: function (e) { if (pressed) go(e.x) } }
             Txt { x: tl.x0; y: parent.height - 14; mono: true; font.pixelSize: 11; tone: 2; wrapMode: Text.NoWrap; lineHeight: 1; topPadding: 0; bottomPadding: 0
-                objectName: "scrubTime"; text: ls.dk === "topology" ? "iteration " + Results.iteration + " of " + Results.duration + " · the run as it went"
+                objectName: "scrubTime"; text: ls.dk === "topology" ? "iteration " + Results.iteration + " of " + Results.duration
                     : Results.clock(Results.t) + " of " + Results.clock(tl.dur) + (Results.playRate > 1 ? "  · played " + Results.playRate.toFixed(0) + "× faster" : "") }
             Txt { visible: ls.dk === "cam"; anchors.right: parent.right; y: parent.height - 14; mono: true; font.pixelSize: 11; tone: 3; wrapMode: Text.NoWrap; lineHeight: 1; topPadding: 0; bottomPadding: 0
                 text: Results.t >= tl.dur - 1e-6 ? "stock: end of the setup" : "stock is drawn at the end of the setup" }
