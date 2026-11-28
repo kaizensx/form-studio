@@ -4,6 +4,18 @@
 
 ### New
 
+- **Tolerance stack-up from the assembly.** Pick the two faces of a gap and Form Studio finds the loop itself: a
+  graph search over the declared mates keeps those that hold the parts along the gap (a seat, or a radial fit whose
+  clearance is a float), and each part on the path adds the distance between the faces the loop enters and leaves by.
+  The links close to the measured gap exactly. Sensitivities come from finite differences on the rebuilt CAD, so
+  angles count. Each tolerance names its source: the request, the drawing's ISO 286 fits, a measured parameter's
+  sigma, the drawing's ISO 2768 class, the printer's calibration, or FDM ±0.2 mm and ISO 2768-m, both labelled
+  assumed. Declared position and profile tolerances are converted by a stated rule. Results: worst case, RSS, a seeded
+  Monte Carlo, Cpk and the share out of spec, a contribution chart, the gap over a temperature span from sourced
+  expansion (never assumed), and what to tighten first, with cost hints labelled assumed. The result carries the
+  loop's faces and segments for the viewport. [docs/TOLERANCES.md](docs/TOLERANCES.md).
+- **`tolerance_stack`, `get_tolerance_stack`** (MCP), **`form stack run|add|list|show|rerun|rm`** (terminal, JSON), and
+  the Bench entry **Tolerance stack-up** in Check, stale after any change. 111 MCP tools.
 - **Engineering calculators that write the part.** Seven calculators size a part from what it has to do, by a named
   standard's equations, and write it as a design with parameters: snap joints (cantilever and annular, Bayer's
   snap-fit guide), living hinges (elastic by strain, or moulded PP and PE from cited practice), springs

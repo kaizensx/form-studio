@@ -262,6 +262,9 @@ def main(argv=None):
     if argv[:1] == ["strength"] or (argv[:1] == ["study"] and argv[1:2] and argv[1] in ("strength", "static", "modal", "buckling", "thermal", "thermal_stress", "verify")):
         from .fea.cli import main as strength_main  # strength studies with a stated error (form/fea)
         return strength_main(argv[1:] if argv[0] == "strength" else argv[2:] if argv[1] == "strength" else argv[1:])
+    if argv[:1] == ["stack"]:                      # tolerance stack-up from the assembly (form/stack)
+        from .stack.cli import main as stack_main
+        return stack_main(argv[1:])
     if argv[:1] == ["calc"]:                       # engineering calculators that write geometry (form/calc)
         from .calc.cli import main as calc_main
         return calc_main(argv[1:])

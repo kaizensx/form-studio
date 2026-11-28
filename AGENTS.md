@@ -42,6 +42,7 @@ Prefer the MCP server (`form-mcp`). Without MCP, the `form` CLI does the same an
 | Turn an STL, OBJ or 3MF into a design by the route its triage chooses (parametric CAD, a surface body, a mesh body, parts) | `reconstruct` | `form reconstruct part.stl --tolerance 0.02` |
 | Rebuild a mesh by hand: what is left to add or cut, then tune the sizes | `reference_residual`, `fit_params`, `compare_to_reference` | — |
 | Assembly instructions as a PDF | `assembly_instructions` | `form instructions <p> --out steps.pdf` |
+| The gap between two faces of an assembly: its loop through the mates, worst case, RSS, Monte Carlo, Cpk, each tolerance's share, at a temperature span, what to tighten | `tolerance_stack` (`save=True` keeps it; the Bench entry `stack`), `get_tolerance_stack` | `form stack run <p> --a 100,0,0@screw --b 0,0,8 --tol screw_l=0.2 --temps -20,80` |
 | An engineering drawing from the solid (dimensions bound to parameters, fits, GD&T only where declared) | `drawing` | `form drawing <p> --sheet A3 --out part.pdf` |
 | STEP AP242 with PMI, read back | `export_pmi` | `form drawing pmi <p>` |
 | Check a person's drawing against the part (never guess a digit: mark it unsure) | `check_drawing` | `form drawing check <p> theirs.pdf` |

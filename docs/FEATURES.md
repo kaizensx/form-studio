@@ -557,6 +557,29 @@ equations, the sources and the verification table are in [CALCULATORS.md](CALCUL
   springs and hinges with their caveats.
 - **Headless:** `calculate`; `form calc <calculator> key=value ... [--build]`, `form calc list|show|verify`.
 
+## Tolerance stack-up
+
+Pick the two faces of a gap in an assembly, and Form Studio finds the loop of dimensions that sets it, then says how
+far the gap moves. The method, the rules and the verification table are in [TOLERANCES.md](TOLERANCES.md).
+
+- **The loop is found, not drawn by hand.** A graph search over the declared mates keeps the ones that hold the parts
+  along the gap: a seat (a lid on a rim, a screw head on a lid) or a radial fit (a pin in a hole, which floats by its
+  clearance). Each part on the path contributes the distance between the faces the loop enters and leaves by. The
+  links add up to the measured gap exactly, and the result says so.
+- **Sensitivities from the real rebuild.** Every length and angle parameter is nudged both ways and the design is
+  rebuilt, so an angle counts as it should. A parameter that only places a part is named as not moving the gap.
+- **Tolerances with their source:** the request; the drawing's ISO 286 fits; a measured parameter's sigma; the
+  drawing's ISO 2768 class; for a printed part, the printer's calibration or FDM ±0.2 mm, assumed; else ISO 2768-m,
+  assumed. Declared position and profile tolerances on the loop's faces are converted by a stated rule.
+- **Worst case, RSS and Monte Carlo** (seeded, with a histogram), Cpk and the share out of spec, and a contribution
+  chart with each tolerance's share of the variance.
+- **Over a temperature span**, from each part's sourced expansion. A part with no sourced coefficient leaves the
+  result out and says what to give.
+- **What to tighten first**, with the effect computed and a cost hint labelled assumed.
+- **Kept with the design.** The Bench entry *Tolerance stack-up* is stale after any change and says which revision
+  it describes. The result carries the loop's faces and segments for the viewport to light on the parts.
+- **Headless:** `tolerance_stack`, `get_tolerance_stack`; `form stack run|add|list|show|rerun|rm`.
+
 ## Analysis, measurement and annotations
 
 | | |
@@ -739,7 +762,7 @@ equations, the sources and the verification table are in [CALCULATORS.md](CALCUL
 | OpenSCAD | Builds `.scad` designs; Customizer ranges become parameters |
 | Blender | Photoreal renders; its 3D-Print Toolbox checks when the add-on is installed |
 | Your slicer | Slices, and opens the 3MF or G-code in it |
-| Any MCP client | The full engine over 106 tools ([MCP reference](MCP.md)) |
+| Any MCP client | The full engine over 111 tools ([MCP reference](MCP.md)) |
 
 When a program's version outside the supported range is why something failed, the error names the supported versions
 and what to do.

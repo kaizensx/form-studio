@@ -119,7 +119,7 @@ instead.
 
 ## Tools at a glance
 
-106 tools. Read-only tools never change a project.
+111 tools. Read-only tools never change a project.
 
 | Tool | Access | What it does |
 |---|---|---|
@@ -232,6 +232,8 @@ instead.
 | [`strength_study`](#strength_study) | changes | Run a strength study on the design: will it hold? |
 | [`get_strength_study`](#get_strength_study) | read-only | Read a strength study: its state (never, running with progress, current, stale with the revision the stored result describes, failed with why), and the result. |
 | [`calculate`](#calculate) | changes | Size a part from requirements with a standard's equations, and write it as a design. |
+| [`tolerance_stack`](#tolerance_stack) | changes | Tolerance stack-up of a gap between two faces of an assembly. |
+| [`get_tolerance_stack`](#get_tolerance_stack) | read-only | Read the tolerance stacks kept with a design. |
 
 ## Tools
 
@@ -2240,6 +2242,59 @@ strength study that checks a cantilever hook's deflection by finite elements (ne
 | `expect_head` | integer \| null |  |
 | `purpose` | string \| null |  |
 | `fea` | boolean |  |
+
+### `tolerance_stack`
+
+Tolerance stack-up of a gap between two faces of an assembly. a, b: the faces, each {"at": [x, y, z]} (a
+point on the face as built, the frame analyze_selection uses; add "part", or "frame": "assembled") or
+{"face": model face index}. direction: the gap's direction (default: face A's outward normal). Form Studio
+finds the loop itself: the chain of parts from A's part to B's through the declared mates that hold them
+along the direction (seats: opposite faces; radial fits: a pin square to it, whose clearance is a float), each
+part's link between the faces it is entered and left by, and d(link)/d(parameter) per part by finite
+differences on the rebuilt CAD (so angles count). Tolerances, first that applies: tolerances= ({param: ±t |
+[lower, upper]}, or "part:param"), the drawing's ISO 286 fits, the parameter's provenance sigma, the drawing's
+ISO 2768 class, the process (printed: printer calibration, else FDM ±0.2 mm assumed), else ISO 2768-m assumed;
+declared position and profile tolerances on faces of the loop are converted (±zone/2 along the gap). dist:
+{id: normal | uniform} (default normal at ±3 sigma = tolerance; assumed ones uniform). spec: [LSL, USL] of
+the gap (default LSL 0, assumed). t_min, t_max (°C): the gap over a temperature span from each part's sourced
+expansion (alpha={part: 1/K} for a part without one; never assumed). Returns the gap and its loop (closure),
+contributors with evidence and rule, worst case, RSS, Monte Carlo (seeded) with histogram, Cpk and share out
+of spec, the contribution chart (percent of variance), suggestions (what to tighten, cost hints labelled
+assumed), thermal, and draw (the loop's faces and segments for the viewport). save=True keeps it with the
+design (the Bench entry 'stack'); stack= alone runs a kept one for the head.
+
+| Argument | Type | Required |
+|---|---|---|
+| `project` | string | yes |
+| `a` | object \| null |  |
+| `b` | object \| null |  |
+| `direction` | array \| null |  |
+| `tolerances` | object \| null |  |
+| `dist` | object \| null |  |
+| `spec` | array \| null |  |
+| `t_min` | number \| null |  |
+| `t_max` | number \| null |  |
+| `alpha` | object \| null |  |
+| `samples` | integer |  |
+| `seed` | integer |  |
+| `params` | array \| null |  |
+| `exclude` | array \| null |  |
+| `name` | string |  |
+| `save` | boolean |  |
+| `stack` | string |  |
+
+### `get_tolerance_stack`
+
+*Read-only.*
+
+Read the tolerance stacks kept with a design. No stack: each with its state (current for the head,
+stale with the revision it describes, never). stack=: its stored result (as tolerance_stack returns it).
+Reads only.
+
+| Argument | Type | Required |
+|---|---|---|
+| `project` | string | yes |
+| `stack` | string |  |
 
 ## Prompts
 

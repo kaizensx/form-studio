@@ -2920,6 +2920,8 @@ def build() -> MCPServer:
     fea_tools.register_tools(mcp, studio, _run, RO, RW, _origin)
     from .calc import tools as calc_tools     # engineering calculators that write geometry: calculate (form/calc)
     calc_tools.register_tools(mcp, studio, _run, RO, RW, _origin)
+    from .stack import tools as stack_tools   # tolerance stack-up from the assembly: tolerance_stack, get_tolerance_stack
+    stack_tools.register_tools(mcp, studio, _run, RO, RW, _origin)
     return mcp
 
 

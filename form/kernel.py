@@ -1399,3 +1399,5 @@ from .massprops import KERNEL_OPS as _MASS_OPS  # noqa: E402  (mass, centre of m
 OPS.update(_MASS_OPS)
 from .drawing.kernel_ops import KERNEL_OPS as _DRAWING_OPS  # noqa: E402  (drawing views, sections, PMI)
 OPS.update(_DRAWING_OPS)
+from .stack.kernel import KERNEL_OPS as _STACK_OPS  # noqa: E402  (tolerance stack-up: the loop and its sensitivities)
+OPS.update(_STACK_OPS)
