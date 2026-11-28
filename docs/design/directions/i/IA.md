@@ -282,7 +282,13 @@ with a many-colour scale as a legend option; feature rows show their value and w
 | Four modes with a line of state; Describe as the Overview; Fit as a study in Check; Document | Built. The Overview holds the brief and the revisions; decisions, open questions, files by kind and the family are not built |
 | View cube and shading chip; no view buttons at the foot | Built. The chip lists the build plate, the floor grid and the dimensions; the 3D view has no other shading modes yet |
 | Legend strip under the part | Built for the four analysis maps. One band per stop, not a continuous scale with a marker |
-| One row grammar (`BenchRow.qml`), rows that open in place with what you get, what it needs and the request | Built, used by Document and the Fit row |
-| The conversation (plan card, live status, Sources, hand-edit notes), Home, Settings, the palette | Not built |
-| The Bench docked and as a sheet, the mode-aware dock and tool options, the rollback bar, Values or Source, sketch on a face | Not built: they wait for the Bench, hand modelling and materials to be merged |
-| The three signature moments | Not built |
+| One row grammar (`BenchRow.qml`) | Built (branch `direction-i-2`). Every row of Check, Make and Document, and of the Bench sheet, is a `BenchRow`: mark, name, number, evidence word, or the state in words. No hand-written rows remain; Fit is the engine's entry |
+| The pane as the Bench's chapter, the selected row opened under the list (`Bench.qml`, `BenchCard.qml`) | Built. The checks (Check) and the release gate (Make) still open as the panels they were, under the list. No convergence plot or per-result detail lines as drawn for the strength study: the card shows the engine's headline, detail, note, inputs, files and request |
+| The Bench as a sheet, Ctrl/⌘ B (`BenchSheet.qml`) | Built: four columns (two or one in a narrow window), filters, find, the selected row at the foot with its request. Not built: Edit the request, Pin, engine install progress in the foot |
+| The tree: value and author per row, the rollback bar lighting the feature it passes, Values or Source | Built. The author is the origin of the first revision whose build log names the feature. Source is read-only and not syntax-coloured. The opened feature is the parameter panel that existed, not the mockup's card with constraints |
+| Hovering a row lights its feature or region on the part | Built for the tree and for Fit (its clearance feature). Studies do not name a region yet, so their rows light nothing |
+| The palette's ranking | Built: tiers by closeness; the modes answer to their old names |
+| The conversation (plan card, live status, Sources, hand-edit notes), Home, Settings, the palette's restyle | Not built |
+| The mode-aware dock and tool options capsule, sketch on a face | Not built: the dock is still one list, and the sketch a sheet |
+| Results on the part from the later engines (strength, DFM, CAM, sheet flat, the drawing sheet, motion) | Not built: `integrate-2` had not landed when this part was made |
+| The three signature moments | Not built. The rollback bar lights the feature it passes (a 420 ms highlight), without the outlines of later cuts |

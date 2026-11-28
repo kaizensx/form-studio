@@ -63,21 +63,37 @@ of the accent. Shadows, glows, glass and the room are dithered, so no gradient s
 | **Design** | Features in build order and their parameters. Select a feature on the model or in the list and change it; dragging a slider rebuilds the part in place while you drag, and the draft shows its computed impact before you commit |
 | **Check** | Every check with its evidence, print orientation, the plates, and the slice: time, filament, layers, Watch it print. A 3D model shows the checks that apply to it and says which do not. **Fit** is a study here, for a design made for 3D printing: a row with its modelled yield that opens the fit model for each interface (a section, the clearance, the chance of fitting and how to raise it) |
 | **Make** | The release gate, approval (over failed checks only with a reason for each, on the record), the released files with their hashes, and the revision history. With 3D printing on, a 3D model is marked for printing here in one click |
-| **Document** | What can be handed on: assembly instructions, the report of a release, the share card, the turntable and the photo render, one row each. The drawing sheet is listed and says it is not built yet |
+| **Document** | What can be handed on: the parts list, assembly notes and instructions, the print report, the measurement plan, the four-view sheet, the photo render, the turntable and the share card, each the engine's own entry with its state. Drawings with dimensions are not built yet, and the pane says so |
 
 **The Overview** (click the design's name, or Ctrl/⌘ I) is a sheet over the stage: what the part is for and its
 purpose (for 3D printing, or just a 3D model and how it will be made), the dimensions you measured with their
 provenance, reference photos and imported parts, and the revisions with who made each. It was the Describe stage.
 
-**The Bench.** The top of the Check pane lists every study of the design, and the top of the Make pane every
-route out of Form Studio and every document, in the Program's style: a state mark on the gutter, the name, the
-headline number in mono with the evidence it rests on, and the state on the right (current · r03, stale · r02,
-never run, failed, running, needs, n/a). A line that is not current runs on click (or from its run mark, on the
-activity bar); a current one opens what it made (the map on the part, the simulation, the sheet, or its file). The
-engine decides every state from keys: an entry is current only when a result exists for the head revision's inputs,
-and a stale one names the revision it describes. The agent runs the same entries with `list_studies`, `run_study`
-and `get_study`, and the terminal with `form study list|run|show <project> [id]`. The command palette finds every
-entry. Studies only the agent can do (the design critique) ask the agent; the release is only ever yours.
+**The Bench.** The pane on the right is the Bench's chapter for the mode you are in: the tree in Design, the
+studies in Check, the routes in Make, the documents in Document. Every row reads the same way: a state mark, the
+name, the number, and the word that says how the number is known (COMPUTED, SIMULATED, MODELLED…). A row with no
+number says its state in words in the number's place: *not run*, *describes r02* (stale, in amber), *cannot run yet*
+(dimmed), *not requested*. Click a row and it opens under the list: what it found, what you get, what it needs, the
+exact request Run makes (the same call the CLI and MCP make) and the buttons. The list stays as the way out. The row
+that is the mode's own subject opens as that mode's panel: the checks in Check, the release gate in Make. A current
+map also goes onto the part.
+
+**Ctrl/⌘ B** (or the button in the top right) opens the Bench as a sheet over the stage: all four chapters as
+columns, every entry with its state and one line of what it is, filters (All, Current, Stale, Not run, Needs
+something), a find field (`/`), and the selected row at the foot with its request, Run and *Open in Check*. Esc
+clears the find, then closes it.
+
+The engine decides every state from keys: an entry is current only when a result exists for the head revision's
+inputs, and a stale one names the revision it describes. The agent runs the same entries with `list_studies`,
+`run_study` and `get_study`, and the terminal with `form study list|run|show <project> [id]`. The command palette
+finds every entry. Studies only the agent can do (the design critique) ask the agent; the release is only ever yours.
+
+**The tree** (Design) lists the features in build order. Each line shows the values the feature is made of and a
+mark for who made it (you, or the agent; the tip names the revision). Its gutter carries the rollback bar: drag it
+up and the part steps back to how it stood after that feature, from the kernel's checkpoints; the feature the bar
+passes lights once on the part; nothing is saved. A selected feature opens under the tree with its parameters.
+**Values | Source** at the head of the tree switches what is under it: *Source* shows the design's code with the
+open feature's lines lit.
 
 Ctrl/⌘ 1 to 4 go to Design, Check, Make and Document. The CLI, MCP and `--stage` keep the engine's ids (`shape`,
 `prove`, `release`, `document`; `brief` opens the Overview and `fit` the Fit study), and the names the places had
@@ -86,6 +102,7 @@ before (Describe, Review, Brief, Shape, Prove, Release) still find them in the c
 | Key | Does |
 |---|---|
 | Ctrl/⌘ K | Search and commands: every action and every design |
+| Ctrl/⌘ B | The Bench: every study, route and document on one sheet |
 | Ctrl/⌘ N | New design: Home, with the composer ready |
 | Ctrl/⌘ Shift O | New conversation |
 | Ctrl/⌘ J | Show or hide the conversation |

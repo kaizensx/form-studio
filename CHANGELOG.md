@@ -4,6 +4,23 @@
 
 ### Changed
 
+- **The right pane is the Bench's chapter for the mode, in one row grammar** (direction I, second part). Check lists
+  the studies, Make the routes, Document the documents, and every row reads the same: a state mark, the name, the
+  number, and the word that says how it is known. A row without a number says its state in its place (*not run*,
+  *describes r02*, *cannot run yet*). A clicked row opens **under the list**: what it found, what you get, what it
+  needs, the exact request Run makes, and the buttons. The two row styles that shared a pane are one
+  (`BenchRow.qml`), and the hand-written rows of Document that repeated the engine's entries are gone: every
+  document is the engine's own entry (`form/studies.py`). Fit is the engine's *Fit under uncertainty* row.
+- **The Bench opens as a sheet: Ctrl/⌘ B.** All four chapters as columns over the stage, with filters by state, a
+  find field (`/`) and the selected row's request at the foot. Each entry now says which chapter it is in
+  (`chapter` in `list_studies`): the features, the requirements, the materials and *Make it lighter* are Design.
+- **The tree shows each feature's value and who made it**, in place of its role word, and a selected feature opens
+  under the tree, which stays. **Values | Source** puts the design's code under the tree with the open feature's
+  lines lit (`GET /tree` returns the source, each feature's lines and the first revision that built it). The
+  feature the rollback bar passes lights once on the part.
+- **The palette ranks by how close a match is**: the exact name, then a name that starts with the words, then a word
+  the place also answers to, then a word inside the name, then the hint. *check* lights the Check mode, *review*
+  still finds it, *checks* the Checks study. No query was removed.
 - **Four modes: Design, Check, Make, Document** (design direction I, `docs/design/directions/i/IA.md`; the first
   part of it). The five stages at the top of a design are four modes, each with its one line of state. **Describe
   is the Overview**: click the design's name in the top left (Ctrl/⌘ I) and a sheet opens over the stage with the
