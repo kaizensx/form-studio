@@ -542,7 +542,7 @@ def _reach(surf, a, r, flute, holder_r, pix):
     material its tip is (reach, mm). Centres tried: the sample pushed out along its normal by r (a wall), the sample
     itself and 16 points around it (a floor)."""
     pr = geom.Projection(surf, a, cells=128)
-    H, lo, p = pr.heightmap(pix)
+    H, lo, p = pr.heightmap(pix, pad=2 * r + (holder_r or 0.0) + 2 * pix)    # room for the tool beside the part
     Ht = geom.disc_max(H, max(0.0, (r - p) / p))
     Hr = geom.disc_max(H, 2 * r / p)
     Hh = geom.disc_max(H, holder_r / p) if holder_r else None
@@ -568,11 +568,11 @@ def _reach(surf, a, r, flute, holder_r, pix):
         ij = np.rint((c - lo) / p).astype(np.int64)
         inb = (ij[:, 0] >= 0) & (ij[:, 1] >= 0) & (ij[:, 0] < nx) & (ij[:, 1] < ny)
         ij = np.clip(ij, 0, [nx - 1, ny - 1])
-        ht = Ht[ij[:, 0], ij[:, 1]]
-        hit = inb & (ht <= za + tol)
+        ht = np.where(inb, Ht[ij[:, 0], ij[:, 1]], -np.inf)          # beyond the grid there is no material
+        hit = ht <= za + tol
         if Hh is not None and flute:
-            hit &= Hh[ij[:, 0], ij[:, 1]] <= za + flute + tol
-        rr = np.maximum(0.0, Hr[ij[:, 0], ij[:, 1]] - za)
+            hit &= np.where(inb, Hh[ij[:, 0], ij[:, 1]], -np.inf) <= za + flute + tol
+        rr = np.maximum(0.0, np.where(inb, Hr[ij[:, 0], ij[:, 1]], -np.inf) - za)
         better = hit & (~ok | (rr < np.nan_to_num(reach, nan=np.inf)))
         reach = np.where(better, rr, reach)
         ok |= hit
@@ -606,15 +606,20 @@ def cnc(model, surf, spec, options) -> tuple[dict, dict]:
     groups = _directions(axes, str(options.get("rotary_axis") or "x"))
     masks, reaches, used_dirs, dir_masks = [], [], [], []
     t0 = time.perf_counter()
+    memo: dict = {}                                    # a direction shared by several setups is measured once
     for name, dirs in groups:
         gm = np.zeros(len(surf.S), bool)
         gr = np.full(len(surf.S), np.inf)
         for a in dirs:
-            ok, rc = _reach(surf, geom.unit(a), r, flute, holder_r, pix)
+            a = geom.unit(a)
+            k = tuple(np.round(a, 9))
+            if k not in memo:
+                memo[k] = _reach(surf, a, r, flute, holder_r, pix)
+                used_dirs.append(a)
+                dir_masks.append((a, memo[k][0]))
+            ok, rc = memo[k]
             gr = np.where(ok, np.minimum(gr, np.nan_to_num(rc, nan=np.inf)), gr)
             gm |= ok
-            used_dirs.append(geom.unit(a))
-            dir_masks.append((geom.unit(a), ok))
         masks.append(gm)
         reaches.append(gr)
     anyok = np.any(masks, axis=0)

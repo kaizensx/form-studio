@@ -200,12 +200,12 @@ class Projection:
             out[i0:i0 + chunk] = hit
         return out
 
-    def heightmap(self, pix: float, chunk: int = 60000):
-        """The highest surface depth along d over every pixel centre of a grid of size pix (−inf where empty):
-        (H, origin, pix)."""
+    def heightmap(self, pix: float, chunk: int = 60000, pad: float = 0.0):
+        """The highest surface depth along d over every pixel centre of a grid of size pix (−inf where empty),
+        reaching pad beyond the part on every side: (H, origin, pix)."""
         allxy = np.concatenate(self.xy)
-        lo = allxy.min(axis=0) - pix
-        hi = allxy.max(axis=0) + pix
+        lo = allxy.min(axis=0) - pix - pad
+        hi = allxy.max(axis=0) + pix + pad
         nx, ny = (int(math.ceil(x)) + 1 for x in (hi - lo) / pix)
         gx, gy = np.meshgrid(np.arange(nx), np.arange(ny), indexing="ij")
         q2 = np.stack([lo[0] + gx.ravel() * pix, lo[1] + gy.ravel() * pix], axis=1)

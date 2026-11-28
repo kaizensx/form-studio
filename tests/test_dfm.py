@@ -147,8 +147,14 @@ class CNC(unittest.TestCase):
             rows, _e, _o = run("cnc", tilted, {**self.T6, "tool_d": 4, "axes": ax})
             self.assertEqual(rows["cnc.access"]["status"], "pass")
             n[ax] = rows["cnc.setups"]["value"]
-        self.assertGreater(n[3], n[4])
-        self.assertGreater(n[4], n[5])
+        self.assertGreaterEqual(n[3], n[4])
+        self.assertGreaterEqual(n[4], n[5])
+        self.assertGreater(n[3], n[5])                                  # the slope and the base: 2 setups on 3 axes, 1 on 5
+
+    def test_outer_walls_are_cut_from_above(self):
+        rows, _e, out = run("cnc", Box(40, 30, 20), self.T6)
+        self.assertEqual(rows["cnc.access"]["status"], "pass")
+        self.assertEqual(rows["cnc.setups"]["value"], 2)                 # top with the flanks, then the base
 
     def test_undercut_slot_is_unreachable(self):
         # a T-slot: its overhanging lips hide the slot's sides from every axis direction
@@ -416,14 +422,14 @@ class Design(FeatureDesign):
 
     def test_a_fix_that_cannot_pass_is_not_applied(self):
         st = self.st
-        p = self._new("Deep", self.POCKET.replace("Box(20, 12, v[\"depth\"])", "Box(7, 12, v[\"depth\"])"))
+        p = self._new("Narrow", self.POCKET.replace("Box(20, 12, v[\"depth\"])", "Box(5, 12, v[\"depth\"])"))
         out = dfm.apply_fix(st, p, "cnc", "cnc.corner_tool", {"tool_d": 6, "material": "metal"})
-        # a 7 mm pocket cannot take corners of 3.15 mm on both sides and a cutter of 6 mm reach its corners
-        if out["applied"]:
-            self.assertTrue(out["fixed"])
-        else:
-            self.assertFalse(out["fixed"])
-            self.assertEqual(st.load(p["id"])["head"], 1)
+        # a 5 mm slot cannot take two corners of the 6 mm cutter's 3 mm radius: no candidate builds, nothing is saved
+        self.assertFalse(out["applied"])
+        self.assertFalse(out["fixed"])
+        self.assertTrue(out["tried"])
+        self.assertTrue(all(not x["built"] or not x["passes"] for x in out["tried"]))
+        self.assertEqual(st.load(p["id"])["head"], 1)
 
     def test_overlay_format(self):
         st = self.st
