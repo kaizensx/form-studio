@@ -48,6 +48,7 @@ P.MenuBar {
         P.MenuItem { text: "Document"; shortcut: "Ctrl+4"; enabled: mb.work; onTriggered: Store.setStage("document") }
         P.MenuSeparator {}
         P.MenuItem { text: Store.overview ? "Close the Overview" : "Overview of the Design"; shortcut: "Ctrl+I"; enabled: mb.work; onTriggered: Store.toggleOverview() }
+        P.MenuItem { text: Store.benchOpen ? "Close the Bench" : "The Bench"; shortcut: "Ctrl+B"; enabled: mb.work; onTriggered: Store.toggleBench() }
         P.MenuItem { text: "Fit Study"; enabled: mb.work && Store.printUi; onTriggered: Store.setStage("fit") }
         P.MenuSeparator {}
         P.MenuItem { text: "Frame the Selection  (F)"; enabled: mb.work; onTriggered: Store.frameSelection() }

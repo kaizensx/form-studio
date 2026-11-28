@@ -702,6 +702,12 @@ Item {
         width: ws.width - Theme.edge - x; height: Math.round((ws.col ? ws.height - Theme.edge : Math.min(ws.height - Theme.edge, Store.barY - Theme.gap)) - y)
     }
 
+    // ── the Bench, open: all four chapters at once, over the stage and the pane; the conversation stays ──
+    BenchSheet {
+        id: benchSheet; source: studio; z: 9; on: Store.benchOpen && !!Store.data
+        x: overview.x; y: overview.y; width: overview.width; height: overview.height; from: insp.x - x
+    }
+
     // the panes folded (a narrow window with the conversation open): one button where they stood
     Glass {
         id: panesBtn; objectName: "panesButton"; source: studio; z: 7
@@ -718,7 +724,8 @@ Item {
         id: insp
         objectName: "programPane"
         source: studio; arrive: 5
-        width: Theme.paneW; radius: Theme.rPane; visible: !ws.panesOff
+        width: Theme.paneW; radius: Theme.rPane; visible: !ws.panesOff && opacity > 0.01
+        opacity: Store.benchOpen ? 0 : 1; Behavior on opacity { NumberAnimation { duration: Theme.exit } }
         x: ws.width - Theme.edge - width; y: Theme.paneTop
         // as tall as what it holds, down to the foot of the window or the legends' dock under it
         readonly property real room_: ws.colFoot - y - dock.reserve
@@ -733,7 +740,7 @@ Item {
         // the stage's status in a sentence: stays put while the panel scrolls. The Program listing has its own header.
         Item {
             id: stageHead
-            readonly property bool on: !(Store.stage === "shape" && !Store.feature && !Store.hasDraft) && Store.stage !== "document"
+            readonly property bool on: (Store.stage === "shape" && Store.hasDraft) || Store.stage === "fit"
             width: parent.width; height: on ? say.implicitHeight + 26 : 6; z: 2; clip: true
             readonly property var s: ws.stageSay(Store.stage)
             Rectangle { visible: stageHead.on; x: 18; y: 20; width: 6; height: 6; radius: 3; color: ws.noteColor(stageHead.s[1]) }
@@ -758,16 +765,19 @@ Item {
             Connections { target: Store; function onRevealInspector(y) { scroll.contentY = Math.max(0, Math.min(scroll.contentHeight - scroll.height, y)) } }
             Column {
                 id: body; x: Store.stage === "shape" || Store.stage === "document" ? 6 : 16; y: 0; width: parent.width - 2 * x; spacing: 14
-                // Fit is a study in Check: a row of the Check pane, opened in place of the list (and a way back from it)
-                BenchRow { objectName: "studyFit"; x: 6 - body.x; width: insp.width - 12; visible: Store.stage === "prove" && Store.printUi && !!ws.d
-                    name: "Fit"; state: ws.d && ws.d.fit ? (ws.d.fit.yield >= 0.95 ? "ok" : "warn") : "none"
-                    value: ws.d && ws.d.fit ? Math.round(ws.d.fit.yield * 100) + " %" : "not run"; evidence: ws.d && ws.d.fit ? "modelled" : ""
-                    lights: { var sp = Store.recipe && Store.recipe.fit ? Store.spec(Store.recipe.fit.clearance) : null; return sp && sp.feature ? sp.feature : "" }
-                    onClicked: Store.setStage("fit") }
+                // the mode's chapter of the Bench (Check: studies, Make: routes, Document: documents), one row grammar;
+                // under it the selected row, opened. The row that is the mode's own subject (the checks in Check,
+                // the release in Make) opens as the mode's panel below.
+                Bench { id: chap; x: 6 - body.x; width: insp.width - 12; visible: Store.stage === "prove" || Store.stage === "release" || Store.stage === "document"
+                    chapter: Store.stage === "release" ? "make" : Store.stage === "document" ? "document" : "check" }
+                BenchCard { id: opened; x: 6 - body.x; width: insp.width - 12
+                    readonly property var pick: chap.visible ? Store.benchSelected(chap.chapter) : null
+                    readonly property bool home: !pick || pick.id === Store.benchHome[chap.chapter]
+                    e: home ? null : pick }
                 BenchRow { objectName: "studyBack"; x: 6 - body.x; width: insp.width - 12; visible: Store.stage === "fit"; chevron: true; selected: true
                     name: "Fit"; value: ws.d && ws.d.fit ? Math.round(ws.d.fit.yield * 100) + " %" : ""; evidence: ws.d && ws.d.fit ? "modelled" : ""
                     onClicked: Store.setStage("prove") }
-                Loader { id: panel; width: parent.width; active: !!Store.data
+                Loader { id: panel; width: parent.width; active: !!Store.data; visible: !chap.visible || opened.home
                     property int was: insp.at
                     source: ({ shape: "Shape.qml", fit: "Fit.qml", prove: "Prove.qml", release: "Release.qml", document: "Document.qml" })[Store.stage] || "Shape.qml"
                     // the new stage comes in from the side it lies on

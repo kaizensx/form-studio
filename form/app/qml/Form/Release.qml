@@ -71,8 +71,6 @@ Column {
         }
     }
 
-    // ── the Bench: every study, route and document with its state (Bench.qml, form/studies.py)
-    Bench { x: -10; width: parent.width + 20; groups: ["route"] }      // the documents are the Document mode's chapter
 
     // ── gate ────────────────────────────────────────────────
     readonly property bool superseded: !!ap && ap.state === "superseded"

@@ -148,7 +148,7 @@ Item {
             var w = pal.wordStart(low, t)
             if (w >= 0 && w !== i) { at = []; for (k = 0; k < t.length; k++) at.push(off + w + k); i = w }
             var tier = low === t ? 3000 : i === 0 ? 2000 : w >= 0 ? 1500 : 1000
-            return { score: tier - i * 2 - Math.min(40, low.length - t.length) * 0.5, at: at }
+            return { score: tier - (off + i) * 2 - Math.min(40, low.length - t.length) * 0.5, at: at }     // how far into the text shown
         }
         var p = 0, score = 0, last = -2
         for (var j = 0; j < t.length; j++) {

@@ -227,6 +227,7 @@ Window {
         else if (Store.paletteOpen) Store.paletteOpen = false
         else if (Store.ctxMenu) Store.ctxMenu = null
         else if (Store.sheet) Store.openSheet(null)
+        else if (Store.benchOpen) { if (Store.benchFind) Store.benchFind = ""; else Store.benchOpen = false }
         else if (Store.compare) Store.endCompare()
         else if (Store.measuring) Store.setMeasuring(false)
         else if (Store.selecting && Store.selItems.length) Store.selClear()
@@ -246,6 +247,7 @@ Window {
     Shortcut { sequence: "Ctrl+3"; onActivated: win.stageKey("release"); onActivatedAmbiguously: win.stageKey("release") }
     Shortcut { sequence: "Ctrl+4"; onActivated: win.stageKey("document"); onActivatedAmbiguously: win.stageKey("document") }
     Shortcut { sequence: "Ctrl+I"; enabled: Store.screen === "work" && !!Store.data; onActivated: Store.toggleOverview(); onActivatedAmbiguously: Store.toggleOverview() }
+    Shortcut { sequence: "Ctrl+B"; enabled: Store.screen === "work" && !!Store.data; onActivated: Store.toggleBench(); onActivatedAmbiguously: Store.toggleBench() }
     Shortcut { sequence: "Ctrl+Return"; onActivated: win.commitKey(); onActivatedAmbiguously: win.commitKey() }
     function newDesign() { Store.startNew() }
     Shortcut { sequences: [StandardKey.New]; onActivated: win.newDesign(); onActivatedAmbiguously: win.newDesign() }

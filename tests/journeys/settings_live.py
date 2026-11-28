@@ -34,7 +34,8 @@ def journey_default_printer_from_settings(ui):
     ui.wait_until(lambda: sh.property("busy") == "", 20, "the sheet to finish")
     # the top bar and the open design follow, with no restart and no click on the design
     ui.wait_until(lambda: ui.js("Store.printing.available && Store.printing.presets.machine.name") == X1, 10, "the app to follow")
-    ui.wait_until(lambda: ui.sees(X1, ui.item("printerChip")), 10, "the printer chip in Review")
+    ui.run_js("Store.setStage('release')")             # the printer is named in Make only: it belongs to the print route
+    ui.wait_until(lambda: ui.find(name="printerChip") is not None and ui.sees(X1, ui.item("printerChip")), 10, "the printer chip in Make")
     ui.wait_until(lambda: (ui.api("/projects/" + pid).get("checks") or {}).get("context", {}).get("envelope") == [256.0, 256.0, 250.0],
                   120, "the design's checks to use the X1's bed")
     # and Settings shows it when opened again
@@ -77,7 +78,7 @@ def journey_just_design_from_settings(ui):
     # printing off hides every print surface, even for a design made for printing; nothing was uninstalled
     ui.wait_until(lambda: ui.find(name="printerChip") is None, 5, "the printer chip to go")
     ui.check(not ui.sees("not for printing", "topBar"), "no “just designing” chip either")
-    ui.check("fit" not in [s["id"] for s in ui.js("Store.stages")], "no Fit stage")
+    ui.check(not ui.js("Store.printUi"), "no Fit study: nothing of printing is shown")
     ui.check((ui.api("/install") and any(r["id"] == "slicer.bambu" and r["status"] == "ok" for r in ui.api("/install")["software"])),
              "the slicer is still installed")
     ui.shot("workspace-printing-off")
@@ -92,10 +93,10 @@ def journey_just_design_from_settings(ui):
     ui.wait_until(lambda: ui.js("Store.printOn"), 10, "3D printing to turn on again")
     ui.wait_until(lambda: "Printing" in ui.texts("sheetCard"), 5, "the Printing tab back")
     ui.key("Escape")
-    ui.run_js("Store.open(Store.studio.projects[0].id).then(function () { Store.setStage('prove') })")
+    ui.run_js("Store.open(Store.studio.projects[0].id).then(function () { Store.setStage('release') })")   # the printer is named in Make
     ui.wait_until(lambda: ui.store.get("screen") == "work", 30, "the design")
     ui.wait_until(lambda: ui.find(name="printerChip") is not None, 10, "the printer chip back")
-    ui.check("fit" in [s["id"] for s in ui.js("Store.stages")], "the Fit stage back")
+    ui.check(ui.js("Store.printUi") is True, "the Fit study back")
     ui.settle(600)
     ui.shot("workspace-printing-on")
 

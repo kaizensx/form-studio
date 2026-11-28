@@ -160,7 +160,7 @@ QtObject {
     property bool overview: false      // the Overview of the design (what was Describe), over the stage
     property real _ovT: 0
     // (the menu bar's item and the window's shortcut can both answer one key press: the second is the same press)
-    function toggleOverview() { var t = Date.now(); if (t - _ovT < 150) return; _ovT = t; overview = !overview }
+    function toggleOverview() { var t = Date.now(); if (t - _ovT < 150) return; _ovT = t; overview = !overview; if (overview) benchOpen = false }
     // the documents of the head revision that exist: assembly instructions made for it, the report of its release
     readonly property int documentCount: (instructions && project && instructions.rev === project.head ? 1 : 0)
                                        + (data && data.approval && data.approval.state === "approved" ? 1 : 0)
@@ -564,7 +564,7 @@ QtObject {
     // A pipeline that starts by itself as a design opens is not news when it ends: the dock and the bar show it.
     property real _openT: 0
     property bool _jobQuiet: false
-    onPidChanged: _openT = Date.now()
+    onPidChanged: { _openT = Date.now(); benchSel = ({}); benchOpen = false; benchSheetSel = "" }
     function track(id) { if (!id) return; job = id; jobSteps = []; _jobT0 = Date.now(); _jobQuiet = _jobT0 - _openT < 4000; _poll.restart(); _actTimer.start() }
     function _tick() {
         var id = job
@@ -590,7 +590,7 @@ QtObject {
     function setStage(id) {
         if (id === "brief") { overview = true; return }          // Describe is the Overview now: the mode stays
         if (id === "fit" && !printUi) id = "prove"                // the fit model is a printer's accuracy: only for a print
-        overview = false
+        overview = false; benchOpen = false
         stage = id; section = null
         if (id !== "prove") layers = null
         if (id !== "release" && compare) endCompare()
@@ -2551,5 +2551,57 @@ QtObject {
         if (a === "materials" || a === "tree") { if (stage !== "shape") setStage("shape"); return }   // Colour and material; the Program
         if (e.files && e.files.length) { Bridge.reveal(Bridge.fileUrl(e.files[0])); return }
         if (e.stage && stage !== e.stage) setStage(e.stage)
+    }
+    // ── the Bench's one row grammar: what a row shows of an entry (Bench.qml, BenchCard.qml, BenchSheet.qml) ──
+    property string treeLower: "values"   // under the tree: the open feature's values, or the design's source
+    property var benchSel: ({})            // the selected entry of each chapter, by chapter
+    property bool benchOpen: false         // the Bench sheet: all four chapters at once (Ctrl+B)
+    property string benchSheetSel: ""
+    property string benchFind: ""
+    property real _bnT: 0
+    function toggleBench() { var t = Date.now(); if (t - _bnT < 150) return; _bnT = t; if (!data) return; overview = false; benchOpen = !benchOpen }
+    readonly property var benchHome: ({ check: "checks", make: "release" })      // the entry whose opened row is the mode's own panel
+    function benchChapter(e) { return e.chapter || ({ study: "check", route: "make", document: "document" })[e.group] || "check" }
+    function benchModeOf(ch) { return ({ design: "shape", check: "prove", make: "release", document: "document" })[ch] || "prove" }
+    function benchSelected(ch) {
+        var id = benchSel[ch] || benchHome[ch] || "", e = id ? benchEntry(id) : null
+        return e && e.state !== "n/a" ? e : null
+    }
+    function benchClass(e) {              // the sheet's filters
+        return e.state === "current" ? "current" : e.state === "stale" ? "stale" : e.state === "unavailable" || e.state === "n/a" ? "needs"
+             : e.state === "never" ? "never" : e.state }
+    function benchDot(e) {
+        return e.state === "current" ? (e.status === "warn" ? "warn" : "ok") : e.state === "stale" ? "stale" : e.state === "failed" ? "fail" : e.state === "running" ? "live" : "none" }
+    function revWord(r) { return r !== null && r !== undefined ? "r" + (r < 10 ? "0" : "") + r : "" }
+    function benchWord(e) {               // the state in words, where a row has no number to show
+        var r = revWord(e.rev)
+        if (e.by === "person") return e.state === "current" ? "released " + r : e.state === "stale" ? "superseded " + r : "not requested"
+        return e.state === "current" ? (e.headline ? "" : "current " + r) : e.state === "stale" ? "describes " + r : e.state === "never" ? "not run"
+             : e.state === "unavailable" ? (e.why && e.why.length <= 28 ? e.why : "cannot run yet") : e.state === "n/a" ? (e.why && e.why.length <= 28 ? e.why : "does not apply")
+             : e.state === "failed" ? "failed" : e.state === "running" ? "running" : e.state }
+    function benchSays(e) {               // the same, as a sentence (the opened row's header)
+        var r = revWord(e.rev)
+        if (e.by === "person") return benchWord(e)
+        return e.state === "current" ? "current for " + (r || revWord(e.head)) : e.state === "stale" ? "stale: describes " + r : e.state === "never" ? "not run"
+             : e.state === "unavailable" ? "cannot run yet" : e.state === "n/a" ? "does not apply" : e.state }
+    function benchSub(e) { return e.state === "unavailable" || e.state === "n/a" ? (e.why || "") : e.state === "failed" ? ((e.error && e.error.message) || "failed") : (e.detail || e.doc || "") }
+    function evWord(ev) { return String(ev || "").split(/[ ,(×]/)[0] }        // "computed (B-rep)" is COMPUTED in a row; the card says all of it
+    function benchLights(e) {             // the feature an entry is about, lit on the part while the pointer is on its row
+        if (e.id === "fit") { var sp = recipe && recipe.fit ? spec(recipe.fit.clearance) : null; return sp && sp.feature ? sp.feature : "" }
+        return e.feature || ""
+    }
+    // the exact request Run makes: the same engine call the CLI and MCP make, or what is put to the agent
+    function benchRequest(e) {
+        if (e.by === "person") return ""
+        if (e.by === "agent") return "Asks your agent: review this design, look at it, then record the critique (" + (e.tool || "critique") + ")."
+        return "run_study(project=\"" + (pid || "") + "\", id=\"" + e.id + "\")" + (e.tool ? "\n" + e.tool + "(project=\"" + (pid || "") + "\")  for more options" : "")
+    }
+    // a row was clicked: it is the chapter's selected row. A current map also goes onto the part; Fit opens its study.
+    function benchPick(ch, e) {
+        var m = Object.assign({}, benchSel); m[ch] = e.id; benchSel = m
+        var a = e.app || ""
+        if (a.indexOf("map.") === 0 && e.state === "current") { openStudy(e); return }
+        if (analysisMap && a.indexOf("map.") !== 0) setAnalysis("")
+        if (a === "fit" && e.state !== "n/a") setStage("fit")
     }
 }

@@ -58,31 +58,43 @@ def journey_review(ui):
     ui.key("Ctrl+2")
     ui.wait_until(lambda: ui.store.get("stage") == "prove", 3, "Check")
     ui.wait_until(lambda: ui.find(name="bench-checks"), 10, "the Bench in the Review pane")
-    rows = [e for e in bench(ui)["entries"] if e["group"] == "study" and e["state"] != "n/a"]
+    rows = [e for e in bench(ui)["entries"] if e["chapter"] == "check" and e["state"] != "n/a"]
     ui.check(len(rows) >= 8, f"the studies of a printed box are listed ({len(rows)})")
     for e in rows:                                     # every study the engine lists is a line, with the engine's state
         line = ui.find(name="bench-" + e["id"])
         ui.check(line is not None, f"a line for {e['id']}")
         lab = (ui.find_all(name="benchState", within=line, shown=False) or [None])[0]
-        want = {"current": "current", "stale": "stale", "never": "never run", "unavailable": "needs", "failed": "failed",
-                "running": "running"}[e["state"]]
-        ui.check(lab is not None and want in str(lab.property("text")).lower(), f"{e['id']} reads {want}: {lab.property('text') if lab else None}")
+        said = str(lab.property("text")).lower() if lab is not None else None
+        if e["state"] == "current":                    # a current row shows its number and how it is known, not a word
+            ui.check(said == "" if e["headline"] else "current" in said, f"{e['id']} is current and shows its headline: {said!r}")
+            ui.check(str(line.property("state")) in ("ok", "warn"), f"{e['id']} has a filled mark: {line.property('state')}")
+        else:
+            want = {"stale": "describes", "never": "not run", "failed": "failed", "running": "running"}.get(e["state"])
+            ui.check(said is not None and (want in said if want else said != ""), f"{e['id']} reads {want or 'what it needs'}: {said!r}")
+            ui.eq(bool(line.property("dim")), e["state"] == "unavailable", f"{e['id']} is dimmed only when it cannot run")
     c = entry(ui, "checks")
     ui.eq(c["state"], "current", "the checks are current after the pipeline")
     ui.eq(c["rev"], 1, "and describe r01")
     ui.eq(entry(ui, "map.thickness")["state"], "never", "the wall-thickness map has never run")
     ui.settle(300)
     crop(ui, "bench-review-before-run")
-    # a line that never ran runs on click, on the activity bar, and lands current
+    # a row that never ran opens under the list when clicked: what you get, the exact request, and Run
     ui.scroll_to(ui.item("bench-map.thickness"), 0.5)
     ui.click("bench-map.thickness", 0.3, 0.5)
+    card = ui.wait_until(lambda: ui.find(name="benchCard"), 5, "the row, opened under the list")
+    ui.check(ui.sees("not run", within=card), "the opened row says it has not run")
+    ui.check("map.thickness" in str(ui.find(name="cardRequest", within=card).property("text")), "and shows the request Run makes")
+    ui.check(ui.find(name="bench-checks") is not None, "the list above stays as the way out")
+    ui.scroll_to(ui.item("cardRun"), 0.5)
+    ui.click("cardRun")
     ui.wait_until(lambda: entry(ui, "map.thickness")["state"] == "current", 120, "the thickness study to finish")
-    ui.wait_until(lambda: "current" in str(role(ui, "map.thickness")).lower(),
-                  10, "its line to say current")
+    ui.wait_until(lambda: role(ui, "map.thickness") == "", 10, "its row to show the number in place of the words")
     h = entry(ui, "map.thickness")["headline"]
     ui.check("mm" in h, f"a headline with a number: {h}")
-    ui.expect(h[:12], within=ui.item("bench-map.thickness"))
-    # once current, it opens what it made: the map on the part, and the line is lit (cyan: where you are)
+    ui.expect(h[:8], within=ui.item("bench-map.thickness"))
+    ui.check(ui.sees("current for r01", within=ui.item("benchCard")), "the opened row says which revision it is current for")
+    # once current, a click puts what it made on the part
+    ui.scroll_to(ui.item("bench-map.thickness"), 0.5)
     ui.click("bench-map.thickness", 0.3, 0.5)
     ui.wait_until(lambda: ui.store.get("analysisMap") == "thickness", 5, "the thickness map on the part")
     ui.wait_until(lambda: not ui.store.get("analysisBusy"), 60, "the map")
@@ -91,12 +103,53 @@ def journey_review(ui):
     ui.run_js("Store.setAnalysis('')")
 
 
+def journey_sheet(ui):
+    """Ctrl+B opens the Bench: all four chapters at once, filters, find, and the selected row's request at the foot."""
+    ui.key("Ctrl+B")
+    ui.wait_until(lambda: ui.js("Store.benchOpen") is True, 3, "the Bench sheet")
+    sheet = ui.item("benchSheet")
+    ui.settle(500)
+    for ch in ("design", "check", "make", "document"):
+        ui.check(ui.find(name="benchCol-" + ch, within=sheet) is not None, f"the {ch} chapter is a column")
+    ui.check(ui.find(name="sheet-map.thickness", within=sheet) is not None and ui.find(name="sheet-exports", within=sheet) is not None
+             and ui.find(name="sheet-doc.bom", within=sheet) is not None, "studies, routes and documents are on the one sheet")
+    ui.click("sheet-lighter", 0.3, 0.5)
+    foot = ui.wait_until(lambda: ui.find(name="benchFoot", within=sheet), 3, "the selected row, opened at the foot")
+    ui.check("lighter" in str(ui.find(name="benchFootRequest", within=foot).property("text")), "with the exact request")
+    ui.shot("bench-sheet")
+    ui.run_js("Store.benchSheetSel = ''")
+    ui.key("/")
+    ui.type("thick")
+    ui.settle(300)
+    ui.check(ui.find(name="sheet-map.thickness", within=sheet) is not None and ui.find(name="sheet-exports", within=sheet) is None, "find narrows every column")
+    ui.key("Escape")
+    ui.settle(200)
+    ui.check(ui.find(name="sheet-exports", within=sheet) is not None, "Esc clears the find first")
+    ui.key("Escape")
+    ui.wait_until(lambda: ui.js("Store.benchOpen") is False, 3, "Esc to close the Bench")
+    ui.click("benchButton")
+    ui.wait_until(lambda: ui.js("Store.benchOpen") is True, 3, "the button in the top right to open it")
+    ui.settle(300)
+    ui.key("Ctrl+B")
+    ui.wait_until(lambda: ui.js("Store.benchOpen") is False, 3, "Ctrl+B to close it")
+    ui.settle(300)
+
+
 def journey_palette(ui):
     ui.key("Ctrl+K")
     ui.wait_until(lambda: ui.store.get("paletteOpen") is True, 3, "the palette")
     ui.type("thickness")
     ui.settle(200)
     ui.check(ui.sees("Wall thickness"), "the palette finds a Bench entry")
+    # the closest match is the one lit: a mode by its name or by what it was called, then entries that start with it
+    def lit(words):
+        ui.key("Ctrl+A"); ui.type(words); ui.settle(200)
+        return str(ui.item("palette").property("selText"))
+    ui.eq(lit("check"), "Check", "'check' lights the Check mode, not an entry that only contains it")
+    ui.eq(lit("review"), "Check", "'review' still finds the mode that was called Review")
+    ui.eq(lit("checks"), "Checks", "'checks' lights the Checks study")
+    ui.check("thickness" in lit("wall th").lower(), "a word start inside a name is found")
+    ui.eq(lit("bench"), "Bench", "'bench' lights the Bench sheet")
     ui.key("Escape")
     ui.wait_until(lambda: ui.store.get("paletteOpen") is False, 3, "the palette to close")
     n = ui.js("Store.bench.entries.filter(function (e) { return e.state !== 'n/a' }).length")
@@ -110,8 +163,8 @@ def journey_stale(ui):
     t = entry(ui, "map.thickness")
     ui.eq(t["state"], "stale", "the thickness study is stale")
     ui.eq(t["rev"], 1, "and describes r01")
-    ui.wait_until(lambda: "r01" in str(role(ui, "map.thickness")).lower(),
-                  15, "the line to name the revision it describes")
+    ui.wait_until(lambda: "describes r01" in str(role(ui, "map.thickness")).lower(),
+                  15, "the row to name the revision it describes")
     for e in bench(ui)["entries"]:
         if e["state"] == "current" and not e.get("live"):
             ui.check(e["rev"] == 2 or e.get("note"), f"{e['id']} is current for r{e['rev']}, not the head")

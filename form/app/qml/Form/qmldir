@@ -20,6 +20,9 @@ ShadeChip 1.0 ShadeChip.qml
 ResultStrip 1.0 ResultStrip.qml
 Overview 1.0 Overview.qml
 BenchRow 1.0 BenchRow.qml
+Bench 1.0 Bench.qml
+BenchCard 1.0 BenchCard.qml
+BenchSheet 1.0 BenchSheet.qml
 BetaTag 1.0 BetaTag.qml
 Cap 1.0 Cap.qml
 Sec 1.0 Sec.qml

@@ -25,8 +25,6 @@ Column {
     readonly property var colw: [54, 70, 78, 70]            // orientation table: numeric column widths
     function uniq(a) { return a.filter(function (x, i) { return a.indexOf(x) === i }) }
 
-    // ── the Bench: every study, route and document with its state (Bench.qml, form/studies.py)
-    Bench { x: -10; width: parent.width + 20; groups: ["study"] }
 
     // ── checks: not current ──────────────────────────────────
     Sec { title: "Checks"; visible: !root.ch

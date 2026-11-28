@@ -2,66 +2,68 @@ import QtQuick
 
 // One row of the Bench (direction I, decision 4): the same grammar for a feature, a study, a route and a document.
 //   a state dot · a name · a number · the word that says how the number is known
-// state: "ok" | "warn" | "fail" | "none" (not run: a ring) | "live". A row that cannot run is `dim` and says why in
-// place of the number (`need`). The selected row is on raised glass with its evidence word lit.
-//
-// A row that has something to say before it is run opens in place (140 ms, the list above does not move): what you
-// get, what you give, what it needs, the exact request that Run sends, and the button. A row with none of these is a
-// plain button. While the pointer is on a row, the feature it is about (`lights`) is lit on the part.
+// state: "ok" | "warn" | "fail" | "none" (not run: a ring) | "stale" (an amber ring) | "live" (running, cyan).
+// A row with no number says its state in words in the number's place (`word`: not run, describes r05, needs joints);
+// a row that cannot run is `dim`. The selected row is on raised glass with its evidence word lit; what it opens is
+// drawn under the list (BenchCard), never inside the row. While the pointer is on a row, the feature or region it is
+// about (`lights`) is lit on the part, and its run mark stands in the tail (`runIcon`; empty: none).
 Item {
     id: br
     property string state: "none"
     property string name: ""
+    property string sub: ""              // a second line under the name (the Bench sheet's rows); empty: one line
     property string value: ""
     property string evidence: ""
-    property string need: ""             // why a row that cannot run cannot (shown in place of the number)
+    property string word: ""             // the state in words, when there is no number to show
+    property color wordColor: Theme.ink3
     property bool dim: false
     property bool selected: false
     property bool chevron: false         // the row leads back: a ‹ in the gutter
-    property string gets: ""             // You get
-    property string gives: ""            // You give
-    property string needs: ""            // Needs (an engine, another app, a release…)
-    property string request: ""          // the exact request Run makes: an engine call or what is put to the agent
-    property string action: ""           // the button's word; empty: no button
-    property bool busy: false
     property string lights: ""           // a feature id: lit on the part while the pointer is on the row
-    property bool open: false
-    readonly property bool opens: gets !== "" || gives !== "" || needs !== "" || request !== ""
-    signal clicked()                     // a plain row was clicked
-    signal run()                         // the opened row's button
+    property string runIcon: ""          // the run mark under the pointer
+    property string runTip: ""
+    property string tip: ""
+    property int gutter: 28              // where the dot's column begins
+    readonly property bool hovered: bm.containsMouse || gm.containsMouse
+    readonly property int line: sub !== "" ? 50 : 32
+    signal clicked()
+    signal run()
     width: parent ? parent.width : 0
-    height: 32 + detail.height
-    readonly property color dot: state === "ok" ? Theme.pass : state === "warn" ? Theme.amber : state === "fail" ? Theme.signal : state === "live" ? Theme.datum : Theme.ink3
-    Rectangle { width: parent.width; height: br.height; radius: 10; visible: br.open; color: Theme.alpha(Theme.lineBase, Theme.dark ? 0.05 : 0.04) }
-    Rectangle { width: parent.width; height: 32; radius: 10
-        color: br.selected || br.open ? Theme.glass2 : bm.pressed ? Theme.washPress : bm.containsMouse ? Theme.washHover : "transparent"
+    height: line
+    readonly property color dot: state === "ok" ? Theme.pass : state === "warn" || state === "stale" ? Theme.amber : state === "fail" ? Theme.signal : state === "live" ? Theme.datum : Theme.ink3
+    readonly property bool ring: state === "none" || state === "stale"
+    Rectangle { anchors.fill: parent; radius: 10
+        color: br.selected ? Theme.glass2 : bm.pressed ? Theme.washPress : br.hovered ? Theme.washHover : "transparent"
         Behavior on color { Tint {} } }
-    Item { x: 28; width: 22; height: 32; opacity: br.dim ? 0.5 : 1
+    Item { x: br.gutter; width: 22; height: br.line; opacity: br.dim ? 0.5 : 1
         Icon { visible: br.chevron; anchors.centerIn: parent; name: "chevron_left"; size: 13; color: Theme.ink3 }
-        Rectangle { visible: !br.chevron; anchors.centerIn: parent; width: 6; height: 6; radius: 3
-            color: br.state === "none" ? "transparent" : br.dot; border.width: br.state === "none" ? 1 : 0; border.color: Theme.ink3 } }
-    Txt { id: nm; x: 58; y: (32 - height) / 2; text: br.name; font.weight: br.selected || br.open ? Theme.wSemi : Theme.wMedium; opacity: br.dim ? 0.5 : 1
-        width: Math.max(40, tail.x - x - 8); elide: Text.ElideRight; wrapMode: Text.NoWrap }
-    Row { id: tail; anchors.right: parent.right; anchors.rightMargin: 10; y: (32 - height) / 2; spacing: 9
-        Txt { visible: text !== ""; mono: true; font.pixelSize: 11; font.weight: Theme.wMedium; tone: 2; text: br.need !== "" ? "" : br.value; opacity: br.dim ? 0.5 : 1; anchors.verticalCenter: parent.verticalCenter; wrapMode: Text.NoWrap }
-        Ev { visible: text !== ""; text: br.need !== "" ? "" : br.evidence; lit: br.selected || br.open; anchors.verticalCenter: parent.verticalCenter }
-        Txt { objectName: "rowNeed"; visible: text !== ""; font.pixelSize: 11; tone: 3; text: br.need; anchors.verticalCenter: parent.verticalCenter; wrapMode: Text.NoWrap } }
-    MouseArea { id: bm; width: parent.width; height: 32; hoverEnabled: true
-        onClicked: { if (br.opens) br.open = !br.open; else br.clicked() }
+        Rectangle { id: mark; objectName: "benchDot"; visible: !br.chevron; anchors.centerIn: parent; width: 7; height: 7; radius: 3.5
+            color: br.ring ? "transparent" : br.dot; border.width: br.ring ? 1.5 : 0; border.color: br.dot
+            Glow { color: Theme.datum; blur: 8; strength: 0.8; on: br.state === "live" }
+            SequentialAnimation on opacity { running: br.state === "live" && !Theme.reduced && br.visible; loops: Animation.Infinite
+                NumberAnimation { to: 0.45; duration: 620; easing.type: Easing.InOutSine }
+                NumberAnimation { to: 1; duration: 620; easing.type: Easing.InOutSine } } } }
+    Column { x: br.gutter + 30; anchors.verticalCenter: parent.verticalCenter; width: Math.max(40, tail.x - x - 8); spacing: 1; opacity: br.dim ? 0.5 : 1
+        Txt { id: nm; width: parent.width; text: br.name; font.weight: br.selected ? Theme.wSemi : Theme.wMedium; elide: Text.ElideRight; wrapMode: Text.NoWrap }
+        Txt { visible: br.sub !== ""; width: parent.width; text: br.sub; kind: "fine"; tone: 3; elide: Text.ElideRight; wrapMode: Text.NoWrap } }
+    // the tail: the number and how it is known, or the state in words. In the sheet's two-line rows they stack.
+    Grid { id: tail; anchors.right: parent.right; anchors.rightMargin: 10; anchors.verticalCenter: parent.verticalCenter
+        columns: br.sub !== "" ? 1 : 3; columnSpacing: 9; rowSpacing: 2; horizontalItemAlignment: Grid.AlignRight; verticalItemAlignment: Grid.AlignVCenter
+        opacity: go.visible ? 0 : 1
+        readonly property real room: Math.max(60, br.width - br.gutter - 30 - Math.min(Math.ceil(nm.implicitWidth) + 2, br.width * 0.5) - 30)      // the name first: the number takes what is left
+        Txt { objectName: "benchValue"; visible: text !== ""; mono: true; font.pixelSize: br.sub !== "" ? 12 : 11; font.weight: Theme.wMedium; tone: br.sub !== "" ? 1 : 2
+            text: br.word !== "" ? "" : br.value; opacity: br.dim ? 0.5 : 1; wrapMode: Text.NoWrap; elide: Text.ElideRight
+            width: Math.min(implicitWidth, tail.room - (br.sub !== "" ? 0 : ev.implicitWidth + 9)) }
+        Ev { id: ev; visible: text !== ""; text: br.word !== "" ? "" : br.evidence; lit: br.selected }
+        Txt { objectName: "benchState"; visible: text !== ""; font.pixelSize: 11; color: br.wordColor; opacity: br.dim ? 0.75 : 1
+            text: br.word; wrapMode: Text.NoWrap; elide: Text.ElideRight; width: Math.min(implicitWidth, tail.room) } }
+    MouseArea { id: bm; anchors.fill: parent; hoverEnabled: true; onClicked: br.clicked()
         onContainsMouseChanged: if (br.lights !== "" && Store.viewer) Store.viewer.hovered = containsMouse ? br.lights : (Store.viewer.hovered === br.lights ? "" : Store.viewer.hovered) }
-
-    // the row, opened in place
-    Item { id: detail; y: 32; width: parent.width; clip: true
-        height: br.open ? dcol.implicitHeight + 16 : 0
-        Behavior on height { NumberAnimation { duration: Theme.move(Theme.rowOpen); easing.type: Easing.BezierSpline; easing.bezierCurve: Theme.easeMode } }
-        opacity: br.open ? 1 : 0; visible: height > 0.5
-        Behavior on opacity { NumberAnimation { duration: Theme.rowOpen } }
-        Column { id: dcol; objectName: "rowDetail"; x: 58; y: 6; width: parent.width - 58 - 12; spacing: 7
-            Repeater { model: [["You get", br.gets], ["You give", br.gives], ["Needs", br.needs]].filter(function (r) { return r[1] !== "" })
-                Item { required property var modelData; width: dcol.width; height: Math.max(16, dv.implicitHeight)
-                    Txt { kind: "fine"; tone: 3; text: modelData[0]; width: 58; wrapMode: Text.NoWrap }
-                    Txt { id: dv; x: 62; width: parent.width - 62; kind: "fine"; tone: 2; text: modelData[1] } } }
-            Rectangle { visible: br.request !== ""; width: dcol.width; height: rq.implicitHeight + 14; radius: 8; color: Theme.glassWell
-                Txt { id: rq; objectName: "rowRequest"; x: 9; y: 7; width: parent.width - 18; mono: true; font.pixelSize: 11; tone: 2; text: br.request; wrapMode: Text.WrapAnywhere } }
-            Btn { objectName: "rowRun"; visible: br.action !== ""; small: true; kind: "primary"; text: br.action; enabled: !br.dim; busy: br.busy; onClicked: br.run() } } }
+    Item { id: go; objectName: "benchRun"; anchors.right: parent.right; anchors.rightMargin: 6; anchors.verticalCenter: parent.verticalCenter; width: 24; height: 24
+        visible: br.runIcon !== "" && br.hovered && br.word !== ""
+        Rectangle { anchors.fill: parent; radius: 7; color: gm.containsMouse ? Theme.plate4 : Theme.plate3 }
+        Icon { anchors.centerIn: parent; size: 12; color: Theme.ink; name: br.runIcon }
+        MouseArea { id: gm; anchors.fill: parent; hoverEnabled: true; cursorShape: Qt.PointingHandCursor; onClicked: br.run() } }
+    Tip { show: bm.containsMouse && !gm.containsMouse && br.tip !== ""; text: br.tip }
+    Tip { show: gm.containsMouse && br.runTip !== ""; text: br.runTip }
 }

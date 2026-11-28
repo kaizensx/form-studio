@@ -176,6 +176,14 @@ Item {
                     Txt { mono: true; font.pixelSize: 11; font.weight: Theme.wMedium; tone: 3; text: Theme.keyText("Ctrl+K"); anchors.verticalCenter: parent.verticalCenter; wrapMode: Text.NoWrap } }
                 MouseArea { id: sm; anchors.fill: parent; hoverEnabled: true; onClicked: Store.paletteOpen = true }
                 Tip { show: sm.containsMouse; below: true; text: "Search and commands"; keys: "Ctrl+K" } }
+            // the Bench, open: every study, route and document on one sheet
+            Item { id: benchBtn; objectName: "benchButton"; visible: bar.work && !!Store.data; width: brow.implicitWidth + 18; height: 32; anchors.verticalCenter: parent.verticalCenter
+                Rectangle { anchors.fill: parent; radius: 16; color: bbm.pressed ? Theme.washPress : bbm.containsMouse || Store.benchOpen ? Theme.washHover : "transparent"; Behavior on color { Tint {} } }
+                Row { id: brow; anchors.centerIn: parent; spacing: 8
+                    Icon { name: "list_checks"; size: 16; color: bbm.containsMouse || Store.benchOpen ? Theme.ink : Theme.ink2; anchors.verticalCenter: parent.verticalCenter }
+                    Txt { mono: true; font.pixelSize: 11; font.weight: Theme.wMedium; tone: 3; text: Theme.keyText("Ctrl+B"); anchors.verticalCenter: parent.verticalCenter; wrapMode: Text.NoWrap } }
+                MouseArea { id: bbm; anchors.fill: parent; hoverEnabled: true; onClicked: Store.toggleBench() }
+                Tip { show: bbm.containsMouse; below: true; text: Store.benchOpen ? "Close the Bench" : "The Bench: every study, route and document"; keys: "Ctrl+B" } }
             Item { width: 34; height: 32; anchors.verticalCenter: parent.verticalCenter
                 readonly property bool on: !!Store.sheet && Store.sheet.kind === "settings"
                 Rectangle { anchors.fill: parent; radius: 16; color: gm.pressed ? Theme.washPress : gm.containsMouse || parent.on ? Theme.washHover : "transparent"; Behavior on color { Tint {} } }

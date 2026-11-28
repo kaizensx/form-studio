@@ -118,7 +118,7 @@ def goto(ui, sid):
         return
     if sid == "fit":
         goto(ui, "prove")
-        ui.click("studyFit")
+        ui.click("bench-fit", 0.3, 0.5)
     else:
         ui.click("stage-" + sid)
     ui.wait_until(lambda: ui.store.get("stage") == sid and ui.js("Store.overview") is False, 3, sid)

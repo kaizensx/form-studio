@@ -37,7 +37,9 @@ def run(ui):
     # ── Document: what exists has a state, what is not built says so ──
     goto(ui, "document")
     ui.settle(400)
-    ui.check(ui.sees("not built yet", within=ui.item("docDrawing")), "the drawing sheet says it is not built yet")
+    ui.check(ui.sees("not built yet", within=ui.item("docNotBuilt")), "what is not built yet is said, not listed as a row")
+    ui.check(ui.find(name="bench-doc.bom") is not None, "the documents are the engine's own entries")
+    ui.check(not ui.exists("docShare") and not ui.exists("docTurntable"), "no hand row repeats an entry")
     ui.shot("direction-i-document")
 
     # ── the Overview: Describe, opened from the design capsule; the mode stays ──
@@ -57,9 +59,9 @@ def run(ui):
     ui.wait_until(lambda: ui.js("Store.overview") is False and ui.store.get("stage") == "prove", 3, "a mode to close the Overview")
 
     # ── Fit is a study in Check: a row with its number and how it is known ──
-    row = ui.item("studyFit")
+    row = ui.item("bench-fit")
     ui.check(any("%" in t for t in ui.texts(row)) and ui.sees("modelled", within=row), f"the Fit row reads as a study: {ui.texts(row)}")
-    ui.click("studyFit")
+    ui.click("bench-fit", 0.3, 0.5)
     ui.wait_until(lambda: ui.store.get("stage") == "fit", 3, "the Fit study to open")
     ui.eq(ui.js("Store.mode"), "prove", "Fit is in Check")
     ui.eq(int(ui.item("stageTabs").property("at")), 1, "Check stays lit while the Fit study is open")
