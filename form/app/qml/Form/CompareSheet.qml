@@ -67,6 +67,7 @@ Column {
             if (viewB && one.vp.model !== viewB) { one.vp.setModel(viewB); frameIn(one.vp) }
             one.vp.setGhost(edgesOnly(viewA))
             one.vp.flagged = changedIds
+            one.vp.selected = changedIds.length ? changedIds[0] : ""
         } else if (cs.tab === "side" && one.leftView) {
             if (viewA && one.leftView.model !== viewA) { one.leftView.setModel(viewA); frameIn(one.leftView) }
             if (viewB && one.rightView.model !== viewB) { one.rightView.setModel(viewB); frameIn(one.rightView) }
@@ -128,7 +129,7 @@ Column {
                     Item { required property var modelData; objectName: "compareParam-" + modelData.key; width: sc.width; height: 22
                         Txt { width: parent.width - pv.implicitWidth - 10; elide: Text.ElideRight; wrapMode: Text.NoWrap; tone: 2; text: modelData.label; anchors.verticalCenter: parent.verticalCenter }
                         Txt { id: pv; anchors.right: parent.right; anchors.verticalCenter: parent.verticalCenter; mono: true; font.pixelSize: 12; wrapMode: Text.NoWrap
-                            text: (modelData.from === null ? "new" : F.trim(modelData.from)) + " → " + (modelData.to === null ? "gone" : F.trim(modelData.to)) + (modelData.unit ? " " + modelData.unit : "") } } }
+                            text: (modelData.from === null || modelData.from === undefined ? "new" : F.trim(modelData.from)) + " → " + (modelData.to === null || modelData.to === undefined ? "gone" : F.trim(modelData.to)) + (modelData.unit ? " " + modelData.unit : "") } } }
                 Item { width: 1; height: 8 }
                 Item { width: sc.width; height: 18
                     Txt { kind: "cap"; text: "The solid" }
@@ -228,11 +229,11 @@ Column {
                         color: ln.modelData.t === "add" ? Theme.alpha(Theme.pass, Theme.dark ? 0.13 : 0.11) : Theme.alpha(Theme.signal, Theme.dark ? 0.13 : 0.09) }
                     Rectangle { visible: ln.gap; anchors.verticalCenter: parent.verticalCenter; width: parent.width; height: 1; color: Theme.rule }
                     Txt { visible: !ln.gap; width: 30; horizontalAlignment: Text.AlignRight; anchors.verticalCenter: parent.verticalCenter; mono: true; font.pixelSize: 11; tone: 3; wrapMode: Text.NoWrap
-                        text: ln.modelData.a !== null ? ln.modelData.a : "" }
+                        text: ln.modelData.a ? String(ln.modelData.a) : "" }
                     Txt { visible: !ln.gap; x: 34; width: 30; horizontalAlignment: Text.AlignRight; anchors.verticalCenter: parent.verticalCenter; mono: true; font.pixelSize: 11; tone: 3; wrapMode: Text.NoWrap
-                        text: ln.modelData.b !== null ? ln.modelData.b : "" }
+                        text: ln.modelData.b ? String(ln.modelData.b) : "" }
                     Txt { visible: !ln.gap; x: 70; width: 12; anchors.verticalCenter: parent.verticalCenter; mono: true; font.pixelSize: 12; wrapMode: Text.NoWrap
                         color: ln.modelData.t === "add" ? Theme.pass : Theme.signal; text: ln.modelData.t === "add" ? "+" : ln.modelData.t === "del" ? "−" : "" }
                     Txt { visible: !ln.gap; x: 86; width: parent.width - 86; anchors.verticalCenter: parent.verticalCenter; mono: true; font.pixelSize: 12; wrapMode: Text.NoWrap; elide: Text.ElideRight
-                        textFormat: Text.StyledText; text: Py.colour(ln.modelData.text, Theme.dark) } } } } }
+                        textFormat: Text.StyledText; text: Py.colour(String(ln.modelData.text || ""), Theme.dark) } } } } }
 }

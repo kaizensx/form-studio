@@ -88,6 +88,5 @@ Column {
                 text: tile.e.by === "agent" ? "Ask" : tile.e.by === "person" ? "Go" : tile.e.state === "current" ? "" : "Run"
                 tip: tile.e.by === "agent" ? "Ask your agent" : tile.e.by === "person" ? "Go to the release" : tile.e.state === "current" ? "Run again" : "Run"
                 onClicked: { var x = tile.e; if (x.by !== "engine") Store.benchOpen = false; Store.runStudy(x.id, x.state === "current") } } }
-        Tip { show: tm.containsMouse && !run.hovered; text: tile.e.label + (tile.off && tile.e.why ? ". Needs: " + tile.e.why : "") }
     }
 }

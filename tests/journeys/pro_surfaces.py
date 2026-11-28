@@ -182,6 +182,8 @@ def journey_tiles(ui):
     th = ui.item("tile-map.thickness")
     ui.check(ui.sees("not run", within=th), "our state, in words, on a tile that never ran")
     ui.settle(300)
+    ui.hover(sheet, 0.5, 0.985)
+    ui.settle(300)
     crop(ui, "benchSheet", "bench-tiles")
     ui.scroll_to(th, 0.5)
     ui.click("tileRun-map.thickness")
@@ -224,10 +226,15 @@ def journey_tree_rows(ui):
     ui.check(ui.sees("Hole H7", within=ui.item("treePmi-fit-1")), "the fit names its size and class")
     # the eye hides a feature in the view only
     h0 = head(ui)
-    row = ui.item("feature-rib")
-    ui.hover(row, 0.5, 0.3)
-    ui.settle(200)
-    ui.click(ui.wait_until(lambda: ui.find(name="featureEye-rib"), 3, "the eye on the hovered line"))
+    ui.scroll_to(ui.item("feature-rib"), 0.5)
+
+    def eye():                                       # the line may be rebuilt as the revision lands: hover it again
+        ui.hover(ui.item("programPane"), 0.5, 0.01)
+        ui.settle(80)
+        ui.hover(ui.item("feature-rib"), 0.5, 0.3)
+        ui.settle(150)
+        return ui.find(name="featureEye-rib")
+    ui.click(ui.wait_until(eye, 8, "the eye on the hovered line"))
     ui.wait_until(lambda: ui.js("Store.hidden.indexOf('rib') >= 0"), 3, "Rib hidden in the view")
     ui.eq(head(ui), h0, "hiding saves nothing")
     ui.check(not ui.js("Store.recipe.features.filter(function (f) { return f.id === 'rib' })[0].suppressed"), "and does not suppress it")
@@ -256,10 +263,13 @@ def journey_tree_rows(ui):
     ui.run_js("Store.select('')")
     ui.settle(300)
     # Equations opens the Values view; an origin plane starts a sketch on it
+    ui.scroll_to(ui.item("treeEquations"), 0.5)
     ui.click("treeEquations")
     ui.wait_until(lambda: ui.js("Store.treeLower") == "values" and ui.js("Store.feature") == "", 3, "the Values view")
+    ui.scroll_to(ui.item("treeOrigin"), 0.5)
     ui.click("treeOrigin")
     ui.wait_until(lambda: ui.exists("treePlane-XZ"), 3, "the three planes")
+    ui.scroll_to(ui.item("treePlane-XZ"), 0.5)
     ui.click("treePlane-XZ")
     ui.wait_until(lambda: ui.js("(Store.sketchHost && Store.sketchHost.on && Store.sketchHost.sk.plane.datum === 'XZ') || (!!Store.sheet && Store.sheet.kind === 'handsketch')"), 5,
                   "a sketch on the XZ plane")

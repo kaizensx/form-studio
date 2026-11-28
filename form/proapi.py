@@ -133,7 +133,7 @@ def compare(st, p: dict, a: int, b: int | None = None) -> dict:
         if old[1] != lab:
             why.append("renamed from " + old[1])
         if not why and sig_a is not None and sig_b is not None and sig_a.get(fid) != sig_b.get(fid):
-            why.append("its faces changed (it follows a feature before it)")
+            why.append("its faces in the solid changed: another feature changed what it made")
         feats.append({"id": fid, "label": lab, "state": "changed" if why else "same", "why": "; ".join(why)})
     ids_b = {f[0] for f in fb}
     removed = [{"id": fid, "label": lab, "state": "removed", "why": "not in r%02d" % b}
