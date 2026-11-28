@@ -147,7 +147,9 @@ Item {
     Shortcut { sequence: "Shift+R"; enabled: ws.designKeys && !Store.hasDraft; onActivated: ws.setTool("sketch", "revolve") }
     Shortcut { sequence: "Shift+F"; enabled: ws.designKeys; onActivated: ws.setTool("annotate", "fillet") }
     Shortcut { sequence: "Shift+C"; enabled: ws.designKeys; onActivated: ws.setTool("annotate", "chamfer") }
-    Shortcut { sequence: "Shift+O"; enabled: ws.designKeys; onActivated: ws.setTool("annotate", "hole") }
+    // Hole is Shift+H. (It did nothing while "Show all features" held the same keys in ContextMenu.qml: two Shortcuts
+    // with one sequence in a window are ambiguous to Qt, and neither fires. Show all features is Alt+H now.)
+    Shortcut { sequence: "Shift+H"; enabled: ws.designKeys; onActivated: ws.setTool("annotate", "hole") }
     Shortcut { sequence: "Shift+P"; enabled: ws.designKeys; onActivated: ws.setTool("select", "pattern") }
     Shortcut { sequence: "Shift+S"; enabled: ws.designKeys; onActivated: ws.setTool("annotate", "shell") }
     Shortcut { sequence: "Shift+B"; enabled: ws.designKeys; onActivated: ws.setTool("annotate", "part") }
@@ -167,9 +169,15 @@ Item {
     Shortcut { sequence: "L"; enabled: ws.keys && ws.tool === "annotate"; onActivated: Store.selMode = "lasso" }
     Shortcut { sequence: "["; enabled: ws.keys && ws.tool === "annotate"; onActivated: Store.brushMm = Math.max(0.5, Store.brushMm / 1.25) }
     Shortcut { sequence: "]"; enabled: ws.keys && ws.tool === "annotate"; onActivated: Store.brushMm = Math.min(25, Store.brushMm * 1.25) }
-    Shortcut { sequence: "A"; enabled: ws.keys; onActivated: ws.setTool("analyze") }
-    Shortcut { sequence: "E"; enabled: ws.keys && !!Store.assembly; onActivated: ws.setTool("assembly") }
-    Shortcut { sequence: "T"; enabled: ws.keys; onActivated: ws.setTool("history") }
+    // Analyze, Assembly and History are tools of Check: from any mode their key goes there, so the dock shows the
+    // tool lit (a key that started a tool whose button was not on screen read as nothing happening)
+    function checkTool(t) {
+        if (Store.mode !== "prove") { Store.setStage("prove"); if (Ws.tool === t) return }
+        ws.setTool(t)
+    }
+    Shortcut { sequence: "A"; enabled: ws.keys; onActivated: ws.checkTool("analyze") }
+    Shortcut { sequence: "E"; enabled: ws.keys && !!Store.assembly; onActivated: ws.checkTool("assembly") }
+    Shortcut { sequence: "T"; enabled: ws.keys; onActivated: ws.checkTool("history") }
 
     // ── the build-up: a new build from the agent (or a pick, or a measurement) grows in feature by feature, in build
     //    order, each one named as it arrives, so you watch the part being made. It is the real geometry of this
@@ -324,6 +332,7 @@ Item {
             capX: Theme.edge + 60 + ws.shift; capY: Theme.paneTop + 2
             capMax: Math.max(240, ws.paneX - capX - Theme.gap - (cube.visible ? cube.width + Theme.gap : 0))
             midX: ws.col ? (lay.freeL + lay.freeR) / 2 : lay.mid
+            footL: rail.visible && rail.y + rail.height + 8 > footY - 44 ? capX : Theme.edge + ws.shift; footR: ws.paneX - Theme.gap
             footY: Math.min(centre.height - Theme.edge, status.y - 36, ws.col ? 1e9 : Store.barY - Theme.gap)      // above the scale cue, the size line and the bar
             onBusyHereChanged: { if (!busyHere && ["sketch", "extrude", "cut", "revolve"].indexOf(Ws.want) >= 0) Ws.want = ""; if (on && ["sketch", "extrude", "cut", "revolve"].indexOf(Ws.want) < 0) { if (Ws.tool !== "select") ws.setTool("select"); Ws.want = "sketch" } }
             onOnChanged: if (on && ["sketch", "extrude", "cut", "revolve"].indexOf(Ws.want) < 0) Ws.want = "sketch"
@@ -470,7 +479,7 @@ Item {
                             enabled: !ws.sim; active: ws.tool === "annotate" && Ws.want === "fillet"; onClicked: ws.setTool("annotate", "fillet") }
                         RailBtn { objectName: "railChamfer"; icon: "triangle"; label: "Chamfer"; keys: "Shift+C"; hint: "Pick the edges to bevel."
                             enabled: !ws.sim; active: ws.tool === "annotate" && Ws.want === "chamfer"; onClicked: ws.setTool("annotate", "chamfer") }
-                        RailBtn { objectName: "railHole"; icon: "circle_dot"; label: "Hole"; keys: "Shift+O"; hint: "Pick a flat face: a hole there, to a standard size."
+                        RailBtn { objectName: "railHole"; icon: "circle_dot"; label: "Hole"; keys: "Shift+H"; hint: "Pick a flat face: a hole there, to a standard size."
                             enabled: !ws.sim; active: ws.tool === "annotate" && Ws.want === "hole"; onClicked: ws.setTool("annotate", "hole") }
                         RailBtn { objectName: "railPattern"; icon: "layout_grid"; label: "Pattern"; keys: "Shift+P"; hint: "Repeat a feature along a line or about an axis. Select the feature first, on the part or in the tree."
                             enabled: !ws.sim; active: Ws.want === "pattern"; onClicked: ws.setTool("select", "pattern") }

@@ -77,6 +77,7 @@ Node {
         geometry: ResultGeometry { source: lay.isDfm ? ({ file: lay.r.mesh.file, kind: "dfm" }) : ({}) }
         materials: CustomMaterial {
             shadingMode: CustomMaterial.Shaded; cullMode: Material.NoCulling; fragmentShader: "shaders/clay.frag"
+            property real uGhost: 0
             property real uDither: lay.port ? lay.port.ditherK : 1; property real uFilmic: Theme.dark ? 1 : 0
             property real uWipe: -1; property real uWipeSide: 1
             property real uMap: 1
@@ -135,6 +136,7 @@ Node {
         geometry: ResultGeometry { source: lay.isCam && lay.setup && lay.setup.stock ? ({ file: lay.r.mesh.file, kind: "stock", setup: Results.setup }) : ({}) }
         materials: CustomMaterial {
             shadingMode: CustomMaterial.Shaded; cullMode: Material.NoCulling; fragmentShader: "shaders/clay.frag"
+            property real uGhost: 0
             property real uDither: lay.port ? lay.port.ditherK : 1; property real uFilmic: Theme.dark ? 1 : 0
             property real uWipe: -1; property real uWipeSide: 1
             property real uMap: 1

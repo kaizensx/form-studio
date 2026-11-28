@@ -73,7 +73,7 @@ Item {
             add("Tools", "game", "gamepad_2", "Game asset", "LODs, UVs, baked maps and collision for Godot, Unity or Unreal", function () { Store.openSheet("game") })
             add("Tools", "timeline", "history", (Store.timelineOpen ? "Hide" : "Show") + " the revision timeline", "Scrub through revisions", function () { Store.timelineOpen = !Store.timelineOpen; if (!Store.timelineOpen) Store.endScrub() })
             add("Tools", "morph", "play", "Play the revision history", "Morph through every revision", function () { Store.timelineOpen = true; Store.playMorph() })
-            if (Store.hidden.length) add("Tools", "showall", "eye", "Show all features", F.plural(Store.hidden.length, "feature") + " hidden", function () { Store.showAll() }, "Shift+H")
+            if (Store.hidden.length) add("Tools", "showall", "eye", "Show all features", F.plural(Store.hidden.length, "feature") + " hidden", function () { Store.showAll() }, "Alt+H")
             if (Store.hasDraft) { add("Tools", "commit", "git_commit_horizontal", "Commit the draft", "Saves a revision", function () { Store.commit() }, "Ctrl+Return")
                 add("Tools", "discard", "undo_2", "Discard the draft", "", function () { Store.discard() }) }
             add("Tools", "importpart", "box", "Import a reference part…", "STEP, IGES, a mesh, a scan or a zip, shown in blueprint", function () { Store.askImportPart() })

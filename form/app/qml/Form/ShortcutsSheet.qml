@@ -32,7 +32,7 @@ Column {
             ["1", "Iso view"], ["2", "Front view"], ["3", "Side view"], ["4", "Top view"], ["5", "Underside view"],
             [".", "Reset the view"],
             ["H", "Hide or show the selected feature"],
-            ["Shift+H", "Show all features"],
+            ["Alt+H", "Show all features"],
             ["Right-click", "Quick actions for a feature"]] },
          { title: "Inside Measure and Annotate", rows: [
             ["D", "Measure: distance"], ["G", "Measure or Annotate: face"], ["O", "Measure: diameter"],

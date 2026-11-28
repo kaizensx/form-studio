@@ -34,6 +34,15 @@ Item {
     property bool showDims: true
     property bool showOrigin: true           // the faint origin cross on the floor; off where words sit over an empty floor
     property bool interactive: true
+    // a sketch open on the part (SketchOnPart.qml). The view is orthographic while it is: what stands off the plane
+    // (the far end of an extrusion, the kernel's preview of it) is then drawn straight over the profile instead of
+    // aside of it, as a perspective view draws it. The part is a ghost (clay.frag uGhost), and the profile's lines
+    // are 3D lines in the part's own depth: what stands in front of them hides them.
+    property bool sketching: false
+    property real ghostParts: sketching ? 1 : 0
+    Behavior on ghostParts { NumberAnimation { duration: Theme.reduced ? 0 : 140 } }
+    property var inkLines: []                // the profile: xyz pairs, design frame
+    property var inkLit: []                  // its selected entities
     property bool spin: false                // slow turntable (home screen)
     // by day the frame is toned with a linear curve (the floor stays paper white), so the lights are turned down to match
     readonly property real lightK: Theme.dark ? 1 : 0.48
@@ -845,7 +854,7 @@ Item {
     View3D {
         id: view
         anchors.fill: parent
-        camera: cam
+        camera: vp.sketching ? ocam : cam
         environment: SceneEnvironment {
             clearColor: Theme.plate; backgroundMode: SceneEnvironment.Color
             antialiasingMode: SceneEnvironment.MSAA; antialiasingQuality: vp.lite ? SceneEnvironment.Medium : SceneEnvironment.VeryHigh
@@ -904,6 +913,10 @@ Item {
             // doublings, so it changes a few times over the whole zoom instead of making the shadow crawl.
             readonly property real shadowFar: 1400 * Math.pow(2, Math.max(0, Math.ceil(Math.log(Math.max(1, (far * 1.3 + span) / 1400)) / Math.LN2)))
         }
+        // the same eye without perspective, for a sketch: a millimetre at the look-at point is as many pixels as in
+        // the perspective view, so the profile does not change size when the view changes over
+        OrthographicCamera { id: ocam; position: cam.position; rotation: cam.rotation; clipNear: cam.clipNear; clipFar: cam.clipFar
+            horizontalMagnification: 1 / Math.max(1e-6, vp.mmPerPx); verticalMagnification: horizontalMagnification }
         // key from the upper left front (casts the shadow), a warm fill, a cool rim from behind that draws the
         // far silhouette, and a little light from straight above so top faces separate from walls
         DirectionalLight { eulerRotation: Qt.vector3d(-50, -34, 0); brightness: 2.0 * vp.lightK; color: "#fffaf2"
@@ -993,6 +1006,8 @@ Item {
             Node {
                 id: design
                 position: vp.shift
+                InkLine { points: vp.inkLines; color: Theme.datum; weight: 2; port: vp; visible: vp.sketching }
+                InkLine { points: vp.inkLit; color: Theme.datumHi; weight: 3; port: vp; visible: vp.sketching; bias: 2 }
                 Repeater3D {
                     id: parts
                     model: vp.model && !vp.asm ? vp._mesh : []
@@ -1018,6 +1033,12 @@ Item {
                         geometry: MeshGeometry { positions: modelData.positions; indices: modelData.indices }
                         materials: CustomMaterial {
                             shadingMode: CustomMaterial.Shaded; cullMode: pmod.k < 1 ? Material.BackFaceCulling : Material.NoCulling; fragmentShader: "shaders/clay.frag"
+                            // a sketch is open (vp.sketching): the part is a ghost, drawn after its own depth pass, so only its
+                            // nearest surface is blended and nothing inside it shows; the feature being previewed stays solid
+                            property real uGhost: vp.ghostParts * (vp.flagged.indexOf(feature) >= 0 ? 0 : 1)
+                            sourceBlend: uGhost > 0 ? CustomMaterial.SrcAlpha : CustomMaterial.NoBlend
+                            destinationBlend: uGhost > 0 ? CustomMaterial.OneMinusSrcAlpha : CustomMaterial.NoBlend
+                            depthDrawMode: uGhost > 0 ? Material.OpaquePrePassDepthDraw : Material.OpaqueOnlyDepthDraw
                             property real uDither: vp.ditherK; property real uFilmic: Theme.dark ? 1 : 0
                             property real uWipe: vp._wipePx; property real uWipeSide: 1
                             property real uMap: 0
@@ -1069,6 +1090,12 @@ Item {
                                 geometry: MeshGeometry { positions: modelData.positions; indices: modelData.indices }
                                 materials: CustomMaterial {
                                     shadingMode: CustomMaterial.Shaded; cullMode: amod.k < 1 ? Material.BackFaceCulling : Material.NoCulling; fragmentShader: "shaders/clay.frag"
+                                    // a sketch is open (vp.sketching): the part is a ghost, drawn after its own depth pass, so only its
+                                    // nearest surface is blended and nothing inside it shows; the feature being previewed stays solid
+                                    property real uGhost: vp.ghostParts * (vp.flagged.indexOf(feature) >= 0 ? 0 : 1)
+                                    sourceBlend: uGhost > 0 ? CustomMaterial.SrcAlpha : CustomMaterial.NoBlend
+                                    destinationBlend: uGhost > 0 ? CustomMaterial.OneMinusSrcAlpha : CustomMaterial.NoBlend
+                                    depthDrawMode: uGhost > 0 ? Material.OpaquePrePassDepthDraw : Material.OpaqueOnlyDepthDraw
                                     property real uDither: vp.ditherK; property real uFilmic: Theme.dark ? 1 : 0
                                     property real uWipe: vp._wipePx; property real uWipeSide: 1
                                     property real uMap: 0
@@ -1122,6 +1149,7 @@ Item {
                         geometry: MeshGeometry { positions: xmod.modelData.positions; indices: xmod.modelData.indices }
                         materials: CustomMaterial {
                             shadingMode: CustomMaterial.Shaded; cullMode: vp.wipeOn || vp._altMix >= 1 ? Material.NoCulling : Material.BackFaceCulling; fragmentShader: "shaders/clay.frag"
+                            property real uGhost: 0
                             property real uDither: vp.ditherK; property real uFilmic: Theme.dark ? 1 : 0
                             property real uWipe: vp._wipePx; property real uWipeSide: -1
                             property real uMap: 0
@@ -1226,6 +1254,7 @@ Item {
                     geometry: MeshGeometry { id: ageo; source: vp._map }
                     materials: CustomMaterial {
                         shadingMode: CustomMaterial.Shaded; cullMode: Material.NoCulling; fragmentShader: "shaders/clay.frag"
+                        property real uGhost: 0
                         property real uDither: vp.ditherK; property real uFilmic: Theme.dark ? 1 : 0
                         property real uWipe: -1; property real uWipeSide: 1
                         property real uMap: vp.mapMix
@@ -1300,7 +1329,7 @@ Item {
 
             // overall dimensions, drawn like a drawing: extension lines, a dimension line, the number
             // (only where the lit lines over the view are not drawn: the small views)
-            Model { visible: vp.lite && vp.showDims && !!vp.model && vp.asmMode !== "exploded" && !vp.platesOn && !vp.dimsHeld && vp._altMix < 0.5; pickable: false; castsShadows: false
+            Model { visible: vp.lite && vp.showDims && !vp.sketching && !!vp.model && vp.asmMode !== "exploded" && !vp.platesOn && !vp.dimsHeld && vp._altMix < 0.5; pickable: false; castsShadows: false
                 geometry: LineGeometry { points: {
                     var o = 7, t = 2.2, p = []
                     var x0 = vp.dimLo.x, x1 = vp.dimHi.x, y0 = vp.dimLo.y, y1 = vp.dimHi.y, z0 = vp.dimLo.z, z1 = vp.dimHi.z
@@ -1477,7 +1506,7 @@ Item {
     // dimension numbers, on the 3D dimension lines: small capsules, the number in mono
     Repeater {
         id: dimLabels
-        model: vp.showDims && rlayer.kind === "" && vp.model && !(vp.asmOn && vp.asmMode === "exploded") && !vp.platesOn && !vp.dimsHeld && vp._altMix < 0.5 ? 3 : 0
+        model: vp.showDims && !vp.sketching && rlayer.kind === "" && vp.model && !(vp.asmOn && vp.asmMode === "exploded") && !vp.platesOn && !vp.dimsHeld && vp._altMix < 0.5 ? 3 : 0
         Rectangle {
             id: dl
             objectName: "dimLabel"
