@@ -433,6 +433,21 @@ mesh of a curved surface can be farther from any smooth surface than the toleran
 export are 0.03 to 0.04 mm from the gear they came from). Units are millimetres unless the file says otherwise (3MF
 does). Nothing is decimated: a mesh over 200,000 triangles shows progress and takes minutes.
 
+## The Bench: every study, route and document, as a record
+
+One registry (`form/studies.py`) lists everything that can be asked of a design, in three groups: **Studies**
+(Review: checks, assembly and joint sweep, the brief's requirements, wall thickness, overhangs, layer cross-section,
+small features, fit, design critique, slice, print simulation, print orientation, every printer, cost, make it
+lighter), **Routes** (Make: STEP/STL/OBJ/GLB, 3MF with colours, slicer project, FreeCAD macro, project archive, game
+asset, release) and **Documents** (Make: parts list, assembly notes, motion checks, print report, measurement plan,
+assembly instructions, four-view sheet, photoreal render, turntable, share card). Each entry has a state (never run,
+current, stale, failed, running, unavailable with why, n/a with why), the revision it describes, its headline number
+with its evidence class, and a run action wired to the same code as its own tool. Results are stored beside the
+revision under a key of its inputs, so a new revision makes them stale by construction and nothing is ever marked
+current by hand. The same listing is `list_studies` / `run_study` / `get_study` over MCP and `form study` in the
+terminal; later studies (mass properties, strength, manufacturability, drawings) register into it and appear
+everywhere at once.
+
 ## Checks and evidence
 
 ![Review: the checks of a revision, each with its evidence](images/prove.webp)
@@ -581,7 +596,7 @@ either. A real thin fin still fails.
 | OpenSCAD | Builds `.scad` designs; Customizer ranges become parameters |
 | Blender | Photoreal renders; its 3D-Print Toolbox checks when the add-on is installed |
 | Your slicer | Slices, and opens the 3MF or G-code in it |
-| Any MCP client | The full engine over 97 tools ([MCP reference](MCP.md)) |
+| Any MCP client | The full engine over 100 tools ([MCP reference](MCP.md)) |
 
 When a program's version outside the supported range is why something failed, the error names the supported versions
 and what to do.

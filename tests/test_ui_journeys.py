@@ -179,6 +179,12 @@ class Journeys(unittest.TestCase):
     def test_isolation(self):              # another conversation never takes over; concepts in the feed; the printer on top
         self.journey("isolation.py")
 
+    def test_bench(self):                  # the Bench: every study, route and document with its state; run, open, stale, palette
+        self.journey("bench.py", env_extra={"FORM_APPEARANCE": "dark"})
+
+    def test_bench_small_light(self):      # the same in the smallest window, on paper
+        self.journey("bench.py", size="1100x700", env_extra={"FORM_APPEARANCE": "light"})
+
     def test_maker_tools(self):
         self.journey("maker_tools.py")
 

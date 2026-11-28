@@ -293,6 +293,10 @@ def make_handler(st: Studio):
                                        "width", "lip", "lip_height") if q.get(k) not in (None, "")}
                 return self._json(feature_helpers.preview(q.get("kind") or "boss", nozzle=st.slicer_info(p=p).get("nozzle_mm"),
                                                           allow_strain=float(q["allow_strain"]) if q.get("allow_strain") else None, **o))
+            if rest == "/bench" or rest.startswith("/bench/"):     # the Bench: every study, route and document (form/studies.py)
+                from . import studies
+                sid = rest[len("/bench/"):] if rest.startswith("/bench/") else ""
+                return self._json(studies.show(st, p, sid) if sid else studies.listing(st, p, q.get("group") or None))
             if rest == "/slicecompare":
                 from . import slicecompare
                 return self._json(slicecompare.cached(st, p) or {"rows": [], "cached": False})
@@ -795,6 +799,12 @@ def make_handler(st: Studio):
                 from . import slicer_open
                 out = slicer_open.run(st, p, body.get("printer") or None, open_app=body.get("open", True) is not False)
                 st.activity(pid, "look", f"Opened in {out['slicer']} with settings chosen for this part.", by="you")
+                return self._json(out)
+            if action == "study":                          # run one Bench entry; the app tracks its job (form/studies.py)
+                from . import studies
+                out = studies.start(st, pid, str(body.get("id") or ""), force=bool(body.get("force")), open=bool(body.get("open")))
+                if out.get("job") and isinstance(out["job"], str):
+                    st.activity(pid, "study", f"Bench: {studies.get(body['id']).label}.", by="you")
                 return self._json(out)
             if action == "slicecompare":
                 from . import slicecompare

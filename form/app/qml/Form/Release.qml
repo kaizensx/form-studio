@@ -71,6 +71,9 @@ Column {
         }
     }
 
+    // ── the Bench: every study, route and document with its state (Bench.qml, form/studies.py)
+    Bench { x: -10; width: parent.width + 20; groups: ["route", "document"] }
+
     // ── gate ────────────────────────────────────────────────
     readonly property bool superseded: !!ap && ap.state === "superseded"
     readonly property bool ready: !!g && g.ready
