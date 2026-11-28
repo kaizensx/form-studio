@@ -22,7 +22,7 @@ ENGINE = fea.python(config.load())
 CASES = ("cantilever", "plate_with_hole", "thick_cylinder", "self_weight", "bonded_bar", "preload_block",
          "nafems_le1", "nafems_le10",
          "modal_cantilever", "modal_free", "euler_column", "thermal_slab", "thermal_cylinder", "thermal_stress_bar",
-         "thermal_stress_cylinder", "sharp_corner")
+         "thermal_stress_cylinder", "sharp_corner", "layered_tension", "layered_cantilever")
 
 
 def engine(*args, timeout=900):

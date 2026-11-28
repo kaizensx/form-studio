@@ -4,6 +4,30 @@
 
 ### New
 
+- **Print physics.** Three tools for a printed part, each number saying how it is known.
+  **Orientation** is a search over several objectives at once, and the answer is the Pareto front: the orientations
+  no other one beats on everything. Support volume and support contact are computed from the facets that overhang
+  past the critical angle, each support column going down to the plate or to the part below; print time comes from a
+  layer-time model that reads the slicer preset and is calibrated on a real slice when you ask, with the factor
+  stated; strength comes from a strength study's stress field against the filament datasheet's Z and X-Y strengths;
+  stair height is computed on the faces you mark cosmetic; and the tilt at which the part tips is computed from its
+  centre of mass over the plate contact. The search covers the six axis orientations, every flat face the part can
+  lie on and a geodesic grid of 162 directions, then refines to 1 degree. You pick; the pick is written to the print
+  setup. `verify=N` slices the best candidates with the real slicer and reports the model's error in time and in
+  support filament.
+  **Strength as printed** is a strength study with a layered (transversely isotropic) material turned to the print
+  orientation: the safety factor across the layers with its own stated error, the in-plane one, and how both change
+  with the orientation. In-plane and Z moduli and strengths are the datasheet's; what no source gives is given by you
+  or assumed by a stated rule, and every assumed value is listed. Verified against Lekhnitskii's off-axis modulus and
+  a Timoshenko beam in three build directions (errors 0.00 to 0.28 %).
+  **Warp risk** is a first-order indicator from the layer-shrinkage model of Wang, Xi and Jin (2007), with the
+  material's thermal expansion and glass transition from named documents, the first layer, the longest span, the
+  height and the corners. It is an indicator, never a predicted lift. [docs/PRINT_PHYSICS.md](docs/PRINT_PHYSICS.md).
+- **`print_orient`, `print_strength`, `print_warp`** (MCP) and **`form print orient|strength|warp <project>`**
+  (terminal, JSON). Bench entries in Check (Orientation front, Strength as printed, Warp risk) and in Make (Print
+  orientation: the setup's orientation, and whether it is on the front). 109 MCP tools.
+- A strength study's field data now carries the stress tensor at the surface nodes (`stress`, six components), and
+  for a layered study the tension across the layers and the shear between them.
 - **Engineering calculators that write the part.** Seven calculators size a part from what it has to do, by a named
   standard's equations, and write it as a design with parameters: snap joints (cantilever and annular, Bayer's
   snap-fit guide), living hinges (elastic by strain, or moulded PP and PE from cited practice), springs

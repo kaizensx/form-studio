@@ -55,6 +55,12 @@
                                      mass, centre of mass, inertia and principal axes from the B-rep, per part and assembled
   form materials [ID]                the materials library: density and mechanical properties, each with its source
   form orient <project> [--apply [id]]   rank the ways the part can lie on the plate; --apply sets the best (or the id given)
+  form print orient <project> [--cosmetic X,Y,Z] [--study ID | --load X,Y,Z] [--calibrate] [--verify N] [--pick ID]
+                                     the Pareto front of print orientations (support, time, strength, surface,
+                                     tip-over); --pick writes one to the print setup; --verify slices the best
+  form print strength <project> --study ID [--orientation O]   strength as printed: a layered material, the safety
+                                     factor across the layers and how it changes with orientation
+  form print warp <project> [--orientation O] [--chamber C]    warp risk (an indicator, never a predicted lift); JSON
   form variants list|save|promote|delete <project> [name] [k=v ...]   named variants of a design
   form share <project> [--out card.png] [--photo]      1600 x 900 share card of the head revision
   form history <project> [--gif out.gif]               revisions (who, when, stamp); --gif animates them (.gif or .webp)
@@ -262,6 +268,9 @@ def main(argv=None):
     if argv[:1] == ["strength"] or (argv[:1] == ["study"] and argv[1:2] and argv[1] in ("strength", "static", "modal", "buckling", "thermal", "thermal_stress", "verify")):
         from .fea.cli import main as strength_main  # strength studies with a stated error (form/fea)
         return strength_main(argv[1:] if argv[0] == "strength" else argv[2:] if argv[1] == "strength" else argv[1:])
+    if argv[:1] == ["print"]:                      # print physics: orientation front, layered strength, warp (form/printphys)
+        from .printphys.cli import main as print_main
+        return print_main(argv[1:])
     if argv[:1] == ["calc"]:                       # engineering calculators that write geometry (form/calc)
         from .calc.cli import main as calc_main
         return calc_main(argv[1:])

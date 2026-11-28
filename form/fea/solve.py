@@ -65,6 +65,75 @@ def lame(E, nu):
     return E * nu / ((1 + nu) * (1 - 2 * nu)), E / (2 * (1 + nu))
 
 
+def isotropic_tensor(lam: float, mu: float) -> np.ndarray:
+    """The elasticity tensor C (3, 3, 3, 3) of an isotropic material: s_ij = C_ijkl e_kl."""
+    d = np.eye(3)
+    return (lam * np.einsum("ij,kl->ijkl", d, d) + mu * (np.einsum("ik,jl->ijkl", d, d) + np.einsum("il,jk->ijkl", d, d)))
+
+
+def _mandel_to_tensor(M: np.ndarray) -> np.ndarray:
+    """A 6 x 6 matrix in Mandel notation (11, 22, 33, sqrt2 23, sqrt2 13, sqrt2 12) as a (3, 3, 3, 3) tensor."""
+    pairs = [(0, 0), (1, 1), (2, 2), (1, 2), (0, 2), (0, 1)]
+    w = [1.0, 1.0, 1.0, np.sqrt(2.0), np.sqrt(2.0), np.sqrt(2.0)]
+    T = np.zeros((3, 3, 3, 3))
+    for a, (i, j) in enumerate(pairs):
+        for b, (k, l) in enumerate(pairs):
+            v = M[a, b] / (w[a] * w[b])
+            T[i, j, k, l] = T[j, i, k, l] = T[i, j, l, k] = T[j, i, l, k] = v
+    return T
+
+
+def transverse_isotropic(E_p: float, E_z: float, nu_p: float, nu_zp: float, G_zp: float, axis) -> tuple:
+    """Elasticity and compliance tensors (each (3, 3, 3, 3), global frame) of a transversely isotropic material whose
+    axis of symmetry is `axis` (a printed part: the build direction, across the layers).
+
+    E_p, nu_p: Young's modulus and Poisson's ratio in the plane of isotropy (in the layers). E_z: Young's modulus
+    along the axis. nu_zp: contraction in the plane per unit extension along the axis (so nu_pz / E_p = nu_zp / E_z).
+    G_zp: shear modulus between the axis and the plane. The in-plane shear modulus is E_p / (2 (1 + nu_p)).
+    Raises SolveError when the five constants are not those of a stable material (Lekhnitskii 1963; Jones, Mechanics
+    of Composite Materials, section 2.4: the compliance must be positive definite)."""
+    if not (E_p > 0 and E_z > 0 and G_zp > 0):
+        raise SolveError("A layered material needs positive moduli (in-plane, across the layers, and in shear).")
+    Sm = np.zeros((6, 6))
+    Sm[0, 0] = Sm[1, 1] = 1.0 / E_p
+    Sm[0, 1] = Sm[1, 0] = -nu_p / E_p
+    Sm[0, 2] = Sm[2, 0] = Sm[1, 2] = Sm[2, 1] = -nu_zp / E_z
+    Sm[2, 2] = 1.0 / E_z
+    Sm[3, 3] = Sm[4, 4] = 1.0 / (2.0 * G_zp)                     # Mandel: e_23 sqrt2 = S44 s_23 sqrt2
+    Sm[5, 5] = (1.0 + nu_p) / E_p
+    if np.linalg.eigvalsh(Sm).min() <= 0:
+        raise SolveError(f"The layered material's constants are not those of a stable material (E in-plane {E_p:g}, "
+                         f"E across {E_z:g}, Poisson's ratios {nu_p:g} and {nu_zp:g}): the compliance is not positive "
+                         "definite. Check the Poisson's ratios.")
+    Cm = np.linalg.inv(Sm)
+    b = np.asarray(axis, float)
+    b = b / np.linalg.norm(b)
+    a = np.eye(3)[int(np.argmin(np.abs(b)))]
+    e1 = a - (a @ b) * b
+    e1 /= np.linalg.norm(e1)
+    Q = np.column_stack([e1, np.cross(b, e1), b])                # columns: the material's axes in the global frame
+
+    def rot(T):
+        return np.einsum("ia,jb,kc,ld,abcd->ijkl", Q, Q, Q, Q, T, optimize=True)
+    return rot(_mandel_to_tensor(Cm)), rot(_mandel_to_tensor(Sm))
+
+
+def young_along(E_p: float, E_z: float, nu_zp: float, G_zp: float, angle_deg: float) -> float:
+    """Young's modulus of a transversely isotropic material along a direction at angle_deg from its axis
+    (Lekhnitskii; Jones eq. 2.97 with 1 = the axis): 1/E = cos^4/E_z + sin^4/E_p + (1/G_zp - 2 nu_zp/E_z) sin^2 cos^2."""
+    c, s = np.cos(np.radians(angle_deg)), np.sin(np.radians(angle_deg))
+    return float(1.0 / (c ** 4 / E_z + s ** 4 / E_p + (1.0 / G_zp - 2.0 * nu_zp / E_z) * s * s * c * c))
+
+
+def _mat3(s: np.ndarray) -> np.ndarray:
+    m = np.empty(s.shape[:-1] + (3, 3))
+    m[..., 0, 0], m[..., 1, 1], m[..., 2, 2] = s[..., 0], s[..., 1], s[..., 2]
+    m[..., 0, 1] = m[..., 1, 0] = s[..., 3]
+    m[..., 1, 2] = m[..., 2, 1] = s[..., 4]
+    m[..., 0, 2] = m[..., 2, 0] = s[..., 5]
+    return m
+
+
 def von_mises(s: np.ndarray) -> np.ndarray:
     """s[..., 6] = xx, yy, zz, xy, yz, zx."""
     return np.sqrt(np.maximum(0.5 * ((s[..., 0] - s[..., 1]) ** 2 + (s[..., 1] - s[..., 2]) ** 2 + (s[..., 2] - s[..., 0]) ** 2)
@@ -158,6 +227,27 @@ class Space:
             la, m = lam[s, None, None, None, None], mu[s, None, None, None, None]
             tr = np.einsum("eakbk->eab", G)
             Ke = la * G + m * np.swapaxes(G, 2, 4) + m * tr[:, :, None, :, None] * eye[None, None, :, None, :]
+            n = Ke.shape[0]
+            r = self._rows(s)
+            I.append(np.repeat(r, 30, axis=1).ravel())
+            J.append(np.tile(r, (1, 30)).ravel())
+            V.append(Ke.reshape(n, 900).ravel())
+        K = sp_.coo_matrix((np.concatenate(V), (np.concatenate(I), np.concatenate(J))), shape=(self.ndof, self.ndof)).tocsr()
+        K.sum_duplicates()
+        return ((K + K.T) * 0.5).tocsr()
+
+    def stiffness_c(self, C: list, mat: np.ndarray) -> sp_.csr_matrix:
+        """Stiffness for a general elasticity tensor per material: C[k] is (3, 3, 3, 3), mat[e] the material of
+        element e. K[a i, b j] = integral of C_ikjl dNa/dx_k dNb/dx_l."""
+        I, J, V = [], [], []
+        for a in range(0, self.nel, CHUNK):
+            s = slice(a, min(a + CHUNK, self.nel))
+            G = np.einsum("akeq,bleq,eq->eakbl", self.dN[:, :, s], self.dN[:, :, s], self.dx[s], optimize=True)
+            Ke = np.empty((G.shape[0], 10, 3, 10, 3))
+            ms = mat[s]
+            for k in np.unique(ms):
+                sel = ms == k
+                Ke[sel] = np.einsum("eakbl,ikjl->eaibj", G[sel], C[int(k)], optimize=True)
             n = Ke.shape[0]
             r = self._rows(s)
             I.append(np.repeat(r, 30, axis=1).ravel())
@@ -303,7 +393,7 @@ class Space:
 
     # ---- stress ----------------------------------------------------------------------------------------------------
     def stress(self, u: np.ndarray, lam: np.ndarray, mu: np.ndarray, dom: np.ndarray | None = None,
-               thermal: np.ndarray | None = None) -> dict:
+               thermal: np.ndarray | None = None, aniso: tuple | None = None) -> dict:
         """Stress from a displacement field.
 
         "element": (nel, 10, 6) the stress of each element at its own 10 nodes (linear inside an element);
@@ -312,12 +402,20 @@ class Space:
         Mises stress at a shared node; "eta": (nel,) each element's error indicator in the energy norm (the difference
         between its own stress and the smoothed one; Zienkiewicz and Zhu 1987).
         thermal: (nel, 10) the stress a held-back temperature change takes off each normal component, (3 lam + 2 mu)
-        alpha dT at each element's nodes (stress = D (strain - thermal strain))."""
+        alpha dT at each element's nodes (stress = D (strain - thermal strain)).
+        aniso: (C, S, mat) for a general material: elasticity and compliance tensors per material and each element's
+        material; lam and mu are then not used."""
         ue = u.reshape(-1, 3)[self.edofs.T]
         H = np.einsum("ajen,eai->enij", self.dNn, ue, optimize=True)           # (nel, 10 nodes, 3, 3)
         e = 0.5 * (H + np.swapaxes(H, 2, 3))
         tr = np.einsum("enii->en", e)
-        s = lam[:, None, None, None] * tr[..., None, None] * np.eye(3) + 2 * mu[:, None, None, None] * e
+        if aniso is None:
+            s = lam[:, None, None, None] * tr[..., None, None] * np.eye(3) + 2 * mu[:, None, None, None] * e
+        else:
+            s = np.empty_like(e)
+            for k in np.unique(aniso[2]):
+                sel = aniso[2] == k
+                s[sel] = np.einsum("ijkl,enkl->enij", aniso[0][int(k)], e[sel], optimize=True)
         se = np.stack([s[..., 0, 0], s[..., 1, 1], s[..., 2, 2], s[..., 0, 1], s[..., 1, 2], s[..., 0, 2]], axis=-1)
         if thermal is not None:
             se[..., :3] -= thermal[..., None]
@@ -340,6 +438,14 @@ class Space:
             take = has & (vm > best)
             nodal[take], best[take] = acc[take], vm[take]
         ds = sm_e - se
+        if aniso is not None:                                     # complementary energy with the compliance tensor
+            dm = _mat3(ds)
+            dens = np.empty(ds.shape[:2])
+            for k in np.unique(aniso[2]):
+                sel = aniso[2] == k
+                dens[sel] = np.einsum("enij,ijkl,enkl->en", dm[sel], aniso[1][int(k)], dm[sel], optimize=True)
+            eta2 = self.vol * np.maximum(dens, 0).mean(axis=1)
+            return {"element": se, "nodal": nodal, "eta": np.sqrt(eta2)}
         E = mu * (3 * lam + 2 * mu) / (lam + mu)
         nu = lam / (2 * (lam + mu))
         trd = ds[..., 0] + ds[..., 1] + ds[..., 2]

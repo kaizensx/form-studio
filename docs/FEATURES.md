@@ -523,6 +523,9 @@ answer stops changing. The full method and the verification table are in [STRENG
   which ones those were.
 - **Stored with the revision.** A result goes stale after any change to the geometry, the loads, the material or
   the engine, and says which revision it describes.
+- **As printed:** `print_strength` solves the same loads with a layered material in the print orientation, and
+  `print_orient` and `print_warp` cover what the orientation does to supports, time, surface and warping
+  ([PRINT_PHYSICS.md](PRINT_PHYSICS.md)).
 - **Headless:** `strength_study`, `get_strength_study`; `form strength
   static|modal|buckling|thermal|thermal_stress|run|list|show|verify`. Runs in the background with progress and
   cancel; a typical bracket converges in about 10 s.
@@ -705,7 +708,7 @@ equations, the sources and the verification table are in [CALCULATORS.md](CALCUL
 | OpenSCAD | Builds `.scad` designs; Customizer ranges become parameters |
 | Blender | Photoreal renders; its 3D-Print Toolbox checks when the add-on is installed |
 | Your slicer | Slices, and opens the 3MF or G-code in it |
-| Any MCP client | The full engine over 106 tools ([MCP reference](MCP.md)) |
+| Any MCP client | The full engine over 109 tools ([MCP reference](MCP.md)) |
 
 When a program's version outside the supported range is why something failed, the error names the supported versions
 and what to do.

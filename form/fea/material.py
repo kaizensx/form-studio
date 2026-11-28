@@ -167,5 +167,101 @@ def resolve(material, need: tuple = MECHANICAL) -> dict:
 
 def engine_material(m: dict) -> dict:
     """What the solver needs of a resolved material."""
-    return {"name": m["name"], "E": m["E"], "nu": m["nu"], "density": m.get("density"), "yield": m.get("yield"),
-            "k": m.get("k"), "cte": m.get("cte")}
+    out = {"name": m["name"], "E": m["E"], "nu": m["nu"], "density": m.get("density"), "yield": m.get("yield"),
+           "k": m.get("k"), "cte": m.get("cte")}
+    ly = m.get("layers")
+    if ly:
+        out["layers"] = {k: ly[k] for k in ("axis", "E_p", "E_z", "nu_p", "nu_zp", "G_zp", "S_xy", "S_z", "S_shear")}
+        out["yield"] = ly["S_xy"]                        # von Mises is compared with the in-plane strength
+    return out
+
+
+ASSUMED_NO_SOURCE = "assumed (no source gives it)"
+LAYER_GIVEN = {"E_z_GPa": ("E_z", 1000.0, "GPa"), "poisson_z": ("nu_zp", 1.0, ""), "G_z_MPa": ("G_zp", 1.0, "MPa"),
+               "uts_xy_MPa": ("S_xy", 1.0, "MPa"), "uts_z_MPa": ("S_z", 1.0, "MPa"),
+               "shear_strength_MPa": ("S_shear", 1.0, "MPa")}
+HUBER = ("Huber's approximation, G = sqrt(E_p E_z) / (2 (1 + sqrt(nu_pz nu_zp))) (M. T. Huber 1923, as used for "
+         "orthotropic plates): an estimate where no shear test across the layers exists")
+
+
+def layered(m: dict, axis, given: dict | None = None) -> dict:
+    """A resolved material as a printed, transversely isotropic one with the build direction `axis`.
+
+    In the layers: E and Poisson's ratio of the resolved material (a filament's X-Y specimens). Across the layers: the
+    modulus and the strength of the datasheet's Z specimens. What no datasheet gives is taken from `given` (E_z_GPa,
+    poisson_z, G_z_MPa, uts_xy_MPa, uts_z_MPa, shear_strength_MPa, with "source" naming where it is from) and else
+    assumed by a stated rule, and every value says which: specified, given, or assumed.
+    Returns {"axis", "E_p", "E_z", "nu_p", "nu_zp", "G_zp", "S_xy", "S_z", "S_shear", "how_known": {...},
+    "knockdown": {...}, "notes": [...]} (MPa)."""
+    from .. import material_library as ml
+    given = {k: v for k, v in (given or {}).items() if v is not None}
+    src = str(given.get("source") or "").strip()
+    key = m.get("key")
+    out = {"axis": [float(x) for x in axis], "E_p": float(m["E"]), "nu_p": float(m["nu"]), "how_known": {}, "notes": []}
+    how = out["how_known"]
+    how["E_p"] = {**(m["sources"].get("E") or {}), "what": "Young's modulus in the layers"}
+    how["nu_p"] = {**(m["sources"].get("nu") or {}), "what": "Poisson's ratio in the layers"}
+
+    def lib(name, direction):
+        if not key:
+            return None
+        try:
+            p = ml.prop(key, name, direction)
+        except KeyError:
+            return None
+        return None if (not p or p.get("status") == "unsourced" or p.get("value") is None) else p
+
+    def take(dst, name, direction, scale, what):
+        p = lib(name, direction)
+        if p is None:
+            return False
+        out[dst] = float(p["value"]) * scale
+        how[dst] = {k: p.get(k) for k in ("name", "value", "unit", "source", "url", "condition", "retrieved", "evidence",
+                                           "spread") if p.get(k) is not None} | {"what": what}
+        return True
+    take("E_z", "E", "z", 1000.0, "Young's modulus across the layers")
+    take("S_z", "uts", "z", 1.0, "ultimate tensile strength across the layers")
+    if not take("S_xy", "uts", "xy", 1.0, "ultimate tensile strength in the layers") and m.get("yield"):
+        out["S_xy"] = float(m["yield"])
+        how["S_xy"] = {**(m["sources"].get("yield") or {}), "what": m.get("strength_basis") or "strength in the layers"}
+    for k, (dst, scale, unit) in LAYER_GIVEN.items():
+        if k not in given:
+            continue
+        try:
+            out[dst] = float(given[k]) * scale
+        except (TypeError, ValueError):
+            raise _err(f"{k} is a number.") from None
+        how[dst] = {"value": float(given[k]), "unit": unit, "source": src or None, "evidence": SPECIFIED if src else ASSUMED}
+    if "E_z" not in out:
+        out["E_z"] = out["E_p"]
+        how["E_z"] = {"value": out["E_z"] / 1000.0, "unit": "GPa", "evidence": ASSUMED_NO_SOURCE,
+                      "rule": "taken equal to the in-plane modulus: no source gives a modulus across the layers"}
+        out["notes"].append("The modulus across the layers is assumed equal to the in-plane one: no Z value is sourced.")
+    if "nu_zp" not in out:
+        out["nu_zp"] = out["nu_p"]
+        how["nu_zp"] = {"value": out["nu_zp"], "unit": "", "evidence": ASSUMED_NO_SOURCE,
+                        "rule": "taken equal to the in-plane Poisson's ratio: datasheets do not give it across the layers"}
+    if "G_zp" not in out:
+        nu_pz = out["nu_zp"] * out["E_p"] / out["E_z"]
+        out["G_zp"] = (out["E_p"] * out["E_z"]) ** 0.5 / (2.0 * (1.0 + max(nu_pz * out["nu_zp"], 0.0) ** 0.5))
+        how["G_zp"] = {"value": out["G_zp"], "unit": "MPa", "evidence": ASSUMED_NO_SOURCE, "rule": HUBER}
+    for dst, why in (("S_xy", "in the layers"), ("S_z", "across the layers"), ("S_shear", "in shear between the layers")):
+        if dst not in out:
+            out[dst] = None
+            how[dst] = {"status": "unsourced", "note": f"No strength {why} is sourced or given; it is left out, not assumed."}
+    for dst, lo in (("E_z", 0.0), ("G_zp", 0.0)):
+        if not out[dst] > lo:
+            raise _err(f"The layered material's {dst} must be positive.")
+    if not -1.0 < out["nu_zp"] < 1.0:
+        raise _err("The Poisson's ratio across the layers is outside (-1, 1).")
+    if out.get("S_xy") and out.get("S_z"):
+        out["knockdown"] = {"strength": round(out["S_z"] / out["S_xy"], 3), "stiffness": round(out["E_z"] / out["E_p"], 3),
+                            "what": "Z over in-plane, of the values above"}
+    assumed = [k for k, v in how.items() if str(v.get("evidence", "")).startswith("assumed")]
+    out["assumed"] = assumed
+    if assumed:
+        out["notes"].append("Assumed, not sourced: " + ", ".join(assumed) + ". Give them with their source to replace "
+                            "the assumption.")
+    out["notes"].append("Datasheet values are for specimens printed at 100 % infill with the datasheet's settings; a "
+                        "part's infill, walls, layer height and temperatures change them.")
+    return out
