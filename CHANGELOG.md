@@ -4,7 +4,6 @@
 
 ### Added
 
-<<<<<<< HEAD
 - **A reply ends in Sources, built from the tool log** (direction I, wave O). Every tool call of a turn whose result
   says how its content is known is one numbered row with its evidence word: SIMULATED, COMPUTED, SPECIFIED, OPENED,
   MEASURED or ASSUMED. The word is the result's own `evidence`; a document or link that was read is OPENED, a
@@ -25,7 +24,6 @@
 - **Commands on the selection.** With something picked on the part, the prompt starts with what it is ("On 2 edges")
   and the message goes with the selection's numbers.
 - **Reduce motion** in Settings › General: movement becomes a short fade, at once. The system's setting turns it on too.
-=======
 - **Results are drawn on the part** (direction I, decision 7). Select a current row of the Bench and what it found
   is on the design itself, from the file its engine stored, with a legend strip under the part that says the scale
   and its unit, how the result is known and what it does not tell.
@@ -55,7 +53,6 @@
   - `GET /api/projects/<id>/result?id=<entry>` is the description the window draws (`form/resultview.py`); the
     arrays stay in the engines' files and are read by the view's own geometry. The manufacturability overlay
     (`form-dfm-overlay/1`) gains `face`, the B-rep face of each triangle.
->>>>>>> refs/remotes/origin/di-results
 
 ### Changed
 
