@@ -514,8 +514,8 @@ def journey_every_listed_shortcut(ui):
     def do_shift_h():
         ui.key("H")
         ui.wait_until(lambda: ui.store.get("hidden") == [fid], 3, "a hidden feature")
-        ui.key("Shift+H")
-        ui.wait_until(lambda: ui.store.get("hidden") == [], 3, "Shift+H to show all")
+        ui.key("Alt+H")
+        ui.wait_until(lambda: ui.store.get("hidden") == [], 3, "Alt+H to show all")
         ui.key("Escape")
 
     def do_right_click():
@@ -686,15 +686,15 @@ def journey_every_listed_shortcut(ui):
         "V": lambda: (ui.key("M"), ui.key("V"), ui.wait_until(lambda: tool(ui) == "select", 3, "V to pick Select")),
         "M": lambda: (a_tool("M", "measure"), ui.key("V")),
         "X": do_x,
-        "A": lambda: (a_tool("A", "analyze"), ui.key("V")),
+        "A": lambda: (a_tool("A", "analyze"), ui.key("V"), stage("Ctrl+1", "shape")),      # A, E and T go to Check
         "E": do_e,
-        "T": lambda: (a_tool("T", "history"), ui.key("T"), ui.wait_until(lambda: ui.store.get("timelineOpen") is False, 3, "T to close")),
+        "T": lambda: (a_tool("T", "history"), ui.key("T"), ui.wait_until(lambda: ui.store.get("timelineOpen") is False, 3, "T to close"), stage("Ctrl+1", "shape")),
         "Esc": do_esc,
         "Return": do_return, "Shift+Return": lambda: None, "Up": do_up,
         "F": do_f,
         "1": lambda: (view("2", "front"), view("1", "iso")), "2": lambda: view("2", "front"), "3": lambda: view("3", "side"),
         "4": lambda: view("4", "top"), "5": lambda: (view("5", "under"), view("1", "iso")),
-        ".": do_dot, "H": do_h, "Shift+H": do_shift_h, "Right-click": do_right_click,
+        ".": do_dot, "H": do_h, "Alt+H": do_shift_h, "Right-click": do_right_click,
         "Ctrl+K": do_palette, "Ctrl+N": do_new, "Ctrl+Shift+O": do_new_chat, "Ctrl+J": do_j, "Ctrl+Shift+H": do_home, "Ctrl+[": do_back, "Ctrl+.": do_focus, "Ctrl+,": do_settings,
         "Ctrl+1": lambda: (stage("Ctrl+2", "prove"), stage("Ctrl+1", "shape")), "Ctrl+2": lambda: stage("Ctrl+2", "prove"), "Ctrl+3": lambda: stage("Ctrl+3", "release"),
         "Ctrl+4": lambda: (stage("Ctrl+4", "document"), stage("Ctrl+1", "shape")), "Ctrl+I": do_overview,
@@ -714,5 +714,5 @@ def journey_every_listed_shortcut(ui):
     ui.clear()
     click_stage(ui)
     # the keys the menu and palette show, which the sheet must also list
-    for k in ("Ctrl+K", "Ctrl+N", "Ctrl+J", "Ctrl+,", "Ctrl+Shift+O", "Ctrl+Shift+H", "Ctrl+Return", "V", "M", "X", "A", "E", "T", "F", ".", "Shift+H", "?"):
+    for k in ("Ctrl+K", "Ctrl+N", "Ctrl+J", "Ctrl+,", "Ctrl+Shift+O", "Ctrl+Shift+H", "Ctrl+Return", "V", "M", "X", "A", "E", "T", "F", ".", "Alt+H", "?"):
         ui.check(k in listed, f"{k} is shown elsewhere in the app but missing from the Shortcuts sheet")

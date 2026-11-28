@@ -915,7 +915,11 @@ Item {
         }
         // the same eye without perspective, for a sketch: a millimetre at the look-at point is as many pixels as in
         // the perspective view, so the profile does not change size when the view changes over
-        OrthographicCamera { id: ocam; position: cam.position; rotation: cam.rotation; clipNear: cam.clipNear; clipFar: cam.clipFar
+        // (it stands further back along its own axis, which changes nothing in an orthographic picture except that the
+        // floor no longer passes behind it at a low angle)
+        OrthographicCamera { id: ocam; readonly property real back: Math.max(2000, cam.span * 3)
+            position: cam.position.plus(cam.position.minus(vp.scene(cam.place.aim)).normalized().times(back)); rotation: cam.rotation
+            clipNear: 1; clipFar: cam.clipFar + back
             horizontalMagnification: 1 / Math.max(1e-6, vp.mmPerPx); verticalMagnification: horizontalMagnification }
         // key from the upper left front (casts the shadow), a warm fill, a cool rim from behind that draws the
         // far silhouette, and a little light from straight above so top faces separate from walls
@@ -1291,7 +1295,7 @@ Item {
                     }
                 }
                 // a result of a later engine, drawn on the part: strength, manufacturability, CNC, flat pattern, motion
-                ResultLayer { id: rlayer; port: vp; live: vp.results && !vp.lite }
+                ResultLayer { id: rlayer; objectName: "resultLayer"; port: vp; live: vp.results && !vp.lite }
                 SelectionLayer { vp: vp; items: vp.focusItems; strength: 0.6; opacity: vp.asmTween ? 0 : 1
                     dot: vp.dist * 0.000034; px: Qt.vector2d(2 / Math.max(1, vp.width), 2 / Math.max(1, vp.height)) }
                 SelectionLayer { vp: vp; items: vp.selection; opacity: vp.asmTween ? 0 : 1
@@ -1344,8 +1348,8 @@ Item {
         }
     }
     // what a result says on the part: the peak, the loads and supports, findings, bend notes (ResultLabels)
-    Loader { anchors.fill: view; active: vp.results && !vp.lite && Results.onPart; visible: !vp.asmTween
-        sourceComponent: ResultLabels { port: vp; lay3: rlayer; camera: cam } }
+    Loader { objectName: "resultLabelsLoader"; anchors.fill: view; active: vp.results && !vp.lite && Results.onPart; visible: !vp.asmTween
+        sourceComponent: ResultLabels { objectName: "resultLabels"; port: vp; lay3: rlayer; camera: cam } }
     // the brush stroke or lasso outline being drawn, on top of the part
     Canvas {
         id: strokeCanvas
@@ -1410,7 +1414,7 @@ Item {
     }
     property string _dimKey: ""
     function _seatLabels() {
-        var items = [], refs = [], i, k, it, w, h, p, c, lit = []
+        var items = [], refs = [], i, k, it, w, h, p, c, lit = [], moved = false
         for (i = 0; i < dimLabels.count; i++) {
             it = dimLabels.itemAt(i); if (!it) continue
             var ends = _dimLine(i), a = _px(ends[0]), e = _px(ends[1]), ts = [0.5, 0.3, 0.7, 0.16, 0.84]
@@ -1420,7 +1424,7 @@ Item {
                 c.push({ x: Math.round(a.x + (e.x - a.x) * ts[k] - w / 2), y: Math.round(a.y + (e.y - a.y) * ts[k] - h / 2) })
             items.push({ kind: "dim", w: w, h: h, cands: c, prev: it.cand }); refs.push(it)
         }
-        var key = JSON.stringify(lit); if (key !== _dimKey) { _dimKey = key; dimPx = lit }
+        var key = JSON.stringify(lit); if (key !== _dimKey) { _dimKey = key; dimPx = lit; moved = true }
         for (i = 0; i < pinLabels.count; i++) {
             it = pinLabels.itemAt(i); if (!it) continue
             var q = it.modelData.p
@@ -1445,17 +1449,27 @@ Item {
             c = p ? [{ x: Math.round(p.x - w / 2), y: Math.round(p.y + 6) }, { x: Math.round(p.x - w / 2), y: Math.round(p.y + 22) }] : []
             items.push({ kind: "ref", w: w, h: h, cands: c, prev: it.cand }); refs.push(it)
         }
-        if (!items.length) return
+        if (!items.length) return moved
         // labels of markers and measurements stay left of labelRight (the dock sits right of it)
         var out = Labels.place(items, { l: 4, t: 4, r: labelRight - 6, b: height - 4 })
         for (i = 0; i < refs.length; i++) {
             it = refs[i]; var r = out[i]
-            if (it.cand !== r.c) it.cand = r.c
-            if (it.shown !== r.visible) it.shown = r.visible
-            if (r.visible && (it.x !== r.x || it.y !== r.y)) { it.x = r.x; it.y = r.y }
+            if (it.cand !== r.c) { it.cand = r.c; moved = true }
+            if (it.shown !== r.visible) { it.shown = r.visible; moved = true }
+            if (r.visible && (it.x !== r.x || it.y !== r.y)) { it.x = r.x; it.y = r.y; moved = true }
         }
+        return moved
     }
-    FrameAnimation { running: vp.visible && (dimLabels.count + pinLabels.count + refLabels.count + plateLabels.count) > 0; onTriggered: vp._seatLabels() }
+    // The labels are seated again for a few frames after anything that can move them (the view, the part, the labels
+    // themselves) and for as long as a pass still moves one; never while the view is still. (It ran on every frame:
+    // a still window was not redrawn for it, but the script ran at the display's rate.)
+    property int _seatFor: 4
+    readonly property var _seatKey: [az, el, dist, target, shift, shownLeft, shownRight, shownTop, shownBottom, width, height, dimLo, dimHi, labels, labelRight,
+                                     dimLabels.count, pinLabels.count, refLabels.count, plateLabels.count, plateCount, plateK, sketching, explode, asmMode, frameTag,
+                                     camRight, camFront, fitK, visible, showDims, Theme.dark, Theme.tBody]
+    on_SeatKeyChanged: _seatFor = 4
+    FrameAnimation { running: vp.visible && vp._seatFor > 0 && (dimLabels.count + pinLabels.count + refLabels.count + plateLabels.count) > 0
+        onTriggered: { if (vp._seatLabels()) vp._seatFor = Math.max(vp._seatFor, 3); vp._seatFor-- } }
 
     // several plates: which plate is which, and a part that fits none of them
     Repeater {

@@ -7,7 +7,8 @@ void MAIN()
     vec4 w = MODEL_MATRIX * vec4(VERTEX, 1.0);
     wpos = w.xyz;
     vec4 v = VIEW_MATRIX * w;
-    v.z += uOff.z * (0.0015 * abs(v.z) + 0.02);
+    // (an orthographic view, PROJECTION_MATRIX[3][3] = 1: the same small step at any distance; the eye may stand far back)
+    v.z += uOff.z * mix(0.0015 * abs(v.z) + 0.02, 0.05, PROJECTION_MATRIX[3][3]);
     vec4 p = PROJECTION_MATRIX * v;
     p.xy += uOff.xy * p.w;
     POSITION = p;

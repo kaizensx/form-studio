@@ -322,7 +322,9 @@ Item {
             poolY: Math.min(0.72, (vp.shownTop + (centre.height - vp.shownBottom)) / 2 / Math.max(1, centre.height) + 0.1)
             poolW: ws.cueOn ? 640 : 900; poolH: ws.cueOn ? 300 : 380
             poolK: Theme.dark ? (ws.cueOn ? 0.16 : 0.09) : (ws.cueOn ? 0.5 : 0.25)
-            breathe: !ws.cueOn && !Store.chatBusy && !Store.sheet && Window.active
+            // (it does not breathe here: the pool's breath changed it by under one 8-bit level a step, which nobody
+            // could see, and cost a still workspace two and a half redraws a second)
+            breathe: false
             Behavior on poolW { NumberAnimation { duration: Theme.move(600); easing.type: Easing.InOutQuad } }
             Behavior on poolH { NumberAnimation { duration: Theme.move(600); easing.type: Easing.InOutQuad } }
             Behavior on poolK { NumberAnimation { duration: 600; easing.type: Easing.InOutQuad } } }

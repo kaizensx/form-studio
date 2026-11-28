@@ -141,6 +141,10 @@ def main(argv=None) -> int:
     if ghost:
         os.environ["QT_MAC_DISABLE_FOREGROUND_APPLICATION_TRANSFORM"] = "1"      # no Dock icon, never the active app
     app = QGuiApplication(sys.argv[:1])
+    # Qt's own cursor flash is off: every field draws its cursor with Caret.qml, which blinks two steps a cycle and
+    # only in the active window. Qt's flash timer kept running under that delegate and redrew the window on each of
+    # its own toggles too (twice the frames of the caret alone, tests/journeys/stage_idle.py).
+    app.styleHints().setCursorFlashTime(0)
     # the app icon (brand/build.py) in every size it ships in, so the dock, the taskbar and the title bar each pick a sharp one
     icon = QIcon()
     for name in ("icon.png", "icon-512.png", "icon-256.png", "icon-128.png", "icon-64.png", "icon-32.png", "icon-16.png"):
