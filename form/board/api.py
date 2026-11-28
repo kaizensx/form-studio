@@ -393,3 +393,5 @@ def register_studies(register) -> None:
                    "Gerbers, drill files, pick-and-place, BOM and the board STEP from the person's KiCad.",
                    "made by KiCad", run=_fab_run, key=_checks_key, needs=("board",),
                    inputs=("the board file", "KiCad's version"), app="board", tool="board_fab", order=30))
+    from . import k2
+    k2.register_studies(register)                    # wave K2: copper, placement and schematic checks

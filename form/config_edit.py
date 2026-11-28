@@ -45,7 +45,7 @@ SCHEMA: dict[str, dict] = {
     **{"use." + k: {"type": "bool", "tab": "software", "hidden": True, "label": "Use " + n,
                     "help": "false: " + n + " is never called, also when it is installed."}
        for k, n in (("coacd", "CoACD"), ("mujoco", "MuJoCo"), ("corpus", "the CADEvolve corpus"), ("blender", "Blender"), ("freecad", "FreeCAD"),
-                    ("openscad", "OpenSCAD"), ("kicad", "KiCad"), ("bambu", "Bambu Studio"), ("orca", "OrcaSlicer"), ("prusa", "PrusaSlicer"),
+                    ("openscad", "OpenSCAD"), ("kicad", "KiCad"), ("freerouting", "Freerouting"), ("bambu", "Bambu Studio"), ("orca", "OrcaSlicer"), ("prusa", "PrusaSlicer"),
                     ("superslicer", "SuperSlicer"), ("qidi", "QIDISlicer"), ("elegoo", "ElegooSlicer"),
                     ("snapmaker", "Snapmaker Orca"))},
     "refine.enabled": {"type": "bool", "tab": "general", "label": "Refine every design after it builds",
@@ -136,6 +136,13 @@ SCHEMA: dict[str, dict] = {
     "cad.kicad_cli": {"type": "path", "tab": "apps", "label": "KiCad (kicad-cli)",
                       "unlocks": "KiCad's own DRC and ERC on a design's board, and its Gerbers, drill files and board STEP",
                       "help": "Optional. Empty: found in the usual places."},
+    "cad.kicad_symbols": {"type": "path", "tab": "apps", "hidden": True, "label": "KiCad symbol libraries (folder)",
+                          "help": "Optional. Empty: where KiCad's installer puts them."},
+    "cad.kicad_footprints": {"type": "path", "tab": "apps", "hidden": True, "label": "KiCad footprint libraries (folder)",
+                             "help": "Optional. Empty: where KiCad's installer puts them."},
+    "cad.freerouting": {"type": "path", "tab": "apps", "hidden": True, "label": "Freerouting (.jar or launcher)",
+                        "unlocks": "A second board router, run as its own program when you ask for it",
+                        "help": "Optional. Your own Freerouting (GPL-3.0); used only when its switch is on."},
     # Backups (form/backup.py): Settings › Backups shows these with the last run, the backups and Recently deleted.
     "backup.enabled": {"type": "bool", "tab": "backups", "label": "Back up automatically",
                        "help": "While Form Studio is open, on the schedule below."},

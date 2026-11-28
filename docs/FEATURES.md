@@ -359,6 +359,12 @@ each one named as it arrives.
   and the board STEP, when kicad-cli is installed (an opt-in engine otherwise). JLCPCB, PCBWay and OSH Park's published
   limits, quoted with page and date. MCP `board_import`, `board_check`, `board_fab`; `form board`. See
   [BOARDS.md](BOARDS.md).
+- **The board designed here too.** KiCad schematics read, edited and written (`board_schematic`: netlist, Form
+  Studio's own ERC subset, symbols from the KiCad libraries on your computer), parts placed against the enclosure's
+  openings, standoffs and lid (`board_place`), and the board routed on two layers by Form Studio's own router with
+  rip-up and negotiated congestion (`board_route`), written as real tracks and vias into the `.kicad_pcb`. Each
+  result says who checked it: Form Studio's geometric check always, KiCad's DRC when it is installed. Your own
+  Freerouting is an opt-in second router.
 
 
 ## Meshes rebuilt as clean CAD by the agent
@@ -873,7 +879,7 @@ far the gap moves. The method, the rules and the verification table are in [TOLE
 | OpenSCAD | Builds `.scad` designs; Customizer ranges become parameters |
 | Blender | Photoreal renders; its 3D-Print Toolbox checks when the add-on is installed |
 | Your slicer | Slices, and opens the 3MF or G-code in it |
-| Any MCP client | The full engine over 142 tools ([MCP reference](MCP.md)) |
+| Any MCP client | The full engine over 145 tools ([MCP reference](MCP.md)) |
 
 When a program's version outside the supported range is why something failed, the error names the supported versions
 and what to do.

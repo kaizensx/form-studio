@@ -59,6 +59,10 @@ SWITCHES: dict[str, dict] = {
         "key": "use.kicad", "default": True, "name": "KiCad",
         "effect": "On: board checks run KiCad's own DRC and ERC, and board fab files (Gerbers, drill, pick-and-place, "
                   "BOM, STEP) are made with it. Off: boards are still read and enclosures checked; KiCad is never started."},
+    "freerouting": {
+        "key": "use.freerouting", "default": False, "name": "Freerouting",
+        "effect": "On: board_route may hand a board to your Freerouting (a separate GPL-3.0 program) when asked with "
+                  "engine=\"freerouting\". Off: it is never started; Form Studio's own router is used."},
     **{f"slicer.{k}": {
         "key": f"use.{k}", "default": True, "name": "this slicer",
         "effect": "On: Form Studio may slice with it and lists its printers. Off: it is skipped, also when the "
