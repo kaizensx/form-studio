@@ -94,10 +94,20 @@ Item {
     // the bed of the printer this design uses (form/printers.py), for the plate caption
     readonly property string bed: d && d.printer ? d.printer.env.envelope.slice(0, 2).map(function (x) { return F.fmt(x, 0) }).join(" × ") : "180 × 180"
     readonly property bool mapBlocked: !!Store.analysisMap && (Store.hasDraft || !!Store.compare)
-    function setTool(t) {
+    function setTool(t, want) {
         if (ws.sim) Store.showLayers(false)
-        if (t === Ws.tool && t !== "select") t = "select"           // the active tool, clicked again, hands back to Select
+        want = want || ""
+        if (t === "sketch") {                                       // Sketch, Extrude, Cut, Revolve: a profile on a face or a plane
+            if (sketch.picking && Ws.want === want) { sketch.end(); return }
+            if (Ws.tool !== "select") ws.setTool("select")
+            Ws.want = want; sketch.pick(want === "sketch" ? "extrude" : want)
+            return
+        }
+        if (sketch.busyHere) sketch.end()
+        if (t === Ws.tool && want === Ws.want && t !== "select") { t = "select"; want = "" }   // the active tool, clicked again, hands back to Select
         var was = Ws.tool
+        Ws.want = want
+        if (t === "annotate" && want) Store.selMode = want === "fillet" || want === "chamfer" ? "edge" : "face"
         if (was === t) return
         Ws.tool = t
         if (was === "measure") Store.setMeasuring(false)
@@ -112,7 +122,7 @@ Item {
     Connections {
         target: Store
         function onMeasuringChanged() { if (Store.measuring) Ws.tool = "measure"; else if (Ws.tool === "measure") Ws.tool = "select" }
-        function onSelectingChanged() { if (Store.selecting) Ws.tool = "annotate"; else if (Ws.tool === "annotate") Ws.tool = "select" }
+        function onSelectingChanged() { if (Store.selecting) Ws.tool = "annotate"; else if (Ws.tool === "annotate") { Ws.tool = "select"; Ws.want = "" } }
         function onTimelineOpenChanged() { if (Store.timelineOpen) Ws.tool = "history"; else if (Ws.tool === "history") Ws.tool = "select" }
         function onSectionChanged() {
             var on = !!(Store.section && Store.section.axis)
@@ -120,14 +130,29 @@ Item {
         }
         function onAnalysisMapChanged() { if (Store.analysisMap && Ws.tool === "select") Ws.tool = "analyze" }
         function onAsmModeChanged() { if (Store.asmMode !== "print" && Ws.tool === "select" && Store.assembly) Ws.tool = "assembly" }
-        function onPidChanged() { Ws.tool = "select"; Ws.refineWant = -1; Store.overview = false }
+        function onPidChanged() { sketch.end(); Ws.tool = "select"; Ws.want = ""; Ws.refineWant = -1; Store.overview = false }
+        function onModeChanged() { if (Store.mode !== "shape" && (sketch.busyHere || Ws.want)) ws.setTool("select") }
         function onFadeTo(apply) { vp.swap(apply) }                 // the timeline and anything else that swaps the geometry
     }
     // a design that has just opened has the keyboard on the part, not in the conversation box Home left it in
     Component.onCompleted: { Store.backdrop = studio; Ws.tool = Store.measuring ? "measure" : Store.timelineOpen ? "history" : "select"; vp.forceActiveFocus() }
 
     readonly property Item focusItem: Window.activeFocusItem
-    readonly property bool keys: Store.screen === "work" && !Store.sheet && !Store.paletteOpen && !(focusItem && focusItem.cursorPosition !== undefined)
+    readonly property bool keys: Store.screen === "work" && !Store.sheet && !Store.paletteOpen && !(focusItem && focusItem.cursorPosition !== undefined) && !sketch.on
+    // the mode's own tools answer to their keys only in that mode (Design: Sketch S, then Shift with the tool's letter)
+    readonly property bool designKeys: keys && Store.mode === "shape" && !ws.sim
+    Shortcut { sequence: "S"; enabled: ws.designKeys && !Store.hasDraft; onActivated: ws.setTool("sketch", "sketch") }
+    Shortcut { sequence: "Shift+E"; enabled: ws.designKeys && !Store.hasDraft; onActivated: ws.setTool("sketch", "extrude") }
+    Shortcut { sequence: "Shift+X"; enabled: ws.designKeys && !Store.hasDraft; onActivated: ws.setTool("sketch", "cut") }
+    Shortcut { sequence: "Shift+R"; enabled: ws.designKeys && !Store.hasDraft; onActivated: ws.setTool("sketch", "revolve") }
+    Shortcut { sequence: "Shift+F"; enabled: ws.designKeys; onActivated: ws.setTool("annotate", "fillet") }
+    Shortcut { sequence: "Shift+C"; enabled: ws.designKeys; onActivated: ws.setTool("annotate", "chamfer") }
+    Shortcut { sequence: "Shift+O"; enabled: ws.designKeys; onActivated: ws.setTool("annotate", "hole") }
+    Shortcut { sequence: "Shift+P"; enabled: ws.designKeys; onActivated: ws.setTool("select", "pattern") }
+    Shortcut { sequence: "Shift+S"; enabled: ws.designKeys; onActivated: ws.setTool("annotate", "shell") }
+    Shortcut { sequence: "Shift+B"; enabled: ws.designKeys; onActivated: ws.setTool("annotate", "part") }
+    Shortcut { sequence: "C"; enabled: ws.keys && Store.mode === "prove" && ws.tool !== "measure" && ws.tool !== "annotate"; onActivated: Store.massOn = !Store.massOn }
+    Shortcut { sequence: "W"; enabled: ws.keys && Store.mode === "document"; onActivated: ws.setTool("views") }
     Shortcut { sequence: "V"; enabled: ws.keys; onActivated: ws.setTool("select") }
     Shortcut { sequence: "M"; enabled: ws.keys; onActivated: ws.setTool("measure") }
     Shortcut { sequence: "N"; enabled: ws.keys; onActivated: ws.setTool("annotate") }
@@ -293,6 +318,17 @@ Item {
             Behavior on poolH { NumberAnimation { duration: Theme.move(600); easing.type: Easing.InOutQuad } }
             Behavior on poolK { NumberAnimation { duration: 600; easing.type: Easing.InOutQuad } } }
 
+        // a sketch drawn on the part: the profile on its plane, its tools in the capsule, what to make of it at the foot
+        SketchOnPart { id: sketch; anchors.fill: parent; z: 4; vp: vp; source: studio
+            capX: Theme.edge + 60 + ws.shift; capY: Theme.paneTop + 2
+            capMax: Math.max(240, ws.paneX - capX - Theme.gap - (cube.visible ? cube.width + Theme.gap : 0))
+            midX: ws.col ? (lay.freeL + lay.freeR) / 2 : lay.mid
+            footY: Math.min(centre.height - Theme.edge, status.y - 36, ws.col ? 1e9 : Store.barY - Theme.gap)      // above the scale cue, the size line and the bar
+            onBusyHereChanged: { if (!busyHere && ["sketch", "extrude", "cut", "revolve"].indexOf(Ws.want) >= 0) Ws.want = ""; if (on && ["sketch", "extrude", "cut", "revolve"].indexOf(Ws.want) < 0) { if (Ws.tool !== "select") ws.setTool("select"); Ws.want = "sketch" } }
+            onOnChanged: if (on && ["sketch", "extrude", "cut", "revolve"].indexOf(Ws.want) < 0) Ws.want = "sketch"
+            Component.onCompleted: Store.sketchHost = sketch
+            Component.onDestruction: if (Store.sketchHost === sketch) Store.sketchHost = null }
+
         // the cue: the build's lower third, over the room and above the bar. The same step is lit in the Program.
         Item {
             id: cue; objectName: "buildCaption"; z: 6
@@ -390,74 +426,139 @@ Item {
             width: vt.implicitWidth + 20; height: 26; radius: 13; color: Theme.glassSolid; border.color: Theme.rule2
             Txt { id: vt; anchors.centerIn: parent; mono: true; font.pixelSize: 12; text: vchip.say; wrapMode: Text.NoWrap } }
 
-        // ── the tool dock ────────────────────────────────────
+        // ── the tool dock: four tools that are always there, then the tools of the mode you are in ──
+        // (docs/design/directions/i/IA.md, decision 8). The four never move. The mode's group cross-fades in 180 ms and
+        // the capsule's foot glides with it; nothing else on the stage is laid out from the dock's height.
         Glass {
             id: rail; objectName: "toolDock"
             source: studio; arrive: 3
-            x: Theme.edge + ws.shift; y: Theme.paneTop; z: 6; width: 48; height: railCol.implicitHeight + 12; radius: 24
+            x: Theme.edge + ws.shift; y: Theme.paneTop; z: 6; width: 48; height: railCol.height + 12; radius: 24
             visible: !!Store.view
+            readonly property string mode: Store.mode
             // while a build plays the tools step back: the part and its cue have the room
             // (as one picture while it is dimmed, so the filled disc and its icon fade together and not one through the other)
             Item { anchors.fill: parent; opacity: ws.cueOn ? 0.45 : 1; layer.enabled: opacity < 0.999; Behavior on opacity { NumberAnimation { duration: Theme.cross } }
             Column {
                 id: railCol; x: 6; y: 6; spacing: 2
-                RailBtn { icon: "mouse_pointer_2"; label: "Select"; keys: "V"; hint: "Click a feature to edit it. Drag to orbit, shift-drag to pan."
-                    active: ws.tool === "select" && !ws.sim; onClicked: ws.setTool("select") }
-                RailBtn { icon: "pencil_ruler"; label: "Measure"; keys: "M"; hint: "Distances, faces and hole diameters, computed from the part’s surface."
+                RailBtn { objectName: "railSelect"; icon: "mouse_pointer_2"; label: "Select"; keys: "V"; hint: "Click a feature to edit it. Drag to orbit, shift-drag to pan."
+                    active: ws.tool === "select" && !ws.sim && !sketch.busyHere && !Ws.want; onClicked: ws.setTool("select") }
+                RailBtn { objectName: "railMeasure"; icon: "pencil_ruler"; label: "Measure"; keys: "M"; hint: "Distances, faces and hole diameters, computed from the part’s surface."
                     active: ws.tool === "measure" && !ws.sim; marked: Store.measures.length > 0; onClicked: ws.setTool("measure") }
-                RailBtn { icon: "map_pin"; label: "Annotate"; keys: "N"; hint: "Pick faces, edges and points or paint a region; see what the solid says there, keep it with a note, ask the agent about it."
-                    active: ws.tool === "annotate" && !ws.sim; marked: Store.annotations.length > 0 || Store.selItems.length > 0; onClicked: ws.setTool("annotate") }
-                RailBtn { icon: "scissors"; label: "Section"; keys: "X"; hint: "Cut the part open along X, Y or Z."
+                RailBtn { objectName: "railSection"; icon: "scissors"; label: "Section"; keys: "X"; hint: "Cut the part open along X, Y or Z."
                     active: ws.tool === "section" && !ws.sim; marked: !!Store.sectionNow(); onClicked: ws.setTool("section") }
-                RailBtn { icon: "scan_line"; label: "Analyze"; keys: "A"; hint: "Colour the part by wall thickness, overhang, section area or small features."
-                    active: ws.tool === "analyze" && !ws.sim; marked: !!Store.analysisMap; onClicked: ws.setTool("analyze") }
-                RailBtn { icon: "boxes"; label: "Assembly"; keys: "E"; hint: "Assembled, exploded or as printed. Move the joints."
-                    visible: !!Store.assembly
-                    active: ws.tool === "assembly" && !ws.sim; marked: Store.asmMode !== "print"; onClicked: ws.setTool("assembly") }
-                RailBtn { icon: "history"; label: "History"; keys: "T"; hint: "Scrub through the revisions. Looking changes nothing."
-                    active: ws.tool === "history" && !ws.sim; marked: !!Store.scrub; onClicked: ws.setTool("history") }
-                // modelling by hand (form/modelling.py): each becomes a feature in the design's code
-                Item { width: 36; height: 9; Rectangle { x: 8; y: 4; width: 20; height: 1; color: Theme.rule } }
-                RailBtn { objectName: "railSketch"; icon: "pen_tool"; label: "Sketch"; hint: "Draw a profile on a plane and extrude, cut or revolve it. On a face: pick it with Annotate, then Sketch here…"
-                    enabled: !ws.sim && !Store.hasDraft; onClicked: Store.openSheet("handsketch", { mode: "add", plane: { datum: "XY", offset: 0 } }) }
-                RailBtn { objectName: "railRound"; icon: "radius"; label: "Fillet or chamfer"; hint: "Pick the edges to round or bevel."
-                    enabled: !ws.sim; active: ws.tool === "annotate" && Store.selMode === "edge"; onClicked: { if (ws.tool !== "annotate") ws.setTool("annotate"); Store.selMode = "edge" } }
-                RailBtn { objectName: "railHole"; icon: "circle_dot"; label: "Hole, shell or sketch on a face"; hint: "Pick a flat face: a hole to a standard size, a shell open there, or a sketch on it."
-                    enabled: !ws.sim; active: ws.tool === "annotate" && Store.selMode === "face"; onClicked: { if (ws.tool !== "annotate") ws.setTool("annotate"); Store.selMode = "face" } }
-                Item { width: 36; height: 9; Rectangle { x: 8; y: 4; width: 20; height: 1; color: Theme.rule } }
-                RailBtn { icon: "layers"; label: "Simulate the print"; hint: ws.d && ws.d.slice ? "Play the slicer’s toolpaths. Simulated, not a print." : "Needs a current slice of this revision."
-                    enabled: !!ws.d && !!ws.d.slice; active: ws.sim
-                    onClicked: { if (ws.sim) Store.showLayers(false); else Store.simulate({ at: 0, play: true }) } }
-                RailBtn { objectName: "railGame"; icon: "gamepad_2"; label: "Game asset"; hint: Store.hasDraft ? "Commit or discard the draft first." : "LODs at triangle budgets, UVs, baked maps and collision, for Godot, Unity or Unreal (built in Blender)."
-                    visible: Store.gameDesign; enabled: !Store.hasDraft; onClicked: Store.openSheet("game") }
-                RailBtn { icon: "camera"; label: "Photo render"; hint: Store.hasDraft ? "Commit or discard the draft first." : "Render the current revision in Blender (an illustration)."
-                    enabled: !Store.hasDraft; onClicked: Store.openSheet("render") }
-                Item { width: 36; height: 9; Rectangle { x: 8; y: 4; width: 20; height: 1; color: Theme.rule } }
-                RailBtn { icon: "maximize_2"; label: Store.feature ? "Frame the selection" : "Frame the part"; keys: "F"; enabled: !ws.sim
-                    onClicked: Store.frameSelection() }
-                RailBtn { icon: "ruler"; toggle: true; label: Store.dims ? "Hide overall dimensions" : "Show overall dimensions"; active: Store.dims; enabled: !ws.sim; onClicked: Store.toggleDims() }
-                RailBtn { icon: "box"; toggle: true; label: Store.companions ? "Hide what the part holds" : "Show what the part holds"; hint: "The object or reference part, drawn in blueprint."
-                    visible: !!(Store.shown && Store.shown.companions && Store.shown.companions.length)
-                    active: vp.showCompanions; enabled: !ws.sim; onClicked: Store.toggleCompanions() }
+                RailBtn { objectName: "railAnnotate"; icon: "map_pin"; label: "Annotate"; keys: "N"; hint: "Pick faces, edges and points or paint a region; see what the solid says there, keep it with a note, ask the agent about it."
+                    active: ws.tool === "annotate" && !ws.sim && !Ws.want; marked: Store.annotations.length > 0 || Store.selItems.length > 0; onClicked: ws.setTool("annotate") }
+                Item { width: 36; height: 9; Rectangle { objectName: "railSep"; x: 8; y: 4; width: 20; height: 1; color: Theme.rule } }
+                Item {
+                    id: modeBox; objectName: "railModeBox"; width: 36; clip: true
+                    readonly property Item cur: rail.mode === "prove" ? gCheck : rail.mode === "release" ? gMake : rail.mode === "document" ? gDoc : gDesign
+                    height: cur.implicitHeight
+                    Behavior on height { NumberAnimation { duration: Theme.move(Theme.base); easing.type: Easing.BezierSpline; easing.bezierCurve: Motion.out } }
+                    // Design: modelling by hand (form/modelling.py): each becomes a feature in the design's code
+                    RailGroup { id: gDesign; objectName: "railGroup-shape"; on: modeBox.cur === gDesign
+                        RailBtn { objectName: "railSketch"; icon: "pen_tool"; label: "Sketch"; keys: "S"; hint: "Pick a flat face or a plane and draw a profile on it; then extrude, cut or revolve it."
+                            enabled: !ws.sim && !Store.hasDraft; active: sketch.busyHere && Ws.want === "sketch"; onClicked: ws.setTool("sketch", "sketch") }
+                        RailBtn { objectName: "railExtrude"; icon: "arrow_up"; label: "Extrude"; keys: "Shift+E"; hint: "A profile drawn on a face or a plane, pulled out of it."
+                            enabled: !ws.sim && !Store.hasDraft; active: sketch.busyHere && Ws.want === "extrude"; onClicked: ws.setTool("sketch", "extrude") }
+                        RailBtn { objectName: "railCut"; icon: "arrow_down_to_line"; label: "Cut"; keys: "Shift+X"; hint: "A profile drawn on a face, cut into the part: a pocket, a slot, a hole of any shape."
+                            enabled: !ws.sim && !Store.hasDraft; active: sketch.busyHere && Ws.want === "cut"; onClicked: ws.setTool("sketch", "cut") }
+                        RailBtn { objectName: "railRevolve"; icon: "rotate_3d"; label: "Revolve"; keys: "Shift+R"; hint: "A profile turned about one of its lines."
+                            enabled: !ws.sim && !Store.hasDraft; active: sketch.busyHere && Ws.want === "revolve"; onClicked: ws.setTool("sketch", "revolve") }
+                        Item { width: 36; height: 9; Rectangle { x: 8; y: 4; width: 20; height: 1; color: Theme.rule } }
+                        RailBtn { objectName: "railRound"; icon: "radius"; label: "Fillet"; keys: "Shift+F"; hint: "Pick the edges to round."
+                            enabled: !ws.sim; active: ws.tool === "annotate" && Ws.want === "fillet"; onClicked: ws.setTool("annotate", "fillet") }
+                        RailBtn { objectName: "railChamfer"; icon: "triangle"; label: "Chamfer"; keys: "Shift+C"; hint: "Pick the edges to bevel."
+                            enabled: !ws.sim; active: ws.tool === "annotate" && Ws.want === "chamfer"; onClicked: ws.setTool("annotate", "chamfer") }
+                        RailBtn { objectName: "railHole"; icon: "circle_dot"; label: "Hole"; keys: "Shift+O"; hint: "Pick a flat face: a hole there, to a standard size."
+                            enabled: !ws.sim; active: ws.tool === "annotate" && Ws.want === "hole"; onClicked: ws.setTool("annotate", "hole") }
+                        RailBtn { objectName: "railPattern"; icon: "layout_grid"; label: "Pattern"; keys: "Shift+P"; hint: "Repeat a feature along a line or about an axis. Select the feature first, on the part or in the tree."
+                            enabled: !ws.sim; active: Ws.want === "pattern"; onClicked: ws.setTool("select", "pattern") }
+                        RailBtn { objectName: "railShell"; icon: "box"; label: "Shell"; keys: "Shift+S"; hint: "Pick a flat face: the part hollowed out and open there."
+                            enabled: !ws.sim; active: ws.tool === "annotate" && Ws.want === "shell"; onClicked: ws.setTool("annotate", "shell") }
+                        RailBtn { objectName: "railPart"; icon: "wrench"; label: "Part here…"; keys: "Shift+B"; hint: "Pick a hole or a face: a screw, insert, bearing or other bought part on it, its hole cut and its fit checked."
+                            enabled: !ws.sim; active: ws.tool === "annotate" && Ws.want === "part"; onClicked: ws.setTool("annotate", "part") }
+                    }
+                    // Check: what the solid says
+                    RailGroup { id: gCheck; objectName: "railGroup-prove"; on: modeBox.cur === gCheck
+                        RailBtn { objectName: "railAnalyze"; icon: "scan_line"; label: "Analyze"; keys: "A"; hint: "Colour the part by wall thickness, overhang, section area or small features."
+                            active: ws.tool === "analyze" && !ws.sim; marked: !!Store.analysisMap; onClicked: ws.setTool("analyze") }
+                        RailBtn { objectName: "railMass"; icon: "weight"; toggle: true; label: Store.massOn ? "Hide the centre of mass" : "Centre of mass"; keys: "C"
+                            hint: "The centre of mass and the principal axes, with the mass and inertia (computed on the B-rep)."
+                            active: Store.massOn; enabled: !ws.sim; onClicked: Store.massOn = !Store.massOn }
+                        RailBtn { objectName: "railAssembly"; icon: "boxes"; label: "Assembly"; keys: "E"; hint: "Assembled, exploded or as printed. Move the joints."
+                            visible: !!Store.assembly
+                            active: ws.tool === "assembly" && !ws.sim; marked: Store.asmMode !== "print"; onClicked: ws.setTool("assembly") }
+                        RailBtn { objectName: "railHistory"; icon: "history"; label: "History"; keys: "T"; hint: "Scrub through the revisions. Looking changes nothing."
+                            active: ws.tool === "history" && !ws.sim; marked: !!Store.scrub; onClicked: ws.setTool("history") }
+                        RailBtn { icon: "box"; toggle: true; label: Store.companions ? "Hide what the part holds" : "Show what the part holds"; hint: "The object or reference part, drawn in blueprint."
+                            visible: !!(Store.shown && Store.shown.companions && Store.shown.companions.length)
+                            active: vp.showCompanions; enabled: !ws.sim; onClicked: Store.toggleCompanions() }
+                    }
+                    // Make: the routes that have something to show on the stage
+                    RailGroup { id: gMake; objectName: "railGroup-release"; on: modeBox.cur === gMake
+                        RailBtn { objectName: "railSimulate"; icon: "layers"; label: "Simulate the print"; hint: ws.d && ws.d.slice ? "Play the slicer’s toolpaths. Simulated, not a print." : "Needs a current slice of this revision."
+                            enabled: !!ws.d && !!ws.d.slice; active: ws.sim
+                            onClicked: { if (ws.sim) Store.showLayers(false); else Store.simulate({ at: 0, play: true }) } }
+                        RailBtn { objectName: "railPlates"; icon: "grid_3x3"; label: "Print layout"; hint: "The parts as they lie on the plates."
+                            visible: !!Store.assembly && Store.printUi
+                            active: Store.asmMode === "print" && ws.tool === "assembly"; onClicked: { if (ws.tool !== "assembly") ws.setTool("assembly"); Store.setAsmMode("print") } }
+                        RailBtn { objectName: "railGame"; icon: "gamepad_2"; label: "Game asset"; hint: Store.hasDraft ? "Commit or discard the draft first." : "LODs at triangle budgets, UVs, baked maps and collision, for Godot, Unity or Unreal (built in Blender)."
+                            visible: Store.gameDesign; enabled: !Store.hasDraft; onClicked: Store.openSheet("game") }
+                        RailBtn { icon: "camera"; label: "Photo render"; hint: Store.hasDraft ? "Commit or discard the draft first." : "Render the current revision in Blender (an illustration)."
+                            enabled: !Store.hasDraft; onClicked: Store.openSheet("render") }
+                    }
+                    // Document: how the part is looked at and dimensioned
+                    RailGroup { id: gDoc; objectName: "railGroup-document"; on: modeBox.cur === gDoc
+                        RailBtn { objectName: "railViews"; icon: "cuboid"; label: "Views"; keys: "W"; hint: "Front, side, top or the three-quarter view."
+                            active: ws.tool === "views" && !ws.sim; enabled: !ws.sim; onClicked: ws.setTool("views") }
+                        RailBtn { objectName: "railDims"; icon: "ruler"; toggle: true; label: Store.dims ? "Hide overall dimensions" : "Show overall dimensions"; active: Store.dims; enabled: !ws.sim; onClicked: Store.toggleDims() }
+                        RailBtn { icon: "maximize_2"; label: Store.feature ? "Frame the selection" : "Frame the part"; keys: "F"; enabled: !ws.sim
+                            onClicked: Store.frameSelection() }
+                        RailBtn { icon: "camera"; label: "Photo render"; hint: Store.hasDraft ? "Commit or discard the draft first." : "Render the current revision in Blender (an illustration)."
+                            enabled: !Store.hasDraft; onClicked: Store.openSheet("render") }
+                    }
+                }
             }
             }
         }
 
-        // ── options of the active tool (one place, one row) ──
+        // ── options of the active tool: one capsule at the head of the stage, always in the same place ──
         Item {
             id: opts
-            x: Theme.edge + 60 + ws.shift; y: Theme.paneTop + 5; z: 5; visible: !ws.sim && !!Store.view
-            readonly property real room: Math.max(160, ws.paneX - x - 16)
-            height: Math.max(sectionBar.shown ? sectionBar.height : 0, analyzeBar.shown ? analyzeBar.height : 0,
-                             measureBar.shown ? measureBar.height : 0, asmBar.shown ? asmBar.height : 0, annotateBar.shown ? annotateBar.height : 0)
-
-            HudBar { id: annotateBar; objectName: "annotateBar"; shown: ws.tool === "annotate"; maxWidth: opts.room
-                Seg { model: [{ value: "face", text: "Face", tip: "G" }, { value: "edge", text: "Edge", tip: "R" }, { value: "point", text: "Point", tip: "P" },
+            x: Theme.edge + 60 + ws.shift; y: Theme.paneTop + 2; z: 5; visible: !ws.sim && !!Store.view && !sketch.busyHere
+            readonly property real room: Math.max(160, capsule.maxWidth - capsule.lead - 6)
+            readonly property bool any: ws.tool === "annotate" || ws.tool === "measure" || ws.tool === "section" || ws.tool === "analyze" || ws.tool === "views"
+                                        || (ws.tool === "assembly" && !!Store.assembly) || Ws.want === "pattern"
+            height: any ? capsule.height : 0
+            ToolCapsule {
+                id: capsule; objectName: "toolCapsule"; source: studio; visible: opts.any
+                maxWidth: Math.max(200, ws.paneX - opts.x - Theme.gap - (cube.visible ? cube.width + Theme.gap : 0))
+                title: Ws.want === "pattern" ? "Pattern" : ws.tool === "annotate" ? ({ fillet: "Fillet", chamfer: "Chamfer", hole: "Hole", shell: "Shell", part: "Part here" }[Ws.want] || "Annotate")
+                     : ws.tool === "measure" ? "Measure" : ws.tool === "section" ? "Section" : ws.tool === "analyze" ? "Analyze" : ws.tool === "assembly" ? "Assembly" : ws.tool === "views" ? "Views" : ""
+            HudBar { id: viewsBar; objectName: "viewsBar"; shown: ws.tool === "views"; maxWidth: opts.room; cut: true
+                Seg { height: 28; model: [{ value: "front", text: "Front" }, { value: "side", text: "Side" }, { value: "top", text: "Top" }, { value: "iso", text: "Three-quarter" }]
+                    value: Store.viewName; onPicked: function (v) { Store.setView(v) } }
+            }
+            HudBar { id: patternBar; objectName: "patternBar"; shown: Ws.want === "pattern" && ws.tool === "select"; maxWidth: opts.room; cut: true
+                Txt { height: 28; verticalAlignment: Text.AlignVCenter; font.pixelSize: 13; tone: 2; wrapMode: Text.NoWrap
+                    text: Store.feature ? "Set it under the feature’s line, in the tree" : "Select the feature to repeat, on the part or in the tree" }
+            }
+            HudBar { id: wantBar; objectName: "wantBar"; shown: ws.tool === "annotate" && !!Ws.want; maxWidth: opts.room; cut: true
+                Txt { height: 28; verticalAlignment: Text.AlignVCenter; font.pixelSize: 13; wrapMode: Text.NoWrap
+                    color: Store.selSay ? Theme.strong(Theme.amber) : Theme.ink2
+                    text: Store.selSay ? Store.selSay : Store.selBusy > 0 ? "Reading the solid…"
+                        : Ws.want === "fillet" || Ws.want === "chamfer" ? (Store.selItems.length ? F.plural(Store.selItems.length, "edge") + " picked · Shift-click adds · set it in the pane" : "Click an edge · Shift-click adds")
+                        : Ws.want === "part" ? (Store.selItems.length ? "Choose the part in the sheet" : "Click a hole or a face")
+                        : Store.selItems.length ? "Set it in the pane on the right" : "Click a flat face" }
+                Btn { small: true; height: 28; text: "Clear"; visible: Store.selItems.length > 0; onClicked: Store.selClear() }
+            }
+            HudBar { id: annotateBar; objectName: "annotateBar"; shown: ws.tool === "annotate" && !Ws.want; maxWidth: opts.room; cut: true
+                Seg { height: 28; model: [{ value: "face", text: "Face", tip: "G" }, { value: "edge", text: "Edge", tip: "R" }, { value: "point", text: "Point", tip: "P" },
                               { value: "brush", text: "Brush", tip: "B: paint a region on the surface" }, { value: "lasso", text: "Lasso", tip: "L: draw around what you see" }]
                     value: Store.selMode; onPicked: function (v) { Store.selMode = v } }
                 HudSlider { visible: Store.selMode === "brush"; label: "Size"; unit: " mm"; decimals: 1; from: 0.5; to: 15; step: 0.5
                     value: Store.brushMm; onMoved: function (v) { Store.brushMm = v } }
-                Rectangle { objectName: "annotateHint"; height: 26; width: Math.min(sh.implicitWidth + 20 + (sspin.visible ? 20 : 0), opts.room); radius: Theme.rSm
+                Rectangle { objectName: "annotateHint"; height: 28; width: Math.min(sh.implicitWidth + 20 + (sspin.visible ? 20 : 0), opts.room); radius: Theme.rSm
                     color: Store.selSay ? Theme.alpha(Theme.amber, 0.12) : Theme.alpha(Theme.plate1, 0.9); border.color: Store.selSay ? Theme.alpha(Theme.amber, 0.35) : Theme.rule
                     Behavior on color { Tint {} }
                     Spinner { id: sspin; x: 9; anchors.verticalCenter: parent.verticalCenter; size: 12; visible: Store.selBusy > 0; color: Theme.annotate }
@@ -467,14 +568,14 @@ Item {
                             : Store.selMode === "brush" ? (ws.compact ? "Drag to paint" : "Drag to paint a region · Alt-drag orbits · Shift adds")
                             : Store.selMode === "lasso" ? (ws.compact ? "Drag around it" : "Draw around what you see · Alt-drag orbits · Shift adds")
                             : ws.compact ? "Click to pick" : "Click to pick a " + Store.selMode + " · Shift-click adds" } }
-                Btn { small: true; height: 26; text: "Clear"; visible: Store.selItems.length > 0; onClicked: Store.selClear() }
+                Btn { small: true; height: 28; text: "Clear"; visible: Store.selItems.length > 0; onClicked: Store.selClear() }
             }
 
-            HudBar { id: measureBar; objectName: "measureBar"; shown: ws.tool === "measure"; maxWidth: opts.room
-                Seg { model: [{ value: "distance", text: "Distance" }, { value: "face", text: "Face" }, { value: "diameter", text: "Diameter" }]
+            HudBar { id: measureBar; objectName: "measureBar"; shown: ws.tool === "measure"; maxWidth: opts.room; cut: true
+                Seg { height: 28; model: [{ value: "distance", text: "Distance" }, { value: "face", text: "Face" }, { value: "diameter", text: "Diameter" }]
                     value: Store.measureKind
                     onPicked: function (v) { Store.measureKind = v; Store.measureFrom = null } }
-                Rectangle { objectName: "measureHint"; height: 26; width: Math.min(mh.implicitWidth + 20 + (mspin.visible ? 20 : 0), opts.room); radius: Theme.rSm
+                Rectangle { objectName: "measureHint"; height: 28; width: Math.min(mh.implicitWidth + 20 + (mspin.visible ? 20 : 0), opts.room); radius: Theme.rSm
                     color: Store.measureSay ? Theme.alpha(Theme.amber, 0.12) : Theme.alpha(Theme.plate1, 0.9); border.color: Store.measureSay ? Theme.alpha(Theme.amber, 0.35) : Theme.rule
                     Behavior on color { Tint {} }
                     Spinner { id: mspin; x: 9; anchors.verticalCenter: parent.verticalCenter; size: 12; visible: Store.measureBusy > 0 }
@@ -486,37 +587,37 @@ Item {
                             : ws.compact ? "Click a hole or round boss" : "Click the wall or rim of a hole or round boss" }
                     MouseArea { id: mhm; anchors.fill: parent; hoverEnabled: true }
                     Tip { show: mhm.containsMouse; text: "Values are computed from the part’s surface, tessellated at 0.05 mm; a hole diameter is exact when it comes from the CAD solid. Points snap to corners, edge midpoints and face centres when close." } }
-                Btn { small: true; height: 26; text: "Clear"; visible: Store.measures.length > 0 || !!Store.measureFrom; onClicked: Store.clearMeasures() }
+                Btn { small: true; height: 28; text: "Clear"; visible: Store.measures.length > 0 || !!Store.measureFrom; onClicked: Store.clearMeasures() }
             }
-            HudBar { id: sectionBar; objectName: "sectionBar"; shown: ws.tool === "section"; maxWidth: opts.room
+            HudBar { id: sectionBar; objectName: "sectionBar"; shown: ws.tool === "section"; maxWidth: opts.room; cut: true
                 readonly property var now: Store.sectionNow()
-                Seg { model: [{ value: "x", text: "X" }, { value: "y", text: "Y" }, { value: "z", text: "Z" }]
+                Seg { height: 28; model: [{ value: "x", text: "X" }, { value: "y", text: "Y" }, { value: "z", text: "Z" }]
                     value: sectionBar.now ? sectionBar.now.axis : ""
                     onPicked: function (v) { Store.setSection(v, sectionBar.now && sectionBar.now.axis === v ? sectionBar.now.t : 0.5) } }
                 HudSlider { label: "Position"; from: 0.02; to: 0.98; step: 0.01; percent: true; visible: !!sectionBar.now
                     value: sectionBar.now ? sectionBar.now.t : 0.5
                     onMoved: function (v) { Store.setSection(sectionBar.now ? sectionBar.now.axis : "y", v) } }
-                Btn { small: true; height: 26; text: "Remove cut"; visible: !!sectionBar.now; onClicked: Store.setSection("", 0.5) }
+                Btn { small: true; height: 28; text: "Remove cut"; visible: !!sectionBar.now; onClicked: Store.setSection("", 0.5) }
             }
-            HudBar { id: analyzeBar; objectName: "analyzeBar"; shown: ws.tool === "analyze"; maxWidth: opts.room
-                Seg { visible: !ws.compact; model: Store.analysisMaps.slice(1); value: Store.analysisMap
+            HudBar { id: analyzeBar; objectName: "analyzeBar"; shown: ws.tool === "analyze"; maxWidth: opts.room; cut: true
+                Seg { height: 28; visible: !ws.compact; model: Store.analysisMaps.slice(1); value: Store.analysisMap
                     onPicked: function (v) { Store.setAnalysis(v === Store.analysisMap ? "" : v) } }
-                Pick { visible: ws.compact; width: 150; height: 26; model: Store.analysisMaps; value: Store.analysisMap; onPicked: function (v) { Store.setAnalysis(v) } }
-                Btn { small: true; height: 26; text: "Clear map"; visible: !!Store.analysisMap && !ws.compact; onClicked: Store.setAnalysis("") }
-                Btn { objectName: "massToggle"; small: true; height: 26; icon: "weight"; text: ws.compact ? "" : "Centre of mass"; active: Store.massOn
+                Pick { visible: ws.compact; width: 150; height: 28; model: Store.analysisMaps; value: Store.analysisMap; onPicked: function (v) { Store.setAnalysis(v) } }
+                Btn { small: true; height: 28; text: "Clear map"; visible: !!Store.analysisMap && !ws.compact; onClicked: Store.setAnalysis("") }
+                Btn { objectName: "massToggle"; small: true; height: 28; icon: "weight"; text: ws.compact ? "" : "Centre of mass"; active: Store.massOn
                     tip: (Store.massOn ? "Hide" : "Show") + " the centre of mass and the principal axes, with the mass and inertia (computed on the B-rep)"
                     onClicked: Store.massOn = !Store.massOn }
             }
-            HudBar { id: asmBar; objectName: "asmBar"; shown: ws.tool === "assembly" && !!Store.assembly; maxWidth: opts.room
-                Seg { visible: !ws.compact; model: ws.asmModes
+            HudBar { id: asmBar; objectName: "asmBar"; shown: ws.tool === "assembly" && !!Store.assembly; maxWidth: opts.room; cut: true
+                Seg { height: 28; visible: !ws.compact; model: ws.asmModes
                     value: Store.asmMode; onPicked: function (v) { Store.setAsmMode(v) } }
-                Pick { visible: ws.compact; width: 150; height: 26; value: Store.asmMode; onPicked: function (v) { Store.setAsmMode(v) }
+                Pick { visible: ws.compact; width: 150; height: 28; value: Store.asmMode; onPicked: function (v) { Store.setAsmMode(v) }
                     model: ws.asmModes.filter(function (m) { return !m.off }) }
-                Rectangle { objectName: "asmDerivedNote"; visible: ws.asmDerived; height: 26; width: Math.min(an.implicitWidth + 20, opts.room); radius: Theme.rSm
+                Rectangle { objectName: "asmDerivedNote"; visible: ws.asmDerived; height: 28; width: Math.min(an.implicitWidth + 20, opts.room); radius: Theme.rSm
                     color: Theme.alpha(Theme.plate1, 0.9); border.color: Theme.rule
                     Txt { id: an; x: 10; width: parent.width - 20; anchors.verticalCenter: parent.verticalCenter; font.pixelSize: 12; tone: 3; wrapMode: Text.NoWrap; elide: Text.ElideRight
                         text: ws.compact ? "Placement not declared" : "Not assembled: the design does not say where each part goes" } }
-                Btn { visible: ws.asmDerived; small: true; height: 26; icon: "sparkles"; text: ws.compact ? "Ask the agent" : "Ask the agent to add it"
+                Btn { visible: ws.asmDerived; small: true; height: 28; icon: "sparkles"; text: ws.compact ? "Ask the agent" : "Ask the agent to add it"
                     tip: "Puts a request in the conversation for you to send: describe how the parts go together in the design."
                     onClicked: ws.askAssembly() }
                 HudSlider { visible: Store.asmMode === "exploded"; label: "Spread"; from: 0; to: 1.6; step: 0.05; base: 1; percent: true
@@ -528,6 +629,7 @@ Item {
                         from: modelData.range[0]; to: modelData.range[1]; step: modelData.step > 0 ? modelData.step : 1; base: 0
                         value: Store.pose[modelData.id] || 0
                         onMoved: function (v) { Store.setPose(modelData.id, v) } } }
+            }
             }
         }
 

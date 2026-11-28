@@ -8,7 +8,7 @@ import os
 import time
 from pathlib import Path
 
-from _lib import close_sheet_esc, head, make, open_sheet_wait, sheet, toasts_gone, wait_job, printing_on, click_stage
+from _lib import close_sheet_esc, head, make, open_sheet_wait, sheet, toasts_gone, wait_job, printing_on, click_stage, dock
 
 DATA = "fresh"
 S = {}
@@ -60,7 +60,7 @@ def journey_every_sheet_opens_and_closes(ui):
         ("variants", lambda: palette(ui, "variants board", "Variants board"), "Variants"),
         ("share", lambda: palette(ui, "share card", "Share card"), "Share card"),
         ("alternatives", lambda: palette(ui, "compare alternatives", "Compare alternatives"), None),
-        ("render", lambda: ui.click_text("Photo render"), None),
+        ("render", lambda: dock(ui, "Photo render"), None),
         ("about", lambda: palette(ui, "about form", "About Form Studio"), "About Form Studio"),
         ("settings", lambda: palette(ui, "software install", "Software: install or check"), "Settings"),
         ("update", lambda: palette(ui, "check for updates", "Check for updates"), None),

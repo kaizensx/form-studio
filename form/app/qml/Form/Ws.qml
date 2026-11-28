@@ -7,6 +7,9 @@ QtObject {
     id: w
     // select | measure | section | analyze | assembly | history. One at a time; its options show next to the rail.
     property string tool: "select"
+    // what the active tool is for, when a dock tool is a way into another one: sketch | extrude | cut | revolve (a
+    // profile drawn on the part), fillet | chamfer | hole | shell | part (picked with Annotate), pattern. "" otherwise.
+    property string want: ""
     property bool dockCollapsed: false      // the legend / measurement dock, folded to its header by the user
     property bool dockTouched: false        // the user has folded or opened it; until then a narrow viewport folds it
     property int refineWant: -1             // Refinement in the dock: -1 as the stage has it (open in Design), 0 folded, 1 opened by hand

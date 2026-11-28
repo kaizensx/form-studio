@@ -21,7 +21,7 @@ class WorkspaceUi(unittest.TestCase):
             self.assertTrue((FORM / f"{name}.qml").exists())
 
     def test_local_components_exist(self):
-        for name in ("RailBtn", "HudBar", "HudSlider", "Tick", "Fold"):
+        for name in ("RailBtn", "RailGroup", "ToolCapsule", "CapChip", "SketchOnPart", "HudBar", "HudSlider", "Tick", "Fold"):
             self.assertTrue((FORM / f"{name}.qml").exists(), name)
         for shader in ("clay.frag", "ground.frag"):
             self.assertTrue((FORM / "shaders" / shader).exists(), shader)

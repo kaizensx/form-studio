@@ -4,6 +4,25 @@
 
 ### Changed
 
+- **The tool dock follows the mode, and a sketch is drawn on the part** (direction I). Select, Measure, Section and
+  Annotate are always in the dock and never move; under a thin rule stand the tools of the mode: Design has Sketch,
+  Extrude, Cut, Revolve, Fillet, Chamfer, Hole, Pattern, Shell and Part here; Check has Analyze, Centre of mass,
+  Assembly and History; Make has Simulate the print, Print layout, Game asset and Photo render; Document has Views,
+  the overall dimensions, Frame and Photo render. The group cross-fades in 180 ms when the mode changes. The active
+  tool's options are one capsule at the head of the stage, always in the same place. Each mode's tools have keys that
+  answer in that mode (Design: S, then Shift with the tool's letter; Hole is Shift+O).
+  **Sketch** no longer opens a sheet: click a flat face or choose a plane, the camera turns to look straight at it,
+  and the profile is drawn on that plane in the 3D view. Lines, arcs, circles and rectangles snap to points,
+  midpoints, the face's corners and a grid; constraints show as small symbols; a dimension is typed in place; the
+  capsule counts the degrees of freedom left and offers what can be said about the selection (coincident, midpoint,
+  symmetric, tangent, equal, angle and distance dimensions among them, which the sheet never showed). Extrude, Cut or
+  Revolve at the foot of the stage shows the kernel's preview on the part with its change in volume before anything
+  is saved. Start blank › Model it by hand draws the first profile the same way, on a plane of the empty floor. The
+  sheet remains as the fallback where there is no 3D view. Nothing changed for agents: `get_sketch`, `edit_sketch`
+  and `add_feature` are the same routes the window uses; `/sketch/solve` now also returns the closed loops as points.
+  Not done: the part is not ghosted behind the sketch and does not hide the lines it should cover; a face is not lit
+  under the pointer before it is picked; Revolve has no dashed outline, only the kernel's preview.
+
 - **The right pane is the Bench's chapter for the mode, in one row grammar** (direction I, second part). Check lists
   the studies, Make the routes, Document the documents, and every row reads the same: a state mark, the name, the
   number, and the word that says how it is known. A row without a number says its state in its place (*not run*,

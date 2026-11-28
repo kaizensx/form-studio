@@ -2,7 +2,7 @@
 large laptop screen (1728 × 1117). Nothing may overlap or run off its container, and the main controls still work."""
 from PySide6.QtCore import QPointF, QRectF
 
-from _lib import goto, has_slicer, open_sheet_wait, close_sheet_esc, phone_dock
+from _lib import goto, has_slicer, open_sheet_wait, close_sheet_esc, phone_dock, dock
 
 DATA = "fresh"
 
@@ -61,7 +61,7 @@ def run(ui):
     ui.wait_until(lambda: ui.store.get("measuring") is True, 3, "Measure")
     no_overlaps(ui, "measureBar", "the measure options")
     ui.key("Escape")
-    ui.click_text("Analyze")
+    dock(ui, "Analyze")
     ui.settle(300)
     opts = ui.item("analyzeBar")
     if ui.exists(text="Thickness", within=opts):
@@ -82,7 +82,7 @@ def run(ui):
     ui.shot(f"size-{tag}-timeline")
     ui.key("T")
     if has_slicer(ui):
-        ui.click_text("Simulate the print")
+        dock(ui, "Simulate the print")
         ui.wait_until(lambda: ui.store.get("layers") is not None and ui.item("printSim").property("count") > 0, 120, "the print simulation")
         ui.settle(800)
         ui.item("printSim").setProperty("playing", False)

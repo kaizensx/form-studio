@@ -237,9 +237,16 @@ Item {
                     Txt { visible: dl.now; anchors.right: parent.right; anchors.rightMargin: 12; anchors.verticalCenter: parent.verticalCenter; mono: true; font.pixelSize: 11; font.weight: Theme.wMedium; font.letterSpacing: 1.0; color: Theme.datum; text: "BUILDING" } } } }
     }
 
+    // Model it by hand: the first profile is drawn here, on a plane of the empty floor (SketchOnPart.qml)
+    SketchOnPart { id: dsketch; anchors.fill: parent; z: 4; vp: dvp; source: studio
+        capX: Math.round(dz.stageL); capY: Theme.paneTop + 2; capMax: Math.max(240, dz.stageR - dz.stageL)
+        midX: dz.midX; footY: Math.min(dz.height - Theme.edge, Store.barY - Theme.gap)
+        Component.onCompleted: Store.sketchHost = dsketch
+        Component.onDestruction: if (Store.sketchHost === dsketch) Store.sketchHost = null }
+
     // the blank canvas: the empty studio floor and the ways to put something on it
     Column {
-        objectName: "blankCanvas"; visible: dz.empty
+        objectName: "blankCanvas"; visible: dz.empty && !dsketch.on
         x: Math.round(dz.midX - width / 2); y: Math.round((parent.height - height) / 2 - 70); spacing: 12; width: Math.min(dz.stageR - dz.stageL - 80, 620)
         Txt { kind: "cap"; color: Theme.datum; anchors.horizontalCenter: parent.horizontalCenter; text: "Blank canvas" }
         Txt { kind: "h2"; anchors.horizontalCenter: parent.horizontalCenter; horizontalAlignment: Text.AlignHCenter; width: parent.width

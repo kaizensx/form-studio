@@ -777,6 +777,26 @@ Item {
                  normal: [n.x, n.y, n.z], x: x, y: y }
     }
     function setSection(axis, t) { sectionAxis = axis || ""; sectionT = t === undefined ? 0.5 : t }
+    // ── a sketch drawn on the part (SketchOnPart.qml): the camera turns to look straight at the plane, and a
+    //    pixel is read as a point of that plane. Design coordinates throughout (what hitAt calls `shown`). ──
+    function designPx(p) { return _px(Qt.vector3d(p.x, p.y, p.z).plus(shift)) }
+    function rayPlane(x, y, o, n) {          // where the ray through pixel (x, y) meets the plane (o, n), or null
+        var a = cam.plate(view.mapTo3DScene(Qt.vector3d(x, y, 0))).minus(shift), b = cam.plate(view.mapTo3DScene(Qt.vector3d(x, y, 100))).minus(shift)
+        var d = b.minus(a), den = d.dotProduct(n)
+        if (Math.abs(den) < 1e-9) return null
+        var t = o.minus(a).dotProduct(n) / den
+        return t > 0 ? a.plus(d.times(t)) : null
+    }
+    function lookNormal(n, xd, c, r) {       // ease to look straight at the plane: n its normal, xd its x, c and r what to frame
+        var e = Math.asin(Math.max(-1, Math.min(1, n.z))) * 180 / Math.PI
+        var a = (Math.abs(n.z) > 0.999 ? Math.atan2(xd.y, xd.x) : Math.atan2(n.x, -n.y)) * 180 / Math.PI
+        while (a - az > 180) a -= 360
+        while (a - az < -180) a += 360
+        tween = true
+        az = a; el = Math.max(-89, Math.min(89, e)); target = Qt.vector3d(c.x, c.y, c.z).plus(shift)
+        dist = Math.max(r, 12) / Math.sin(13 * Math.PI / 180) * 1.3
+        _moved = true
+    }
     function setMarker(m) {
         marker = m
         if (!m) return

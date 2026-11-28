@@ -813,7 +813,13 @@ QtObject {
         }
         dlg.accepted()
     }
-    function openSheet(kind, props) { sheet = kind ? { kind: kind, props: props || ({}) } : null }
+    // A sketch is drawn on the part where there is a 3D view to draw it in (SketchOnPart.qml, which names itself
+    // here); the sheet (SketchEditor.qml) is the fallback: a software renderer, or a plane the view cannot stand on.
+    property var sketchHost: null
+    function openSheet(kind, props) {
+        if (kind === "handsketch" && sketchHost && sketchHost.begin(props || ({}))) return
+        sheet = kind ? { kind: kind, props: props || ({}) } : null
+    }
 
     // ── the game asset of the open design (form/game/app.py; GameSheet) ──
     // game: GET /game (engines, budgets, software, the last asset built); gameLod: the LOD drawn; gameLods: their meshes

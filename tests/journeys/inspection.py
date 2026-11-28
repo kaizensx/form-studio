@@ -4,7 +4,7 @@ the pixels to click are found by asking the viewport what is under them, part by
 import json
 import zipfile
 
-from _lib import make, open_project, wait_job, printing_on
+from _lib import make, open_project, wait_job, printing_on, dock
 
 DATA = "fresh"
 S = {}
@@ -113,7 +113,7 @@ def journey_measure_on_parts_in_every_view(ui):
 def journey_two_bodies_say_what_they_cannot_show(ui):
     open_project(ui, S["bodies"])
     ui.check(ui.js("Store.assembly.derived") is True, "two bodies with no declaration")
-    ui.click_text("Assembly")
+    dock(ui, "Assembly")
     ui.wait_until(lambda: tool(ui) == "assembly", 3, "the Assembly tool")
     bar = ui.item("asmBar")
     ui.expect("Exploded", within=bar)

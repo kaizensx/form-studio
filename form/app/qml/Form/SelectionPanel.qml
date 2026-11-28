@@ -26,11 +26,22 @@ Rectangle {
     readonly property var edgePicks: items.filter(function (x) { return x.kind === "edge" && x.edge && x.edge.midpoint })
                                           .map(function (x) { return { at: x.edge.midpoint } })
     property string modelling: ""            // "edges" | "face" while the picked-feature panel is open
+    // a dock tool that picks with Annotate says what the pick is for (Ws.want: fillet, chamfer, hole, shell, part): its
+    // panel opens as soon as the pick allows it, on that kind
+    readonly property string want: Ws.want
+    function _wanted() {
+        if (modelling || !want) return
+        if ((want === "fillet" || want === "chamfer") && edgePicks.length) modelling = "edges"
+        else if ((want === "hole" || want === "shell") && flat) modelling = "face"
+        else if (want === "part" && items.some(function (x) { return !!x.on })) Store.openSheet("parts", { item: items.filter(function (x) { return !!x.on })[0] })
+        if (modelling) Qt.callLater(function () { if (modelPanel.kinds.indexOf(Ws.want) >= 0) modelPanel.kind = Ws.want })
+    }
+    onWantChanged: { if (modelling && want && modelPanel.kinds.indexOf(want) < 0) modelling = ""; _wanted(); if (modelPanel.kinds.indexOf(want) >= 0) modelPanel.kind = want }
     width: 300; radius: Theme.rMd
     readonly property real footH: !!modelling && !collapsed && !keeping ? actFoot.implicitHeight + 18 : 0
     height: collapsed ? 36 : Math.min(maxHeight, 36 + col.implicitHeight + 12 + footH)
     color: Theme.alpha(Theme.plate1, 0.96); border.color: Theme.rule
-    onItemsChanged: { if (!items.length) { keeping = false; modelling = "" } }
+    onItemsChanged: { if (!items.length) { keeping = false; modelling = "" } else Qt.callLater(_wanted) }
 
     function featLabel(id) { var f = Store.featureById(id); return f ? f.label : id || "" }
     function partLabel(id) {
