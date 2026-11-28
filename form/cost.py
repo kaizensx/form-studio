@@ -83,7 +83,12 @@ def save_prefs(cfg: dict, body: dict) -> dict:
             cur["currency"] = str(body["currency"] or "").strip()[:8]
         path = prefs_path(cfg)
         path.parent.mkdir(parents=True, exist_ok=True)
-        path.write_text(json.dumps(cur, indent=1, ensure_ascii=False), encoding="utf-8")
+        try:                                       # keep what other parts of Form Studio keep here (form/costing: shops)
+            raw = json.loads(path.read_text(encoding="utf-8"))
+            raw = raw if isinstance(raw, dict) else {}
+        except (OSError, ValueError):
+            raw = {}
+        path.write_text(json.dumps({**raw, **cur}, indent=1, ensure_ascii=False), encoding="utf-8")
         return cur
 
 

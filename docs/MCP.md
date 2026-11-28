@@ -116,7 +116,7 @@ instead.
 
 ## Tools at a glance
 
-108 tools. Read-only tools never change a project.
+116 tools. Read-only tools never change a project.
 
 | Tool | Access | What it does |
 |---|---|---|
@@ -155,10 +155,16 @@ instead.
 | [`cam_plan`](#cam_plan) | changes | Plan the CNC machining of a design on a 3-axis mill or router. |
 | [`cam_post`](#cam_post) | changes | Write the G-code of the design's CAM plan for a controller, read it back and simulate it from the file. |
 | [`cam_simulate`](#cam_simulate) | changes | Simulate the design's posted CNC program again from its file and say where it stands. |
+| [`flat_pattern`](#flat_pattern) | changes | Lay a part flat for cutting and write the DXF. |
+| [`cut_file_check`](#cut_file_check) | read-only | Check a DXF before a shop cuts it, or a design's own flat pattern or profile (written to DXF and read back). |
+| [`bend_order`](#bend_order) | changes | Find an order in which a press brake can form every bend of a sheet-metal part, with a stated tool model: a V-die of 8 × t (Bystronic's rule, cited), an 88° groove, a gooseneck punch of stated dimensions sectioned to the bend's length, the part air-bent and checked at 25, 50, 75 and 100 % of each bend against punch, ram, die and bed, turned end for end when that helps. |
+| [`service_preflight`](#service_preflight) | read-only | Check a part against a cutting and bending service's published materials, thicknesses and limits before a person sends it: material offered, thickness on the service's list, bending offered at that thickness, bend angle, flat size of a bent part, smallest laser hole, and the cut-file rules. |
 | [`add_text`](#add_text) | changes | Put raised (or, with sunk, cut-in) lettering on a flat face of a Python design, as a real feature of its source: a new revision whose build adds a stage text_N with Form Studio's bundled font. |
 | [`add_feature`](#add_feature) | changes | Add a feature to a Python design as a new revision. |
 | [`get_sketch`](#get_sketch) | read-only | Get the sketch of a feature made from one (extrude, cut, revolve): its plane, points, entities (line, circle, arc) and constraints, solved by form.sketch2d: point positions, the profile, degrees of freedom left, and the named dimensions with their values (each is a parameter "<feature>_<name>"). |
 | [`edit_sketch`](#edit_sketch) | changes | Edit a feature's sketch with ops (or send the whole sketch), as one revision. |
+| [`standard_part`](#standard_part) | changes | Standard parts to buy (screws, nuts, washers, inserts, bearings, dowels, collars, shafts, LM bushings, GT2 pulleys and belts, NEMA motors, V-Slot extrusion and T-nuts, magnets, O-rings), generated from published tables: every dimension names its standard and table, or the maker's datasheet. |
+| [`bom`](#bom) | changes | The parts list a buyer orders from: purchased items grouped by standard designation (e.g. "ISO 4762 M5×12 A2-70") with quantity, material and mass (the maker's catalogue value, else the modelled volume on the B-rep times the sourced density, else none), the made parts with their mass (mass_properties), and supplier numbers. |
 | [`remove_feature`](#remove_feature) | changes | Remove a feature as a new revision: a standard feature added with add_feature ("boss_1", "hook_1"), or any feature of a FeatureDesign (its method goes; the features before it load from their checkpoints). |
 | [`compare_printers`](#compare_printers) | read-only | Slice the head revision's exported model for real on every printer set up in every installed slicer (the selected printers first, up to limit; or only the printer ids given, from list_printers) and return each one's simulated print time, filament grams and cost from the user's prices, with the fastest, least filament and cheapest. |
 | [`make_lighter`](#make_lighter) | read-only | Make it lighter: search changes that reduce mass while every check that passes now still passes. |
@@ -196,7 +202,9 @@ instead.
 | [`set_appearance`](#set_appearance) | changes | Set the colour and material of a design. |
 | [`suggest_orientation`](#suggest_orientation) | read-only | Rank the ways the part can lie on the plate: the six axis orientations plus every flat face on its convex hull. |
 | [`print_simulation`](#print_simulation) | read-only | Simulate the print layer by layer. |
-| [`estimate_cost`](#estimate_cost) | read-only | Estimate the print cost. Filament, electricity and machine-time cost of the current slice, per plate and for `copies`, plus the same volume in the other materials the slicer has presets for. |
+| [`estimate_cost`](#estimate_cost) | read-only | Estimate the cost. Without `process`: the print cost of the current slice as before (filament, electricity and machine time per plate and for `copies`, plus the same volume in the slicer's other materials; grams and hours are the slicer's simulation, prices the user's; when a cost is null, "needs" says which number to ask for; no currency is assumed). |
+| [`cost_compare`](#cost_compare) | read-only | Compare cost per part against quantity across processes. |
+| [`cost_rates`](#cost_rates) | changes | Read or set the rates the cost models use. |
 | [`plate_plan`](#plate_plan) | read-only | Plan the plates. How the design's printed parts go onto plates: each part as it lies on its own (orientation, size, material), the plates they are packed onto when the design does not fit one plate (or its parts differ in material), parts too big for the plate (with their size against the bed and what would make them fit), and per plate the slicer's time and filament when it has been sliced. |
 | [`set_part_print`](#set_part_print) | changes | Set one part's print settings. |
 | [`pack_plate`](#pack_plate) | read-only | Pack copies on a plate. Do `copies` of this design fit on one plate? |
@@ -938,6 +946,84 @@ speeds table or post changed, or the file was edited). Simulated, not proven on 
 | `project` | string | yes |
 | `cell` | number \| null |  |
 | `force` | boolean |  |
+
+### `flat_pattern`
+
+Lay a part flat for cutting and write the DXF. kind "flat" (a bent sheet-metal part): the solid's skin
+recognised (flat faces and cylindrical bends of one thickness), unfolded with a bend allowance θ·(r + K·t)
+whose K-factor comes from a sourced table (options: material al_5052_h32|al_6061_t6|steel_mild|steel_304|
+copper, method table|din6935, forming air|bottoming|coining, or k for your shop's own value, recorded as
+specified), then folded back from the flat pattern's own numbers and compared with the solid (verify.max_mm
+against 0.01 mm). The DXF has CUT (closed contours), BEND_UP and BEND_DOWN (centre lines), ETCH (label as
+outlines: options.label) and NOTES (angle, radius, K, allowance per bend). What cannot be unfolded is named
+with the face and why (a louvre, an edge round, two thicknesses). kind "profile" (any flat part for laser,
+waterjet or router): the outline of its largest flat face, with kerf (mm) offsetting the cutter's path half
+the kerf away from the material. "auto": flat when the part has bends, else profile. Returns the summary,
+the bends, the verification, dxf and png paths. out: write the DXF there too.
+
+| Argument | Type | Required |
+|---|---|---|
+| `project` | string | yes |
+| `kind` | string |  |
+| `options` | object \| null |  |
+| `kerf` | number |  |
+| `rev` | integer \| null |  |
+| `out` | string |  |
+
+### `cut_file_check`
+
+*Read-only.*
+
+Check a DXF before a shop cuts it, or a design's own flat pattern or profile (written to DXF and read
+back). process laser|waterjet|router. Layers are read by intent from their names (cut, bend, etch, ignore;
+an unknown layer is taken as cut and listed). Rules, each with the fabricator page it came from (SendCutSend,
+Protolabs) or marked unsourced: closed contours, duplicate and overlapping lines, crossing contours, tiny
+segments, text not converted to outlines, cut geometry on one layer, units, the smallest hole or slot (per
+process; laser 50 % of t), hole to edge, hole to bend line, inside corner radius (waterjet, router), part
+size (router). options: t (thickness, mm; needed for the rules in multiples of t), units (mm|in, overrides
+the file), material (router size limit). Returns rows, findings with places, and the layers it read.
+
+| Argument | Type | Required |
+|---|---|---|
+| `path` | string |  |
+| `project` | string |  |
+| `process` | string |  |
+| `options` | object \| null |  |
+
+### `bend_order`
+
+Find an order in which a press brake can form every bend of a sheet-metal part, with a stated tool model:
+a V-die of 8 × t (Bystronic's rule, cited), an 88° groove, a gooseneck punch of stated dimensions sectioned to
+the bend's length, the part air-bent and checked at 25, 50, 75 and 100 % of each bend against punch, ram,
+die and bed, turned end for end when that helps. Returns the sequence (or that none exists with these
+tools, or that the search budget ran out), each bend's collisions alone and after all others, the model with
+its dimensions and evidence, and its limits (2D cross-section, no springback, hems need other tools).
+options: punch gooseneck|straight, die_v (mm), and the flat_pattern K-factor options.
+
+| Argument | Type | Required |
+|---|---|---|
+| `project` | string | yes |
+| `options` | object \| null |  |
+| `rev` | integer \| null |  |
+
+### `service_preflight`
+
+*Read-only.*
+
+Check a part against a cutting and bending service's published materials, thicknesses and limits before
+a person sends it: material offered, thickness on the service's list, bending offered at that thickness,
+bend angle, flat size of a bent part, smallest laser hole, and the cut-file rules. Every limit names the page
+and the date it was read; a table read more than 90 days ago says so. Nothing is uploaded and nothing is
+ordered. project (its flat pattern or profile) or path (a DXF; give thickness in mm). service: sendcutsend.
+material: al_5052_h32 or steel_mild (or their names).
+
+| Argument | Type | Required |
+|---|---|---|
+| `project` | string |  |
+| `path` | string |  |
+| `service` | string |  |
+| `material` | string |  |
+| `thickness` | number \| null |  |
 
 ### `add_text`
 
@@ -1755,10 +1841,23 @@ plate: which plate (1-based) when the design was sliced on several (plate_plan).
 
 *Read-only.*
 
-Estimate the print cost. Filament, electricity and machine-time cost of the current slice, per plate and for `copies`, plus the same
-volume in the other materials the slicer has presets for. Grams and hours are the slicer's simulation; prices
-are the user's (saved ones are used when you pass none). Never invent a price: when a cost is null, "needs"
-says which number to ask the user for. No currency is assumed.
+Estimate the cost. Without `process`: the print cost of the current slice as before (filament, electricity
+and machine time per plate and for `copies`, plus the same volume in the slicer's other materials; grams and
+hours are the slicer's simulation, prices the user's; when a cost is null, "needs" says which number to ask
+for; no currency is assumed).
+With `process` (fdm, sla, sls, mjf, lpbf, cnc, injection, sheet_metal, purchased): the cost of that process
+built from its drivers, as fixed lines (tooling, setups, programming) and per-part lines, each with its
+formula and the evidence of every input, and the cost per part at each of `quantities` (default 1, 10, 100,
+1000, 10000). FDM uses the slicer's grams and hours when sliced; CNC the current CAM simulation's cycle time
+and the setups manufacturability counts; moulding follows Boothroyd-Dewhurst-Knight (clamp from projected
+area, cycle = fill + cooling h²/(π²α)·ln(4/π·(Ti−Tm)/(Tx−Tm)) + resetting, mould base and cavity points);
+sheet metal the unfold's flat area, cut length and bends; purchased parts the parts list at prices the person
+gave. Rates come from a table where each is sourced (published, cited, dated) or an assumed process parameter;
+money is never assumed. `shop` picks one of the person's shops (their rates, specified); `currency` converts
+with the ECB reference rate or the shop's own; `rates` overrides rates for this call ({"labour": 45});
+`options` per process ({"injection": {"resin": "ABS", "cavities": 2}, "cnc": {"tool_d": 6}}). A line without
+a value has amount null and `needs`: it is left out of the totals (not_counted), never guessed. full=true
+returns every input with its source.
 
 | Argument | Type | Required |
 |---|---|---|
@@ -1768,6 +1867,56 @@ says which number to ask the user for. No currency is assumed.
 | `watts` | number \| null |  |
 | `machine_rate_per_h` | number \| null |  |
 | `copies` | integer |  |
+| `process` | string |  |
+| `quantities` | array \| null |  |
+| `options` | object \| null |  |
+| `shop` | string |  |
+| `currency` | string |  |
+| `rates` | object \| null |  |
+| `full` | boolean |  |
+
+### `cost_compare`
+
+*Read-only.*
+
+Compare cost per part against quantity across processes. Default: every printing technology, CNC and
+moulding, plus sheet metal for a sheet part. Returns the cheapest process at each quantity, `switches` (where
+the cheapest changes, e.g. "Injection moulding costs less per part than FDM printing from about 628 parts")
+and every pairwise crossover, each with its arithmetic (ΔF / ΔV) and the evidence of the lines it rests on.
+Crossovers use counted lines only; a process with lines not counted says which. Purchased parts are listed
+apart. Same rates, shops and options as estimate_cost. A quote-style estimate, not a quote.
+
+| Argument | Type | Required |
+|---|---|---|
+| `project` | string | yes |
+| `processes` | array \| null |  |
+| `quantities` | array \| null |  |
+| `options` | object \| null |  |
+| `shop` | string |  |
+| `currency` | string |  |
+| `rates` | object \| null |  |
+| `full` | boolean |  |
+
+### `cost_rates`
+
+Read or set the rates the cost models use. action "list": every rate as the shop resolves it (value,
+unit, evidence sourced|specified|assumed|missing, source with URL, date and quote), the published value beside
+the shop's own, the exchange rates and the sources. action "set": change a shop (created when new): label,
+currency (ISO code), rates {id: value} (null forgets an override, so the published rate applies again),
+fx {"USD": 1.1} (units of that currency per 1 EUR), part_prices {designation: price} for purchased parts,
+activate=true makes it the shop costs use. action "delete": remove a shop. Set only numbers the person gave
+you; they are recorded as specified. Never set a rate or a price they did not give.
+
+| Argument | Type | Required |
+|---|---|---|
+| `action` | string |  |
+| `shop` | string |  |
+| `label` | string \| null |  |
+| `currency` | string \| null |  |
+| `rates` | object \| null |  |
+| `fx` | object \| null |  |
+| `part_prices` | object \| null |  |
+| `activate` | boolean |  |
 
 ### `plate_plan`
 

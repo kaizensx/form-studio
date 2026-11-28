@@ -43,6 +43,11 @@
   form simulate <project> --gif out.gif | --frames dir | --png out.png [--layers a:b] [--layer n]
                                      the sliced toolpaths building up, from the slicer's G-code (not a print)
   form cost <project> [--price-per-kg X --kwh-price Y --watts Z --copies N] [--save]
+  form cost <project> --process fdm|sla|sls|mjf|lpbf|cnc|injection|sheet_metal|purchased [--qty 1,100,1000]
+                                     a cost per process from its drivers, every rate sourced, yours or assumed
+  form cost compare <project> [--processes fdm,cnc,injection] [--qty ...]   cost per part vs quantity, crossovers
+  form cost rates [--shop S] [--rate ID=VALUE] [--currency EUR] [--fx USD=1.1] [--part-price D=X] [--use]
+                                     the sourced rates table and your shops' own rates
   form pack <project> --copies N [--spacing mm]   do N copies fit on one plate?
   form analyze <project> --map thickness|overhang|section|features [--json | --png out.png]
   form measure <project> --from x,y,z --to x,y,z   distance and its components; or --at x,y,z: what is at a point
@@ -476,8 +481,29 @@ def main(argv=None):
     sm.add_argument("--count", type=int, default=72, help="number of frames")
     sm.add_argument("--size", default="720x540")
     sm.add_argument("--max-mb", type=float, default=4.0, help="shrink the GIF until it is at most this large")
-    co = sub.add_parser("cost", help="filament, electricity and machine time for the current slice")
-    co.add_argument("project")
+    co = sub.add_parser("cost", help="filament, electricity and machine time for the current slice; with --process a cost "
+                                     "per process (fdm, sla, sls, mjf, lpbf, cnc, injection, sheet_metal, purchased) at "
+                                     "--qty quantities; cost compare <project>: curves and crossovers; cost rates: the "
+                                     "sourced rates and your shops")
+    co.add_argument("project", help="a project, or `compare` / `rates`")
+    co.add_argument("extra", nargs="?", default="", help="with compare: the project")
+    co.add_argument("--process", default="", help="fdm, sla, sls, mjf, lpbf, cnc, injection, sheet_metal, purchased")
+    co.add_argument("--processes", default="", help="compare: a comma list (default: every process that applies)")
+    co.add_argument("--qty", default="", help="quantities, e.g. 1,10,100,1000")
+    co.add_argument("--option", action="append", default=[], metavar="PROCESS.KEY=VALUE",
+                    help="e.g. injection.resin=ABS injection.cavities=2 cnc.tool_d=6")
+    co.add_argument("--shop", default="")
+    co.add_argument("--currency", default="")
+    co.add_argument("--rate", action="append", default=[], metavar="ID=VALUE",
+                    help="with a process or compare: a rate for this estimate only; with rates: a shop override "
+                         "(ID= forgets it)")
+    co.add_argument("--fx", action="append", default=[], metavar="CUR=PER_EUR", help="rates: your exchange rate")
+    co.add_argument("--part-price", action="append", default=[], metavar="DESIGNATION=PRICE",
+                    help="rates: a purchased part's price")
+    co.add_argument("--label", default=None, help="rates: the shop's name")
+    co.add_argument("--use", action="store_true", help="rates: make the shop the one costs use")
+    co.add_argument("--delete", action="store_true", help="rates: delete the shop")
+    co.add_argument("--full", action="store_true", help="every input with its source")
     co.add_argument("--price-per-kg", type=float)
     co.add_argument("--kwh-price", type=float)
     co.add_argument("--watts", type=float)
@@ -1271,6 +1297,48 @@ def main(argv=None):
                     f.write(simulate.png_at(tp, at + 1, size=size, title=title))
                 out["png"] = a.png
             _print(out)
+        elif a.cmd == "cost" and (a.project in ("compare", "rates") or a.process or a.qty):
+            from . import costing
+            from .costing import rates as cr
+
+            def kv(items, num=True):
+                out = {}
+                for x in items:
+                    k, sep, val = x.rpartition("=")
+                    if not sep or not k:
+                        raise StudioError(f"“{x}” is not KEY=VALUE.")
+                    out[k.strip()] = (None if val.strip() == "" else float(val)) if num else val.strip()
+                return out
+            opts: dict = {}
+            for k, val in kv(a.option, num=False).items():
+                proc, _, key = k.partition(".")
+                try:
+                    val = float(val)
+                except ValueError:
+                    pass
+                opts.setdefault(costing.process_id(proc), {})[key] = val
+            if a.project == "rates":
+                if a.rate or a.fx or a.part_price or a.currency or a.label is not None or a.use or a.delete:
+                    cr.update_shop(st.cfg, a.shop, a.label, a.currency or None, kv(a.rate), kv(a.fx), a.use,
+                                   delete=a.delete, part_prices=kv(a.part_price))
+                out = cr.listing(st.cfg, None if a.delete else (a.shop or None))
+                if not a.full:
+                    out = {**{k: out[k] for k in ("shop", "label", "currency", "shops", "active", "fx", "part_prices",
+                                                  "rule", "table")},
+                           "rates": [{k: r.get(k) for k in ("id", "value", "unit", "evidence", "applies", "source", "why",
+                                                            "needs", "overridden") if r.get(k) not in (None, False)}
+                                     for r in out["rates"]]}
+                _print(out)
+            elif a.project == "compare":
+                if not a.extra:
+                    raise StudioError("Which project?", "form cost compare <project>")
+                r = costing.compare(st, st.load(a.extra), [x for x in a.processes.split(",") if x] or None,
+                                    a.qty or None, opts, a.shop or None, a.currency or None, kv(a.rate))
+                _print(r if a.full else costing.brief(r))
+            else:
+                r = costing.estimate(st, st.load(a.project), a.process or "fdm", a.qty or None, opts, a.shop or None,
+                                     a.currency or None, kv(a.rate))
+                _print(r if a.full else costing.brief(r))
         elif a.cmd == "cost":
             from . import cost
             p = st.load(a.project)

@@ -157,6 +157,9 @@ message, with what the design is for.
 | `form design-only <project> on\|off` | Slice this design or not |
 | `form simulate <project> [--png PNG --layer N] [--gif GIF] [--frames DIR] [--layers a:b]` | Pictures of the toolpaths building up, from the slicer's G-code |
 | `form cost <project> [--price-per-kg] [--kwh-price] [--watts] [--machine-rate] [--copies] [--save]` | Filament, electricity and machine time |
+| `form cost <project> --process fdm\|sla\|sls\|mjf\|lpbf\|cnc\|injection\|sheet_metal\|purchased [--qty 1,100,1000] [--option injection.cavities=2] [--rate ID=VALUE] [--shop S] [--currency C] [--full]` | A cost per process from the design's drivers: fixed and per-part lines, each with its formula and evidence, and the cost per part at each quantity (docs/COST.md) |
+| `form cost compare <project> [--processes fdm,cnc,injection] [--qty ...]` | Cost per part against quantity across processes, the cheapest at each quantity, where it switches and every crossover |
+| `form cost rates [--shop S] [--label L] [--rate ID=VALUE] [--currency EUR] [--fx USD=1.1] [--part-price D=X] [--use] [--delete] [--full]` | The rates table with sources, and your shops' own rates (specified) |
 | `form pack <project> [--copies N] [--spacing MM] [--no-rotate]` | Do N copies fit on one plate |
 | `form optimize <project> --vary key:min:max ... --minimize\|--maximize METRIC [--require EXPR] [--budget N]` | Goal seek over parameters |
 | `form slicer-open <project> [--printer ID] [--explain] [--no-open]` | Choose settings for this part on this printer (orientation, layer height, walls, top and bottom layers, infill, supports, brim, seam, filament, speed profile; each with its reason, computed or heuristic), slice it for real, write a project 3MF with those settings and open it in the slicer. `--explain` leads the JSON with one line per decision; `--no-open` writes the file only |

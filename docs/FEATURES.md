@@ -546,6 +546,17 @@ as profiles with optional kerf; a SendCutSend preflight checks material, thickne
 anything. `form sheet`; MCP `flat_pattern`, `cut_file_check`, `bend_order`, `service_preflight`. See
 [SHEET_METAL.md](SHEET_METAL.md).
 
+**Cost per process, with sourced rates.** What a design costs by FDM, SLA, SLS, MJF, metal LPBF, 3-axis CNC,
+injection moulding or sheet metal, plus the parts you buy, built from its own drivers: the slicer's grams and hours,
+the CAM simulation's cycle time, the setups, projected area and walls that manufacturability measures, and the sheet
+unfold's flat area, cut length and bends. Moulding follows Boothroyd, Dewhurst and Knight: clamp force and machine,
+fill, cooling and resetting times, mould base and cavity hours. Every rate is published, cited and dated, or a
+process parameter labelled assumed; money is never assumed, and a line nobody priced is left out and says what to
+set. Cost per part against quantity, the cheapest process at each quantity and where one process overtakes another
+("Injection moulding costs less per part than FDM printing from about 628 parts"), each with its arithmetic. Your
+shop's rates and currency in Settings › Costs. `form cost`; MCP `estimate_cost`, `cost_compare`, `cost_rates`; the
+Bench's Cost. See [COST.md](COST.md).
+
 ## Analysis, measurement and annotations
 
 | | |
@@ -694,7 +705,7 @@ anything. `form sheet`; MCP `flat_pattern`, `cut_file_check`, `bend_order`, `ser
 | OpenSCAD | Builds `.scad` designs; Customizer ranges become parameters |
 | Blender | Photoreal renders; its 3D-Print Toolbox checks when the add-on is installed |
 | Your slicer | Slices, and opens the 3MF or G-code in it |
-| Any MCP client | The full engine over 108 tools ([MCP reference](MCP.md)) |
+| Any MCP client | The full engine over 116 tools ([MCP reference](MCP.md)) |
 
 When a program's version outside the supported range is why something failed, the error names the supported versions
 and what to do.

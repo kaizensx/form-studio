@@ -40,8 +40,9 @@ computed change impact, checks with evidence classes, the fit model, printer cal
 | Agents | `form/agents/`, `form/chat.py`, `form/ask.py` | Run an agent CLI, or talk to a model API, a local model or a provider added by URL with Form Studio's tools (`form/agents/mcp_client.py`); questions and measurements the agent asks wait for the person's answer |
 | Standard parts and the parts list | `form/catalog.py`, `form/placement.py`, `form/bom.py` | Part families generated from cited tables (bd_warehouse's data files read as CSV, and tables kept with their sources), importable without OCCT; placements as a block in the design's source that cuts each mating feature and lists the part as purchased; snap and fit as kernel ops; the grouped parts list, supplier references beside the project, and the catalogue provider interface (off, none shipped) |
 | Blender modelling bridge | `form/adapters/blender_model.py`, `form/adapters/blender_ops.py`, `form/meshsource.py` | An agent's declarative op list, schema-checked, run in Blender by a fixed runner; streams a preview per op; returns cage data (points, quads, creases, named regions) for a design's source |
+| Cost per process | `form/costing/` | Cost models for printing, CNC, moulding (Boothroyd-Dewhurst-Knight), sheet metal and bought parts from the design's drivers; the sourced rates table (rates.toml), shops and currency; quantity curves and crossovers; `cost()` for optimise |
 | Sheet metal | `form/sheet/` | Sheet-metal features, the B-rep unfold proved by folding back, flat pattern DXF, the cut-file checker, bend order on a press-brake model, flat profiles with kerf, service preflight |
-| MCP server | `form/mcp_server.py` | 109 tools over stdio |
+| MCP server | `form/mcp_server.py` | 116 tools over stdio |
 | CLI | `form/__main__.py` | Every capability as a JSON-printing command |
 | Archives | `form/bundle.py` | `.formstudio` files: a project, its conversations and the code it was built from, checked before anything is written |
 | Installer | `form/installer.py`, `form/setup.py` | Finds and installs slicers, agents and libraries, with consent; hands-free on first start |

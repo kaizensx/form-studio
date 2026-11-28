@@ -56,7 +56,7 @@ Parametric build123d on OpenCascade, every requirement proved on the solid, on y
 <p align="center">
   <picture>
     <source media="(prefers-color-scheme: dark)" srcset="docs/readme/numbers-1-dark.svg">
-    <img src="docs/readme/numbers-1-light.svg" width="414" alt="108 MCP tools for any agent. 18 agent apps, model APIs and local models.">
+    <img src="docs/readme/numbers-1-light.svg" width="414" alt="116 MCP tools for any agent. 18 agent apps, model APIs and local models.">
   </picture>
   <picture>
     <source media="(prefers-color-scheme: dark)" srcset="docs/readme/numbers-2-dark.svg">
@@ -86,7 +86,7 @@ Form Studio sits between your agent and the CAD kernel and keeps the record of w
 ```mermaid
 flowchart LR
   you(["You: words, a photo,<br/>a sketch, a part, a link"]) --> agent["Your agent<br/>app, model API or local model"]
-  agent -- "108 MCP tools · form CLI" --> engine["Form Studio engine<br/>parameters with provenance<br/>revisions · hashed outputs"]
+  agent -- "116 MCP tools · form CLI" --> engine["Form Studio engine<br/>parameters with provenance<br/>revisions · hashed outputs"]
   engine --> kernel["CAD kernel<br/>build123d on OpenCascade"]
   kernel --> checks["Checks<br/>solid · mesh · fits · joints"]
   checks --> release{{"You approve<br/>files frozen with SHA-256"}}
@@ -327,8 +327,9 @@ form tool get_project '{"project": "desk-stand"}'                               
 | | |
 |---|---|
 | **Every command** | [docs/CLI.md](docs/CLI.md) |
-| **108 MCP tools** | [docs/MCP.md](docs/MCP.md) |
+| **116 MCP tools** | [docs/MCP.md](docs/MCP.md) |
 | **CNC toolpaths and their stock simulation** | [docs/CAM.md](docs/CAM.md) |
+| **Cost per process, with sourced rates** | [docs/COST.md](docs/COST.md) |
 | **How the engine is built** | [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) |
 
 ## Community

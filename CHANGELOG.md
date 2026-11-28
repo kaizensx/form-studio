@@ -4,6 +4,39 @@
 
 ### New
 
+- **Cost per process, with sourced rates.** See what a design costs to make by FDM, resin (SLA), SLS, Multi Jet
+  Fusion, metal (LPBF), 3-axis CNC, injection moulding or sheet metal, plus the parts you buy. Each estimate is built
+  from the design's own drivers:
+  - FDM uses the slicer's grams and hours.
+  - CNC uses the current CAM simulation's cycle time and the setups manufacturability counts.
+  - Moulding uses the projected area and thickest wall manufacturability measures.
+  - Sheet metal uses the unfold's flat area, cut length and bends.
+  - Purchased parts use the parts list, priced only where you gave a price.
+
+  Without a slice or a CAM simulation the time is estimated and says so. Moulding follows Boothroyd, Dewhurst and
+  Knight: the clamp force picks the machine, the cycle is fill plus cooling (h²/(π²α) · ln(4/π · (Ti − Tm)/(Tx − Tm)))
+  plus resetting, and the mould is a mould base plus cavity hours. The model reproduces the book's worked numbers.
+
+  Every rate is published, cited and dated, or it is a process parameter labelled assumed:
+  - labour and electricity from Eurostat;
+  - printer, material and powder prices from vendor pages;
+  - LPBF and milling machine rates from a 2026 paper;
+  - resin prices from PlasticPortal;
+  - US dollars converted at the ECB reference rate.
+
+  Money is never assumed. A line nobody has priced, such as an MJF machine hour or a press-brake hour, is left out of
+  the total and says what to set. Each line shows its formula with the numbers filled in and the evidence of every
+  input.
+
+  You can compare cost per part against quantity across processes. The comparison shows the cheapest process at each
+  quantity and where one process overtakes another, with the arithmetic, for example "Injection moulding costs less
+  per part than FDM printing from about 628 parts". Your own rates, currency and exchange rates go in a shop, in
+  Settings › Costs or with `form cost rates`. They are recorded as yours and replace the published ones.
+  `costing.cost()` and `costing.objective()` give optimise and inverse design a cost per part.
+
+  Available as `estimate_cost` (now with `process` and `quantities`; without them it is unchanged), `cost_compare`
+  and `cost_rates` over MCP (116 tools), as `form cost <project> --process ...`, `form cost compare` and
+  `form cost rates`, and as the Bench's **Cost** in Make. See docs/COST.md.
 - **CNC, 3-axis: toolpaths with a stock simulation that measures gouge and leftover.** Plan the machining of a
   design on a mill or router: facing, adaptive clearing at constant engagement, finishing of floors and walls, the
   outline cut through with tabs, drilling with pecks, helical boring, chamfering, and 3D finishing in parallel
@@ -126,6 +159,9 @@
   304 8.00 g/cm³); woods keep the bd_materials catalogue density, labelled typical. "Oak" is red oak.
 
 ### Fixed
+
+- The packaged app now carries the speeds-and-feeds table CAM reads (form/cam/feeds.toml) and the cost rates table.
+- Saving print prices (`form cost --save`, the Cost section) keeps the other settings in cost.json.
 
 - **Parts that do not fit one plate go onto more plates, never off the plate.** A design whose parts (or copies of
   it) do not fit the printer's bed is packed onto as many plates as it takes: largest first, turned about Z where

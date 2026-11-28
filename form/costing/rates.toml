@@ -1,0 +1,834 @@
+# Rates for the cost models (form/costing). Every number here is one of two kinds:
+#
+#   sourced   a published number: a statistics office, a vendor's public price page, a peer-reviewed paper or a
+#             textbook. `source` names an entry below; `quote` is the sentence or table cell that states it, and
+#             `applies` is the period or date the number is for. All pages were read on 2026-11-28.
+#   assumed   no source states it. Only process parameters are assumed (times, build rates, a machine's life in
+#             hours, fractions); a price or an hourly rate (money) is never assumed here. A money rate with no source
+#             has no value: the cost line that needs it is left out and says what to set.
+#
+# Money is in the currency it was published in. It is converted only with a stated rate: the ECB reference rate
+# below, or a rate the person sets for their shop. Vendor prices change; each says when it was read.
+# The person overrides any rate per shop in Settings > Costs (or `form cost rates --set id=value`); an override is
+# "specified" (the person's number), never "sourced".
+
+version = 1
+read = "2026-11-28"
+
+# ---- sources ---------------------------------------------------------------------------------------------------
+
+[[source]]
+id = "eurostat-lc-2025"
+title = "EU hourly labour costs ranged from €12 to €57 in 2025"
+publisher = "Eurostat"
+url = "https://ec.europa.eu/eurostat/web/products-eurostat-news/w/ddn-20260331-2"
+published = "2026-03-31"
+read = "2026-11-28"
+
+[[source]]
+id = "eurostat-lc-se"
+title = "Hourly labour costs (Statistics Explained), table 3"
+publisher = "Eurostat"
+url = "https://ec.europa.eu/eurostat/statistics-explained/index.php?title=Hourly_labour_costs"
+published = "2026"
+read = "2026-11-28"
+
+[[source]]
+id = "bls-ecec-2026"
+title = "Employer Costs for Employee Compensation, June 2026 (USDL-26-1494), table 4"
+publisher = "U.S. Bureau of Labor Statistics"
+url = "https://www.bls.gov/news.release/ecec.htm"
+published = "2026-09-09"
+read = "2026-11-28"
+
+[[source]]
+id = "eurostat-elec-2026"
+title = "Non-household electricity prices fall further in 2026"
+publisher = "Eurostat"
+url = "https://ec.europa.eu/eurostat/web/products-eurostat-news/w/ddn-20261104-1"
+published = "2026-11-04"
+read = "2026-11-28"
+
+[[source]]
+id = "prusament-pla"
+title = "Prusament PLA Jet Black 1kg"
+publisher = "Prusa Research (vendor price page, viewed from Germany)"
+url = "https://www.prusa3d.com/product/prusament-pla-jet-black-1kg-nfc/"
+read = "2026-11-28"
+
+[[source]]
+id = "prusa-core-one"
+title = "Original Prusa CORE One+"
+publisher = "Prusa Research (vendor product page)"
+url = "https://www.prusa3d.com/product/prusa-core-one/"
+read = "2026-11-28"
+
+[[source]]
+id = "formlabs-grey"
+title = "Grey Resin V5"
+publisher = "Formlabs (vendor price page)"
+url = "https://formlabs.com/products/grey-resin/"
+read = "2026-11-28"
+
+[[source]]
+id = "formlabs-form4"
+title = "Form 4"
+publisher = "Formlabs (vendor product page)"
+url = "https://formlabs.com/3d-printers/form-4/"
+read = "2026-11-28"
+
+[[source]]
+id = "formlabs-pa12"
+title = "Nylon 12 Powder (10 kg)"
+publisher = "Formlabs (vendor price page)"
+url = "https://formlabs.com/products/nylon-12-powder-10/"
+read = "2026-11-28"
+
+[[source]]
+id = "formlabs-fuse"
+title = "Fuse 1+ 30W"
+publisher = "Formlabs (vendor product page)"
+url = "https://formlabs.com/3d-printers/fuse-1/"
+read = "2026-11-28"
+
+[[source]]
+id = "mh-hp-pa12"
+title = "HP 3D HR PA 12 Material (300 L / 130 kg)"
+publisher = "MatterHackers (reseller price page; HP publishes no price)"
+url = "https://www.matterhackers.com/store/l/hp-3d-hr-pa-12-material/sk/MMWMSX0K"
+read = "2026-11-28"
+
+[[source]]
+id = "bareth-2026"
+title = "Comparative Cost-Benefit Analysis of AM and Tool-Based Manufacturing for Battery Cell Housings"
+publisher = "Bareth et al., Applied Sciences 16(3):1537, doi:10.3390/app16031537"
+url = "https://www.mdpi.com/2076-3417/16/3/1537"
+published = "2026-02-03"
+read = "2026-11-28"
+
+[[source]]
+id = "qualloy-316l"
+title = "316L powder 15-45 µm"
+publisher = "Qualloy (vendor price page, ex works)"
+url = "https://qualloy.com/materials/iron/316L-15-45"
+read = "2026-11-28"
+
+[[source]]
+id = "nist-sp1176"
+title = "Costs and Cost Effectiveness of Additive Manufacturing (NIST SP 1176)"
+publisher = "Thomas and Gilbert, NIST"
+url = "https://nvlpubs.nist.gov/nistpubs/specialpublications/nist.sp.1176.pdf"
+published = "2014-12"
+read = "2026-11-28"
+
+[[source]]
+id = "speedy-6061"
+title = "6061-T6 aluminum sheet 0.100 in, 12 in x 12 in plate"
+publisher = "Speedy Metals (vendor price page)"
+url = "https://www.speedymetals.com/showproduct.aspx?productid=85"
+read = "2026-11-28"
+
+[[source]]
+id = "lme-al"
+title = "LME aluminium cash settlement"
+publisher = "Westmetall (LME market data)"
+url = "https://www.westmetall.com/en/markdaten.php?action=table&field=LME_Al_cash"
+published = "2026-11-27"
+read = "2026-11-28"
+
+[[source]]
+id = "eurometal-hrc"
+title = "European domestic HRC prices increase slightly despite subdued market activity"
+publisher = "EUROMETAL (Fastmarkets HRC index, ex works Northern Europe)"
+url = "https://eurometal.net/european-domestic-hrc-prices-increase-slightly-despite-subdued-market-activity/"
+published = "2026-10-03"
+read = "2026-11-28"
+
+[[source]]
+id = "plasticportal-42"
+title = "Price reports, week 42/2026 (EUR/t of granulate, delivered Central and Eastern Europe)"
+publisher = "PlasticPortal.eu"
+url = "https://www.plasticportal.eu/price-reports"
+published = "2026-11-18"
+read = "2026-11-28"
+
+[[source]]
+id = "bdk-ch8"
+title = "Product Design for Manufacture and Assembly, 2nd ed., ch. 8 Design for Injection Molding"
+publisher = "Boothroyd, Dewhurst and Knight (Marcel Dekker); read in the MIT 2.810 course reading, a scanned copy"
+url = "http://alvarestech.com/temp/PrototipagemRapida/MIT/web.mit.edu/2.810/www/readings/BDK-InjectionMolding.pdf"
+published = "2002"
+read = "2026-11-28"
+note = "US dollars of the book's date, not adjusted for inflation. The tables were read from a scan; columns are matched to rows in printed order."
+
+[[source]]
+id = "dfma-foam"
+title = "Structural Foam Molding Cost"
+publisher = "Boothroyd Dewhurst, Inc."
+url = "https://www.dfma.com/resources/foam-molding-cost.asp"
+published = "2026-03-18"
+read = "2026-11-28"
+
+[[source]]
+id = "basf-cooling"
+title = "Estimating cooling times in injection molding (technical information)"
+publisher = "BASF"
+url = "https://download.basf.com/p1/8a8082587fd4b608017fd634c46521c7/en/Estimating_Cooling_Times_in_Injection_Molding_Technical_Information_Englisch.pdf"
+read = "2026-11-28"
+
+[[source]]
+id = "laser-cost-doc"
+title = "Machine Operating Cost Calculation Laser 3mm Mild Steel"
+publisher = "an anonymous, undated document on Scribd (a weak source)"
+url = "https://www.scribd.com/document/926665836/Machine-Operating-Cost-Calculation-Laser-3mm-Mild-Steal"
+read = "2026-11-28"
+
+[[source]]
+id = "ecb-usd"
+title = "Euro foreign exchange reference rates: US dollar"
+publisher = "European Central Bank"
+url = "https://www.ecb.europa.eu/stats/policy_and_exchange_rates/euro_reference_exchange_rates/html/eurofxref-graph-usd.en.html"
+published = "2026-11-27"
+read = "2026-11-28"
+
+# ---- exchange rates (units of the currency per 1 EUR) ------------------------------------------------------------
+
+[fx.USD]
+per_eur = 1.0957
+source = "ecb-usd"
+applies = "2026-11-27"
+quote = "27 November 2026 EUR 1 = USD 1.0957"
+
+# ---- labour and energy -----------------------------------------------------------------------------------------
+
+[[rate]]
+id = "labour"
+label = "Labour, per hour (euro area, industry)"
+value = 40.3
+unit = "EUR/h"
+source = "eurostat-lc-se"
+applies = "2025"
+quote = "industry being the highest paying sector (€40.3 per hour)"
+
+[[rate]]
+id = "labour_eu_whole"
+label = "Labour, per hour (EU, whole economy; for reference)"
+value = 34.9
+unit = "EUR/h"
+source = "eurostat-lc-2025"
+applies = "2025"
+quote = "average hourly labour costs in the whole economy… were estimated to be €34.9 in the EU"
+
+[[rate]]
+id = "labour_us_mfg"
+label = "Labour, per hour worked (US manufacturing, total compensation; for reference)"
+value = 48.62
+unit = "USD/h"
+source = "bls-ecec-2026"
+applies = "June 2026"
+quote = "Manufacturing industry | 48.62 | 100.0 | 32.50 | 66.9 | 16.12"
+
+[[rate]]
+id = "electricity"
+label = "Electricity, non-household (EU average)"
+value = 0.18
+unit = "EUR/kWh"
+source = "eurostat-elec-2026"
+applies = "2026-H1"
+quote = "average price of electricity for non-household consumers in the EU was €0.18 per kilowatt-hour"
+
+# ---- FDM -------------------------------------------------------------------------------------------------------
+
+[[rate]]
+id = "fdm.material.PLA"
+label = "PLA filament, per kg (list price incl. VAT)"
+value = 32.99
+unit = "EUR/kg"
+source = "prusament-pla"
+applies = "2026-11-28"
+quote = "€26.39€32.99 €22.18without VAT (a sale price beside the list price)"
+
+[[rate]]
+id = "fdm.printer_price"
+label = "FDM printer, purchase price (assembled, incl. VAT)"
+value = 1349
+unit = "EUR"
+source = "prusa-core-one"
+applies = "2026-11-28"
+quote = "Assembled€1,349"
+
+[[rate]]
+id = "fdm.power_w"
+label = "FDM printer, power while printing PLA"
+value = 90
+unit = "W"
+source = "prusa-core-one"
+applies = "2026-11-28"
+quote = "Power consumptionPLA: 90W / ABS: 110W"
+
+[[rate]]
+id = "fdm.life_h"
+label = "FDM printer, hours of printing it is written off over"
+value = 5000
+unit = "h"
+assumed = true
+why = "No published figure; a machine's life in hours depends on the shop."
+
+[[rate]]
+id = "print.setup_min"
+label = "Printing (any process), labour per build job (prepare, start, clear the plate)"
+value = 10
+unit = "min"
+assumed = true
+why = "No published figure."
+
+[[rate]]
+id = "fdm.post_min"
+label = "FDM, labour per part (remove supports, check)"
+value = 5
+unit = "min"
+assumed = true
+why = "No published figure; depends on the part."
+
+[[rate]]
+id = "fdm.solid_fraction"
+label = "FDM, share of the solid's volume deposited (walls and infill) without a slice"
+value = 0.45
+unit = "fraction"
+assumed = true
+why = "Used only when there is no slice; the slicer's grams replace it."
+
+[[rate]]
+id = "fdm.rate_g_h"
+label = "FDM, deposition rate without a slice"
+value = 12
+unit = "g/h"
+assumed = true
+why = "Used only when there is no slice; the slicer's time replaces it."
+
+# ---- SLA -------------------------------------------------------------------------------------------------------
+
+[[rate]]
+id = "sla.resin_per_l"
+label = "SLA resin, per litre (Grey V5, 1 L)"
+value = 79
+unit = "USD/L"
+source = "formlabs-grey"
+applies = "2026-11-28"
+quote = "1 L - Form 4… $79"
+
+[[rate]]
+id = "sla.printer_price"
+label = "SLA printer, purchase price (Form 4, Basic Package)"
+value = 2625
+unit = "USD"
+source = "formlabs-form4"
+applies = "2026-11-28"
+quote = "Formlabs desktop resin printers start at $2,625 for the Form 4"
+
+[[rate]]
+id = "sla.life_h"
+label = "SLA printer, hours of printing it is written off over"
+value = 5000
+unit = "h"
+assumed = true
+why = "No published figure."
+
+[[rate]]
+id = "sla.rate_cm3_h"
+label = "SLA, part volume printed per hour"
+value = 20
+unit = "cm3/h"
+assumed = true
+why = "No published figure; build time depends on height, not only volume."
+
+[[rate]]
+id = "sla.support_factor"
+label = "SLA, resin used per part volume (supports and waste)"
+value = 1.15
+unit = "factor"
+assumed = true
+why = "No published figure."
+
+[[rate]]
+id = "sla.post_min"
+label = "SLA, labour per part (wash, cure, remove supports)"
+value = 10
+unit = "min"
+assumed = true
+why = "No published figure."
+
+# ---- SLS, MJF --------------------------------------------------------------------------------------------------
+
+[[rate]]
+id = "sls.powder_per_kg"
+label = "SLS powder, per kg (Nylon 12, 10 kg list)"
+value = 99
+unit = "USD/kg"
+source = "formlabs-pa12"
+applies = "2026-11-28"
+quote = "Starting at $99/kg"
+
+[[rate]]
+id = "sls.printer_price"
+label = "SLS printer, purchase price (Fuse 1+ 30W hardware)"
+value = 24649
+unit = "USD"
+source = "formlabs-fuse"
+applies = "2026-11-28"
+quote = "Hardware Starting At: $24,649"
+
+[[rate]]
+id = "sls.life_h"
+label = "SLS printer, hours of building it is written off over"
+value = 10000
+unit = "h"
+assumed = true
+why = "No published figure."
+
+[[rate]]
+id = "sls.rate_cm3_h"
+label = "SLS, part volume built per hour"
+value = 25
+unit = "cm3/h"
+assumed = true
+why = "No published figure; a full build packs many parts."
+
+[[rate]]
+id = "sls.powder_factor"
+label = "SLS, powder consumed per part mass (refresh and loss)"
+value = 1.5
+unit = "factor"
+assumed = true
+why = "No published figure; depends on the refresh ratio."
+
+[[rate]]
+id = "powder.post_min"
+label = "SLS and MJF, labour per part (depowder, blast)"
+value = 5
+unit = "min"
+assumed = true
+why = "No published figure."
+
+[[rate]]
+id = "mjf.powder_per_kg"
+label = "MJF powder, per kg (HP 3D HR PA 12, 130 kg: 8,315 USD / 130 kg)"
+value = 63.96
+unit = "USD/kg"
+source = "mh-hp-pa12"
+applies = "2026-11-28"
+quote = "HP 3D HR PA 12 Material (300 L / 130 kg) ; Price: $8,315.00"
+
+[[rate]]
+id = "mjf.machine_per_h"
+label = "MJF machine, per hour"
+unit = "EUR/h"
+why = "No published rate was found: set your shop's."
+
+[[rate]]
+id = "mjf.rate_cm3_h"
+label = "MJF, part volume built per hour"
+value = 40
+unit = "cm3/h"
+assumed = true
+why = "No published figure."
+
+[[rate]]
+id = "mjf.powder_factor"
+label = "MJF, powder consumed per part mass (refresh and loss)"
+value = 1.3
+unit = "factor"
+assumed = true
+why = "No published figure."
+
+# ---- metal LPBF ------------------------------------------------------------------------------------------------
+
+[[rate]]
+id = "lpbf.machine_per_h"
+label = "LPBF machine, per hour (EOS M290, without labour)"
+value = 25.04
+unit = "EUR/h"
+source = "bareth-2026"
+applies = "2026"
+quote = "For an AM battery cell can production using the EOS M290 system, the machine hourly rate is 25.04 € h−1."
+
+[[rate]]
+id = "lpbf.powder_per_kg"
+label = "Metal powder, per kg (316L 15-45 µm, from 20 kg, ex works)"
+value = 13.56
+unit = "EUR/kg"
+source = "qualloy-316l"
+applies = "2026-11-28"
+quote = "From 20 Kg… €13.56 per Kg (Ex-Work)"
+
+[[rate]]
+id = "lpbf.rate_cm3_h"
+label = "LPBF, build rate"
+value = 6.3
+unit = "cm3/h"
+source = "nist-sp1176"
+applies = "2014 (the report's base model)"
+quote = "base model has a build rate of 6.3 ccm/hr, a utilization of 4500 h/yr"
+
+[[rate]]
+id = "lpbf.post_h"
+label = "LPBF, labour per part (remove from plate, supports, stress relief handling)"
+value = 0.5
+unit = "h"
+assumed = true
+why = "No published figure."
+
+[[rate]]
+id = "lpbf.powder_factor"
+label = "LPBF, powder consumed per part mass (supports and loss)"
+value = 1.2
+unit = "factor"
+assumed = true
+why = "No published figure."
+
+# ---- CNC -------------------------------------------------------------------------------------------------------
+
+[[rate]]
+id = "cnc.machine_per_h"
+label = "Milling machine, per hour (without labour)"
+value = 8.28
+unit = "EUR/h"
+source = "bareth-2026"
+applies = "2026"
+quote = "Machine Hourly Rate | EUR 25.04 | EUR 37.79 | EUR 75.68 | EUR 8.28 (the milling column)"
+
+[[rate]]
+id = "cnc.stock.AL-6061"
+label = "6061-T6 aluminium stock, per kg (24.00 USD for a 1.44 lb plate)"
+value = 36.74
+unit = "USD/kg"
+source = "speedy-6061"
+applies = "2026-11-28"
+quote = "12\"x12\" Plate… 1.4400 lbs Price: $24.00"
+
+[[rate]]
+id = "cnc.setup_min"
+label = "CNC, labour per setup (fixture, zero, first-part check)"
+value = 30
+unit = "min"
+assumed = true
+why = "No published figure."
+
+[[rate]]
+id = "cnc.program_min"
+label = "CNC, programming time per design (once)"
+value = 60
+unit = "min"
+assumed = true
+why = "No published figure. Form Studio's own CAM plan shortens it."
+
+[[rate]]
+id = "cnc.margin_mm"
+label = "CNC, stock margin on each side of the part"
+value = 3
+unit = "mm"
+assumed = true
+why = "No published figure."
+
+[[rate]]
+id = "cnc.mrr_cm3_min"
+label = "CNC, material removed per minute without a CAM simulation"
+value = 8
+unit = "cm3/min"
+assumed = true
+why = "Used only when there is no current CAM simulation; its cycle time replaces it."
+
+[[rate]]
+id = "cnc.tool_wear"
+label = "CNC, tool wear as a share of machine and operator time"
+value = 0.1
+unit = "fraction"
+assumed = true
+why = "No published figure."
+
+# ---- injection moulding (Boothroyd, Dewhurst and Knight, ch. 8) --------------------------------------------------
+
+[[rate]]
+id = "im.mould_maker_per_h"
+label = "Mould making, per hour (the textbook point system's rate)"
+value = 40
+unit = "USD/h"
+source = "dfma-foam"
+applies = "the textbook's point system"
+quote = "the textbook's point system at $40 per mold-making hour"
+
+[[rate]]
+id = "im.k1"
+label = "Moulding machine rate, intercept (Eq. 8.15: C_r = k1 + m1·F)"
+value = 25
+unit = "USD/h"
+source = "bdk-ch8"
+applies = "2002 (book date)"
+quote = "For the latest machine rate data, obtained by the authors, and given in Table 8.4, k1 = 25 $/h and m1 = 0.0091 $/h/kN"
+
+[[rate]]
+id = "im.m1"
+label = "Moulding machine rate, per kN of clamp (Eq. 8.15)"
+value = 0.0091
+unit = "USD/h/kN"
+source = "bdk-ch8"
+applies = "2002 (book date)"
+quote = "k1 = 25 $/h and m1 = 0.0091 $/h/kN"
+
+[[rate]]
+id = "im.cavity_exponent"
+label = "Cavity and core hours vs projected area, exponent (Eq. 8.13: M_po = 5 + 0.085·A_p^e)"
+value = 0.5
+unit = "exponent"
+source = "bdk-ch8"
+applies = "2002 (book date)"
+quote = "M_po = 5 + 0.085 × A_p^{1/2} h (8.13), as printed in this scanned copy; check it against your edition"
+
+[[rate]]
+id = "im.multicavity_m"
+label = "Multi-cavity index (Eq. 8.16: C_n = C_1·n^m)"
+value = 0.7
+unit = "exponent"
+source = "bdk-ch8"
+applies = "2002 (book date)"
+quote = "a reasonable value of m for most molding applications is 0.7"
+
+[[rate]]
+id = "im.runner_fraction"
+label = "Shot area added by the runner"
+value = 0.15
+unit = "fraction"
+assumed = true
+why = "BDK's worked example reads about 15 percent from its Table 8.2 for a 177 cm² disk; other sizes differ."
+
+[[rate]]
+id = "im.appearance"
+label = "Cavity finish surcharge (Table 8.6: opaque, standard SPE #3)"
+value = 0.15
+unit = "fraction"
+source = "bdk-ch8"
+applies = "2002 (book date)"
+quote = "Table 8.6: opaque, standard (SPE #3) 15 percent"
+
+[[rate]]
+id = "im.operator_share"
+label = "Operator time per machine hour (one person tends several presses)"
+value = 0.0
+unit = "fraction"
+assumed = true
+why = "BDK's machine rates are operating costs; set a share to add your operator's time."
+
+[[rate]]
+id = "im.resin.ABS"
+label = "ABS granulate, per kg (1,990 EUR/t)"
+value = 1.99
+unit = "EUR/kg"
+source = "plasticportal-42"
+applies = "week 42/2026"
+quote = "ABS 1,990 EUR/t; Euros per tonne of granulate (EUR/t), delivered in Central and Eastern Europe."
+
+[[rate]]
+id = "im.resin.PP"
+label = "PP homopolymer, injection grade, per kg (1,321 EUR/t)"
+value = 1.321
+unit = "EUR/kg"
+source = "plasticportal-42"
+applies = "week 42/2026"
+quote = "PPH IM 1,321 EUR/t"
+
+[[rate]]
+id = "im.resin.HDPE"
+label = "HDPE, injection grade, per kg (1,312 EUR/t)"
+value = 1.312
+unit = "EUR/kg"
+source = "plasticportal-42"
+applies = "week 42/2026"
+quote = "HDPE IM 1,312 EUR/t"
+
+# ---- sheet metal -----------------------------------------------------------------------------------------------
+
+[[rate]]
+id = "sheet.material.steel"
+label = "Steel, per kg (hot-rolled coil index; cut sheet from a stockist costs more)"
+value = 0.74833
+unit = "EUR/kg"
+source = "eurometal-hrc"
+applies = "2026-10-01"
+quote = "Fastmarkets' daily steel hot-rolled coil index domestic, exw Northern Europe was calculated at €748.33 per tonne"
+
+[[rate]]
+id = "sheet.material.aluminium"
+label = "Aluminium, per kg (LME cash, the raw metal; sheet costs more)"
+value = 2.983
+unit = "USD/kg"
+source = "lme-al"
+applies = "2026-11-27"
+quote = "27. November 2026 | 2,983.00 | 2,835.50"
+
+[[rate]]
+id = "sheet.laser_per_h"
+label = "Laser cutter, per hour (net, 3 mm mild steel)"
+value = 27.55
+unit = "EUR/h"
+source = "laser-cost-doc"
+applies = "undated"
+quote = "Machine hourly rate (net) 27,55 Euro/h"
+
+[[rate]]
+id = "sheet.cut_mm_min"
+label = "Laser cutting speed (2-3 mm sheet)"
+value = 3000
+unit = "mm/min"
+assumed = true
+why = "No published figure; depends on the laser, the material and its thickness."
+
+[[rate]]
+id = "sheet.pierce_s"
+label = "Laser, time per pierce (one per contour)"
+value = 1.0
+unit = "s"
+assumed = true
+why = "No published figure."
+
+[[rate]]
+id = "sheet.brake_per_h"
+label = "Press brake, per hour (without labour)"
+unit = "EUR/h"
+why = "No published rate was found: set your shop's."
+
+[[rate]]
+id = "sheet.bend_s"
+label = "Press brake, time per bend (position, bend, turn)"
+value = 20
+unit = "s"
+assumed = true
+why = "No published figure."
+
+[[rate]]
+id = "sheet.setup_min"
+label = "Sheet metal, setup per batch (nest, load, brake tooling)"
+value = 30
+unit = "min"
+assumed = true
+why = "No published figure."
+
+[[rate]]
+id = "sheet.utilisation"
+label = "Sheet used per flat blank area (nesting)"
+value = 1.25
+unit = "factor"
+assumed = true
+why = "No published figure; nesting on a full sheet."
+
+# ---- injection-moulding machines (BDK Table 8.4) and resins (Table 8.5) ------------------------------------------
+
+[[im_machine]]
+clamp_kN = 300
+shot_cm3 = 34
+rate_usd_h = 28
+dry_cycle_s = 1.7
+stroke_cm = 20
+power_kW = 5.5
+
+[[im_machine]]
+clamp_kN = 500
+shot_cm3 = 85
+rate_usd_h = 30
+dry_cycle_s = 1.9
+stroke_cm = 23
+power_kW = 7.5
+
+[[im_machine]]
+clamp_kN = 800
+shot_cm3 = 201
+rate_usd_h = 33
+dry_cycle_s = 3.3
+stroke_cm = 32
+power_kW = 18.5
+
+[[im_machine]]
+clamp_kN = 1100
+shot_cm3 = 286
+rate_usd_h = 36
+dry_cycle_s = 3.9
+stroke_cm = 37
+power_kW = 22.0
+
+[[im_machine]]
+clamp_kN = 1600
+shot_cm3 = 286
+rate_usd_h = 41
+dry_cycle_s = 3.6
+stroke_cm = 42
+power_kW = 22.0
+
+[[im_machine]]
+clamp_kN = 5000
+shot_cm3 = 2290
+rate_usd_h = 74
+dry_cycle_s = 6.1
+stroke_cm = 70
+power_kW = 63.0
+
+[[im_machine]]
+clamp_kN = 8500
+shot_cm3 = 3636
+rate_usd_h = 108
+dry_cycle_s = 8.6
+stroke_cm = 85
+power_kW = 90.0
+
+# Table 8.5: thermal diffusivity (mm²/s), injection, mould and ejection temperatures (°C), injection pressure (bar).
+[im_resin.HDPE]
+label = "High-density polyethylene"
+sg = 0.95
+alpha = 0.11
+Ti = 232
+Tm = 27
+Tx = 52
+p_bar = 965
+
+[im_resin.ABS]
+label = "ABS"
+sg = 1.05
+alpha = 0.13
+Ti = 260
+Tm = 54
+Tx = 82
+p_bar = 1000
+
+[im_resin.POM]
+label = "Acetal (homopolymer)"
+sg = 1.42
+alpha = 0.09
+Ti = 216
+Tm = 93
+Tx = 129
+p_bar = 1172
+
+[im_resin.PA66]
+label = "Polyamide (6/6 nylon)"
+sg = 1.13
+alpha = 0.10
+Ti = 291
+Tm = 91
+Tx = 129
+p_bar = 1103
+
+[im_resin.PC]
+label = "Polycarbonate"
+sg = 1.20
+alpha = 0.13
+Ti = 302
+Tm = 91
+Tx = 127
+p_bar = 1172
+
+[im_resin.PP_TALC40]
+label = "Polypropylene (40% talc)"
+sg = 1.22
+alpha = 0.08
+Ti = 218
+Tm = 38
+Tx = 88
+p_bar = 965

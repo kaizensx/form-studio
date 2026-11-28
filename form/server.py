@@ -201,6 +201,9 @@ def make_handler(st: Studio):
                 owned = printers_mod.route_get(st, path, q)
                 if owned is not None:
                     return self._json(owned)
+            if path == "/api/cost/rates":                  # the cost models' rates and your shops (form/costing/rates.py)
+                from .costing import rates as cost_rates
+                return self._json(cost_rates.listing(st.cfg, q.get("shop") or None))
             if path == "/api/materials":                   # colours and materials (form/materials.py)
                 from . import materials
                 return self._json(materials.catalogue())
@@ -600,6 +603,13 @@ def make_handler(st: Studio):
                                                             str(body.get("reference") or "card"), str(body.get("coin") or ""),
                                                             str(body.get("broke") or ""), str(body.get("purpose") or "print")),
                                    "steps": replace.STEPS})
+            if path == "/api/cost/rates":                  # Settings › Costs: a shop's rates, currency, exchange rates
+                from .costing import rates as cost_rates
+                body = body if isinstance(body, dict) else {}
+                cost_rates.update_shop(st.cfg, str(body.get("shop") or ""), body.get("label"), body.get("currency"),
+                                       body.get("rates"), body.get("fx"), bool(body.get("activate")),
+                                       delete=bool(body.get("delete")), part_prices=body.get("part_prices"))
+                return self._json(cost_rates.listing(st.cfg, None if body.get("delete") else (body.get("shop") or None)))
             if path == "/api/import":
                 p = st.import_archive(body if isinstance(body, bytes) else b"")
                 return self._json({"id": p["id"]})

@@ -31,7 +31,10 @@ datas += [(str(p), "form/game") for p in sorted((ROOT / "form" / "game").glob("*
 datas += [(str(ROOT / "form" / "dfm" / "rules"), "form/dfm/rules"),
           (str(ROOT / "form" / "sheet" / "rules"), "form/sheet/rules"),
           (str(ROOT / "form" / "sheet" / "tables"), "form/sheet/tables"),
-          (str(ROOT / "form" / "sheet" / "services"), "form/sheet/services")]
+          (str(ROOT / "form" / "sheet" / "services"), "form/sheet/services"),
+          # the speeds-and-feeds table (form/cam) and the cost models' sourced rates (form/costing)
+          (str(ROOT / "form" / "cam" / "feeds.toml"), "form/cam"),
+          (str(ROOT / "form" / "costing" / "rates.toml"), "form/costing")]
 binaries, hidden = [], []
 for pkg in ("OCP", "build123d", "ocp_gordon", "ocpsvg", "lib3mf", "mcp", "pypdfium2", "pypdfium2_raw",
             "bd_warehouse", "bd_materials", "py_gearworks", "manifold3d"):   # parts libraries, materials, mesh booleans
