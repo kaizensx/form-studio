@@ -33,13 +33,21 @@ def run(ui):
     ui.check(not any("guide" in t.lower() or "converge" in t.lower() for t in said), f"nothing without an evidence class, nothing that failed: {said}")
     # the reply's numbers: 14.2 and 19.4 stand in the study's result (1), 276.0 in the material's (2); 250 stands in none
     html = ui.item("replyText").property("text")
-    ui.check("14.2 MPa<sup>" in html and "276.0 MPa<sup>" in html and "19.4<sup>" in html, f"the numbers that stand in a result carry its index: {html[-600:]}")
+    ui.check("14.2&nbsp;MPa&nbsp;</span><sup>" in html and "276.0&nbsp;MPa&nbsp;</span><sup>" in html and "19.4&nbsp;</span><sup>" in html, f"the numbers that stand in a result carry its index: {html[-600:]}")
     ui.check("250<sup>" not in html and "250 N<sup>" not in html, "a number no result holds is not marked")
     ui.eq(html.count("<sup>"), 3, "three marks, one per number")
     saved = ui.api("/conversations/" + ui.store.get("convId"))
     srcs = [e["source"] for e in saved["items"] if e.get("t") == "result" and e.get("source")]
     ui.eq([s["how"] for s in srcs], ["simulated", "specified", "opened"], "the sources are saved with the tool results they came from")
     ui.shot("sources")
+
+    # a reply that states a figure with no tool result behind it says so: model knowledge, without a number
+    send(ui, "the yield is 276.5 MPa")
+    reply(ui, "You said: the yield is 276.5 MPa")
+    card = ui.find_all("sourcesCard")[-1]
+    rows = ui.find_all("sourceRow", within=card)
+    ui.eq([r.property("how") for r in rows], ["model knowledge"], "the one row says where the figure comes from")
+    ui.check(ui.sees("0 · from the tool log", within=card), f"nothing from the tool log is counted: {ui.texts(within=card)}")
 
     # ---- the plan card: the steps of plan_design; the approval the agent asks for is answered on it ----
     send(ui, "plan card for the mount")

@@ -109,11 +109,13 @@ Rectangle {
         // what this turn's reply rests on: the tool calls whose results say how they are known (form/cite.py), in the
         // order they were made; `said` are the turn's reply blocks, which get the indices once the turn has ended
         var srcs = [], said = [], plan = null
-        function closeTurn(ended) {
-            if (ended && srcs.length) {
+        function closeTurn(ended, more) {
+            more = more || []          // given but not opened, opened earlier, model knowledge: rows without a number
+            if (ended && (srcs.length || more.length)) {
                 var cites = srcs.map(function (x) { return [x.n, x.figures] })
                 said.forEach(function (b) { b.cites = cites })
-                out.push({ t: "sources", k: "src" + out.length, list: srcs.map(function (x) { return { n: x.n, title: x.title, how: x.how } }) })
+                out.push({ t: "sources", k: "src" + out.length, count: srcs.length,
+                           list: srcs.map(function (x) { return { n: x.n, title: x.title, how: x.how } }).concat(more.map(function (x) { return { n: 0, title: x.title, how: x.how } })) })
             }
             srcs = []; said = []; plan = null
         }
@@ -159,10 +161,11 @@ Rectangle {
                 // changes made by hand since the last reply: one note that names them, and the newest revision's card
                 var hn = out.length && out[out.length - 1].t === "hand" ? out[out.length - 1] : null
                 if (!hn) { hn = { t: "hand", k: "h" + i, edits: [], change: null }; out.push(hn) }
-                hn.edits.push({ text: ev.text, to: ev.change.to }); hn.change = ev.change
+                hn.edits.push({ text: ev.text, to: ev.change.to })
+                if (ev.change.from !== ev.change.to) hn.change = ev.change       // a card only for a revision that was made
             }
             else if (ev.t === "act") out.push({ t: "act", k: "a" + i, by: ev.by, text: ev.text, change: ev.change || null })
-            else if (ev.t === "end") closeTurn(true), out.push({ t: "end", k: "e" + i, cost: ev.cost_usd, steps: ev.steps, seconds: ev.seconds, stopped: !!ev.stopped,
+            else if (ev.t === "end") closeTurn(true, ev.cite_rows), out.push({ t: "end", k: "e" + i, cost: ev.cost_usd, steps: ev.steps, seconds: ev.seconds, stopped: !!ev.stopped,
                                                 model: Store.modelName(ev) || model, agent: ev.agent || agent, change: ev.change || null,
                                                 usage: ev.usage || null })
             else if (ev.t === "error") out.push({ t: "error", k: "x" + i, text: ev.text, hint: ev.hint || "", agent: ev.agent || agent })
@@ -422,7 +425,7 @@ Rectangle {
                                     HoverHandler { id: ah }
                                     Tip { show: ah.hovered; text: ach.modelData.name } } } }
                         Txt { id: ut; width: Math.min(implicitWidth, body.width - 54); text: it.m.text; lineHeight: 1.4 } } } } }
-            Component { id: cSources; TalkSources { width: body.width; list: it.m.list } }
+            Component { id: cSources; TalkSources { width: body.width; list: it.m.list; count: it.m.count } }
             Component { id: cPlan; TalkPlan { width: body.width; steps: it.m.steps; q: it.m.q; onEdit: ta.forceActiveFocus() } }
             // by hand since the last reply: what you changed, named, and the newest revision's card
             Component { id: cHand; Column { objectName: "handNote"; spacing: 8

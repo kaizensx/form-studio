@@ -76,8 +76,9 @@ def route_post(st, p: dict, action: str, body):
             pv = modelling.preview(st, p, ops, view=True)
             pv.pop("rid", None)
             return pv
+        h0 = p["head"]              # before the commit: the card says r04 → r05 (the commit may hand `p` back changed)
         r = modelling.commit(st, p, ops, eh, "you", note=f"Changed the sketch of {fid}")
-        _said(st, body, pid, p["head"], r)
+        _said(st, body, pid, h0, r)
         q = r.pop("project")
         return {"head": r["head"], "said": r["said"], "preview": r["preview"], "job": _ran(st, pid, q)}
     if action == "tree":
@@ -91,8 +92,9 @@ def route_post(st, p: dict, action: str, body):
             pv = modelling.preview(st, p, ops)
             pv.pop("rid", None)
             return pv
+        h0 = p["head"]              # before the commit: the card says r04 → r05 (the commit may hand `p` back changed)
         r = modelling.commit(st, p, ops, eh, "you")
-        _said(st, body, pid, p["head"], r)
+        _said(st, body, pid, h0, r)
         q = r.pop("project")
         return {"head": r["head"], "said": r["said"], "changed": r["changed"], "reused": len(r["reused"]),
                 "preview": r["preview"], "job": _ran(st, pid, q)}
@@ -104,8 +106,9 @@ def route_post(st, p: dict, action: str, body):
         pv.pop("rid", None)
         return {"feature": pl["feature"], "label": pl["label"], "summary": pl["summary"], "params": pl["params"],
                 "picked": pl["picked"], "preview": pv}
+    h0 = p["head"]              # before the commit: the card says r04 → r05 (the commit may hand `p` back changed)
     r = modelling.commit(st, p, pl["ops"], eh, "you", planned=pl)
-    _said(st, body, pid, p["head"], r)
+    _said(st, body, pid, h0, r)
     q = r.pop("project")
     return {"head": r["head"], "feature": pl["feature"], "said": r["said"], "preview": r["preview"],
             "job": _ran(st, pid, q)}

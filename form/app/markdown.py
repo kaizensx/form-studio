@@ -62,8 +62,9 @@ _UNIT = re.compile(r"[ \u00a0]?(?:(?:MPa|GPa|kPa|Pa|mm³|cm³|mm²|cm²|mm|cm|kg
 
 
 def _cited(plain: str, st: dict) -> str:
-    """Plain words → HTML, each number that stands in a source's tool result marked once with that source's index
-    (style["cites"]: [[index, [figures]]], built from the tool log by form/cite.py). Nothing else is marked."""
+    """Plain words → HTML. A number that stands in a source's tool result is set as a figure (mono, on a quiet
+    ground, with its unit) and carries that source's index the first time it appears (style["cites"]:
+    [[index, [figures]]], built from the tool log by form/cite.py). No other number is touched."""
     cites = st.get("cites")
     if not cites:
         return _esc(plain)
@@ -71,14 +72,17 @@ def _cited(plain: str, st: dict) -> str:
     out, pos = [], 0
     for m in _NUMBER.finditer(plain):
         fig = m.group(0)
-        n = next((c[0] for c in cites if fig in c[1]), None) if fig not in done else None
+        n = next((c[0] for c in cites if fig in c[1]), None)
         if n is None:
             continue
-        done.add(fig)
         unit = _UNIT.match(plain, m.end())
         end = unit.end() if unit else m.end()
-        out.append(_esc(plain[pos:end]))
-        out.append('<sup><span style="color:%s; font-family:\'%s\'; font-size:11px;">&nbsp;%d</span></sup>' % (st.get("link", "#3ee6ff"), st["mono"], int(n)))
+        out.append(_esc(plain[pos:m.start()]))
+        out.append('<span style="font-family:\'%s\'; font-size:%dpx; background-color:%s;">&nbsp;%s&nbsp;</span>'
+                   % (st["mono"], st["code_px"], st.get("fig_bg") or st["code_bg"], _esc(plain[m.start():end]).replace(" ", "&nbsp;")))
+        if fig not in done:
+            done.add(fig)
+            out.append('<sup><span style="color:%s; font-family:\'%s\'; font-size:11px;">&nbsp;%d</span></sup>' % (st.get("link", "#3ee6ff"), st["mono"], int(n)))
         pos = end
     out.append(_esc(plain[pos:]))
     return "".join(out)
