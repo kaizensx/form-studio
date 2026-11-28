@@ -38,6 +38,10 @@ PAGES = [
     ("mcp", "docs/MCP.md", "MCP tools", "Every tool an agent can call, generated from the server itself."),
     ("architecture", "docs/ARCHITECTURE.md", "Architecture", "The engine, the kernel worker, adapters, staleness and the fit model."),
     ("strength", "docs/STRENGTH.md", "Strength studies", "Stress, displacement and a safety factor with a stated error, and the verification table."),
+    ("print-physics", "docs/PRINT_PHYSICS.md", "Print physics", "Orientation as a Pareto front, strength as printed with a layered material, and a warp-risk indicator, each number with how it is known."),
+    ("optimisation", "docs/OPTIMISATION.md", "Inverse design and topology", "A Pareto front of variants each built and solved, and topology optimisation written back as features, with the verification."),
+    ("cost", "docs/COST.md", "Cost per process", "Printing, CNC, moulding, sheet metal and bought parts from sourced, dated rates, with quantity curves and crossovers."),
+    ("tolerances", "docs/TOLERANCES.md", "Tolerance stack-up", "The loop found through the mates; worst case, RSS, Monte Carlo and temperature, each tolerance with its source."),
     ("verification", "docs/VERIFICATION.md", "Compatibility", "Platforms, agents, programs and slicers, and what CI exercises."),
     ("changelog", "CHANGELOG.md", "Changelog", "What changed in each version."),
     ("releasing", "docs/RELEASING.md", "Releases", "Stable, preview and patch releases, and how versions are numbered."),
@@ -179,7 +183,7 @@ def main() -> int:
     if OUT.exists():
         shutil.rmtree(OUT)
     OUT.mkdir(parents=True)
-    urls = ["", "docs/", "measure/"]
+    urls = ["", "docs/", "measure/", "benchmarks.html"]
     for slug, source, title, desc in PAGES:
         text = (ROOT / source).read_text(encoding="utf-8")
         body = rewrite(render(text), source)

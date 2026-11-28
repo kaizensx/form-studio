@@ -56,7 +56,7 @@ Parametric build123d on OpenCascade, every requirement proved on the solid, on y
 <p align="center">
   <picture>
     <source media="(prefers-color-scheme: dark)" srcset="docs/readme/numbers-1-dark.svg">
-    <img src="docs/readme/numbers-1-light.svg" width="414" alt="126 MCP tools for any agent. 18 agent apps, model APIs and local models.">
+    <img src="docs/readme/numbers-1-light.svg" width="414" alt="142 MCP tools for any agent. 18 agent apps, model APIs and local models.">
   </picture>
   <picture>
     <source media="(prefers-color-scheme: dark)" srcset="docs/readme/numbers-2-dark.svg">
@@ -86,7 +86,7 @@ Form Studio sits between your agent and the CAD kernel and keeps the record of w
 ```mermaid
 flowchart LR
   you(["You: words, a photo,<br/>a sketch, a part, a link"]) --> agent["Your agent<br/>app, model API or local model"]
-  agent -- "126 MCP tools · form CLI" --> engine["Form Studio engine<br/>parameters with provenance<br/>revisions · hashed outputs"]
+  agent -- "142 MCP tools · form CLI" --> engine["Form Studio engine<br/>parameters with provenance<br/>revisions · hashed outputs"]
   engine --> kernel["CAD kernel<br/>build123d on OpenCascade"]
   kernel --> checks["Checks<br/>solid · mesh · fits · joints"]
   checks --> release{{"You approve<br/>files frozen with SHA-256"}}
@@ -170,7 +170,7 @@ Whatever you bring is assessed first. **Triage** reads a mesh, a STEP, a photo, 
   </picture>
 </p>
 
-Every revision is checked on the B-rep and its mesh: a valid solid, a closed export mesh, the STL against the CAD volume, the STEP re-imported in FreeCAD, fits, joints and loads. Each result says whether it was computed, a stated rule of thumb or a model. Compare any two revisions on the solids themselves, branch, keep variants, and go back at any point. Only a person approves a release, and its files are frozen with their hashes and a report of every check.
+Every revision is checked on the B-rep and its mesh: a valid solid, a closed export mesh, the STL against the CAD volume, the STEP re-imported in FreeCAD, fits, joints and loads. Each result says whether it was computed, a stated rule of thumb or a model. Compare any two revisions on the solids themselves, branch, keep variants, and go back at any point. Only a person approves a release, and its files are frozen with their hashes and a report of every check. For the part you made, a test plan says what to measure, with which instrument and limits, and the results report holds only what was measured: it is never a pass while anything is unchecked. Designs and conversations are backed up on a schedule to a folder you choose, or a Git repository you own.
 
 ## Make it
 
@@ -185,7 +185,7 @@ One design, the output you need:
 
 | Output | What you get |
 |---|---|
-| **CAD exchange** | STEP from the B-rep, re-imported in FreeCAD as a check; FreeCAD macros to carry on in FreeCAD, and OpenSCAD designs welcome as a source. |
+| **CAD exchange** | STEP from the B-rep, re-imported in FreeCAD as a check; a native FreeCAD PartDesign feature tree (sketches, pads, holes, fillets, patterns, a spreadsheet of the parameters) with editable history, recomputed in FreeCAD and checked against the solid; and OpenSCAD designs welcome as a source. |
 | **CNC, laser and moulding** | Mark a design *Just a 3D model* for its process: its thinnest feature is compared with what that process can make, and no print checks get in the way. Give it an engineering material (aluminium 6061 or 7075, steel, stainless, brass, titanium, woods, POM and more) for its look and its computed mass. |
 | **Renders and the web** | OBJ and GLB, four-view sheets, turntable videos and photoreal renders in Blender. |
 | **Game engines (Beta)** | Four levels of detail inside triangle budgets, UVs, baked textures and collision, for Unreal, Unity, Godot and glTF. Every asset passes its technical checks; visual quality is still improving. |
@@ -329,11 +329,15 @@ form tool get_project '{"project": "desk-stand"}'                               
 | | |
 |---|---|
 | **Every command** | [docs/CLI.md](docs/CLI.md) |
-| **126 MCP tools** | [docs/MCP.md](docs/MCP.md) |
+| **142 MCP tools** | [docs/MCP.md](docs/MCP.md) |
 | **How the engine is built** | [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) |
 | **Strength studies and their verification** | [docs/STRENGTH.md](docs/STRENGTH.md) |
 | **Engineering calculators and their verification** | [docs/CALCULATORS.md](docs/CALCULATORS.md) |
 | **CNC toolpaths and their stock simulation** | [docs/CAM.md](docs/CAM.md) |
+| **Print physics: orientation, strength as printed, warp risk** | [docs/PRINT_PHYSICS.md](docs/PRINT_PHYSICS.md) |
+| **Inverse design and topology optimisation, with their verification** | [docs/OPTIMISATION.md](docs/OPTIMISATION.md) |
+| **Cost per process, with sourced rates** | [docs/COST.md](docs/COST.md) |
+| **Tolerance stack-up and its verification** | [docs/TOLERANCES.md](docs/TOLERANCES.md) |
 
 ## Community
 

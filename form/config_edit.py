@@ -25,7 +25,8 @@ from . import fsutil
 # key → what the Settings sheet and the CLI need to know. type: str | path | bool | float | int | choice | vec3 |
 # agent | model | effort (strings the sheet picks from what is installed)
 SCHEMA: dict[str, dict] = {
-    # tab: general | printer (Printing, shown only to someone who prints) | chat (Agents) | apps | updates | advanced.
+    # tab: general | printer (Printing, shown only to someone who prints) | chat (Agents) | apps | backups | updates |
+    # advanced.
     # type "printer" rows are not text: the Settings sheet shows the default printer and opens the printer picker.
     # what Form Studio is set up for (form/capabilities.py): Settings shows it as the "Set up for" cards, not a field
     "general.capabilities": {"type": "capabilities", "tab": "general", "hidden": True, "label": "Set up for",
@@ -135,6 +136,23 @@ SCHEMA: dict[str, dict] = {
     "cad.kicad_cli": {"type": "path", "tab": "apps", "label": "KiCad (kicad-cli)",
                       "unlocks": "KiCad's own DRC and ERC on a design's board, and its Gerbers, drill files and board STEP",
                       "help": "Optional. Empty: found in the usual places."},
+    # Backups (form/backup.py): Settings › Backups shows these with the last run, the backups and Recently deleted.
+    "backup.enabled": {"type": "bool", "tab": "backups", "label": "Back up automatically",
+                       "help": "While Form Studio is open, on the schedule below."},
+    "backup.every": {"type": "choice", "tab": "backups", "label": "How often", "choices": ["hourly", "daily", "weekly"]},
+    "backup.folder": {"type": "path", "tab": "backups", "label": "Backup folder",
+                      "help": "A folder outside the project folder: another drive, or a folder your cloud drive syncs."},
+    "backup.keep": {"type": "int", "tab": "backups", "label": "Backups to keep", "min": 1, "max": 365,
+                    "help": "The oldest backup files in the folder are removed beyond this number. Nothing else there is touched."},
+    "backup.conversations": {"type": "bool", "tab": "backups", "label": "Include conversations",
+                             "help": "Every conversation with its attachments, beside the designs."},
+    "backup.built": {"type": "bool", "tab": "backups", "label": "Include built outputs",
+                     "help": "STEP, STL, renders and slices. They are made again from the revisions; leaving them out "
+                             "makes backups much smaller."},
+    "backup.git_remote": {"type": "str", "tab": "backups", "label": "Also push to a Git repository",
+                          "help": "Its SSH or HTTPS address, without a password in it. Built outputs are never "
+                                  "pushed. Empty: the folder only."},
+    "backup.git_branch": {"type": "str", "tab": "backups", "label": "Branch", "help": "The branch backups are committed to."},
     "apps.cad": {"type": "str", "tab": "apps", "label": "“Open in CAD” uses", "help": "An application name or a command. Empty: the system default."},
     "apps.viewer": {"type": "str", "tab": "apps", "label": "“Open in viewer” uses", "help": "Empty: the system default."},
 }
@@ -230,6 +248,12 @@ def coerce(key: str, value):
             raise ValueError("cannot be empty")
         if key == "chat.model" and not s:
             s = "default"
+        if key == "backup.git_remote" and s:
+            from .backup import BackupError, check_remote
+            try:
+                check_remote(s)
+            except BackupError as e:
+                raise ValueError(e.message[0].lower() + e.message[1:].rstrip(".")) from None
         return s
     except (TypeError, ValueError) as e:
         raise ConfigError(f"{key}: {e}.", spec.get("help", ""))

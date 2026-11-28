@@ -222,6 +222,27 @@ class Designs(unittest.TestCase):
         self.assertGreater(V(s1)["centre_distance"], V(r)["centre_distance"] + 9.9)     # (40 - 30) x 2 / 2 = 10 mm of pitch radius
         self.assertFalse(self.st.rev(p).get("partial"))
 
+    def test_a_gear_the_rack_does_not_undercut_has_no_sliver_faces(self):
+        """py_gearworks' undercut curve on a 31-tooth wheel left two 5e-5 mm² faces per tooth; their edges stayed open in
+        the STL until the export ladder's last repair rung, which a busy machine did not reach in its time budget."""
+        from form.calc import shapes
+        self.assertTrue(shapes.undercuts(12, 0.0, 20.0))                    # below 17 teeth at 20°: undercut
+        self.assertFalse(shapes.undercuts(17.2, 0.0, 20.0))
+        self.assertFalse(shapes.undercuts(12, 0.4, 20.0))                   # a positive shift avoids it
+        self.assertFalse(shapes.undercuts(15, 0.0, 20.0, 20.0))              # helical: the virtual tooth count
+        c, inp = CASES["helical"]
+        v = calc.run(c, inp)["geometry"]["values"]
+        for obj in shapes.gear_objects(v)[:2]:
+            part = obj.build_part()
+            self.assertTrue(part.is_valid)
+            self.assertEqual(shapes._slivers(part), 0)
+        r, pid = self.make("helical")
+        self.st.run_sync(pid, ["geometry", "exports"])
+        metas = sorted(self.st.dir(pid).glob("artifacts/exports/*/meta.json"))
+        c = json.loads(metas[-1].read_text())["closure"]
+        self.assertTrue(c["closed"])
+        self.assertEqual(c["rung"], "mesh")                                  # closed by the mesher, no repair needed
+
     def test_bench_entry_for_a_design_no_calculator_wrote(self):
         p = self.st.create("Plain box", "storage_box", purpose="model")
         e = studies.show(self.st, p, "calc")

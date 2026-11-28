@@ -213,17 +213,29 @@ def params(data: dict, fid: str) -> list[dict]:
     return out
 
 
+def _py(x) -> str:
+    """A value as Python source, laid out as json.dumps lays it out (True, False and None, not JSON's words: a
+    construction line wrote "construction": true, which the design then could not run)."""
+    import json
+    if isinstance(x, bool) or x is None:
+        return repr(x)
+    if isinstance(x, dict):
+        return "{" + ", ".join(f"{json.dumps(str(k))}: {_py(v)}" for k, v in x.items()) + "}"
+    if isinstance(x, (list, tuple)):
+        return "[" + ", ".join(_py(v) for v in x) + "]"
+    return json.dumps(x)
+
+
 def literal(data: dict, indent: str = "        ") -> str:
     """The sketch as a Python literal laid out one list per line (what the feature method holds)."""
-    import json
     d = check(data)
     rows = []
     for k in ("plane", "points", "fixed", "entities", "constraints"):
         if k in ("entities", "constraints") and d[k]:
-            inner = (",\n" + indent + "    ").join(json.dumps(x) for x in d[k])
+            inner = (",\n" + indent + "    ").join(_py(x) for x in d[k])
             rows.append(f'"{k}": [\n{indent}    {inner}]')
         else:
-            rows.append(f'"{k}": {json.dumps(d[k])}')
+            rows.append(f'"{k}": {_py(d[k])}')
     return "{" + (",\n" + indent).join(rows) + "}"
 
 

@@ -44,6 +44,65 @@
 
 ### New
 
+- **FreeCAD PartDesign export with editable history.** **`freecad_partdesign`** (MCP, 142 tools) and **`form export
+  fcstd <project> [--out f.FCStd] [--edit key=value]`** (terminal, JSON) write the design as a native PartDesign
+  Body, not a baked solid: sketches with Sketcher constraints and named dimensions, Pad, Pocket, Revolution, Groove,
+  Fillet and Chamfer on the edges they were picked on, Hole (ISO size and fit when FreeCAD's table gives the same
+  diameter), LinearPattern, PolarPattern, and Thickness for a shell. A "Params" spreadsheet holds every parameter and
+  the feature sizes are expressions on its cells, so editing a cell in FreeCAD edits the model as the parameter does
+  in Form Studio. Free code is decomposed where it is a prism (a sketch of its cap and a Pad or Pocket, sizes not bound
+  to the parameters); what is not recognised goes in as a frozen solid, and the report lists those features as
+  non-parametric. FreeCAD's command line builds the file, recomputes it and checks every feature against Form
+  Studio's solid (symmetric difference per feature; volume, bounding box and face count of the result): only a
+  feature that recomputes to that solid is reported editable. Measured with FreeCAD 1.1.4: a bracket made by hand
+  (sketch, pad, ISO 273 holes, counterbore, fillet, chamfer, linear pattern), a revolve, and a tray (shell, cut, polar
+  pattern) come back fully native at 0 % volume deviation, equal face counts, and a width edited in the spreadsheet
+  gives exactly Form Studio's solid at that width; all 14 built-in building blocks come back at volume parity
+  (≤ 0.00005 %, bounding box exact), their free-code stages decomposed (24 stages) or frozen (32, parts included), with
+  equal face counts on 12 of 14 (gridfinity_bin 134 in Form Studio against 135 in FreeCAD, battery_holder 74 against
+  86; the same solid, cut into more faces).
+  Designs of several solids are one frozen Body per part. FreeCAD's topological naming is still fragile: a fillet,
+  chamfer or thickness names edges and faces of the solid before it, found by geometry on FreeCAD's own solid, and an
+  edit that changes the topology before it can move or break it. The export writes element names in full (the
+  document's string hasher off): with the hasher, FreeCAD 1.1.4 lost a scripted fillet's edges on the first edit.
+  Parametric CAD Bench runs now write their answer with this export (answer.FCStd and the answer.py that made it);
+  the agent's own FreeCAD script stays the fallback.
+- **Fixed: a sketch with a construction line could not build.** The sketch literal in the design's source was JSON
+  (`"construction": true`); it is Python now (`True`), so a revolve about a construction line builds.
+- **Benchmarks in public.** `form bench list|run|publish` runs Form Studio's own verification suites and publishes
+  every row, failures included, with the commit, machine and date: strength studies against textbook and NAFEMS cases,
+  calculators against published worked examples, ISO 286 limits against the ISO 286-2 tables, every manufacturability
+  rule probed on both sides of its threshold, and mesh to editable CAD against tolerance. The results are
+  `docs/BENCHMARKS.md` and the site's benchmarks page; the Benchmark suites workflow regenerates them on dev, so they
+  are never edited by hand. **`form bench cadbench`** runs Parametric CAD Bench v3 (100 public FreeCAD tasks,
+  Apache-2.0) through Form Studio: each task's prompt to the agent with Form Studio's MCP server attached, in a data
+  folder of its own, scored by the task's own verifier image with no network; `form bench oracle` checks that a
+  task's reference scores 1.0 through the same path. The stand-in agent proves the plumbing; the score is pending a
+  run with a real model.
+- **Print physics.** Three tools for a printed part, each number saying how it is known.
+  **Orientation** is a search over several objectives at once, and the answer is the Pareto front: the orientations
+  no other one beats on everything. Support volume and support contact are computed from the facets that overhang
+  past the critical angle, each support column going down to the plate or to the part below; print time comes from a
+  layer-time model that reads the slicer preset and is calibrated on a real slice when you ask, with the factor
+  stated; strength comes from a strength study's stress field against the filament datasheet's Z and X-Y strengths;
+  stair height is computed on the faces you mark cosmetic; and the tilt at which the part tips is computed from its
+  centre of mass over the plate contact. The search covers the six axis orientations, every flat face the part can
+  lie on and a geodesic grid of 162 directions, then refines to 1 degree. You pick; the pick is written to the print
+  setup. `verify=N` slices the best candidates with the real slicer and reports the model's error in time and in
+  support filament.
+  **Strength as printed** is a strength study with a layered (transversely isotropic) material turned to the print
+  orientation: the safety factor across the layers with its own stated error, the in-plane one, and how both change
+  with the orientation. In-plane and Z moduli and strengths are the datasheet's; what no source gives is given by you
+  or assumed by a stated rule, and every assumed value is listed. Verified against Lekhnitskii's off-axis modulus and
+  a Timoshenko beam in three build directions (errors 0.00 to 0.28 %).
+  **Warp risk** is a first-order indicator from the layer-shrinkage model of Wang, Xi and Jin (2007), with the
+  material's thermal expansion and glass transition from named documents, the first layer, the longest span, the
+  height and the corners. It is an indicator, never a predicted lift. [docs/PRINT_PHYSICS.md](docs/PRINT_PHYSICS.md).
+- **`print_orient`, `print_strength`, `print_warp`** (MCP) and **`form print orient|strength|warp <project>`**
+  (terminal, JSON). Bench entries in Check (Orientation front, Strength as printed, Warp risk) and in Make (Print
+  orientation: the setup's orientation, and whether it is on the front). 142 MCP tools.
+- A strength study's field data now carries the stress tensor at the surface nodes (`stress`, six components), and
+  for a layered study the tension across the layers and the shear between them.
 - **Engineering drawings from the solid.** A shop drawing of any design on A4 to A0 or ANSI A to E: the views
   projected by OCCT's hidden-line removal on the B-rep (first or third angle, ISO 5456-2), a full section through the
   bores with hatching and its cutting plane, a detail view of a chamfer too small to read at the sheet's scale, an
@@ -69,9 +128,44 @@
   part: expected and measured, the tolerance it was judged by, PASS, FAIL or UNSURE, a crop of the sheet and a render
   with the measured feature lit. A PDF's text layer and DXF entities are read exactly; an image is read by the agent,
   row by row with its place on the sheet, and anything it is unsure of stays UNSURE. Form Studio runs no OCR.
-- MCP tools `drawing`, `export_pmi` and `check_drawing` (126 tools); `form drawing <project> [--sheet A3]
+- MCP tools `drawing`, `export_pmi` and `check_drawing` (142 tools); `form drawing <project> [--sheet A3]
   [--projection first] [--out part.pdf]`, `form drawing pmi|check|spec|set ...`; a Drawing section with "Drawing,
   A3", "STEP with PMI" in the app's documents.
+- **Inverse design.** Say what the part must do ("hold 60 N with a safety factor of 3, as light and as stiff as
+  possible") and get the variants of the design that do it, on a Pareto front. The search runs over the design's own
+  parameters with Gaussian-process surrogates, NSGA-II and hypervolume infill, and the surrogate only chooses what
+  to try next: every reported variant was built by the kernel and solved by the strength study, the safety factor
+  that counts is the lower one, and candidates that failed or missed a requirement are shown with the reason. The
+  result states the solves, builds and seconds used and that the front is approximate. Any point is saved as a named
+  variant. Objectives and requirements: mass from the material's sourced density, safety factor, stress,
+  displacement, first natural frequency, support area, wall thickness, and cost when a price is given (no rate is
+  made up). Checked on ZDT1 and ZDT2 against their known fronts.
+- **Topology optimisation written back as features.** SIMP (density filter, optimality criteria) on the strength
+  study's own mesh finds where material carries the load; the faces that carry supports and loads stay solid. The
+  density field is then rebuilt as CAD: threshold, outlines, ribs measured, and one named feature per lightening
+  pocket, with three parameters (rib inset, corner radius, web thickness). The rebuilt design is built by the kernel
+  and its strength study is solved again with the refining solver; the result sets its safety factor, displacement
+  and mass beside the density field's own numbers and beside the solid part. On the test arm: 42 % lighter, safety
+  factor 2.53 (at least 2.46) against 2.37 read from the density field. A target can be a volume fraction, a mass or
+  a safety factor. When the features cannot be fitted or built, the run says why and offers the smoothed dense
+  region as a mesh body, labelled as one. SIMP reproduces the published compliance of the MBB beam (Andreassen et
+  al. 2011) to 0.002 %. [docs/OPTIMISATION.md](docs/OPTIMISATION.md).
+- **`inverse_design`, `get_inverse_design`, `topology_optimise`, `get_topology`, `apply_topology`** (MCP) and
+  **`form optimize pareto`**, **`form optimize topology`** (terminal, JSON), with the Bench entries **Inverse
+  design** and **Topology optimisation** in the Design chapter. Both run in the background with progress and cancel.
+  The stored records hold the Pareto chart data and the density field of every iteration. 142 MCP tools.
+- **Tolerance stack-up from the assembly.** Pick the two faces of a gap and Form Studio finds the loop itself: a
+  graph search over the declared mates keeps those that hold the parts along the gap (a seat, or a radial fit whose
+  clearance is a float), and each part on the path adds the distance between the faces the loop enters and leaves by.
+  The links close to the measured gap exactly. Sensitivities come from finite differences on the rebuilt CAD, so
+  angles count. Each tolerance names its source: the request, the drawing's ISO 286 fits, a measured parameter's
+  sigma, the drawing's ISO 2768 class, the printer's calibration, or FDM ±0.2 mm and ISO 2768-m, both labelled
+  assumed. Declared position and profile tolerances are converted by a stated rule. Results: worst case, RSS, a seeded
+  Monte Carlo, Cpk and the share out of spec, a contribution chart, the gap over a temperature span from sourced
+  expansion (never assumed), and what to tighten first, with cost hints labelled assumed. The result carries the
+  loop's faces and segments for the viewport. [docs/TOLERANCES.md](docs/TOLERANCES.md).
+- **`tolerance_stack`, `get_tolerance_stack`** (MCP), **`form stack run|add|list|show|rerun|rm`** (terminal, JSON), and
+  the Bench entry **Tolerance stack-up** in Check, stale after any change. 142 MCP tools.
 - **Engineering calculators that write the part.** Seven calculators size a part from what it has to do, by a named
   standard's equations, and write it as a design with parameters: snap joints (cantilever and annular, Bayer's
   snap-fit guide), living hinges (elastic by strain, or moulded PP and PE from cited practice), springs
@@ -84,9 +178,46 @@
   against 72 published quantities; a snap hook is also checked by finite elements where the strength engine is
   installed. [docs/CALCULATORS.md](docs/CALCULATORS.md).
 - **`calculate`** (MCP) and **`form calc <calculator> key=value ... [--build]`** (terminal, JSON), and the Bench
-  entry **Engineering calculation**. 126 MCP tools.
+  entry **Engineering calculation**. 142 MCP tools.
 - ISO 286 tables and published fastener dimensions moved to modules with no CAD kernel behind them
   (`form/iso286.py`, `form/hardware_tables.py`); `form.craft.fits` and `form.parts` read the same copy.
+- **Cost per process, with sourced rates.** See what a design costs to make by FDM, resin (SLA), SLS, Multi Jet
+  Fusion, metal (LPBF), 3-axis CNC, injection moulding or sheet metal, plus the parts you buy. Each estimate is built
+  from the design's own drivers:
+  - FDM uses the slicer's grams and hours.
+  - CNC uses the current CAM simulation's cycle time and the setups manufacturability counts.
+  - Moulding uses the projected area and thickest wall manufacturability measures.
+  - Sheet metal uses the unfold's flat area, cut length and bends.
+  - Purchased parts use the parts list, priced only where you gave a price.
+
+  Without a slice or a CAM simulation the time is estimated and says so. Moulding follows Boothroyd, Dewhurst and
+  Knight: the clamp force picks the machine, the cycle is fill plus cooling (h²/(π²α) · ln(4/π · (Ti − Tm)/(Tx − Tm)))
+  plus resetting, and the mould is a mould base plus cavity hours. The model reproduces the book's worked numbers.
+
+  Every rate is published, cited and dated, or it is a process parameter labelled assumed:
+  - labour and electricity from Eurostat;
+  - printer, material and powder prices from vendor pages;
+  - LPBF and milling machine rates from a 2026 paper;
+  - resin prices from PlasticPortal;
+  - US dollars converted at the ECB reference rate.
+
+  Money is never assumed. A line nobody has priced, such as an MJF machine hour or a press-brake hour, is left out of
+  the total and says what to set. Each line shows its formula with the numbers filled in and the evidence of every
+  input.
+
+  You can compare cost per part against quantity across processes. The comparison shows the cheapest process at each
+  quantity and where one process overtakes another, with the arithmetic, for example "Injection moulding costs less
+  per part than FDM printing from about 628 parts". Your own rates, currency and exchange rates go in a shop, in
+  Settings › Costs or with `form cost rates`. They are recorded as yours and replace the published ones.
+  `costing.cost()` and `costing.objective()` give optimise and inverse design a cost per part.
+  Inverse design takes it as the metric `cost.per_part` (`costing={"process", "quantity", "shop"}`; terminal
+  `form optimize pareto --cost-process --cost-quantity`): each candidate is costed from its own volume and bounding
+  box by FDM, SLA, SLS, MJF, LPBF or CNC, and the axis is labelled with the rates' evidence classes and the largest
+  assumed share. Moulding and sheet metal need a check of each candidate's solid and are refused, not guessed.
+
+  Available as `estimate_cost` (now with `process` and `quantities`; without them it is unchanged), `cost_compare`
+  and `cost_rates` over MCP (142 tools), as `form cost <project> --process ...`, `form cost compare` and
+  `form cost rates`, and as the Bench's **Cost per process** in Make. See docs/COST.md.
 - **Sheet metal and cut parts.** Design a bent part from a base flange, edge flanges, hems, jogs, relief cuts
   (rectangular or obround) and louvres, each with its thickness and inside radius (`form.sheet.build.Sheet`). The
   part is unfolded on the exact solid: one skin walked across tangent edges, constant thickness checked face by
@@ -103,7 +234,7 @@
   compensation. A SendCutSend preflight checks material, thickness, bending and limits from their pages, read
   2026-11-28; nothing is uploaded or ordered. Manufacturability's `sheet_metal` process now judges bent parts
   (flange length, holes to edge and bend, hems). `flat_pattern`, `cut_file_check`, `bend_order`,
-  `service_preflight` over MCP (126 tools), `form sheet`, three Bench entries, and docs/SHEET_METAL.md.
+  `service_preflight` over MCP (142 tools), `form sheet`, three Bench entries, and docs/SHEET_METAL.md.
 - **CNC, 3-axis: toolpaths with a stock simulation that measures gouge and leftover.** Plan the machining of a
   design on a mill or router: facing, adaptive clearing at constant engagement, finishing of floors and walls, the
   outline cut through with tabs, drilling with pecks, helical boring, chamfering, and 3D finishing in parallel
@@ -117,7 +248,7 @@
   current simulation (a new revision, another tool or an edited file makes it stale), nothing assumed and your
   approval, and it is labelled "simulated, not proven on a machine" until you record what it did on one. The
   viewport's data (toolpaths by operation, the stock with gouge and leftover marked) is written beside it.
-  `cam_plan`, `cam_post`, `cam_simulate` over MCP (126 tools), `form cam`, the Bench's "CNC, 3-axis", and
+  `cam_plan`, `cam_post`, `cam_simulate` over MCP (142 tools), `form cam`, the Bench's "CNC, 3-axis", and
   docs/CAM.md.
 - **Manufacturability, with fixes that are proved.** Check a design for CNC milling (3, 4 or 5 axes), injection
   moulding, or FDM, resin (SLA), SLS, MJF and metal (LPBF) printing. Every rule is measured on the exact solid and
@@ -128,8 +259,36 @@
   depth, tool reach and holes. Problems are drawn on the part. Draft, internal corners, escape holes and walls or
   holes set by a parameter can be fixed: the fix is written into the design as a parameter and a feature, checked
   before it is saved, saved as a revision and checked again; it is called fixed only when that check passes. A rule
-  that could not be checked is never a pass. `manufacturability` and `apply_fix` over MCP (126 tools), `form dfm`,
+  that could not be checked is never a pass. `manufacturability` and `apply_fix` over MCP (142 tools), `form dfm`,
   and docs/MANUFACTURABILITY.md.
+- **Test plan.** For any design, Form Studio writes what to measure on the made part, from what the design claims:
+  one test for each requirement of the brief, each fit (an ISO 286 hole, an ISO 286 pair in the code, the fit window of
+  a part that meets another, each mate of an assembly with its designed clearance), each critical dimension (the
+  brief's and the interfaces', every measured or specified value, the overall size) and each load of a strength study.
+  Each test names the instrument (its resolution a tenth of the tolerance band or finer), the limits and where they
+  come from (a dimension the design gives no tolerance gets ISO 2768-1 m, and says so), how many readings, and when it
+  passes. A critical dimension takes its limits from the drawing where it states them (an ISO 286 fit on the size, or
+  the drawing's ISO 2768-1 class), and a load test quotes the strength study's converged displacement with its
+  stated error. A PDF set in Geist with a checklist to fill in, Markdown, and the checklist as CSV. Document › **Test plan**
+  on the Bench; `test_plan` (MCP); `form testplan`.
+- **Results are measured, and only measured.** `record_physical_result(kind="test", test=..., values=[...])` or
+  `form testplan record` (one test, or the filled checklist) keeps each reading with provenance "measured", the
+  instrument, who measured it and the limits it was judged against.
+- **Results report.** One document for the head revision: the design with its revision, geometry key, design-code
+  and STEP SHA-256; every check and study with its evidence class and what it states about its error; the physical
+  results against the test plan; the open items; and a verdict. PASS only when every required test is measured within
+  its limits and nothing is open; anything unchecked is NOT A PASS; a measured failure is FAIL. The physical section
+  holds only numbers a person measured. PDF and Markdown. Document › **Results report** on the Bench;
+  `results_report` (MCP); `form report`.
+- **Backups.** Every design and conversation (the reference leaves conversations out), on a schedule (hourly, daily
+  or weekly) while Form Studio is open, to a folder you choose, and optionally pushed to a Git repository you created,
+  with your own Git sign-in. Each backup is one .zip with the SHA-256 of every file; it is read back and checked after
+  it is written, the oldest beyond the number you keep are removed (nothing else in the folder is touched), and a
+  restore writes back the same bytes. Form Studio never creates a repository and refuses an address with a password
+  in it. Settings › **Backups**; `backup` (MCP); `form backup`.
+- **Recently deleted, 30 days.** A deleted design is listed with the days it has left and the backup that holds it,
+  and comes back with its conversations attached. After 30 days it leaves only when a verified backup holds it.
+  142 MCP tools.
 - **The Bench.** Every study, route and document of a design in one listing: at the top of the Review pane the
   studies (checks, assembly and joints, requirements, analysis maps, fit, critique, slice, print simulation,
   orientation, every printer, cost, make it lighter), at the top of the Make pane the routes (exports, 3MF with
@@ -140,7 +299,7 @@
   made. States come from keys of the head revision's inputs, never set by hand. The command palette finds every
   entry.
 - **`list_studies`, `run_study`, `get_study`** (MCP) and **`form study list|run|show <project> [id]`** (terminal): the
-  same Bench, headless. 126 MCP tools. Mass & inertia, Materials & sources (each value with its document) and Features
+  same Bench, headless. 142 MCP tools. Mass & inertia, Materials & sources (each value with its document) and Features
   (built, suppressed by hand, left out with the reason) are Bench studies too; a change made by hand is a new
   revision, so every study of the revision before it shows stale. The command palette also finds the hand tools:
   Sketch on a plane, Fillet or chamfer, Hole, shell or sketch on a face, Feature tree.
@@ -200,7 +359,7 @@
   else the B-rep volume times the sourced density, else none), and the made parts with their mass; CSV and a PDF
   page. Supplier numbers come only from you or a page at a link you give. An optional catalogue service is in
   Settings, off by default, and says before each search what is sent and to whom; no provider ships yet.
-- **`standard_part`, `bom`** (MCP) and **`form parts …`, `form bom …`** (terminal). 126 MCP tools.
+- **`standard_part`, `bom`** (MCP) and **`form parts …`, `form bom …`** (terminal). 142 MCP tools.
 - **Motion studies.** A mechanism played over time from its own declaration: drivers (a ramp, keyframes, a speed or a
   sine), couplings (gears, rack and pinion, lead screw, belt, cam) and closed loops solved per frame by Newton's method
   on the loop-closure equations, so a four-bar moves as one. Frames a linkage cannot reach (beyond its Grashof limit)
@@ -237,7 +396,7 @@
 - **Board fab files.** Gerbers, drill files, pick-and-place, BOM and the board STEP through your KiCad.
 - **`board_import`, `board_check`, `board_fab`** (MCP), **`form board read|import|check|fab|kicad`** (terminal) and the
   Bench's **Board and enclosure**, **Board checks** and **Board fab files**. docs/BOARDS.md, with the plan for
-  schematic capture and routing (K2). 126 MCP tools.
+  schematic capture and routing (K2). 142 MCP tools.
 
 ### Changed
 
@@ -307,6 +466,8 @@
 
 - A commit no longer fails on a design whose `derived()` reports a value as text (the bearing flange's housing
   limits).
+- The packaged app now carries the speeds-and-feeds table CAM reads (form/cam/feeds.toml) and the cost rates table.
+- Saving print prices (`form cost --save`, the Cost section) keeps the other settings in cost.json.
 
 - **Parts that do not fit one plate go onto more plates, never off the plate.** A design whose parts (or copies of
   it) do not fit the printer's bed is packed onto as many plates as it takes: largest first, turned about Z where

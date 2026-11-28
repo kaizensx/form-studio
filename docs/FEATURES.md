@@ -291,6 +291,14 @@ each one named as it arrives.
 - **Goal seek** (`optimize`): search parameter ranges for the lightest, smallest or strongest design that still passes
   its constraints, for example the lightest bracket with a safety factor of at least 3. Every candidate is a real
   kernel build.
+- **Inverse design** (`inverse_design`): state the requirement and get the variants that meet it, on a Pareto front
+  over two or three objectives (lighter against stiffer). A surrogate chooses what to try; every reported variant is
+  built by the kernel and solved by the strength study, and the budget used is stated.
+  [OPTIMISATION.md](OPTIMISATION.md).
+- **Topology optimisation as features** (`topology_optimise`): the material that carries no load is found on the
+  strength study's mesh and written back as lightening pockets, named features with parameters for rib inset,
+  corner radius and web thickness. The rebuilt part is studied again; when features cannot be fitted, a labelled
+  mesh body is offered instead.
 - **Alternatives:** a grid of real variants over one or two parameters, ranked by objectives you weight (less
   material, harder to tip, fit yield, smaller footprint).
 
@@ -503,7 +511,7 @@ One registry (`form/studies.py`) lists everything that can be asked of a design,
 small features, fit, design critique, slice, print simulation, print orientation, every printer, cost, make it
 lighter), **Routes** (Make: STEP/STL/OBJ/GLB, 3MF with colours, slicer project, FreeCAD macro, project archive, game
 asset, release) and **Documents** (Make: parts list, assembly notes, motion checks, print report, measurement plan,
-assembly instructions, four-view sheet, photoreal render, turntable, share card). Each entry has a state (never run,
+assembly instructions, four-view sheet, photoreal render, turntable, share card, test plan, results report). Each entry has a state (never run,
 current, stale, failed, running, unavailable with why, n/a with why), the revision it describes, its headline number
 with its evidence class, and a run action wired to the same code as its own tool. Results are stored beside the
 revision under a key of its inputs, so a new revision makes them stale by construction and nothing is ever marked
@@ -584,6 +592,9 @@ answer stops changing. The full method and the verification table are in [STRENG
   which ones those were.
 - **Stored with the revision.** A result goes stale after any change to the geometry, the loads, the material or
   the engine, and says which revision it describes.
+- **As printed:** `print_strength` solves the same loads with a layered material in the print orientation, and
+  `print_orient` and `print_warp` cover what the orientation does to supports, time, surface and warping
+  ([PRINT_PHYSICS.md](PRINT_PHYSICS.md)).
 - **Headless:** `strength_study`, `get_strength_study`; `form strength
   static|modal|buckling|thermal|thermal_stress|run|list|show|verify`. Runs in the background with progress and
   cancel; a typical bracket converges in about 10 s.
@@ -646,6 +657,39 @@ volume and where it is, rapids through stock, shank and holder collisions, and t
 limits. A program goes into a release only with a current simulation, nothing assumed and your approval, labelled
 "simulated, not proven on a machine" until you record what it did on one. MCP `cam_plan`, `cam_post`,
 `cam_simulate`; `form cam`. See [CAM.md](CAM.md).
+**Cost per process, with sourced rates.** What a design costs by FDM, SLA, SLS, MJF, metal LPBF, 3-axis CNC,
+injection moulding or sheet metal, plus the parts you buy, built from its own drivers: the slicer's grams and hours,
+the CAM simulation's cycle time, the setups, projected area and walls that manufacturability measures, and the sheet
+unfold's flat area, cut length and bends. Moulding follows Boothroyd, Dewhurst and Knight: clamp force and machine,
+fill, cooling and resetting times, mould base and cavity hours. Every rate is published, cited and dated, or a
+process parameter labelled assumed; money is never assumed, and a line nobody priced is left out and says what to
+set. Cost per part against quantity, the cheapest process at each quantity and where one process overtakes another
+("Injection moulding costs less per part than FDM printing from about 628 parts"), each with its arithmetic. Your
+shop's rates and currency in Settings › Costs. `form cost`; MCP `estimate_cost`, `cost_compare`, `cost_rates`; the
+Bench's Cost per process. See [COST.md](COST.md).
+
+## Tolerance stack-up
+
+Pick the two faces of a gap in an assembly, and Form Studio finds the loop of dimensions that sets it, then says how
+far the gap moves. The method, the rules and the verification table are in [TOLERANCES.md](TOLERANCES.md).
+
+- **The loop is found, not drawn by hand.** A graph search over the declared mates keeps the ones that hold the parts
+  along the gap: a seat (a lid on a rim, a screw head on a lid) or a radial fit (a pin in a hole, which floats by its
+  clearance). Each part on the path contributes the distance between the faces the loop enters and leaves by. The
+  links add up to the measured gap exactly, and the result says so.
+- **Sensitivities from the real rebuild.** Every length and angle parameter is nudged both ways and the design is
+  rebuilt, so an angle counts as it should. A parameter that only places a part is named as not moving the gap.
+- **Tolerances with their source:** the request; the drawing's ISO 286 fits; a measured parameter's sigma; the
+  drawing's ISO 2768 class; for a printed part, the printer's calibration or FDM ±0.2 mm, assumed; else ISO 2768-m,
+  assumed. Declared position and profile tolerances on the loop's faces are converted by a stated rule.
+- **Worst case, RSS and Monte Carlo** (seeded, with a histogram), Cpk and the share out of spec, and a contribution
+  chart with each tolerance's share of the variance.
+- **Over a temperature span**, from each part's sourced expansion. A part with no sourced coefficient leaves the
+  result out and says what to give.
+- **What to tighten first**, with the effect computed and a cost hint labelled assumed.
+- **Kept with the design.** The Bench entry *Tolerance stack-up* is stale after any change and says which revision
+  it describes. The result carries the loop's faces and segments for the viewport to light on the parts.
+- **Headless:** `tolerance_stack`, `get_tolerance_stack`; `form stack run|add|list|show|rerun|rm`.
 
 ## Analysis, measurement and annotations
 
@@ -825,11 +869,11 @@ limits. A program goes into a release only with a current simulation, nothing as
 
 | Program | What Form Studio does with it |
 |---|---|
-| FreeCAD | Opens the STEP, runs a re-import check, and writes a macro with every parameter in a spreadsheet |
+| FreeCAD | Opens the STEP, runs a re-import check, writes a macro with every parameter in a spreadsheet, and exports a native PartDesign feature tree (`freecad_partdesign`, `form export fcstd`): sketches with constraints and named dimensions, Pad, Pocket, Revolution, Groove, Fillet, Chamfer, Hole with ISO sizes, Linear and Polar patterns, Thickness, sizes bound to a Params spreadsheet; built and recomputed in FreeCAD, each feature checked against Form Studio's solid, free code decomposed into Pad/Pocket where it is a prism and frozen otherwise, and said so |
 | OpenSCAD | Builds `.scad` designs; Customizer ranges become parameters |
 | Blender | Photoreal renders; its 3D-Print Toolbox checks when the add-on is installed |
 | Your slicer | Slices, and opens the 3MF or G-code in it |
-| Any MCP client | The full engine over 126 tools ([MCP reference](MCP.md)) |
+| Any MCP client | The full engine over 142 tools ([MCP reference](MCP.md)) |
 
 When a program's version outside the supported range is why something failed, the error names the supported versions
 and what to do.
@@ -902,12 +946,27 @@ and what to do.
 
 ![Add a provider: the address, what was found, and the models it lists](images/provider-added.webp)
 
+## Test plan and results report
+
+- **Test plan** (`form/reports.py`): one test per requirement of the brief, per fit (ISO 286 holes and pairs, the fit
+  window, assembly mates), per critical dimension (brief and interface parameters, measured or specified values, the
+  overall size) and per strength-study load. Each says the instrument (10:1 rule), the limits and their source
+  (untoleranced: ISO 2768-1 m), the readings and when it passes. PDF set in Geist (`form/pdfdoc.py`: vector text,
+  fonts embedded), Markdown and a checklist CSV that is filled in and recorded with `form testplan record --csv`.
+- **Results** are recorded only as measured (`record_physical_result(kind="test")`), with the instrument and the limits
+  they were judged against.
+- **Results report**: design, revision and hashes; every check and study with its evidence class and stated error;
+  the physical results against the plan; open items; a verdict that is PASS only with every required test measured
+  and nothing open. A claim with no physical test (a face count) is listed as not tested, with why.
+
 ## Moving and sharing designs
 
 - **One file per design.** Export a design with its revisions, conversations and the code it was built from as one
   `.formstudio` file, and import it on another computer. Clashing ids get new ones and nothing is overwritten; older
   `.formproj` files still import. `form export`, `form import`; MCP `export_project`, `import_project`.
 - **Conversations** export alone as Markdown (to read) or JSON (to import again). `form export-conversation`.
+- **Backups** (`form/backup.py`): every design and conversation on a schedule to a folder you choose, optionally pushed to a Git repository you own with your own credentials (never created for you, never a stored password). One .zip per backup with the SHA-256 of every file, verified after writing, the oldest pruned; a restore writes back the same bytes. Settings › Backups, `form backup`, MCP `backup`.
+- **Recently deleted**: 30 days with the days left and the backup that holds each design; put back with its conversations; after 30 days a design leaves only when a verified backup holds it.
 
 ## Building blocks for agents
 

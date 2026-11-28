@@ -24,7 +24,9 @@ datas = [(str(ROOT / "form" / "app" / "qml"), "form/app/qml"),
          (str(ROOT / "form" / "adapters" / "blender_model.py"), "form/adapters"),
          (str(ROOT / "form" / "adapters" / "blender_game.py"), "form/adapters"),
          # the game runner's LOD decimation, imported by it from its own folder
-         (str(ROOT / "form" / "adapters" / "blender_lod.py"), "form/adapters")]
+         (str(ROOT / "form" / "adapters" / "blender_lod.py"), "form/adapters"),
+         # the FreeCAD side of the PartDesign export: read as text and written into the script FreeCAD runs
+         (str(ROOT / "form" / "partdesign_fc.py"), "form")]
 # the game pipeline as files too (form/game): its runner path is resolved from them on disk
 datas += [(str(p), "form/game") for p in sorted((ROOT / "form" / "game").glob("*.py"))]
 # tables read as TOML at run time: manufacturability (form/dfm/rules), sheet metal (form/sheet), CAM (form/cam)
@@ -34,6 +36,8 @@ datas += [(str(ROOT / "form" / "dfm" / "rules"), "form/dfm/rules"),
           (str(ROOT / "form" / "sheet" / "services"), "form/sheet/services"),
           # CAM's speeds and feeds table with its sources (form/cam/feeds.py)
           (str(ROOT / "form" / "cam" / "feeds.toml"), "form/cam"),
+          # the cost models' sourced rates (form/costing)
+          (str(ROOT / "form" / "costing" / "rates.toml"), "form/costing"),
           # the API names the design preflight checks against (form/preflight.py; scripts/gen_preflight_api.py)
           (str(ROOT / "form" / "preflight_api.json"), "form")]
 binaries, hidden = [], []
@@ -70,13 +74,17 @@ ENGINE_SRC += [(p, "engine_src/form/game") for p in sorted((ROOT / "form" / "gam
 ENGINE_SRC += [(p, "engine_src/form/fea") for p in sorted((ROOT / "form" / "fea").glob("*.py"))]
 # The MuJoCo check for robot files (form/engines.py "robot.mujoco") runs `python -m form.robot validate ...` there
 ENGINE_SRC += [(ROOT / "form" / "robot.py", "engine_src/form")]
+# Topology optimisation runs in the same environment: `python -m form.topo.run <job>` (SciPy, and form.fea's mesh and solvers)
+ENGINE_SRC += [(p, "engine_src/form/topo") for p in sorted((ROOT / "form" / "topo").glob("*.py"))]
 datas += [(str(p), dest) for p, dest in ENGINE_SRC]
 # Inside the app itself, CADFit's search code and trimesh (which only that code imports) stay out: the search runs in
 # its own environment. Its reader (cqrun) and _compat stay in: the app reads the program CADFit sends back.
 CADFIT_ONLY = ("form.recon.cadfit.vendor", "form.recon.cadfit.driver")
 # The same for the strength solver: core, mesh, solve, verify and run import Netgen, scikit-fem and PyAMG, which only
 # the FEA engine's environment has; the app keeps the definition, storage, tools and CLI side of form/fea.
-FEA_ONLY = ("form.fea.core", "form.fea.mesh", "form.fea.solve", "form.fea.verify", "form.fea.run")
+FEA_ONLY = ("form.fea.core", "form.fea.mesh", "form.fea.solve", "form.fea.verify", "form.fea.run",
+            # the optimiser's side of form/topo (SciPy, Netgen); the app keeps study, tools, emit and cad
+            "form.topo.simp", "form.topo.mesh3d", "form.topo.recon", "form.topo.run", "form.topo.verify")
 hidden += [m for m in collect_submodules("form") if not m.startswith(CADFIT_ONLY + FEA_ONLY)]
 datas += collect_data_files("form", include_py_files=False)
 # exemplar designs are read as source text by design_examples, so they ship as files too

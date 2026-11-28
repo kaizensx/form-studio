@@ -44,7 +44,7 @@ Rectangle {
                     // one of
                     Pick { visible: row.r.type === "choice"; width: 220; value: row.v
                         model: (row.r.choices || []).map(function (c) {
-                            var t = ({ auto: "Automatic", bambu: "Bambu Studio", orca: "OrcaSlicer", prusa: "PrusaSlicer", superslicer: "SuperSlicer", qidi: "QIDISlicer", elegoo: "ElegooSlicer", snapmaker: "Snapmaker Orca", stable: "Stable", preview: "Preview", model: "A 3D model", print: "3D printing" })[c] || c
+                            var t = ({ auto: "Automatic", bambu: "Bambu Studio", orca: "OrcaSlicer", prusa: "PrusaSlicer", superslicer: "SuperSlicer", qidi: "QIDISlicer", elegoo: "ElegooSlicer", snapmaker: "Snapmaker Orca", stable: "Stable", preview: "Preview", model: "A 3D model", print: "3D printing", hourly: "Every hour", daily: "Every day", weekly: "Every week" })[c] || c
                             return { value: c, text: t + (row.r.detected && typeof row.r.detected !== "string" && row.r.detected.indexOf(c) >= 0 ? "  · installed" : "") } })
                         onPicked: function (val) { rc.sheet.setEdit(row.r, val) } }
                     // agents, models and efforts: picked from what is set up here
@@ -57,7 +57,7 @@ Rectangle {
                     // text and paths
                     Field { visible: row.r.type === "str" || row.r.type === "path"; width: row.r.type === "path" ? 250 : 280
                         text: (rc.sheet.rev, String(row.v === null || row.v === undefined ? "" : row.v)); mono: row.r.type === "path"
-                        placeholder: row.r.type === "path" && row.r.key !== "data.dir" ? (row.found ? row.found : "not found: choose…") : ""
+                        placeholder: row.r.key === "backup.folder" ? "choose a folder…" : row.r.type === "path" && row.r.key !== "data.dir" ? (row.found ? row.found : "not found: choose…") : ""
                         onEdited: function (t) { rc.sheet.setEdit(row.r, t) } }
                     Btn { visible: row.r.type === "path"; small: true; icon: "folder_open"; tip: "Choose…"; anchors.verticalCenter: parent.verticalCenter
                         onClicked: rc.sheet.choosePath(row.r) }

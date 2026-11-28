@@ -49,10 +49,10 @@ more revision (refine_design shows, undoes or turns it off). Long work answers w
 
 Rules:
 - Units are mm, degrees, grams. Only change parameters that describe_recipe lists.
-- preview_change before commit_change; pass expect_head so a newer revision is never overwritten.
+- Commit with expect_head so a newer revision is never overwritten.
 - Provenance is evidence. Mark a value "measured" only when the user measured it and told you the number. Never invent
   physical results: record_physical_result is only for what the user reports.
-- A slice is a simulation, not a print; fit yield is a model. Say so.
+- A slice is a simulation; fit yield is a model. Say so.
 - You cannot approve a release: request_release returns a link the user opens in Form Studio. Nothing here starts a
   print or sends files anywhere.
 - Every design has a purpose, "print" or "model" (just a 3D model; get_project says). For a model never ask about a
@@ -79,7 +79,7 @@ Rules:
   create_design relation="part_of"). A second create_design in a conversation says its relation: replaces, part_of,
   alternative or new.
 - "Will it hold?": strength_study, then get_strength_study (design_guide(topic="strength")). Quote its evidence and
-  lower safety factor; not converged means none.
+  lower safety factor; not converged means none. Lighter, still holding: inverse_design or topology_optimise.
 - Complex designs (mechanisms, organic or styled forms, textures, several parts) are staged: design_brief ->
   design_guide(topic=...), design_examples -> plan_design -> create_design(plan=...) -> look at the sheet -> critique
   -> update_design. The design_guide topics and the skills hold each workflow.
@@ -2227,16 +2227,30 @@ def build() -> MCPServer:
 
     @mcp.tool(annotations=RW)
     async def record_physical_result(project: str, kind: str, result: str | None = None,
-                                     widths: list[dict] | None = None, source: str = "part", note: str = "") -> dict:
-        """Record what the USER observed after a real print or a real machining run. Never call this with values
-        the user did not report.
+                                     widths: list[dict] | None = None, source: str = "part", note: str = "",
+                                     test: str | None = None, values: list[float] | None = None,
+                                     instrument: str = "", by: str = "") -> dict:
+        """Record what the USER observed or measured on the real part, after a real print or a real machining run.
+        Never call this with values the user did not report: every value here is kept with provenance "measured".
         kind="fit": result is too_tight | good | too_loose for this revision.
         kind="widths": measured pairs [{"nominal": mm, "measured": mm}] from a coupon (source="coupon") or this part
         (source="part"); they calibrate this printer profile for every future design.
         kind="machined": the posted CNC program was run on a machine; result is good | gouged | collision |
         left_material | scrapped. It belongs to that program (its file hashes); until one is recorded the program
-        is labelled "simulated, not proven on a machine"."""
+        is labelled "simulated, not proven on a machine".
+        kind="test": a result against the test plan (test_plan lists the ids): test=<id> with the readings
+        values=[...] in the test's unit, or result="pass" | "fail" for a pass/fail test; instrument= what was used,
+        by= who measured. It is judged against the plan's limits, and the results report shows it."""
         st = studio()
+        if kind == "test":
+            from . import reports
+
+            def rec_test():
+                return reports.record(st, project, test or "", values=values, result=result, instrument=instrument,
+                                      by=by, note=note)
+            rec = await _run(rec_test)
+            return {"recorded": rec, "verdict": rec["test_record"]["verdict"],
+                    "next": "results_report shows every result against the plan, with what is still open."}
         body = {"kind": kind, "note": note}
         if kind in ("fit", "machined"):
             body["result"] = result
@@ -2594,6 +2608,27 @@ def build() -> MCPServer:
                     "note": "The spreadsheet records values; the STEP is a frozen solid. Edit the design in Form Studio and export again."}
         return await _run(go)
 
+    @mcp.tool(annotations=ToolAnnotations(read_only_hint=False, destructive_hint=False, idempotent_hint=True,
+                                          open_world_hint=False))
+    async def freecad_partdesign(project: str, out: str = "", edit: dict | None = None, ctx: Context = None) -> dict:
+        """The design as a native FreeCAD PartDesign feature tree (.FCStd) with editable history, built and checked in
+        FreeCAD's command line (freecadcmd). Sketches (Sketcher constraints, named dimensions), Pad, Pocket,
+        Revolution, Groove, Fillet, Chamfer, Hole (ISO size when it matches), LinearPattern, PolarPattern and
+        Thickness; a "Params" spreadsheet holds every parameter and the feature sizes are expressions on its cells.
+        A feature of free code is decomposed into sketch + Pad/Pocket where it is a prism, else it is a frozen solid.
+        out: the .FCStd path or a folder (default: the project's partdesign folder); the FreeCAD script that made it
+        (<name>.py) and the step solids (<name>_steps/) are written next to it. edit: {parameter: value} also sets
+        those cells in FreeCAD, recomputes, and compares with Form Studio's build at those values (the file keeps the
+        exported values). Returns per feature: native | decomposed | frozen | failed, editable only when FreeCAD
+        recomputed it to Form Studio's solid; the parameters bound to cells; volume, bounding box and face count
+        parity. FreeCAD's topological naming is still fragile (read the toponaming note)."""
+        st = studio()
+        from . import partdesign
+        res = await _run(lambda: partdesign.export(st, st.load(project), out or None, edit or None))
+        act(project, "look", f"Exported a FreeCAD PartDesign tree: {len(res['editable'])} editable feature(s), "
+                             f"{len(res['non_parametric'])} non-parametric", ctx)
+        return res
+
     # ---- analysis on the model (form/analysis.py): maps, measuring, print orientation -------------
     @mcp.tool(annotations=RO, structured_output=False)
     async def analyze(project: str, map: str = "thickness", view: str = "iso", rev: int | None = None, ctx: Context = None) -> list:
@@ -2816,7 +2851,8 @@ def build() -> MCPServer:
         Returns a picture of the top three as printed and, for each candidate, the numbers behind its score (support
         volume, overhang area, plate contact, height, smallest layer cross-section through the structure features) and
         each term's contribution. The score formula is in the result. It ranks computed geometry; it does not predict
-        print success. Apply one with set_print_setup(project, orientation=<id>)."""
+        print success. Apply one with set_print_setup(project, orientation=<id>). print_orient searches every direction
+        over support, time, strength, surface and tip-over and returns the Pareto front."""
         st = studio()
         from . import analysis
         def go():
@@ -2878,18 +2914,78 @@ def build() -> MCPServer:
 
     @mcp.tool(annotations=RO)
     async def estimate_cost(project: str, price_per_kg: float | None = None, kwh_price: float | None = None,
-                            watts: float | None = None, machine_rate_per_h: float | None = None, copies: int = 1) -> dict:
-        """Estimate the print cost. Filament, electricity and machine-time cost of the current slice, per plate and for `copies`, plus the same
-        volume in the other materials the slicer has presets for. Grams and hours are the slicer's simulation; prices
-        are the user's (saved ones are used when you pass none). Never invent a price: when a cost is null, "needs"
-        says which number to ask the user for. No currency is assumed."""
+                            watts: float | None = None, machine_rate_per_h: float | None = None, copies: int = 1,
+                            process: str = "", quantities: list | None = None, options: dict | None = None,
+                            shop: str = "", currency: str = "", rates: dict | None = None, full: bool = False) -> dict:
+        """Estimate the cost. Without `process`: the print cost of the current slice as before (filament, electricity
+        and machine time per plate and for `copies`, plus the same volume in the slicer's other materials; grams and
+        hours are the slicer's simulation, prices the user's; when a cost is null, "needs" says which number to ask
+        for; no currency is assumed).
+        With `process` (fdm, sla, sls, mjf, lpbf, cnc, injection, sheet_metal, purchased): the cost of that process
+        built from its drivers, as fixed lines (tooling, setups, programming) and per-part lines, each with its
+        formula and the evidence of every input, and the cost per part at each of `quantities` (default 1, 10, 100,
+        1000, 10000). FDM uses the slicer's grams and hours when sliced; CNC the current CAM simulation's cycle time
+        and the setups manufacturability counts; moulding follows Boothroyd-Dewhurst-Knight (clamp from projected
+        area, cycle = fill + cooling h²/(π²α)·ln(4/π·(Ti−Tm)/(Tx−Tm)) + resetting, mould base and cavity points);
+        sheet metal the unfold's flat area, cut length and bends; purchased parts the parts list at prices the person
+        gave. Rates come from a table where each is sourced (published, cited, dated) or an assumed process parameter;
+        money is never assumed. `shop` picks one of the person's shops (their rates, specified); `currency` converts
+        with the ECB reference rate or the shop's own; `rates` overrides rates for this call ({"labour": 45});
+        `options` per process ({"injection": {"resin": "ABS", "cavities": 2}, "cnc": {"tool_d": 6}}). A line without
+        a value has amount null and `needs`: it is left out of the totals (not_counted), never guessed. full=true
+        returns every input with its source."""
         st = studio()
         def go():
-            from . import cost
-            given = {"price_per_kg": price_per_kg, "kwh_price": kwh_price, "watts": watts, "machine_rate_per_h": machine_rate_per_h}
-            out = cost.project(st, st.load(project), copies, given)
-            out.pop("prefs", None)
-            return out
+            p = st.load(project)
+            if not process and not quantities:
+                from . import cost
+                given = {"price_per_kg": price_per_kg, "kwh_price": kwh_price, "watts": watts, "machine_rate_per_h": machine_rate_per_h}
+                out = cost.project(st, p, copies, given)
+                out.pop("prefs", None)
+                return out
+            from . import costing
+            r = costing.estimate(st, p, process or "fdm", quantities, options, shop or None, currency or None, rates)
+            return r if full else costing.brief(r)
+        return await _run(go)
+
+    @mcp.tool(annotations=RO)
+    async def cost_compare(project: str, processes: list | None = None, quantities: list | None = None,
+                           options: dict | None = None, shop: str = "", currency: str = "", rates: dict | None = None,
+                           full: bool = False) -> dict:
+        """Compare cost per part against quantity across processes. Default: every printing technology, CNC and
+        moulding, plus sheet metal for a sheet part. Returns the cheapest process at each quantity, `switches` (where
+        the cheapest changes, e.g. "Injection moulding costs less per part than FDM printing from about 628 parts")
+        and every pairwise crossover, each with its arithmetic (ΔF / ΔV) and the evidence of the lines it rests on.
+        Crossovers use counted lines only; a process with lines not counted says which. Purchased parts are listed
+        apart. Same rates, shops and options as estimate_cost. A quote-style estimate, not a quote."""
+        st = studio()
+        def go():
+            from . import costing
+            r = costing.compare(st, st.load(project), processes, quantities, options, shop or None, currency or None, rates)
+            return r if full else costing.brief(r)
+        return await _run(go)
+
+    @mcp.tool()
+    async def cost_rates(action: str = "list", shop: str = "", label: str | None = None, currency: str | None = None,
+                         rates: dict | None = None, fx: dict | None = None, part_prices: dict | None = None,
+                         activate: bool = False) -> dict:
+        """Read or set the rates the cost models use. action "list": every rate as the shop resolves it (value,
+        unit, evidence sourced|specified|assumed|missing, source with URL, date and quote), the published value beside
+        the shop's own, the exchange rates and the sources. action "set": change a shop (created when new): label,
+        currency (ISO code), rates {id: value} (null forgets an override, so the published rate applies again),
+        fx {"USD": 1.1} (units of that currency per 1 EUR), part_prices {designation: price} for purchased parts,
+        activate=true makes it the shop costs use. action "delete": remove a shop. Set only numbers the person gave
+        you; they are recorded as specified. Never set a rate or a price they did not give."""
+        st = studio()
+        def go():
+            from .costing import rates as cr
+            if action == "list":
+                return cr.listing(st.cfg, shop or None)
+            if action in ("set", "delete"):
+                cr.update_shop(st.cfg, shop, label, currency, rates, fx, activate, delete=action == "delete",
+                               part_prices=part_prices)
+                return cr.listing(st.cfg, None if action == "delete" else (shop or None))
+            raise StudioError('action is "list", "set" or "delete".')
         return await _run(go)
 
     @mcp.tool(annotations=RO)
@@ -3386,6 +3482,17 @@ def build() -> MCPServer:
     fea_tools.register_tools(mcp, studio, _run, RO, RW, _origin)
     from .calc import tools as calc_tools     # engineering calculators that write geometry: calculate (form/calc)
     calc_tools.register_tools(mcp, studio, _run, RO, RW, _origin)
+    from .printphys import tools as print_tools   # print physics: print_orient, print_strength, print_warp (form/printphys)
+    print_tools.register_tools(mcp, studio, _run, RO, RW, _origin)
+    from .inverse import tools as inverse_tools   # inverse design: inverse_design, get_inverse_design (form/inverse)
+    inverse_tools.register_tools(mcp, studio, _run, RO, RW, _origin)
+    from .topo import tools as topo_tools     # topology optimisation as features: topology_optimise, get_topology,
+    topo_tools.register_tools(mcp, studio, _run, RO, RW, _origin)      # apply_topology (form/topo)
+    from .stack import tools as stack_tools   # tolerance stack-up from the assembly: tolerance_stack, get_tolerance_stack
+    stack_tools.register_tools(mcp, studio, _run, RO, RW, _origin)
+    from . import backup, reports
+    reports.register_mcp(mcp, studio, _run)
+    backup.register_mcp(mcp, studio, _run)
     return mcp
 
 

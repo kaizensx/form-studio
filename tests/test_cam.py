@@ -840,6 +840,7 @@ class Project(unittest.TestCase):
         self.assertAlmostEqual(out["simulation"]["summary"]["removed_mm3"], want, delta=0.01 * want)
 
     def test_6_cli_and_mcp(self):
+        # the Studio's own data folder: another test module may have set FORM_DATA before this one was imported
         env = {**os.environ, "FORM_DATA": str(self.st.root), "PYTHONPATH": str(ROOT)}
         r = subprocess.run([sys.executable, "-m", "form", "cam", "status", self.p["id"]], capture_output=True, text=True, env=env, cwd=ROOT)
         self.assertEqual(r.returncode, 0, r.stderr)

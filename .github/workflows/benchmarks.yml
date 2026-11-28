@@ -1,0 +1,94 @@
+name: Benchmark suites
+
+# Form Studio's own verification suites (form/bench, `form bench run`) on every change to dev that can move them:
+# strength against textbook and NAFEMS cases, calculators against worked examples, ISO 286 against its tables,
+# manufacturability rules at their thresholds, mesh to editable CAD against tolerance. A suite whose code is not on
+# dev yet reports that and keeps the entry measured on its own branch. The results go to the ci-assets branch
+# (bench/suites.json); pages.yml writes /benchmarks.html from them, so the table is never edited by hand.
+#
+#   measure  runs the project's code with a read-only token
+#   publish  stores the results (contents write; runs no project code)
+on:
+  push:
+    branches: [dev]
+    paths:
+      - form/**
+      - scripts/recon_bench.py
+      - tests/recon_fixtures.py
+      - pyproject.toml
+      - requirements.lock
+      - .github/workflows/benchmarks.yml
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: benchmark-suites
+  cancel-in-progress: false
+
+env:
+  FORM_NO_UPDATE_CHECK: 1
+
+jobs:
+  measure:
+    runs-on: ubuntu-22.04
+    timeout-minutes: 90
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: ./.github/actions/setup-form
+        id: form
+      - name: The FEA engine's Python, from the engine's own pins (when the strength studies are on dev)
+        env:
+          PY: ${{ steps.form.outputs.python }}
+        run: |
+          pins=$("$PY" -c "from form import engines; print(' '.join(engines.SPECS['fea']['pins']))" 2>/dev/null || true)
+          if [ -n "$pins" ]; then
+            uv venv -q -p 3.12 "$RUNNER_TEMP/fea"
+            VIRTUAL_ENV="$RUNNER_TEMP/fea" uv pip install -q $pins
+            echo "FORM_FEA_PYTHON=$RUNNER_TEMP/fea/bin/python" >> "$GITHUB_ENV"
+          else
+            echo "form.engines has no FEA engine on this commit: the strength suite reports that."
+          fi
+      - name: Previous results
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+        run: |
+          python3 scripts/ci/assets.py get --path bench/suites.json --out docs/benchmarks/suites.json || true
+      - name: Run the suites
+        env:
+          PY: ${{ steps.form.outputs.python }}
+        run: |
+          "$PY" -m form bench run --save > "$RUNNER_TEMP/run.json" || echo "Some rows fail; they are published with the rest."
+          "$PY" -m form bench publish
+          mkdir -p "$RUNNER_TEMP/out"
+          cp docs/benchmarks/suites.json docs/BENCHMARKS.md site/benchmarks.html "$RUNNER_TEMP/out/"
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: benchmark-suites
+          path: ${{ runner.temp }}/out
+          retention-days: 30
+
+  publish:
+    needs: measure
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: write          # the ci-assets branch
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          name: benchmark-suites
+          path: ${{ runner.temp }}/in
+      - name: Store on ci-assets
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+        run: |
+          mkdir -p "$RUNNER_TEMP/bench"
+          cp "$RUNNER_TEMP/in/suites.json" "$RUNNER_TEMP/bench/suites.json"
+          python3 scripts/ci/assets.py put --src "$RUNNER_TEMP/bench" --dest bench --message "Benchmark suites for ${GITHUB_SHA::10}"

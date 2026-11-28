@@ -149,7 +149,7 @@ In the conversation: Return sends, Shift Return adds a line, Up brings back your
 ## Settings
 
 Settings (Ctrl/⌘ ,) edits `studio.toml` for you, with a backup of the file. The pages are listed in a rail on the
-left (General, Agents & models, Engines & software, Printing, Other apps, Updates, Advanced) and each page is a set of
+left (General, Agents & models, Engines & software, Printing, Other apps, Backups, Updates, Advanced) and each page is a set of
 titled cards. The search box in the rail finds a setting on any page, numbers
 are checked as you type, every value can be reset to its default, and changes apply at once: choosing the default
 printer updates the printer chip, the plate and the open design's checks without a restart.
@@ -162,6 +162,7 @@ printer updates the printer chip, the plate and the open design's checks without
 | Printing | The default printer, filament and process, from every printer set up in your slicers; the slicer, and whether designs made for printing are sliced; the keep-out margin and the gap between parts on a plate; which program "Open in slicer" uses. Shown only when 3D printing is on |
 | Agents & models | Agent apps, model API keys, local models and providers you added, in one list; Add a provider…; the agent, model and effort for new conversations; web lookups; a spending limit per message; opening Form Studio when an outside agent starts working. Keys are stored privately and never shown again |
 | Other apps | Blender, OpenSCAD and FreeCAD: whether and where each was found, Browse as a fallback, and what each one unlocks; which programs "Open in CAD" and "Open in viewer" use |
+| Backups | Back up now, the last backup and when the next one runs; on a schedule (hourly, daily, weekly) to a folder you choose, how many to keep, with or without conversations and built outputs; optionally a Git repository you created, pushed with your own sign-in; the backups in the folder with Verify and Restore; Recently deleted, 30 days, with Put back |
 | Updates | The daily check for a newer Form Studio, and the Stable or Preview channel |
 | Advanced | The slice time limit, how long the agent waits for your answers, the Claude Code command, and the printer name used when none is chosen |
 | Engines & software | Everything Form Studio uses: installed or not, its size and licence, an Install button, and for each optional engine or app that is installed a **Use in Form Studio** switch with one line on what it changes. Installed and used are separate: switched off, an engine stays on the computer and is never called. The switch applies at once |

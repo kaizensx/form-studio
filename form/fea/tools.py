@@ -24,7 +24,7 @@ def digest(r: dict, full: bool = False) -> dict:
             "safety_factor_withheld", "discretisation_error", "singularities", "equilibrium", "loads", "hand_estimate",
             "frequencies_Hz", "modes", "free_body", "mass_g", "load_factor", "load_factor_extrapolated", "load_factors",
             "thermal", "t_max_C", "t_min_C", "t_max_at", "t_min_at", "heat_through_W", "conditions", "heat_balance",
-            "meaning", "mesh", "materials", "material_notes", "units", "faces", "versions")
+            "meaning", "mesh", "materials", "layers", "material_notes", "units", "faces", "versions")
     out = {k: r[k] for k in keep if k in r}
     conv = r.get("convergence") or {}
     out["convergence"] = {"method": conv.get("method"), "tolerance": conv.get("tolerance"),

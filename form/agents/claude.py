@@ -160,6 +160,11 @@ class Claude(Adapter):
         if run.files:
             # absolute paths in permission rules start with a double slash
             allowed.append("Read(/" + Path(run.cwd).as_posix().rstrip("/") + "/**)")
+        for rule in getattr(run, "extra_tools", None) or []:      # the benchmark harness: file tools in its folder
+            name = rule.split("(", 1)[0]
+            if name not in tools:
+                tools.append(name)
+            allowed.append(rule)
         cmd = [exe, "-p", run.message, "--output-format", "stream-json", "--verbose", "--include-partial-messages",
                "--mcp-config", str(mcp_file), "--strict-mcp-config",
                "--tools", ",".join(tools) if tools else "",

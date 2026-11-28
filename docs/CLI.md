@@ -106,6 +106,12 @@ message, with what the design is for.
 | `form delete <project> --yes` | Move a project to the trash inside the projects folder |
 | `form export <project> [--out FILE.formstudio] [--no-conversations]` | The design, its history, its conversations and the code it was built from, as one file |
 | `form import FILE.formstudio \| FILE.formproj \| CONVERSATION.json` | Import; a clashing id gets a new one and nothing is overwritten |
+| `form testplan <project> [--out DIR]` | The test plan: each requirement, fit, critical dimension and load with its instrument, limits, readings and when it passes; TEST_PLAN.pdf, TEST_PLAN.md and TEST_CHECKLIST.csv |
+| `form testplan record <project> TEST V1 V2 ... [--instrument I] [--by NAME]`, `--result pass\|fail`, `--csv FILLED.csv` | Record what you measured against one test (or every filled row of the checklist), with provenance measured |
+| `form report <project> [--out DIR]` | The results report: measured results against the plan, every check and study with its evidence, open items and the verdict (PASS, NOT A PASS, FAIL); exits 0 only on PASS |
+| `form backup status\|run [--if-due]\|list\|verify [FILE]` | Back up every design and conversation to the folder (and Git repository) in Settings › Backups; check a backup's SHA-256s |
+| `form backup restore FILE [--project ID ...] [--replace]` | Restore from a backup file or a clone of the backup repository; an existing design is kept unless `--replace` (then it goes to Recently deleted) |
+| `form backup deleted\|undelete ENTRY\|purge` | Recently deleted: 30 days, and longer while no backup holds a design |
 
 ## Look and analyse
 
@@ -124,7 +130,11 @@ message, with what the design is for.
 | `form engrave <project> TEXT --at x,y,z --normal x,y,z [--up x,y,z] [--height MM] [--depth MM] [--sunk]` | Raised or sunk text on a flat face, written into the design's code as a feature and built as a new revision; `--list` and `--remove text_N` |
 | `form feature <project> boss\|snap_hook --at x,y,z --normal x,y,z [--size M3] [--hole tapped\|clearance\|insert] ...` | A screw boss or a snap-fit hook on a flat face, written into the design's code and built as a new revision |
 | `form strength static\|modal\|buckling\|thermal\|thermal_stress <project> [--fix x,y,z]... [--roller x,y,z] [--pin x,y,z] [--force x,y,z:Fx,Fy,Fz] [--pressure x,y,z:MPa] [--preload x,y,z:x,y,z:N] [--gravity [G]] [--temperature x,y,z:C] [--convection x,y,z:H:AMBIENT] [--heat x,y,z:W] [--reference C] [--material KEY\|JSON] [--modes N] [--mesh JSON]` | A strength study with a stated error: stress, displacement and safety factor, natural frequencies, the buckling load factor, steady temperatures or thermal stress. Exit 3 when it did not converge. `form study strength ...` is the same. [STRENGTH.md](STRENGTH.md) |
+| `form stack run <project> --a X,Y,Z[@part] --b X,Y,Z[@part] [--dir X,Y,Z] [--tol KEY=T\|KEY=LO:HI] [--dist KEY=normal\|uniform] [--spec LO,HI] [--temps TMIN,TMAX] [--alpha PART=1/K] [--samples N --seed S] [--brief]`, `form stack add ... --name N`, `form stack list\|show\|rerun\|rm <project> [id]` | Tolerance stack-up of the gap between two picked faces: the loop found through the mates, worst case, RSS, Monte Carlo, Cpk, each tolerance's share and source, the gap over a temperature span, what to tighten first. `add` keeps it with the design (the Bench entry `stack`). [TOLERANCES.md](TOLERANCES.md) |
 | `form calc <calculator> key=value ... [--build] [--name N] [--project P --at x,y,z --normal x,y,z] [--fea]`, `form calc list`, `form calc show <project>`, `form calc verify [--geometry]` | An engineering calculator: `snapfit`, `hinge`, `spring`, `fastener`, `gear`, `cam` or `fit`. A sheet with every number labelled computed, specified or assumed, its equation and its source; `--build` writes the geometry as a design with parameters, `--project` puts a snap hook or an insert boss on a face. `show` runs the calculation of a calculator-written design again for its head revision; `verify` prints the worked examples against their published answers. [CALCULATORS.md](CALCULATORS.md) |
+| `form print orient <project> [--cosmetic x,y,z]... [--study ID \| --load x,y,z] [--weights JSON] [--level 1\|2\|3] [--calibrate] [--verify N] [--critical DEG] [--free] [--top N]`, `form print orient <project> --pick ID` | The Pareto front of print orientations over support, time, strength, surface and tip-over; `--pick` writes one to the print setup; `--verify N` slices the best with the real slicer and reports the model's error. [PRINT_PHYSICS.md](PRINT_PHYSICS.md) |
+| `form print strength <project> --study ID [--orientation O] [--sweep a;b \| --no-sweep] [--assume JSON]` (or `--fix`, `--force`, `--material` as for `form strength`) | Strength as printed: a layered material in the print orientation, the safety factor across the layers and in them, and how it changes with orientation. Exit 3 when it did not converge |
+| `form print warp <project> [--orientation O] [--material M] [--chamber C] [--alpha 1/K] [--tg C] [--layer mm] [--source TEXT]` | Warp risk: an indicator from a cited model, never a predicted lift |
 | `form strength run\|show\|remove <project> <study>`, `form strength list <project>`, `form strength verify [case ...]` | Solve a saved study again, read it (`--full`, `--field`), list a design's studies with their states, or run the verification suite |
 | `form dfm <project> [--process P] [--set k=v ...] [--override RULE:fail=X] [--fix ID [--preview]] [--png FILE]` | Manufacturability for CNC, moulding or a printing technology: every rule with its source, findings, proposed fixes; `--fix` applies one and proves it by checking again. `form dfm rules [PROCESS]` prints the rule tables |
 | `form sheet flat\|profile\|check\|bends\|preflight\|tables <project or file.dxf> [--set k=v ...] [--kerf MM] [--process laser\|waterjet\|router] [--service sendcutsend --material M --thickness MM] [--out FILE]` | Sheet metal and cut parts: the flat pattern (unfolded, folded back to prove it) and its DXF, a flat part's profile with kerf, the cut-file check of any DXF, a bend order with a press-brake model, a service preflight (nothing is sent); see docs/SHEET_METAL.md |
@@ -163,8 +173,13 @@ message, with what the design is for.
 | `form design-only <project> on\|off` | Slice this design or not |
 | `form simulate <project> [--png PNG --layer N] [--gif GIF] [--frames DIR] [--layers a:b]` | Pictures of the toolpaths building up, from the slicer's G-code |
 | `form cost <project> [--price-per-kg] [--kwh-price] [--watts] [--machine-rate] [--copies] [--save]` | Filament, electricity and machine time |
+| `form cost <project> --process fdm\|sla\|sls\|mjf\|lpbf\|cnc\|injection\|sheet_metal\|purchased [--qty 1,100,1000] [--option injection.cavities=2] [--rate ID=VALUE] [--shop S] [--currency C] [--full]` | A cost per process from the design's drivers: fixed and per-part lines, each with its formula and evidence, and the cost per part at each quantity (docs/COST.md) |
+| `form cost compare <project> [--processes fdm,cnc,injection] [--qty ...]` | Cost per part against quantity across processes, the cheapest at each quantity, where it switches and every crossover |
+| `form cost rates [--shop S] [--label L] [--rate ID=VALUE] [--currency EUR] [--fx USD=1.1] [--part-price D=X] [--use] [--delete] [--full]` | The rates table with sources, and your shops' own rates (specified) |
 | `form pack <project> [--copies N] [--spacing MM] [--no-rotate]` | Do N copies fit on one plate |
 | `form optimize <project> --vary key:min:max ... --minimize\|--maximize METRIC [--require EXPR] [--budget N] [--study ID]` | Goal seek over parameters. `--require "fea.safety_factor>=2"` keeps a strength study as a constraint, solved on real candidates within 8 solves |
+| `form optimize pareto <project> --minimize METRIC ... [--maximize METRIC] [--require EXPR] [--vary key:min:max] [--solves N] [--seconds S]` | Inverse design: the variants that meet the requirements, on a Pareto front. Every reported variant is built by the kernel and, for a strength metric, solved by the study; the budget used is stated. `--show` reads the stored search, `--save INDEX[:NAME]` keeps a point as a variant, `--verify` runs the search on ZDT1 and ZDT2. [OPTIMISATION.md](OPTIMISATION.md) |
+| `form optimize topology <project> [--volfrac F \| --mass G \| --safety-factor SF] [--pull z] [--h MM] [--rmin MM] [--mode pockets\|free]` | Topology optimisation written back as features: SIMP on the strength study's mesh, the result rebuilt as lightening pockets with parameters and studied again. `--show [--frames]` reads the stored run, `--apply [--as-new NAME] [--mesh-body]` keeps it, `--verify` runs the MBB benchmark. [OPTIMISATION.md](OPTIMISATION.md) |
 | `form slicer-open <project> [--printer ID] [--explain] [--no-open]` | Choose settings for this part on this printer (orientation, layer height, walls, top and bottom layers, infill, supports, brim, seam, filament, speed profile; each with its reason, computed or heuristic), slice it for real, write a project 3MF with those settings and open it in the slicer. `--explain` leads the JSON with one line per decision; `--no-open` writes the file only |
 | `form compare-printers <project> [--printer ID] [--limit N]` | Slice the design for real on every printer in your slicers: time, filament and cost side by side |
 | `form lighter <project> [--builds N] [--apply ID] [--require "fea.safety_factor>=2"] [--study ID]` | Lighter versions that keep every passing check passing: thinner walls, bigger pockets, less infill, each with its mass and the slicer's grams; `--apply` commits one |
@@ -176,6 +191,20 @@ message, with what the design is for.
 | `form drawing check <project> <file> [--rows JSON]` | Check a person's drawing (PDF, DXF or image with the agent's rows) against the part, one row per dimension |
 | `form drawing spec <project> '<json>'` | Declare datums, GD&T, fits, surface texture, general tolerance and notes for the drawing |
 | `form drawing set <project> <dimension id> <value> [--expect-head N]` | Change a dimension: commits its parameter |
+
+## Benchmarks
+
+Results are kept in `docs/benchmarks/` and published as [BENCHMARKS.md](BENCHMARKS.md) and the site's benchmarks page.
+Every command prints JSON.
+
+| Command | Does |
+|---|---|
+| `form bench list` | The own suites (strength, calculators, ISO 286, manufacturability rules, mesh to CAD) with their saved results, and Parametric CAD Bench v3 with its runs |
+| `form bench run [--suite S ...] [--skip S] [--source DIR] [--commit SHA] [--branch B] [--save]` | Run suites, each in its own process with a data folder of its own, on this checkout or another source tree; `--save` merges the rows into `docs/benchmarks/suites.json`. Exit 1 when a row fails |
+| `form bench publish` | Write `docs/BENCHMARKS.md` and `site/benchmarks.html` from the saved results, every row with its commit, machine and date |
+| `form bench cadbench --download DIR` | Fetch the pinned Parametric CAD Bench v3 task set with Harbor (`harbor download`) |
+| `form bench cadbench --tasks DIR --agent claude-code --model M [--effort E] [--task ID ...] [--limit N] [--budget-usd 10] [--out DIR] [--no-publish]` | Each task's prompt to the agent with Form Studio's MCP server attached, scored by the task's own verifier in Docker; saves the run and publishes. `--agent standin` is the deterministic stand-in (no model) that proves the plumbing |
+| `form bench oracle --tasks DIR [--task ID ...]` | Score each task's held-back reference through the harness: the scorer parity check, every reward 1.0 |
 
 ## Any MCP tool
 

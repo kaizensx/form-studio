@@ -25,6 +25,8 @@ Prefer the MCP server (`form-mcp`). Without MCP, the `form` CLI does the same an
 | Say what must be true, and read what was measured | `design_brief` (contract and audit) → `get_project` (`proof`) | — |
 | Read a datasheet or drawing | `read_document` (PDF pages as images) | — |
 | Find the best design under constraints | `optimize` | `form optimize <p> --vary arm_t:4:20 --minimize solid_mass_g --require "statics.safety_factor>=3"` |
+| Say what the part must do and get the variants that do it (a Pareto front; every variant built and studied) | `inverse_design` → `get_inverse_design` | `form optimize pareto <p> --minimize mass_g --minimize fea.max_displacement_mm --require "fea.safety_factor>=3"` |
+| Remove the material that carries no load, written back as features (pockets with parameters), studied again | `topology_optimise` → `get_topology` → `apply_topology` | `form optimize topology <p> --volfrac 0.5`, `form optimize topology <p> --apply` |
 | Show motion | `animate` (turntable or morph) | `form animate <p> --morph 1:4` |
 | Check this machine | `setup_status` (never run fixes without asking) | `form setup --check` |
 | Ask the person a blocking question | `ask_user` (a card in Form Studio's chat; elsewhere it tells you to ask yourself) | `form chat` prompts in the terminal |
@@ -33,6 +35,9 @@ Prefer the MCP server (`form-mcp`). Without MCP, the `form` CLI does the same an
 | Mass, centre of mass, inertia (per part, assembled at a pose) and the sourced materials library | `mass_properties` | `form mass <p> --pose '{"lid_hinge": 90}'`, `form materials AL-6061` |
 | Put text on a flat face (a feature in the source) | `add_text`, `remove_text` | `form engrave <p> TEXT --at x,y,z --normal x,y,z` |
 | Will it hold: stress, displacement and a safety factor with a stated error; frequencies; buckling | `strength_study` → `get_strength_study` | `form strength static <p> --fix x,y,z --force x,y,z:Fx,Fy,Fz --material AL-6061` |
+| Print orientation over support, time, strength, surface and tip-over: the Pareto front, the pick written to the print setup, the model checked against real slices | `print_orient` (`pick=` writes the choice; `verify=N` slices the best) | `form print orient <p> --cosmetic x,y,z --study S --verify 3`, `form print orient <p> --pick ID` |
+| Strength of the part as printed: a layered material in the print orientation, the safety factor across the layers and how it changes with orientation | `print_strength` → `get_strength_study` (`result.layers`) | `form print strength <p> --study S` |
+| Warp risk (an indicator, never a predicted lift) | `print_warp` | `form print warp <p> --chamber 45` |
 | Size a snap fit, living hinge, spring, bolted joint, gear pair, cam or fit from a standard's equations, and write it as a design | `calculate` (`build=True` writes the design; every number is computed, specified or assumed, with its equation and source) | `form calc spring wire_d=1.6 mean_d=14 active=6 force=40 wire=music --build`, `form calc list` |
 | Work the feature tree: suppress, restore, move, rename; see the part up to one feature | `edit_design` ops `suppress`/`restore`/`move`/`rename`, `render(upto=)`, `get_design_source` (`tree`) | `form tree <p> [suppress\|restore\|move\|rename F]`, `form tree <p> --upto F` |
 | Fillet, chamfer, hole (ISO 273, tap drill, ISO 286), pattern or shell on picked geometry (one feature in the source) | `add_feature` kinds `fillet`, `chamfer`, `hole`, `pattern`, `shell` (`preview=True` saves nothing) | `form model <p> fillet --at x,y,z --radius 2` |
@@ -44,16 +49,23 @@ Prefer the MCP server (`form-mcp`). Without MCP, the `form` CLI does the same an
 | Can it be made (CNC, moulding, FDM, SLA, SLS, MJF, LPBF), with fixes proved by checking again | `manufacturability` → `apply_fix` | `form dfm <p> --process cnc --set tool_d=6 --set material=metal [--fix RULE]` |
 | Sheet metal: flat pattern DXF (proved by folding back), cut-file check, bend order, a service's limits | `flat_pattern`, `cut_file_check`, `bend_order`, `service_preflight` | `form sheet flat <p> --set material=steel_mild`, `form sheet check part.dxf --set t=2` |
 | CNC, 3-axis: toolpaths, G-code for a controller, read back and run on a stock model (gouge, leftover, collisions, cycle time); simulated, not proven on a machine | `cam_plan` → `cam_post` → `cam_simulate` | `form cam plan <p> --tool 6mm-flat --material aluminum`, `form cam post <p> --machine grbl` |
+| What it costs by each process (printing, CNC, moulding, sheet metal, bought parts), per part against quantity and where one overtakes another; every rate sourced, yours or assumed | `estimate_cost` (`process`, `quantities`), `cost_compare`, `cost_rates` | `form cost compare <p>`, `form cost <p> --process injection --qty 1000`, `form cost rates` |
 | Assess anything the person brings (mesh, STEP, photo, PDF, link, words) and get the route | `triage` | `form triage scan.stl` |
 | Turn an STL, OBJ or 3MF into a design by the route its triage chooses (parametric CAD, a surface body, a mesh body, parts) | `reconstruct` | `form reconstruct part.stl --tolerance 0.02` |
 | Rebuild a mesh by hand: what is left to add or cut, then tune the sizes | `reference_residual`, `fit_params`, `compare_to_reference` | — |
+| The design as a FreeCAD PartDesign feature tree (sketches, pads, holes, fillets, patterns, a Params spreadsheet), recomputed and checked in FreeCAD | `freecad_partdesign` | `form export fcstd <p> --out part.FCStd --edit w=80` |
 | Assembly instructions as a PDF | `assembly_instructions` | `form instructions <p> --out steps.pdf` |
+| The gap between two faces of an assembly: its loop through the mates, worst case, RSS, Monte Carlo, Cpk, each tolerance's share, at a temperature span, what to tighten | `tolerance_stack` (`save=True` keeps it; the Bench entry `stack`), `get_tolerance_stack` | `form stack run <p> --a 100,0,0@screw --b 0,0,8 --tol screw_l=0.2 --temps -20,80` |
 | An engineering drawing from the solid (dimensions bound to parameters, fits, GD&T only where declared) | `drawing` | `form drawing <p> --sheet A3 --out part.pdf` |
 | STEP AP242 with PMI, read back | `export_pmi` | `form drawing pmi <p>` |
 | Check a person's drawing against the part (never guess a digit: mark it unsure) | `check_drawing` | `form drawing check <p> theirs.pdf` |
 | Play a mechanism: loops, couplings, traces, clearance along the cycle, holding torque, an MP4 | `motion_study` | `form motion <p> --drivers '[{"joint": "crank", "from": 0, "to": 360}]'` |
 | URDF, SRDF and MJCF with inertia from the B-rep, checked and parsed back | `robot_files` | `form urdf <p>`, `form mjcf <p>` |
 | A feasible assembly order and insertion directions (the explode and instructions follow it) | `assembly_sequence` | `form sequence <p>` |
+| What to measure on the made part (each requirement, fit, critical dimension and load), with a checklist | `test_plan` | `form testplan <p>` |
+| Record what the person measured against a test | `record_physical_result(kind="test", test=, values=)` | `form testplan record <p> TEST 8.01 8.02` |
+| The results report: measured results, every check and study with its evidence, open items, verdict | `results_report` | `form report <p>` |
+| Backups of designs and conversations; Recently deleted | `backup` (restore only when the person asks) | `form backup status\|run\|verify\|restore` |
 
 Every design has a **purpose**: `print` (for 3D printing) or `model` (just a 3D model: rendering, CAD exchange, CNC,
 laser, moulding). `get_project` reports it and `form_overview` says whether the person prints at all (`has_printer`).
@@ -65,7 +77,9 @@ Rules that keep the record honest:
 1. **Units:** mm, degrees, grams. For a design started from a building block, only use parameter keys that `describe_recipe` lists.
 2. **Preview, then commit.** Pass `expect_head` so you never overwrite someone else's newer revision.
 3. **Provenance is evidence.** Mark a value `measured` only when the user measured it and gave you the number. Ask how they measured it, for example with calipers. Otherwise it stays `assumed`.
-4. **Never invent physical results.** `record_physical_result` is only for what the user reports after a real print or a real machining run.
+4. **Never invent physical results.** `record_physical_result` is only for what the user reports after a real print,
+   a real machining run or a measurement of the part. A results report is a pass only when every required test was
+   measured; say its verdict as it is.
 5. **Name evidence classes correctly.** A slice is a simulation. A CNC program is "simulated, not proven on a machine" until the person records what it did on one. Fit yield is a statistical model. Checks are labelled computed, heuristic or model. Say which one you are reporting.
 6. **You cannot approve a release.** The user approves in the app's Release stage, after reviewing the checks and acknowledging the warnings.
 7. **No printing, no uploads.** Form Studio never sends files to a printer or a service, and you must not either unless the user explicitly asks.

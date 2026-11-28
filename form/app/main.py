@@ -34,6 +34,8 @@ def _engine(cfg):
         except Exception:
             pass                     # reported on the first real kernel call
     threading.Thread(target=warm, daemon=True, name="form-kernel-warm").start()
+    from ..backup import start_scheduler
+    start_scheduler(st)                                  # [backup] enabled: backups on their schedule (form/backup.py)
     return st, httpd
 
 

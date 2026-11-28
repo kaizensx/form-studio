@@ -78,7 +78,7 @@ SPECS: dict[str, dict] = {
         "pins": ("netgen-mesher==6.2.2608", "netgen-occt==7.8.1", "scikit-fem==12.0.2", "scipy==1.18.1",
                  "pyamg==5.4.1", "numpy==2.5.5"),
         "check": ("import netgen.occ, netgen.meshing, skfem, scipy.sparse.linalg, pyamg, numpy; "
-                  "import form.fea.core, form.fea.run, form.fea.verify"),
+                  "import form.fea.core, form.fea.run, form.fea.verify, form.topo.run, form.topo.verify"),
     },
     "robot.mujoco": {
         "label": "MuJoCo",

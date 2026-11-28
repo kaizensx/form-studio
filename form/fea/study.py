@@ -45,6 +45,7 @@ from pathlib import Path
 from . import ENGINE, ENGINE_KIND, HOW_TO_GET, KIND_LABEL, KINDS, python
 from . import material as material_mod
 
+KEY_LAYERS = 1                  # bump when the layered material model changes a result
 KEY_VERSION = 1                 # bump when the engine's method changes a result (form/fea/core.py ENGINE_VERSION too)
 FIXTURES = ("fixed", "roller", "pin", "hold")
 LOADS = ("force", "pressure", "preload", "gravity")
@@ -225,6 +226,41 @@ def clean(body: dict) -> dict:
             out["modes"] = max(1, min(int(body.get("modes") or (6 if kind == "modal" else 3)), 20))
         except (TypeError, ValueError):
             raise _err("modes is a whole number (1 to 20).") from None
+    if body.get("layers"):
+        ly = body["layers"]
+        if not isinstance(ly, dict):
+            raise _err("layers is an object: {\"orientation\": \"setup\" | an orientation id, \"sweep\": [...], \"assume\": {...}}.")
+        if kind != "static":
+            raise _err(f"A layered (printed) material is for a static study, not a {KIND_LABEL[kind]} one.")
+        from .. import analysis
+        o = str(ly.get("orientation") or "setup")
+        if o != "setup" and not analysis.valid_orientation(o):
+            raise _err(f"Unknown print orientation “{o}”.", "Use \"setup\" (the design's print orientation), one of "
+                       + ", ".join(analysis.NAMED) + ", or a “down:x,y,z” id from print_orient.")
+        sweep = ly.get("sweep")
+        if sweep in (None, "auto", True):
+            sweep = "auto"
+        elif sweep in (False, "none", []):
+            sweep = []
+        else:
+            if not isinstance(sweep, (list, tuple)) or len(sweep) > 8:
+                raise _err("layers.sweep is \"auto\", [] or up to eight orientation ids.")
+            for x in sweep:
+                if not analysis.valid_orientation(x):
+                    raise _err(f"Unknown print orientation “{x}” in layers.sweep.")
+            sweep = [str(x) for x in sweep]
+        assume = {}
+        for k, v in (ly.get("assume") or {}).items():
+            if k == "source":
+                assume[k] = str(v)[:200]
+            elif k in material_mod.LAYER_GIVEN:
+                try:
+                    assume[k] = float(v)
+                except (TypeError, ValueError):
+                    raise _err(f"layers.assume.{k} is a number.") from None
+            else:
+                raise _err(f"Unknown value “{k}” in layers.assume.", "Values: " + ", ".join(material_mod.LAYER_GIVEN) + ", source.")
+        out["layers"] = {"orientation": o, "sweep": sweep, "assume": assume}
     mesh = {}
     for k, v in (body.get("mesh") or {}).items():
         if k not in MESH_OPTIONS:
@@ -321,6 +357,42 @@ def materials_for(st, p: dict, d: dict, rev: int | None = None) -> dict:
                        "Give material=\"AL-6061\" (or the values with their source) with the study, or set the "
                        "design's material with set_appearance.")
         out[pid_] = material_mod.resolve(choice, NEED.get(d["kind"], material_mod.MECHANICAL))
+    if d.get("layers"):
+        if len(out) != 1:
+            raise _err("A layered (printed) study is for a design of one solid: this design has several parts.",
+                       "Study the part on its own, or run the study without layers.")
+        o = layer_orientation(p, d)
+        (pid_, m), = out.items()
+        m["layers"] = material_mod.layered(m, layer_axis(o), d["layers"].get("assume"))
+        m["layers"]["orientation"] = o
+    return out
+
+
+def layer_orientation(p: dict, d: dict) -> str:
+    """The print orientation a layered study is solved in: its own, or the design's print setup."""
+    o = (d.get("layers") or {}).get("orientation") or "setup"
+    return p.get("orientation") or "as_modelled" if o == "setup" else o
+
+
+def layer_axis(orientation: str) -> list:
+    """The build direction (across the layers) in the design frame: opposite to the direction that faces the plate."""
+    from .. import analysis
+    return [-float(x) for x in analysis.orientation_down(orientation)]
+
+
+def layer_sweep(p: dict, d: dict) -> list:
+    """The other build directions a layered study also solves: the ones named, or the six axis orientations."""
+    from .. import analysis
+    sw = (d.get("layers") or {}).get("sweep")
+    chosen = layer_orientation(p, d)
+    ids = list(analysis.NAMED) if sw == "auto" else list(sw or [])
+    out, seen = [], [analysis.orientation_down(chosen)]
+    for o in ids:
+        dn = analysis.orientation_down(o)
+        if any(float(dn @ k) > 0.9995 for k in seen):
+            continue
+        seen.append(dn)
+        out.append({"id": o, "label": analysis.orientation_label(o), "axis": layer_axis(o)})
     return out
 
 
@@ -341,6 +413,12 @@ def key(st, p: dict, d: dict, rev: int | None = None) -> str:
     numbers = {k: [m["E"], m["nu"], m.get("density"), m.get("yield")] +
                ([m.get("k"), m.get("cte")] if d["kind"] in NEED else []) for k, m in mats.items()}
     core = {k: d.get(k) for k in ("kind", "fixtures", "loads", "modes", "mesh")}
+    if d.get("layers"):
+        (m,) = mats.values()
+        ly = m["layers"]
+        core["layers"] = [KEY_LAYERS, ly["orientation"], [ly.get(k) for k in ("E_p", "E_z", "nu_p", "nu_zp", "G_zp", "S_xy",
+                                                                             "S_z", "S_shear")],
+                          [s["id"] for s in layer_sweep(p, d)]]
     if d["kind"] in NEED:
         core.update(thermal=d.get("thermal"), reference_C=d.get("reference_C"))
     return H("fea", st.keys(p, rev)["geometry"], core, numbers, _engine_tag(st.cfg))
@@ -463,6 +541,12 @@ def headline(d: dict, r: dict) -> str:
         err = 100 * (r["discretisation_error"]["stress"] or 0)
         sf = r.get("safety_factor")
         head = f"safety factor {sf['value']:.2f} (at least {sf['low']:.2f})" if sf else "no safety factor (no yield strength)"
+        if r.get("layers"):
+            lay = r["layers"]
+            gov = {"across_layers": "across the layers", "in_plane": "in the layers",
+                   "interlayer_shear": "in shear between the layers"}.get(lay.get("governing"), "")
+            head = (head if sf else "no safety factor (no strength sourced)") + \
+                (f" {gov}" if sf and gov else "") + f", printed {lay.get('orientation_label') or 'as set'}"
         return (f"{head}; peak von Mises {r['peak_von_mises_MPa']:.3g} MPa ± {err:.1f} %, "
                 f"max displacement {r['max_displacement_mm']:.3g} mm")
     if r["kind"] == "modal":
@@ -521,6 +605,9 @@ def _engine_spec(d: dict, prep: dict, mats: dict) -> dict:
         spec["thermal"] = {"reference": d.get("reference_C", 20.0), "conditions": conditions}
     if d.get("modes"):
         spec["modes"] = d["modes"]
+    if d.get("layers"):
+        ly = next(iter(mats.values()))["layers"]
+        spec["layers"] = {"id": ly["orientation"], "sweep": d.get("_sweep") or []}
     return spec
 
 
@@ -536,9 +623,9 @@ def _picks(d: dict) -> list:
     return [{"at": x["at"]} for x in out]
 
 
-def _spawn(py: Path, work: Path, on_progress, cancelled) -> int:
+def _spawn(py: Path, work: Path, on_progress, cancelled, module: str = "form.fea.run", timeout_s: float = TIMEOUT_S) -> int:
     from .. import engines
-    cmd = [str(py), "-m", "form.fea.run", str(work)]
+    cmd = [str(py), "-m", module, str(work)]
     env = engines.child_env({"OMP_NUM_THREADS": str(max(1, min(8, (os.cpu_count() or 2) // 2)))})
     if Path(py) == Path(sys.executable):              # a developer's environment: this Python, as it is
         env = {**os.environ, "PYTHONPATH": str(engines.src_root()) + os.pathsep + os.environ.get("PYTHONPATH", "")}
@@ -572,7 +659,7 @@ def _spawn(py: Path, work: Path, on_progress, cancelled) -> int:
                 proc.kill()
                 proc.wait(timeout=10)
             return -1
-        if time.time() - t0 > TIMEOUT_S:
+        if time.time() - t0 > timeout_s:
             proc.kill()
             proc.wait(timeout=10)
             return -2
@@ -620,7 +707,7 @@ def run(st, pid: str, sid: str, force: bool = False, on_progress=None, cancelled
                      out_step=str(work / "solid.step"), picks=_picks(d), p=p)
         if prep.get("error"):
             raise _err(prep["error"])
-        spec = _engine_spec(d, prep, mats)
+        spec = _engine_spec({**d, "_sweep": layer_sweep(p, d)} if d.get("layers") else d, prep, mats)
         _write(work / "job.json", {"step": prep["step"], "spec": spec})
         code = _spawn(py, work, on_progress, cancelled)
         if code == -1:
@@ -646,7 +733,7 @@ def run(st, pid: str, sid: str, force: bool = False, on_progress=None, cancelled
         raise
     out.update({
         "id": sid, "name": d["name"], "key": k, "rev": rev["n"], "ts": time.time(), "wall_seconds": round(time.time() - t0, 2),
-        "definition": {x: d.get(x) for x in ("kind", "fixtures", "loads", "modes", "mesh", "thermal", "reference_C") if x in d},
+        "definition": {x: d.get(x) for x in ("kind", "fixtures", "loads", "modes", "mesh", "thermal", "reference_C", "layers") if x in d},
         "materials": {pid_ or "design": {x: m.get(x) for x in ("name", "key", "kind", "E", "nu", "density", "yield", "k", "cte",
                                                                 "strength_basis", "sources", "notes", "knockdown")}
                       for pid_, m in mats.items()},
@@ -659,7 +746,25 @@ def run(st, pid: str, sid: str, force: bool = False, on_progress=None, cancelled
     if notes:
         out["material_notes"] = sorted(set(notes))
     sf = out.get("safety_factor")
-    if sf:
+    if d.get("layers") and out.get("layers"):
+        from .. import analysis
+        ml_ = next(iter(mats.values()))["layers"]
+        lay = out["layers"]
+        lay.update({"orientation": ml_["orientation"], "orientation_label": analysis.orientation_label(ml_["orientation"]),
+                    "follows_print_setup": d["layers"]["orientation"] == "setup",
+                    "material": {k: ml_.get(k) for k in ("how_known", "knockdown", "assumed", "notes")},
+                    "evidence": out["evidence"] + ("; assumed: " + ", ".join(ml_["assumed"]) if ml_.get("assumed") else "")})
+        for r_ in lay.get("by_orientation") or []:
+            if analysis.valid_orientation(r_.get("id")):
+                r_["label"] = analysis.orientation_label(r_["id"])
+        if sf:
+            words = {"across_layers": "tension across the layers against the Z strength",
+                     "in_plane": "von Mises stress against the in-plane strength",
+                     "interlayer_shear": "shear between the layers against the shear strength given"}
+            sf["against"] = words.get(sf.get("against"), sf.get("against"))
+            sf["strength_source"] = {"design": ml_["how_known"].get({"across_layers": "S_z", "in_plane": "S_xy",
+                                                                     "interlayer_shear": "S_shear"}.get(lay.get("governing")))}
+    elif sf:
         basis = sorted({m.get("strength_basis") or "yield strength" for m in mats.values()})
         sf["against"] = "; ".join(basis)
         sf["strength_source"] = {pid_ or "design": (m.get("sources") or {}).get("yield") for pid_, m in mats.items()}
@@ -702,17 +807,20 @@ def pick_static(p: dict, sid: str = "") -> str:
     return statics[0]["id"]
 
 
-def evaluate(st, p: dict, sid: str, values: dict, budget_s: float = 45.0) -> dict:
+def evaluate(st, p: dict, sid: str, values: dict, budget_s: float = 45.0, rid: str | None = None, cancelled=None,
+             mesh: dict | None = None) -> dict:
     """Solve a study on candidate parameter values (not a revision): the engine's result, stored nowhere. The picked
-    points are the study's own; a candidate on which a point no longer lands on a face raises StudioError."""
+    points are the study's own; a candidate on which a point no longer lands on a face raises StudioError.
+    rid: a design source other than the head's (an edit that is not saved yet); values are then the whole set.
+    mesh: mesh options that replace the study's own for this solve."""
     d = get(p, sid)
     mats = materials_for(st, p, d)
     py = python(st.cfg)
     if py is None:
         raise _err("The strength solver is not installed, so the constraint cannot be checked. Nothing was made up.",
                    HOW_TO_GET, status=409, kind="unavailable")
-    rid = st.rid(p)
-    vals = {**st.rev(p)["values"], **{k: float(v) for k, v in (values or {}).items()}}
+    vals = dict(values) if rid else {**st.rev(p)["values"], **{k: float(v) for k, v in (values or {}).items()}}
+    rid = rid or st.rid(p)
     work = _dir(st, p, sid) / f"candidate-{uuid.uuid4().hex[:8]}.work"
     work.mkdir(parents=True, exist_ok=True)
     try:
@@ -720,11 +828,12 @@ def evaluate(st, p: dict, sid: str, values: dict, budget_s: float = 45.0) -> dic
                      out_step=str(work / "solid.step"), picks=_picks(d), p=p)
         if prep.get("error"):
             raise _err(prep["error"])
-        spec = _engine_spec(d, prep, mats)
-        spec["mesh"] = {**spec.get("mesh", {}), "budget_s": min(float(spec.get("mesh", {}).get("budget_s", budget_s)), budget_s)}
+        spec = _engine_spec({**d, "_sweep": []} if d.get("layers") else d, prep, mats)
+        spec["mesh"] = {**spec.get("mesh", {}), "budget_s": min(float(spec.get("mesh", {}).get("budget_s", budget_s)), budget_s),
+                        **(mesh or {})}
         _write(work / "job.json", {"step": prep["step"], "spec": spec})
         from .. import taskstore
-        code = _spawn(py, work, lambda ev: None, taskstore.cancelled)
+        code = _spawn(py, work, lambda ev: None, cancelled or taskstore.cancelled)
         if code == -1:
             raise _err("Cancelled.", status=409, kind="cancelled")
         out = _read(work / "result.json")
@@ -733,6 +842,7 @@ def evaluate(st, p: dict, sid: str, values: dict, budget_s: float = 45.0) -> dic
         if out.get("error"):
             raise _err(out["error"].get("message", "The study failed."), out["error"].get("hint", ""), status=422,
                        kind=out["error"].get("kind"))
+        out["volume_mm3"] = prep.get("volume_mm3")
         return out
     finally:
         shutil.rmtree(work, ignore_errors=True)
