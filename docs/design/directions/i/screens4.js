@@ -1,0 +1,47 @@
+// Direction I: the three signature moments, as storyboards (three frames each, with their timing).
+const fshot = (k, cx, cy, layers) => shot("part", k, cx, cy, layers);
+const board = (n, title, line, frames, spec) => put(`<div class="room" style="--px:720px;--py:420px;opacity:.6"></div><div class="board">
+  <p class="over">Signature moment ${n} of 3</p><header><h1>${title}</h1><p>${line}</p></header>
+  <div class="frames">${frames.map(([t, body, b, c]) => `<div class="fr">${body}<span class="t">${t}</span><p class="c"><b>${b}</b>${c}</p></div>`).join("")}</div>
+  <div class="spec">${spec.map(([a, b]) => `<div><span class="num">${a}</span><br>${b}</div>`).join("")}</div></div>`);
+const lit = (f, w, h, paths) => `<svg class="sk" width="${w}" height="${h}">${paths.map((p) => `<path d="${pl(f, p)}"/>`).join("")}</svg>`;
+const ring = (cx, cz, r, y = 46) => Array.from({ length: 25 }, (_, i) => [cx + r * Math.cos(i / 24 * 2 * Math.PI), y, cz + r * Math.sin(i / 24 * 2 * Math.PI)]);
+
+if (S === "moment-develop") { const K = .56, CX = 218, CY = 236;
+  const marks = (f, w, h) => { const [bx, by] = f(0, 46, 35), [ax, ay] = f(0, 14, 35); return `<svg class="sk" width="${w}" height="${h}" style="--accent:var(--ink)"><line x1="${bx}" y1="${by}" x2="${ax}" y2="${ay}"/><circle class="pt" cx="${ax}" cy="${ay}" r="3"/></svg><span class="dimtag" style="left:${ax - 4}px;top:${ay + 18}px;color:var(--ink);border-color:var(--edge)">250 N</span>`; };
+  const mask = (f, r) => { const [x, y] = f(0, 44.2, 8); return `-webkit-mask-image:radial-gradient(circle ${r}px at ${x}px ${y}px,#000 55%,transparent 100%)`; };
+  const legend = (o) => `<div class="abs glass" style="left:18px;right:18px;top:402px;border-radius:16px;padding:11px 14px;display:grid;gap:7px;opacity:${o}"><div class="bar" style="height:8px;background:${RAMP}"></div><div style="display:flex;justify-content:space-between;font:500 11px var(--mono);color:var(--ink2)"><span>0</span><span style="color:var(--ink)">14.2 MPa peak</span><span style="color:var(--accent)">error ≤ 2.8 %</span></div></div>`;
+  board(1, "A result develops", "A finished study is revealed on the part the way a print comes up in the tray. It plays once, when a result is first shown.", [
+    ["0 ms", fshot(K, CX, CY, (f, w, h) => img("mount-s8", w) + marks(f, w, h)), "The part, as asked", "Fixtures and the load are already drawn on it. The study has passed its own checks before anything shows."],
+    ["0 – 320 ms", fshot(K, CX, CY, (f, w, h) => img("mount-s8", w) + `<img src="assets/mount-heat.webp" width="${w}" style="${mask(f, 105)}"><img src="assets/mount-glow.webp" width="${w}" class="bloom" style="${mask(f, 105)}">` + marks(f, w, h)) + legend(.35), "The map comes up from the peak", "A soft edge travels outward from the highest stress. Where it has not reached, the part is still clay."],
+    ["320 – 520 ms", fshot(K, CX, CY, (f, w, h) => img("mount-heat", w) + img("mount-glow", w, "bloom") + marks(f, w, h)) + legend(1), "The error statement lands last", "The legend's numbers settle, then the error line lights once in cyan. After that nothing moves."]],
+    [["520 ms in all · ease-out (0.16, 1, 0.3, 1)", "<b>What moves:</b> one mask radius on the map, the legend's opacity, one colour on the error line. No camera move, no bounce."],
+     ["Fast by rule", "<b>Never waits for you:</b> the result is readable from the first frame; a click or a key ends the reveal at once. A second visit to the same result shows it at rest."],
+     ["Reduce Motion", "<b>A 120 ms cross-fade</b> from clay to the map, nothing travelling. A result that did not converge never plays this: it shows its reason instead."]]); }
+
+if (S === "moment-rollback") { const K = .47, CX = 218, CY = 190;
+  const slot = (sx) => [...Array.from({ length: 13 }, (_, i) => [sx + 2.75 * Math.cos(Math.PI * i / 12), 28 - 2.75 + 2.75 * Math.sin(Math.PI * i / 12), 6]), ...Array.from({ length: 13 }, (_, i) => [sx - 2.75 * Math.cos(Math.PI * i / 12), 12 + 2.75 - 2.75 * Math.sin(Math.PI * i / 12), 6]), [sx + 2.75, 28 - 2.75, 6]];
+  const faint = (f, w, h, paths) => `<svg class="sk" width="${w}" height="${h}">${paths.map((p) => `<path class="faint" d="${pl(f, p)}"/>`).join("")}</svg>`;
+  const mini = (from, bar) => `<div class="abs glass" style="left:18px;right:18px;top:352px;border-radius:16px;padding:5px"><div class="rows">${[0, 1, 2, 3].map((j) => { const i = from + j; return (bar === i ? `<div class="rb"><i></i></div>` : "") + frow(D.feats[i], i, bar != null && i >= bar ? "todo" : i === bar - 1 ? "sel" : ""); }).join("")}${bar == null ? `<div class="rb rest"><i></i></div>` : ""}</div></div>`;
+  const holes = [[-15.5, 19.5], [15.5, 19.5], [-15.5, 50.5], [15.5, 50.5]].map(([x, z]) => ring(x, z, 1.7));
+  const gus = [[[-23, 46, 44], [-23, 14, 6], [-28, 14, 6], [-28, 46, 44]], [[23, 46, 44], [23, 14, 6]], [[28, 46, 44], [28, 14, 6]], [[23, 46, 44], [28, 46, 44]], [[23, 14, 6], [28, 14, 6]]];
+  board(2, "A feature lights as the bar passes", "Drag the rollback bar through the tree. The part steps back in time under it, from the kernel's checkpoints.", [
+    ["at rest", fshot(K, CX, CY, (f, w, h) => img("mount-s8", w)) + mini(4, null), "The bar rests under the last feature", "It is the tree's own gutter line, the one drawn line in the pane."],
+    ["passing 05", fshot(K, CX, CY, (f, w, h) => img("mount-s5", w) + faint(f, w, h, [slot(-13), slot(13)]) + lit(f, w, h, holes)) + mini(3, 5), "The feature it passes lights once", "Its edges flash in cyan for 140 ms and its row takes the glass. Later features stay as faint outlines."],
+    ["passing 03", fshot(K, CX, CY, (f, w, h) => img("mount-s3", w) + faint(f, w, h, [slot(-13), slot(13), ring(0, 35, 11), ...holes]) + lit(f, w, h, gus)) + mini(1, 3), "Under 100 ms a step", "Each step is a stored solid, shown at once. Release the bar and the tree builds forward again."]],
+    [["140 ms flash · 80 ms row · linear in, ease-out", "<b>What moves:</b> the bar follows the pointer with no easing at all. Only the flash and the row's glass are timed."],
+     ["Budget", "<b>Under 100 ms</b> from a new bar position to the solid on screen (the plan's acceptance for wave B1). If a checkpoint is missing the row says so and the part does not pretend."],
+     ["Reduce Motion", "<b>No flash.</b> The row's glass and the part change together, instantly."]]); }
+
+if (S === "moment-unfold") { const K = .56, CX = 218, CY = 236, s = 1.28;
+  const v = (n, x, y, sc = 1) => `<g transform="translate(${x} ${y}) scale(${sc})"><path class="vis" d="${HLR[n].vis}"/></g>`;
+  const paper = (inner, o = 1) => `<div class="paper" style="left:28px;top:96px;width:${297 * s}px;height:${210 * s}px;opacity:${o}"><svg viewBox="0 0 297 210" width="${297 * s}" height="${210 * s}"><rect class="frame" x="8" y="8" width="281" height="194"/>${inner}</svg></div>`;
+  const cyanEdges = (w, h, o) => { const p = PROJ.part, sc = p.pxmm * K; return `<svg width="${w}" height="${h}" style="opacity:${o}"><g transform="translate(${w / 2} ${h / 2 - 2 * p.up[2] * sc}) scale(${sc})"><path d="${HLR.iso.vis}" fill="none" stroke="var(--accent)" stroke-width=".16" stroke-linecap="round" style="filter:drop-shadow(0 0 .5px var(--accent))"/></g></svg>`; };
+  const Z = 2.7, fold = (n, cx, cy, wmm, hmm, origin, tf, col = "var(--accent)") => `<div class="abs" style="left:${cx - wmm * Z / 2}px;top:${cy - hmm * Z / 2}px;width:${wmm * Z}px;height:${hmm * Z}px;transform-origin:${origin};transform:${tf}"><svg style="overflow:visible;display:block" viewBox="${-wmm / 2} ${-hmm / 2} ${wmm} ${hmm}" width="${wmm * Z}" height="${hmm * Z}"><rect x="${-wmm / 2 - 3}" y="${-hmm / 2 - 3}" width="${wmm + 6}" height="${hmm + 6}" fill="var(--sheet)" opacity=".75" stroke="var(--sheet-line)" stroke-width=".3"/><path d="${HLR[n].vis}" fill="none" stroke="${col}" stroke-width=".32" stroke-linecap="round"/></svg></div>`;
+  board(3, "The sheet unfolds from the part", "Going to Document, the drawing is not a new page: the part's own edges become its views.", [
+    ["0 – 140 ms", fshot(K, CX, CY, (f, w, h) => img("mount-s8", w) + cyanEdges(w, h, 1)), "Every visible edge lights", "The lines the kernel will project are shown on the solid first, in cyan."],
+    ["140 – 340 ms", `<div style="perspective:1100px;perspective-origin:50% 40%;position:absolute;inset:0">${fold("top", 176, 300 - 62 * Z / 2 - 9 - 52 * Z / 2, 56, 52, "50% 100%", "rotateX(-52deg)")}${fold("right", 176 + 56 * Z / 2 + 9 + 52 * Z / 2, 300, 52, 62, "0% 50%", "rotateY(52deg)")}${fold("front", 176, 300, 56, 62, "50% 50%", "none", "var(--sheet-ink)")}</div>`, "The part turns to its front and opens", "The clay fades, the lines stay. Top and side swing out on the hinges a third-angle sheet implies."],
+    ["340 – 480 ms", paper(v("top", 78, 50) + v("front", 78, 128) + v("right", 158, 128) + v("iso", 238, 68, .78) + `<rect class="frame" x="187" y="162" width="102" height="40"/>`), "The views land on the paper", "Dimensions and tolerances fade in last, 120 ms, in the datum colour. Hold Space to see the part again."]],
+    [["480 ms in all · ease-in-out (0.65, 0, 0.35, 1) for the fold", "<b>What moves:</b> the camera to the front view, two hinged groups of lines, the paper's opacity. Line widths never change."],
+     ["Fast by rule", "<b>Once per visit to Document,</b> and only from the 3D view. Switching between sheets, or coming back within a minute, cuts."],
+     ["Reduce Motion", "<b>A 160 ms cross-fade</b> from the part to the sheet."]]); }
