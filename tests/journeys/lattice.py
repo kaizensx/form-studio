@@ -68,7 +68,7 @@ def one(ui, name, **spec):
     dn = d["density"]
     ui.check(dn["measured"] is not None and abs(dn["drawn"] - dn["measured"]) < 0.08, f"the drawn lattice is as dense as the built one ({dn['drawn']:.3f} against {dn['measured']:.3f})")
     strip = " ".join(ui.texts(ui.item("legendStrip")))
-    ui.check("Relative density" in strip and "measured on the built solid" in strip, "the strip names the density and how it is known")
+    ui.check("Relative density" in strip and "built " in strip and " measured" in strip, "the strip names the density and how it is known")
     ui.check("Not told here" in str(ui.item("legendLimits").property("text")), "and what it does not tell")
     ui.check(ui.sees("The built solid", within=ui.item("benchCard")), "the card has the three densities")
     return pid, d
@@ -78,7 +78,7 @@ def run(ui):
     ui.wait_until(lambda: ui.store.get("screen") == "home", 30, "Home")
     _pid, d = one(ui, "Octet block", kind="octet", cell=8, strut_d=1.2, skin=1.5)
     lim = str(ui.item("legendLimits").property("text"))
-    ui.check(("a mesh body" if d["output"] == "mesh" else "B-rep") in lim, f"the strip says what was built ({d['output']}): {lim[:80]}")
+    ui.check(("Mesh body" if d["output"] == "mesh" else "B-rep") in lim, f"the strip says what was built ({d['output']}): {lim[:80]}")
     ui.check(ui.find(name="latticeValue") is not None and ui.item("latticeValue").isVisible(), "a uniform lattice is one value on the scale")
     crop(ui, "lattice-octet")
     _pid, d = one(ui, "Gyroid block", kind="gyroid", cell=10, skin=1.5,

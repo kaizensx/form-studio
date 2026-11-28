@@ -65,9 +65,9 @@ Glass {
         if (dk === "motion") return d.clearance ? d.clearance.detail : ""
         if (dk === "stack") return "Worst case " + Results.fmt(d.worst_case[0], "") + " to " + Results.fmt(d.worst_case[1], "mm") + ", RSS " + Results.fmt(d.rss[0], "") + " to " + Results.fmt(d.rss[1], "mm") + (d.cpk !== null && d.cpk !== undefined ? ", Cpk " + d.cpk.toFixed(2) : "") + "."
         if (dk === "lattice") { var dn = d.density || {}
-            return "Built as " + (d.output === "mesh" ? "a mesh body" : "B-rep") + (d.skin ? " inside a " + F.fmt(d.skin, 1) + " mm skin" : "") + ". "
-                + "Computed for the cell " + Results.fmt(dn.computed, "") + (dn.measured !== null && dn.measured !== undefined ? ", measured on the built solid " + Results.fmt(dn.measured, "") : "")
-                + (d.clipped ? "; the first " + d.triangles + " triangles are drawn" : "") + "." }
+            return (d.output === "mesh" ? "Mesh body" : "B-rep") + (d.skin ? ", " + F.fmt(d.skin, 1) + " mm skin" : "") + ". "
+                + "Cell " + Results.fmt(dn.computed, "") + " computed" + (dn.measured !== null && dn.measured !== undefined ? ", built " + Results.fmt(dn.measured, "") + " measured" : "")
+                + (d.clipped ? "; first " + d.triangles + " triangles drawn" : "") + "." }
         if (dk === "topology") { var h = d.history || [], a = h.length > 1 ? h[1] : null, b = h.length ? h[h.length - 1] : null
             return (d.converged ? "Converged" : "Stopped before converging") + " after " + Math.max(0, h.length - 1) + " iterations" + (a && b && a.compliance && b.compliance ? "; compliance " + Results.fmt(a.compliance, "") + " to " + Results.fmt(b.compliance, "") : "") + "." }
         return ""
@@ -166,11 +166,11 @@ Glass {
                 model: [{ value: false, text: "Folded" }, { value: true, text: "Flat" }]; value: Results.flat; onPicked: function (v) { Results.flat = v } } }
 
         // ── a timeline: the operations of a CNC setup, or a mechanism's smallest gap over its cycle ──
-        Item { id: tl; objectName: "timeline"; width: parent.width; height: ls.dk === "motion" || ls.dk === "topology" ? 54 : 34; visible: ls.dk === "cam" || ls.dk === "motion" || ls.dk === "topology"
+        Item { id: tl; objectName: "timeline"; width: parent.width; height: ls.dk === "motion" ? 54 : 34; visible: ls.dk === "cam" || ls.dk === "motion" || ls.dk === "topology"
             readonly property real dur: Math.max(1e-9, Results.duration)
             readonly property real x0: 34
             readonly property real w: width - x0
-            Rectangle { objectName: "playButton"; width: 26; height: 26; radius: 13; y: ls.dk === "motion" || ls.dk === "topology" ? 14 : -4; color: pm.containsMouse ? Theme.washHover : Theme.alpha(Theme.lineBase, 0.06); border.color: Theme.rule
+            Rectangle { objectName: "playButton"; width: 26; height: 26; radius: 13; y: ls.dk === "motion" ? 14 : -4; color: pm.containsMouse ? Theme.washHover : Theme.alpha(Theme.lineBase, 0.06); border.color: Theme.rule
                 Icon { anchors.centerIn: parent; name: Results.playing ? "pause" : "play"; size: 12; color: Theme.ink }
                 MouseArea { id: pm; anchors.fill: parent; hoverEnabled: true; onClicked: Results.toggle() } }
             // CNC: one span per operation, in its colour, as long as it runs
@@ -198,7 +198,7 @@ Glass {
                     if (c.first_contact_t !== null && c.first_contact_t !== undefined) { var fx = c.first_contact_t / tl.dur * W; g.strokeStyle = Theme.signal; g.lineWidth = 1.5; g.beginPath(); g.moveTo(fx, 0); g.lineTo(fx, H); g.stroke() } } }
             // topology: the compliance of every iteration the engine stored (falling as the layout finds the load path),
             // the iterations drawn up to the one shown
-            Canvas { id: tplot; x: tl.x0; width: tl.w; height: 40; visible: ls.dk === "topology"
+            Canvas { id: tplot; x: tl.x0; y: -4; width: tl.w; height: 18; visible: ls.dk === "topology"
                 readonly property var h: ls.dk === "topology" ? (ls.d.history || []).filter(function (x) { return x.compliance !== null && x.compliance !== undefined }) : []
                 readonly property real lo: { var m = Infinity; for (var i = 0; i < h.length; i++) m = Math.min(m, h[i].compliance); return isFinite(m) ? m : 0 }
                 readonly property real hi: { var m = -Infinity; for (var i = 0; i < h.length; i++) m = Math.max(m, h[i].compliance); return isFinite(m) ? m : 1 }
@@ -221,7 +221,7 @@ Glass {
             Txt { visible: ls.dk === "motion" && !!plot.c; anchors.right: parent.right; y: parent.height - 14; lineHeight: 1; topPadding: 0; bottomPadding: 0; mono: true; font.pixelSize: 11; tone: 3; wrapMode: Text.NoWrap
                 text: plot.c ? "smallest gap, 0 to " + Results.fmt(plot.span, "mm") + (plot.c.first_contact_t !== null && plot.c.first_contact_t !== undefined ? " · first contact " + Results.fmt(plot.c.first_contact_t, "s") : " · no contact") : "" }
             // the moment shown
-            Rectangle { objectName: "scrubHandle"; x: Math.round(tl.x0 + Results.t / tl.dur * tl.w - 1); y: ls.dk === "motion" || ls.dk === "topology" ? 0 : -4; width: 2; height: ls.dk === "motion" || ls.dk === "topology" ? 40 : 18; radius: 1; color: Theme.ink }
+            Rectangle { objectName: "scrubHandle"; x: Math.round(tl.x0 + Results.t / tl.dur * tl.w - 1); y: ls.dk === "motion" ? 0 : -4; width: 2; height: ls.dk === "motion" ? 40 : 18; radius: 1; color: Theme.ink }
             MouseArea { objectName: "scrubArea"; x: tl.x0; width: tl.w; y: -6; height: parent.height - 8; cursorShape: Qt.SizeHorCursor
                 function go(mx) { Results.scrub(Math.max(0, Math.min(1, mx / width)) * tl.dur) }
                 onPressed: function (e) { go(e.x) } onPositionChanged: function (e) { if (pressed) go(e.x) } }

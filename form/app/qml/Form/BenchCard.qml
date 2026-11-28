@@ -13,8 +13,8 @@ Rectangle {
     readonly property bool off: !!e && (e.state === "unavailable" || e.state === "n/a")
     readonly property bool has: !!e && (e.state === "current" || e.state === "stale") && !!e.headline
     // the headline's first number stands large; the words around it say what it is
-    readonly property var cut: { var m = has ? /^(.*?)(\d[\d.,]*(?:\s?(?:of|×|h|\/)\s?\d[\d.,]*)*)(.*)$/.exec(e.headline) : null
-        return rcard.lead ? rcard.lead : m ? [m[2], (m[1] + " " + m[3]).replace(/\s+/g, " ").replace(/^[\s·]+|[\s·]+$/g, "")] : ["", has ? e.headline : ""] }
+    readonly property var cut: { var m = has && e ? /^(.*?)(\d[\d.,]*(?:\s?(?:of|×|h|\/)\s?\d[\d.,]*)*)(.*)$/.exec(e.headline) : null
+        return rcard.lead ? rcard.lead : m ? [m[2], (m[1] + " " + m[3]).replace(/\s+/g, " ").replace(/^[\s·]+|[\s·]+$/g, "")] : ["", has && e ? e.headline : ""] }
     readonly property string action: !e || off || e.state === "running" ? "" : e.by === "agent" ? "Ask your agent" : e.by === "person" ? "Go to the release"
         : e.state === "current" ? (opens && !drawn ? openWord : "Run again") : e.state === "stale" ? "Run for " + Store.revWord(e.head) : "Run"
     // what a current entry opens in the window (Store.openStudy); any other with a file shows the file

@@ -599,8 +599,7 @@ def _lattice(st, p: dict, e: dict, opts: dict) -> dict:
                         "range": rng or [drawn, drawn]},
             "representation": built.get("representation") or "", "output": built.get("output") or "",
             "headline": r.get("headline") or "", "evidence": e.get("evidence") or "computed; measured on the built solid",
-            "not": "Not told here: how the lattice fails (buckling of struts, a wall's local yield), fatigue, and "
-                        "powder or resin left inside (printability says where it can drain)."}
+            "not": "Not told here: how the lattice fails, fatigue, and powder or resin left inside."}
 
 
 # ---- fronts: inverse design and print orientation (a Pareto chart in the card) -----------------------------------
