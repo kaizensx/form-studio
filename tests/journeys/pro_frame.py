@@ -14,7 +14,7 @@ import json
 import os
 import time
 
-from _lib import TAB_KEY, make, open_project, tool, toasts_gone, wait_job
+from _lib import TAB_KEY, click_stage, make, open_project, tool, toasts_gone, wait_job
 
 DATA = "fresh"
 TALK = [{"t": "user", "text": "make it a little taller", "local": True},
@@ -28,10 +28,13 @@ def rect(ui, name):
     return (round(p.x(), 1), round(p.y(), 1), round(it.width(), 1), round(it.height(), 1))
 
 
-def crop(ui, items, name, pad=10):
+def crop(ui, items, name, pad=10, rest=True):
     out = os.environ.get("FORM_CRAFT_OUT")
     if not out:
         return
+    if rest:                                   # the pointer off the controls: no tooltip over the picture
+        ui.hover("viewport", 0.55, 0.62)
+        ui.settle(250)
     from pathlib import Path
     from PySide6.QtCore import QRect, Qt
     ui._pump(80)
@@ -74,6 +77,13 @@ def free(ui):
     return ui.js("(function(){var v=Store.viewer;return [v.width-v.insetLeft-v.insetRight, v.height-v.insetTop-v.insetBottom, v.insetTop]})()")
 
 
+def listed(ui):
+    """The ids of the tools the ribbon has for the mode in front, in its band or behind its More."""
+    groups = ui.item("toolRibbon").property("groups")
+    groups = groups.toVariant() if hasattr(groups, "toVariant") else groups
+    return [t["id"] for g in groups for t in g["tools"]]
+
+
 def column(ui, on):
     ui.run_js("Store.talkOpen = true; Store.chatItems = %s; Store.talkCalm = %s" % (json.dumps(TALK), "false" if on else "true"))
     ui.settle(1300)
@@ -100,7 +110,7 @@ def journey_ribbon(ui):
 
     # ── each mode: its groups, captioned; the tools that have an engine; keys in the tooltips ──
     want = {"shape": ({"create": ["sketch", "extrude", "cut", "revolve"], "modify": ["fillet", "chamfer", "hole", "pattern", "shell"],
-                       "insert": ["part", "text"]}, ["sweep", "loft", "rib", "mirror", "draft", "split", "move_face", "plane", "axis"]),
+                       "insert": ["part", "text"]}, []),
             "prove": ({"inspect": ["analyze", "mass", "section"], "review": ["history"]}, []),
             "release": ({"output": ["render"]}, ["slice", "plates"]),
             "document": ({"sheets": ["views", "dims"], "picture": ["frame"]}, [])}
@@ -125,7 +135,7 @@ def journey_ribbon(ui):
             for t in ids:
                 ui.check(ui.exists("ribbon-" + t) or ui.exists("ribbonMore"), f"{mode}: {t} in the ribbon (or its More)")
         for t in absent:
-            ui.check(not ui.exists("ribbon-" + t), f"{mode}: {t} is not shown: the engine has no {t} yet / it does not apply")
+            ui.check(t not in listed(ui), f"{mode}: {t} is not shown: it does not apply to this design")
         ui.eq([rect(ui, n) for n in ("railSelect", "railMeasure", "railSection", "railAnnotate")], four, f"{mode}: the four have not moved")
         ui.eq(rect(ui, "toolRibbon")[3], 38.0, f"{mode}: one line, nothing wraps")
         crop(ui, ["toolRibbon", "toolDock"], "ribbon-" + mode)
@@ -135,14 +145,24 @@ def journey_ribbon(ui):
     ui.eq(ui.item("ribbon-fillet").property("keys"), "Shift+F", "Fillet says its key")
     ui.check(ui.exists("ribbonCaption-create") and ui.item("ribbonCaption-create").property("text") == "Create", "the Create caption")
 
-    # ── a kind the engine learns appears by itself (the capability check reads GET /studio feature_kinds) ──
+    # ── a tool waits for its feature kind: the capability check reads GET /studio feature_kinds ──
     kinds = ui.js("Store.studio.feature_kinds")
     ui.check(isinstance(kinds, list) and "fillet" in kinds and "extrude" in kinds, f"the engine lists its feature kinds: {kinds}")
-    ui.run_js("Store.studio = Object.assign({}, Store.studio, { feature_kinds: Store.studio.feature_kinds.concat(['sweep', 'mirror']) })")
-    ui.settle(300)
-    ui.check(ui.exists("ribbon-sweep") or ui.exists("ribbonMore"), "Sweep appears once the engine lists it")
+    on = {"sweep": "sweep", "loft": "loft", "rib": "rib", "mirror": "mirror", "draft": "draft", "split": "split",
+          "move_face": "move_face", "plane": "datum_plane", "axis": "datum_axis"}
+    for t, k in on.items():
+        ui.eq(t in listed(ui), k in kinds, f"{t} is shown exactly when the engine builds {k}")
+    ui.run_js("Store.studio = Object.assign({}, Store.studio, { feature_kinds: Store.studio.feature_kinds.filter("
+              "function (k) { return k !== 'sweep' && k !== 'mirror' }) })")
+    ui.wait_until(lambda: "sweep" not in listed(ui) and "mirror" not in listed(ui), 3, "an engine without sweep and mirror: no Sweep, no Mirror")
     ui.run_js("Store.reloadStudio()")
-    ui.wait_until(lambda: not ui.exists("ribbon-sweep"), 5, "and goes when the engine does not")
+    ui.wait_until(lambda: ("sweep" in listed(ui)) == ("sweep" in kinds), 5, "the engine's own list again")
+    if "sweep" in kinds:                      # it has no panel in the window: the request is written in the conversation
+        tool(ui, "sweep")
+        ui.wait_until(lambda: "sweep" in (ui.js("Store.chatRecall") or "").lower(), 3, "Sweep writes its request in the conversation")
+        ui.run_js("Store.chatRecall = ''; Store.talkCalm = true")
+        click_stage(ui)                       # the keyboard back on the part
+        ui.settle(900)
 
     # ── the tools work from the ribbon ──
     tool(ui, "fillet")

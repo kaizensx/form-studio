@@ -179,7 +179,8 @@ Item {
             return { active: (Results.id === e.id && Results.on) || (Store.mode === Store.benchModeOf(ch) && (Store.benchSel[ch] || "") === e.id),
                      marked: e.state === "current", hint: (t.hint || "") + " " + Store.benchSays(e).replace(/^./, function (c) { return c.toUpperCase() }) + "." }
         }
-        if (t && t.need && t.need.kind) return { active: ws.tool === "annotate" && Ws.want === id, enabled: !sim && !Store.hasDraft }
+        if (t && t.need && t.need.kind) return { enabled: !Store.hasDraft,
+            hint: (t.hint || "") + " Opens the conversation with the request written for you to finish; the agent adds it as a feature of the design." }
         return {}
     }
     function toolRun(id) {
@@ -204,8 +205,8 @@ Item {
             Store.benchPick(ch, e)
             return
         }
-        // a feature kind the engine has just learnt (more-features): picked on the part, its panel in the pane
-        if (t && t.need && t.need.kind) ws.setTool("annotate", id)
+        // a feature kind the engine builds that has no panel in the window yet: the request, written in the conversation
+        if (t && t.need && t.need.kind) { Store.talkOpen = true; Store.talkCalm = false; Store.recallChat(t.ask || ("Add a " + t.label.toLowerCase() + " to this design: ")) }
     }
     function setTool(t, want) {
         if (ws.sim) Store.showLayers(false)

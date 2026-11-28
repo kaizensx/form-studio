@@ -3,8 +3,8 @@ import QtQuick
 // The tools of the mode you are in, labelled and grouped, in one slim band of glass at the head of the stage
 // (docs/design/directions/i/IA.md, "Built so far": the pro frame). Each group has a caption lettered like a
 // drawing's; each tool an icon and its label. Nothing ever wraps: when the stage is narrow the groups give up their
-// labels one by one from the right (icons only, the label in the tooltip), then the captions go, and only then do
-// the last tools move into More. The band ends with Hide, which folds it back into the icon dock (remembered).
+// labels one by one from the right (icons only, the label in the tooltip), the tools used least move into More, the
+// captions go, and only then does the first group lose its labels (see `plan`). The band ends with Hide, which folds it back into the icon dock (remembered).
 //
 //   groups  [{ id, caption, tools: [{ id, icon, label, keys, hint }] }], already cut to what this design can use
 //   host    toolState(id) -> { active, marked, enabled, toggle, label, hint }; toolRun(id)
@@ -27,41 +27,39 @@ Glass {
     readonly property int tail: 32 + 4        // Hide
     function _full(t) { return Math.ceil(fmLabel.advanceWidth(t.label)) + 44 }
     function _capW(g) { return Math.ceil(fmCap.advanceWidth(g.caption.toUpperCase()) + 1.1 * g.caption.length) + 10 }
-    function _width(gs, compact, caps, keep, more) {
+    function _width(gs, compact, caps, shown, more) {
         var w = 2 * pad + tail, n = 0
         for (var i = 0; i < gs.length; i++) {
-            var k = keep[i]
-            if (!k) continue
+            var k = shown[i]
+            if (!k.length) continue
             if (n) w += sepW
             n++
             if (caps) w += _capW(gs[i])
-            for (var j = 0; j < k; j++) w += (compact[i] ? 32 : _full(gs[i].tools[j])) + (j ? sp : 0)
+            for (var j = 0; j < k.length; j++) w += (compact[i] ? 32 : _full(k[j])) + (j ? sp : 0)
         }
         if (more) w += (n ? sepW : 0) + 32
         return w
     }
+    // In this order, until it fits: the groups after the first give up their labels, from the right; the tools used
+    // least (`extra` in ToolSet.js: sweep, loft, rib, mirror, draft, split, move face, the planes) go into More, from
+    // the end; the captions go; the first group gives up its labels; then the last tools go into More.
     readonly property var plan: {
         var gs = groups || [], room = maxWidth, n = gs.length
-        var compact = gs.map(function () { return false }), keep = gs.map(function (g) { return g.tools.length })
-        var caps = true
-        if (_width(gs, compact, caps, keep, false) > room) {
-            for (var i = n - 1; i >= 0 && _width(gs, compact, caps, keep, false) > room; i--) compact[i] = true
-            if (_width(gs, compact, caps, keep, false) > room) caps = false
-            // still too wide: the last tools go into More, from the end
-            var more = []
-            var over = _width(gs, compact, caps, keep, false) > room
-            while (over && _width(gs, compact, caps, keep, true) > room) {
-                var g = -1
-                for (var q = n - 1; q >= 0; q--) if (keep[q] > 0) { g = q; break }
-                if (g < 0) break
-                keep[g]--
-                more.unshift({ group: gs[g].caption, tool: gs[g].tools[keep[g]] })
-            }
-            return { compact: compact, caps: caps, keep: keep, more: more }
-        }
-        return { compact: compact, caps: caps, keep: keep, more: [] }
+        var compact = gs.map(function () { return false }), shown = gs.map(function (g) { return g.tools.slice() })
+        var caps = true, more = []
+        function fits() { return rb._width(gs, compact, caps, shown, more.length > 0) <= room }
+        function out(i, j) { more.push({ group: gs[i].caption, gi: i, ti: gs[i].tools.indexOf(shown[i][j]), tool: shown[i][j] }); shown[i].splice(j, 1) }
+        for (var i = n - 1; i >= 1 && !fits(); i--) compact[i] = true
+        for (var g = n - 1; g >= 0 && !fits(); g--)
+            for (var j = shown[g].length - 1; j >= 0 && !fits(); j--) if (shown[g][j].extra) out(g, j)
+        if (!fits()) caps = false
+        if (!fits() && n) compact[0] = true
+        for (var q = n - 1; q >= 0 && !fits(); q--)
+            while (shown[q].length && !fits()) out(q, shown[q].length - 1)
+        more.sort(function (x, y) { return x.gi - y.gi || x.ti - y.ti })
+        return { compact: compact, caps: caps, shown: shown, more: more }
     }
-    width: Math.round(Math.min(maxWidth, _width(groups || [], plan.compact, plan.caps, plan.keep, plan.more.length > 0)))
+    width: Math.round(Math.min(maxWidth, _width(groups || [], plan.compact, plan.caps, plan.shown, plan.more.length > 0)))
     Behavior on width { enabled: rb.settled; NumberAnimation { duration: Theme.move(Theme.base); easing.type: Easing.BezierSpline; easing.bezierCurve: Theme.easeOut } }
     property bool settled: false
     Component.onCompleted: Qt.callLater(function () { rb.settled = true })
@@ -80,10 +78,10 @@ Glass {
                     id: grp
                     required property var modelData
                     required property int index
-                    readonly property int keep: rb.plan.keep[index] || 0
-                    readonly property bool first: { for (var i = 0; i < index; i++) if (rb.plan.keep[i]) return false; return true }
+                    readonly property var tools: rb.plan.shown[index] || []
+                    readonly property bool first: { for (var i = 0; i < index; i++) if ((rb.plan.shown[i] || []).length) return false; return true }
                     objectName: "ribbonGroup-" + modelData.id
-                    visible: keep > 0
+                    visible: tools.length > 0
                     height: parent.height; spacing: 0
                     Item { visible: !grp.first; width: rb.sepW; height: parent.height
                         Rectangle { x: 8; anchors.verticalCenter: parent.verticalCenter; width: 1; height: 18; color: Theme.rule } }
@@ -93,7 +91,7 @@ Glass {
                     Row {
                         spacing: rb.sp; anchors.verticalCenter: parent.verticalCenter
                         Repeater {
-                            model: grp.modelData.tools.slice(0, grp.keep)
+                            model: grp.tools
                             RibbonBtn { tipTo: rb
                                 required property var modelData
                                 readonly property var st: rb.host ? rb.host.toolState(modelData.id) : ({})

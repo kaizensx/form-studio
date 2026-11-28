@@ -172,6 +172,8 @@ def tool(ui, tid):
             ui.settle(200)
             ui.click(name)
             return
+        ui.hover("ribbonMore")
+        ui.settle(200)
         ui.click("ribbonMore")
         ui.wait_until(lambda: ui.exists("ribbonMore-" + tid), 3, f"{tid} in More")
         ui.settle(150)

@@ -5,7 +5,9 @@
 // `need` says what a tool waits for, so that nothing is shown that cannot do anything yet:
 //   kind:  ["sweep"]      a feature kind the engine builds (GET /studio feature_kinds, form/modelling.py KINDS).
 //                         Sweep, loft, rib, mirror, draft, split, move face and the planes are registered here and
-//                         appear by themselves when the engine lists their kind.
+//                         appear by themselves when the engine lists their kind. The window has no panel of its
+//                         own for them yet: `ask` is put in the conversation, written for the person to finish,
+//                         and the agent adds the feature (add_feature: the same engine call).
 //   bench: ["strength"]   a Bench entry (form/studies.py) the design has; the first one that applies is opened.
 //   when:  "assembly"     the design declares how its parts go together; "print" it is made for printing;
 //                         "companions" it carries a reference part; "game" a game asset.
@@ -18,24 +20,24 @@ var MODES = {
             { id: "extrude", icon: "arrow_up", label: "Extrude", keys: "Shift+E", hint: "A profile drawn on a face or a plane, pulled out of it." },
             { id: "cut", icon: "arrow_down_to_line", label: "Cut", keys: "Shift+X", hint: "A profile drawn on a face, cut into the part: a pocket, a slot, a hole of any shape." },
             { id: "revolve", icon: "rotate_3d", label: "Revolve", keys: "Shift+R", hint: "A profile turned about one of its lines." },
-            { id: "sweep", icon: "spline", label: "Sweep", hint: "A profile carried along a path.", need: { kind: ["sweep"] } },
-            { id: "loft", icon: "layers_2", label: "Loft", hint: "A solid through two or more profiles.", need: { kind: ["loft"] } },
-            { id: "rib", icon: "separator_vertical", label: "Rib", hint: "A thin wall from an open profile, grown to the faces around it.", need: { kind: ["rib"] } }
+            { id: "sweep", icon: "spline", label: "Sweep", hint: "A profile carried along a path.", extra: true, need: { kind: ["sweep"] }, ask: "Add a sweep to this design: carry the profile  along the path . Twist: none." },
+            { id: "loft", icon: "layers_2", label: "Loft", hint: "A solid through two or more profiles.", extra: true, need: { kind: ["loft"] }, ask: "Add a loft to this design, through these profiles: " },
+            { id: "rib", icon: "separator_vertical", label: "Rib", hint: "A thin wall from an open profile, grown to the faces around it.", extra: true, need: { kind: ["rib"] }, ask: "Add a rib to this design: an open line from  to , 2 mm thick." }
         ] },
         { id: "modify", caption: "Modify", tools: [
             { id: "fillet", icon: "radius", label: "Fillet", keys: "Shift+F", hint: "Pick the edges to round." },
             { id: "chamfer", icon: "triangle", label: "Chamfer", keys: "Shift+C", hint: "Pick the edges to bevel." },
             { id: "hole", icon: "circle_dot", label: "Hole", keys: "Shift+H", hint: "Pick a flat face: a hole there, to a standard size." },
             { id: "pattern", icon: "layout_grid", label: "Pattern", keys: "Shift+P", hint: "Repeat a feature along a line or about an axis. Select the feature first, on the part or in the tree." },
-            { id: "mirror", icon: "flip_horizontal_2", label: "Mirror", hint: "A feature or the body, mirrored about a plane.", need: { kind: ["mirror"] } },
+            { id: "mirror", icon: "flip_horizontal_2", label: "Mirror", hint: "A feature or the body, mirrored about a plane.", extra: true, need: { kind: ["mirror"] }, ask: "Mirror  about the plane  in this design." },
             { id: "shell", icon: "box", label: "Shell", keys: "Shift+S", hint: "Pick a flat face: the part hollowed out and open there." },
-            { id: "draft", icon: "cone", label: "Draft", hint: "Faces tilted from the pull direction, for a mould or a print.", need: { kind: ["draft"] } },
-            { id: "split", icon: "slice", label: "Split", hint: "The body cut in two by a plane or a face.", need: { kind: ["split"] } },
-            { id: "move_face", icon: "move", label: "Move face", hint: "A face pushed or pulled; the features around it follow.", need: { kind: ["move_face", "moveface"] } }
+            { id: "draft", icon: "cone", label: "Draft", hint: "Faces tilted from the pull direction, for a mould or a print.", extra: true, need: { kind: ["draft"] }, ask: "Add a draft to this design: tilt the faces  by 2° from the pull direction, neutral plane ." },
+            { id: "split", icon: "slice", label: "Split", hint: "The body cut in two by a plane or a face.", extra: true, need: { kind: ["split"] }, ask: "Split this design’s body at the plane  and keep ." },
+            { id: "move_face", icon: "move", label: "Move face", hint: "A face pushed or pulled; the features around it follow.", extra: true, need: { kind: ["move_face", "moveface"] }, ask: "Move the face  of this design by  mm." }
         ] },
         { id: "reference", caption: "Reference", tools: [
-            { id: "plane", icon: "diamond", label: "Plane", hint: "A datum plane to sketch on or mirror about.", need: { kind: ["plane", "datum_plane"] } },
-            { id: "axis", icon: "move_3d", label: "Axis", hint: "A datum axis to revolve or pattern about.", need: { kind: ["axis", "datum_axis"] } }
+            { id: "plane", icon: "diamond", label: "Plane", hint: "A datum plane to sketch on or mirror about.", extra: true, need: { kind: ["plane", "datum_plane"] }, ask: "Add a datum plane to this design: offset  mm from ." },
+            { id: "axis", icon: "move_3d", label: "Axis", hint: "A datum axis to revolve or pattern about.", extra: true, need: { kind: ["axis", "datum_axis"] }, ask: "Add a datum axis to this design through ." }
         ] },
         { id: "insert", caption: "Insert", tools: [
             { id: "part", icon: "wrench", label: "Part here", keys: "Shift+B", hint: "Pick a hole or a face: a screw, insert, bearing or other bought part on it, its hole cut and its fit checked." },
