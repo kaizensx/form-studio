@@ -337,6 +337,7 @@ form tool get_project '{"project": "desk-stand"}'                               
 | **Print physics: orientation, strength as printed, warp risk** | [docs/PRINT_PHYSICS.md](docs/PRINT_PHYSICS.md) |
 | **Inverse design and topology optimisation, with their verification** | [docs/OPTIMISATION.md](docs/OPTIMISATION.md) |
 | **Cost per process, with sourced rates** | [docs/COST.md](docs/COST.md) |
+| **Tolerance stack-up and its verification** | [docs/TOLERANCES.md](docs/TOLERANCES.md) |
 
 ## Community
 

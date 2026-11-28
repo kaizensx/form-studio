@@ -298,6 +298,9 @@ def main(argv=None):
     if argv[:1] == ["optimize"] and argv[1:2] and argv[1] in ("pareto", "topology"):
         from .inverse.cli import main as search_main  # inverse design and topology optimisation (form/inverse, form/topo)
         return search_main(argv[1:])
+    if argv[:1] == ["stack"]:                      # tolerance stack-up from the assembly (form/stack)
+        from .stack.cli import main as stack_main
+        return stack_main(argv[1:])
     if argv[:1] == ["calc"]:                       # engineering calculators that write geometry (form/calc)
         from .calc.cli import main as calc_main
         return calc_main(argv[1:])

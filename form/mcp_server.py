@@ -3474,6 +3474,8 @@ def build() -> MCPServer:
     inverse_tools.register_tools(mcp, studio, _run, RO, RW, _origin)
     from .topo import tools as topo_tools     # topology optimisation as features: topology_optimise, get_topology,
     topo_tools.register_tools(mcp, studio, _run, RO, RW, _origin)      # apply_topology (form/topo)
+    from .stack import tools as stack_tools   # tolerance stack-up from the assembly: tolerance_stack, get_tolerance_stack
+    stack_tools.register_tools(mcp, studio, _run, RO, RW, _origin)
     return mcp
 
 

@@ -35,7 +35,7 @@ SUITES = [
     {"id": "calculators", "title": "Calculators against published worked examples", "wave": "X",
      "module": "form.calc.verify", "needs": "the CAD kernel for the solids"},
     {"id": "iso286", "title": "ISO 286 limits against the ISO 286-2 tables", "wave": "F",
-     "module": "form.drawing.iso286", "needs": ""},
+     "module": "form.iso286", "needs": ""},
     {"id": "dfm", "title": "Manufacturability rules at their thresholds", "wave": "E",
      "module": "form.dfm.rules", "needs": ""},
     {"id": "recon", "title": "Mesh to editable CAD: deviation against tolerance", "wave": "recon",

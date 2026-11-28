@@ -1417,3 +1417,5 @@ from .placement import KERNEL_OPS as _PLACEMENT_OPS  # noqa: E402  (standard par
 OPS.update(_PLACEMENT_OPS)
 from .board.fit import KERNEL_OPS as _BOARD_OPS  # noqa: E402  (a circuit board against its enclosure)
 OPS.update(_BOARD_OPS)
+from .stack.kernel import KERNEL_OPS as _STACK_OPS  # noqa: E402  (tolerance stack-up: the loop and its sensitivities)
+OPS.update(_STACK_OPS)

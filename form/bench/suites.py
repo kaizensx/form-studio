@@ -13,7 +13,7 @@ Suites:
   strength      form.fea.verify (wave D): textbook and NAFEMS cases solved by the strength study's own code path.
                 Needs the FEA engine's Python ($FORM_FEA_PYTHON, or this Python when it has Netgen and scikit-fem).
   calculators   form.calc.verify (wave X): worked examples from their published sources, and the solids measured.
-  iso286        ISO 286 limits (wave F): form.drawing.iso286 computed from the standard's formulas, checked against
+  iso286        ISO 286 limits (wave F): form.iso286 computed from the standard's formulas, checked against
                 the ISO 286-2 table values transcribed in form/craft/fits.py; without wave F, the tabulated module's
                 own named fits.
   dfm           form.dfm.rules (wave E): every numeric limit of every process table probed on both sides of its
@@ -126,8 +126,8 @@ def iso286() -> dict:
     lows = (0,) + tuple(table.RANGES[:-1])
     step = [f"over {lo} to {hi} mm" for lo, hi in zip(lows, table.RANGES)]
     rows = []
-    if _has("form.drawing.iso286"):
-        from form.drawing import iso286 as calc
+    if _has("form.iso286"):
+        from form import iso286 as calc
         for g in sorted(table.IT):
             for k, d in enumerate(mids):
                 got = calc.it(g, d)
@@ -159,7 +159,7 @@ def iso286() -> dict:
         f = table.iso_fit(code, d)
         rows.append(_row(f"fit {code}", f"Ø{d} hole limits", hole, tuple(f["hole"]), "mm", 0, tuple(f["hole"]) == hole, src))
         rows.append(_row(f"fit {code}", f"Ø{d} shaft limits", shaft, tuple(f["shaft"]), "mm", 0, tuple(f["shaft"]) == shaft, src))
-    return {"suite": "iso286", "available": True, "rows": rows, "mode": "named fits (form.drawing.iso286 not in this tree)"}
+    return {"suite": "iso286", "available": True, "rows": rows, "mode": "named fits (form.iso286 not in this tree)"}
 
 
 # ---- DFM thresholds (wave E) ------------------------------------------------------------------------------------
