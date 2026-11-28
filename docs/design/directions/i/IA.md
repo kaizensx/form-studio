@@ -1,6 +1,6 @@
 # Direction I: Lightdesk, one bench
 
-Date: 2026-11-28. Branch `dev`. Status: **a design proposal in mockups. Nothing here is built in the app.**
+Date: 2026-11-28. Status: **approved; being built on the branch `direction-i`.** What is built is listed in [Built so far](#built-so-far-branch-direction-i); the rest of this page is the proposal as it was drawn.
 
 Direction I keeps Lightdesk (`docs/design/DIRECTION.md`): the room, the warm pool, glass panes, one cyan, Geist and
 Geist Mono, the film-title cue, the conversation on the left, the pane on the right, the floating dock. It changes
@@ -273,3 +273,16 @@ The owner approved direction I with the recommended choices: four modes (Describ
 study in Check); the drawing sheet in the dark theme is a night sheet with cyan dimensions, and a key switches it
 to white paper; the dock stays vertical at the stage's left edge; stress maps use one hue (clay to cyan to white),
 with a many-colour scale as a legend option; feature rows show their value and who made the feature.
+
+## Built so far (branch `direction-i`)
+
+| Part | State |
+|---|---|
+| Tokens: 11 px minimum, edge 20, pane 332, the evidence word, the motion durations | Built |
+| Four modes with a line of state; Describe as the Overview; Fit as a study in Check; Document | Built. The Overview holds the brief and the revisions; decisions, open questions, files by kind and the family are not built |
+| View cube and shading chip; no view buttons at the foot | Built. The chip lists the build plate, the floor grid and the dimensions; the 3D view has no other shading modes yet |
+| Legend strip under the part | Built for the four analysis maps. One band per stop, not a continuous scale with a marker |
+| One row grammar (`BenchRow.qml`), rows that open in place with what you get, what it needs and the request | Built, used by Document and the Fit row |
+| The conversation (plan card, live status, Sources, hand-edit notes), Home, Settings, the palette | Not built |
+| The Bench docked and as a sheet, the mode-aware dock and tool options, the rollback bar, Values or Source, sketch on a face | Not built: they wait for the Bench, hand modelling and materials to be merged |
+| The three signature moments | Not built |

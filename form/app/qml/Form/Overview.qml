@@ -20,7 +20,8 @@ Glass {
     Behavior on lift { NumberAnimation { duration: Theme.move(Theme.benchOpen); easing.type: Easing.BezierSpline; easing.bezierCurve: Theme.easeMode } }
     transform: Translate { y: ov.lift }
     Rectangle { anchors.fill: parent; radius: ov.radius; color: Theme.alpha(Theme.plate1, ov.blurred ? 0.8 : 0.9) }
-    MouseArea { anchors.fill: parent; acceptedButtons: Qt.AllButtons; onWheel: function (w) { w.accepted = true } }
+    MouseArea { anchors.fill: parent; acceptedButtons: Qt.AllButtons; hoverEnabled: true;      // nothing under the sheet answers the pointer
+        onWheel: function (w) { w.accepted = true } }
     focus: on
     Keys.onEscapePressed: Store.overview = false
 
