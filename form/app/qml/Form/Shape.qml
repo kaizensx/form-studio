@@ -114,7 +114,7 @@ Column {
                         Txt { id: why; objectName: "leftOutReason"; kind: "fine"; visible: !!fr.out; tone: 2; x: 64; y: 28; width: parent.width - 78; wrapMode: Text.WordWrap
                             text: fr.out ? Store.leftOutReason(fr.out) : "" }
                         // its role, lettered in neutral mono; "building" on the line that runs
-                        Txt { id: kw; objectName: "featureRole"; anchors.right: parent.right; anchors.rightMargin: 12; y: (32 - height) / 2; mono: true; font.pixelSize: 10; font.weight: Theme.wMedium; font.letterSpacing: 1.0
+                        Txt { id: kw; objectName: "featureRole"; anchors.right: parent.right; anchors.rightMargin: 12; y: (32 - height) / 2; mono: true; font.pixelSize: 11; font.weight: Theme.wMedium; font.letterSpacing: 1.0
                             font.capitalization: Font.AllUppercase; wrapMode: Text.NoWrap
                             text: fr.arriving ? "building" : fr.out ? "left out" : fr.modelData.role
                             color: fr.arriving ? Theme.datum : fr.out ? Theme.amber : Theme.ink3; opacity: fr.built ? 0.6 : fr.todo ? 0.5 : 1 }

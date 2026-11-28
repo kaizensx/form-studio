@@ -36,7 +36,7 @@ Rectangle {
                         font.family: Theme.sans; font.pixelSize: 12; font.weight: Theme.wSemi; color: chip.on ? Theme.ink : Theme.ink2 }
                     Text { anchors.horizontalCenter: parent.horizontalCenter; renderType: Theme.textRender
                         text: F.trim(chip.modelData.triangles) + (chip.modelData.budget ? " / " + F.trim(chip.modelData.budget) : "") + " tris"
-                        font.family: Theme.mono; font.pixelSize: 10; color: lb.over(chip.modelData) ? Theme.signal : chip.on ? Theme.ink2 : Theme.ink3 } }
+                        font.family: Theme.mono; font.pixelSize: 11; color: lb.over(chip.modelData) ? Theme.signal : chip.on ? Theme.ink2 : Theme.ink3 } }
                 MouseArea { id: ma; anchors.fill: parent; hoverEnabled: true; cursorShape: Qt.PointingHandCursor
                     onClicked: lb.picked(chip.modelData.lod) }
                 Tip { show: ma.containsMouse; text: chip.modelData.source || "" }

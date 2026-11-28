@@ -42,7 +42,7 @@ Item {
                                   + ({ yes: " · tools supported", some: " · tools on some models", no: " · no tool support listed", unknown: " · tool support not listed" })[pr.p.tools || "unknown"]
                                   + (pr.p.key_set ? " · key stored privately, not shown again" : pr.p.local ? " · no key" : "")
                         : pr.a ? (pr.a.why || "Not answering.") : "Looking…" }
-                Txt { kind: "fine"; tone: 4; mono: true; font.pixelSize: 10; width: parent.width; elide: Text.ElideMiddle; wrapMode: Text.NoWrap; text: pr.p.base || "" } }
+                Txt { kind: "fine"; tone: 4; mono: true; font.pixelSize: 11; width: parent.width; elide: Text.ElideMiddle; wrapMode: Text.NoWrap; text: pr.p.base || "" } }
             Row { id: acts; spacing: 6; anchors.right: parent.right; anchors.verticalCenter: parent.verticalCenter
                 Btn { visible: !pr.confirm && pr.up; small: true; kind: "quiet"; icon: "flask_conical"; text: "Test"; active: pr.testing
                     objectName: "providerTest"; onClicked: pr.testing = !pr.testing }

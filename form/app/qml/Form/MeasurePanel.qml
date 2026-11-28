@@ -43,7 +43,7 @@ Rectangle {
                         required property int index
                         width: parent.width; height: rc.implicitHeight + 12
                         Rectangle { visible: row.index > 0; width: parent.width; height: 1; color: Theme.rule }
-                        Txt { y: 8; mono: true; font.pixelSize: 10; tone: 4; text: String(row.index + 1) }
+                        Txt { y: 8; mono: true; font.pixelSize: 11; tone: 4; text: String(row.index + 1) }
                         Column { id: rc; x: 18; y: 6; width: parent.width - 18 - 22; spacing: 2
                             Row { spacing: 8
                                 Txt { mono: true; font.pixelSize: 14; font.weight: 600; color: Theme.datum; text: row.modelData.label; wrapMode: Text.NoWrap }

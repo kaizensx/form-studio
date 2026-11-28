@@ -234,7 +234,7 @@ Item {
                         Icon { anchors.centerIn: parent; name: "play"; size: 10; color: Theme.datum; opacity: dl.now ? 1 : 0
                             Behavior on opacity { NumberAnimation { duration: Theme.fast } } } }
                     Txt { x: 64; anchors.verticalCenter: parent.verticalCenter; width: parent.width - 150; elide: Text.ElideRight; wrapMode: Text.NoWrap; font.pixelSize: 13; font.weight: dl.now ? Theme.wSemi : Theme.wMedium; tone: dl.now ? 1 : 2; text: dl.modelData.label || dl.modelData.feature }
-                    Txt { visible: dl.now; anchors.right: parent.right; anchors.rightMargin: 12; anchors.verticalCenter: parent.verticalCenter; mono: true; font.pixelSize: 10; font.weight: Theme.wMedium; font.letterSpacing: 1.0; color: Theme.datum; text: "BUILDING" } } } }
+                    Txt { visible: dl.now; anchors.right: parent.right; anchors.rightMargin: 12; anchors.verticalCenter: parent.verticalCenter; mono: true; font.pixelSize: 11; font.weight: Theme.wMedium; font.letterSpacing: 1.0; color: Theme.datum; text: "BUILDING" } } } }
     }
 
     // the blank canvas: the empty studio floor and the ways to put something on it

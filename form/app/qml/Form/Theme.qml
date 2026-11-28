@@ -47,9 +47,9 @@ QtObject {
     // the room behind everything: top, upper wall, the lit floor, the foot
     readonly property var room: dark ? ["#0a0a0b", "#131314", "#1b1b1c", "#0d0d0e"] : ["#e6e3de", "#efede9", "#f6f5f2", "#e4e1dc"]
     readonly property color vignette: dark ? Qt.rgba(0, 0, 0, 0.78) : Qt.rgba(0.47, 0.41, 0.35, 0.16)
-    readonly property int edge: 12          // panes sit this far from the window's edge
-    readonly property int paneTop: 68       // where the side panes begin, under the top row (capsules 12..52, stages 8..56)
-    readonly property int paneW: 300        // the right pane
+    readonly property int edge: 20          // panes sit this far from the window's edge (direction I: edge 20, gap 12)
+    readonly property int paneTop: 76       // where the side panes begin, under the top row (capsules 16..60, modes 12..64)
+    readonly property int paneW: 332        // the right pane: the Bench, docked
     readonly property int rPane: 22         // panes; capsules are fully round
     // ink
     readonly property color ink: dark ? "#f4f3f1" : "#161616"
@@ -103,7 +103,7 @@ QtObject {
     readonly property real lineBox: 1.3     // Geist and Geist Mono: ascent + descent, in em (1005 + 295 units of 1000)
 
     // type scale (ratio ~1.2 from 13)
-    readonly property int tCap: 10
+    readonly property int tCap: 11         // the smallest type on any screen is 11 px
     readonly property int tFine: 11
     readonly property int tBody: 13
     readonly property int tLead: 15
@@ -113,6 +113,11 @@ QtObject {
     readonly property int tHero: 44
     readonly property int tDisplay: 68     // one line per screen at most: Home's question
     readonly property int tCue: 54         // the build's lower third: the feature being made
+
+    // an evidence word (Ev.qml, Tag.qml): how a number is known, in mono capitals. One size, one tracking.
+    readonly property int tEv: 11
+    readonly property real evTrack: 0.66   // 0.06 em of 11 px
+    readonly property real tagTrack: 0.88  // 0.08 em, inside a pill
 
     readonly property int rXs: 6
     readonly property int rSm: 9
@@ -170,6 +175,19 @@ QtObject {
     // dropped (Theme.move(ms) returns 0, Theme.shift(px) returns 0) and only opacity/colour still animate.
     readonly property bool reduced: Bridge.reducedMotion
     readonly property int press: 110
+    // direction I (docs/design/directions/i/IA.md, the motion spec). Nothing is longer than 520 ms.
+    readonly property int mode: 180        // a mode change: the lit segment glides, the pane's rows cross-fade
+    readonly property int benchOpen: 220   // the Bench opens; it closes in 160
+    readonly property int benchClose: 160
+    readonly property int rowOpen: 140     // a row opens in place
+    readonly property int strip: 180       // the legend strip arrives under the part, with an 8 px rise
+    readonly property int sources: 120     // the Sources block under a reply: opacity only
+    readonly property int develop: 520     // a result develops on the part (mask 0..320, legend and error line 320..520)
+    readonly property int unfold: 480      // the drawing sheet unfolds
+    readonly property int flashIn: 140     // the feature the rollback bar passes
+    readonly property int moment: 160      // what a signature moment becomes under Reduce Motion: a cross-fade
+    readonly property var easeMode: [0.16, 1, 0.3, 1, 1, 1]
+    readonly property var easeFold: [0.65, 0, 0.35, 1, 1, 1]
     readonly property int pop: 150
     readonly property int exit: 110
     readonly property int stagger: 45

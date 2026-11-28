@@ -40,7 +40,7 @@ Item {
                 anchors.verticalCenter: parent.verticalCenter } }
         Txt { kind: "fine"; width: parent.width; maximumLineCount: 2; elide: Text.ElideRight
             color: ag.a.available && ag.k && (ag.k.set || ag.k.from_env) ? Theme.pass : Theme.ink3; text: ag.status() }
-        Txt { kind: "fine"; tone: 4; mono: true; font.pixelSize: 10; width: parent.width; elide: Text.ElideMiddle; wrapMode: Text.NoWrap
+        Txt { kind: "fine"; tone: 4; mono: true; font.pixelSize: 11; width: parent.width; elide: Text.ElideMiddle; wrapMode: Text.NoWrap
             visible: ag.a.available && !ag.api
             text: (ag.a.cli || "") + (ag.count ? "  ·  " + ag.count + " listed models" : "") }
         Txt { kind: "fine"; tone: 4; width: parent.width; visible: ag.untested

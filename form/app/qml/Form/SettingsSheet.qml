@@ -190,7 +190,7 @@ Item {
                             width: 6; height: 6; radius: 3; color: Theme.blueprint }
                         Rectangle { visible: !!ni.modelData.badge && ni.pending === 0; anchors.right: parent.right; anchors.rightMargin: 8; anchors.verticalCenter: parent.verticalCenter
                             width: bt.implicitWidth + 10; height: 16; radius: 8; color: Theme.alpha(Theme.amber, 0.14)
-                            Text { id: bt; anchors.centerIn: parent; text: ni.modelData.badge ? String(ni.modelData.badge) : ""; color: Theme.amber; font.family: Theme.mono; font.pixelSize: 10; renderType: Theme.textRender } }
+                            Text { id: bt; anchors.centerIn: parent; text: ni.modelData.badge ? String(ni.modelData.badge) : ""; color: Theme.amber; font.family: Theme.mono; font.pixelSize: 11; renderType: Theme.textRender } }
                         MouseArea { id: nm; anchors.fill: parent; hoverEnabled: true; onClicked: st.go(ni.modelData.value) } }
                 }
             }

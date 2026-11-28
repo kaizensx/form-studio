@@ -32,7 +32,7 @@ Item {
                         color: tab.on ? Theme.ink : tm.containsMouse ? Theme.ink : Theme.ink2
                         Behavior on color { Tint {} } }
                     Rectangle { visible: !!tab.modelData.badge; width: bt.implicitWidth + 10; height: 16; radius: 8; color: Theme.alpha(Theme.amber, 0.14); anchors.verticalCenter: parent.verticalCenter
-                        Text { id: bt; anchors.centerIn: parent; text: tab.modelData.badge ? String(tab.modelData.badge) : ""; color: Theme.amber; font.family: Theme.mono; font.pixelSize: 10; renderType: Theme.textRender } } }
+                        Text { id: bt; anchors.centerIn: parent; text: tab.modelData.badge ? String(tab.modelData.badge) : ""; color: Theme.amber; font.family: Theme.mono; font.pixelSize: 11; renderType: Theme.textRender } } }
                 MouseArea { id: tm; anchors.fill: parent; anchors.leftMargin: -12; anchors.rightMargin: -12; hoverEnabled: true; onClicked: g.picked(tab.v) }
             }
         }

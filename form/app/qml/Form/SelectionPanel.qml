@@ -91,7 +91,7 @@ Rectangle {
                         width: parent.width; height: rc.implicitHeight + 12
                         Rectangle { visible: row.index > 0; width: parent.width; height: 1; color: Theme.rule }
                         Rectangle { y: 9; width: 16; height: 16; radius: 8; color: Theme.alpha(Theme.annotate, 0.18)
-                            Txt { anchors.centerIn: parent; mono: true; font.pixelSize: 9; color: Theme.annotate; text: String(row.index + 1) } }
+                            Txt { anchors.centerIn: parent; mono: true; font.pixelSize: 11; color: Theme.annotate; text: String(row.index + 1) } }
                         Column { id: rc; x: 24; y: 6; width: parent.width - 24 - 22; spacing: 2
                             Txt { font.pixelSize: 13; font.weight: 600; width: parent.width; elide: Text.ElideRight; wrapMode: Text.NoWrap; text: row.ln[0] }
                             Txt { kind: "fine"; tone: 2; mono: true; width: parent.width; text: row.ln[1] }
@@ -153,7 +153,7 @@ Rectangle {
                         MouseArea { id: am; anchors.fill: parent; hoverEnabled: true; cursorShape: Qt.PointingHandCursor
                             onClicked: Store.focusAnnotation(ar.on ? null : ar.modelData) }
                         Rectangle { x: 6; y: 9; width: 18; height: 18; radius: 9; color: ar.on ? Theme.annotate : Theme.alpha(Theme.annotate, 0.18)
-                            Txt { anchors.centerIn: parent; mono: true; font.pixelSize: 10; color: ar.on ? Theme.datumInk : Theme.annotate; text: String(ar.index + 1) } }
+                            Txt { anchors.centerIn: parent; mono: true; font.pixelSize: 11; color: ar.on ? Theme.datumInk : Theme.annotate; text: String(ar.index + 1) } }
                         Column { id: ac; x: 32; y: 7; width: parent.width - 40; spacing: 3
                             Row { spacing: 6; width: parent.width
                                 Txt { font.pixelSize: 13; font.weight: 600; text: ar.modelData.name; width: Math.min(implicitWidth, parent.width - rt.width - 6); elide: Text.ElideRight; wrapMode: Text.NoWrap }

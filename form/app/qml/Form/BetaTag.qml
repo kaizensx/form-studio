@@ -10,7 +10,7 @@ Rectangle {
     implicitHeight: 16; implicitWidth: lbl.implicitWidth + 12; radius: height / 2
     color: Theme.alpha(Theme.datum, 0.12)
     Text { id: lbl; anchors.centerIn: parent; text: b.text; color: Theme.datum; font.capitalization: Font.AllUppercase
-        font.family: Theme.mono; font.pixelSize: 10; font.weight: Theme.wMedium; font.letterSpacing: 0.8; renderType: Theme.textRender }
+        font.family: Theme.mono; font.pixelSize: 11; font.weight: Theme.wMedium; font.letterSpacing: 0.8; renderType: Theme.textRender }
     MouseArea { id: bm; anchors.fill: parent; hoverEnabled: true; acceptedButtons: Qt.NoButton }
     Tip { show: bm.containsMouse && b.tip !== ""; text: b.tip }
 }

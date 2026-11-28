@@ -33,7 +33,7 @@ Rectangle {
                     Txt { kind: "fine"; visible: !!row.r.help; text: row.r.help || ""; width: parent.width }
                     Txt { kind: "fine"; visible: row.hasPath; width: parent.width; elide: Text.ElideMiddle; wrapMode: Text.NoWrap
                         color: row.found ? Theme.pass : Theme.ink3; text: row.found ? "Found: " + row.found : "Not found on this computer" }
-                    Txt { visible: row.r.tab === "advanced"; kind: "fine"; tone: 4; mono: true; font.pixelSize: 10; text: row.r.key } }   // the file key only where people edit the file itself
+                    Txt { visible: row.r.tab === "advanced"; kind: "fine"; tone: 4; mono: true; font.pixelSize: 11; text: row.r.key } }   // the file key only where people edit the file itself
                 Row { id: ctl; anchors.right: parent.right; anchors.rightMargin: 18; anchors.verticalCenter: parent.verticalCenter; spacing: 8
                     // reset to the default
                     Btn { visible: !rc.sheet.isDefault(row.r) && row.r["default"] !== undefined && row.r["default"] !== null && row.r.key !== "data.dir"
