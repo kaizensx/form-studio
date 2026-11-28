@@ -143,6 +143,13 @@ under the data folder (`form/engines.py`), showing its size and licence first. T
   SHA-256 before use, makes these environments. Licence: MIT OR Apache-2.0. The Python 3.12 it installs for them is
   CPython (Python Software Foundation License) from uv's managed builds.
 
+## Programs run when you have them
+
+- **KiCad** (https://www.kicad.org, GPL-3.0-or-later) is never bundled or downloaded by Form Studio. When you have
+  installed it, its `kicad-cli` runs as a separate process for board checks (DRC, ERC) and board fab files; its
+  reports and files are kept as KiCad wrote them. Form Studio reads `.kicad_pcb` files with its own parser
+  (`form/board/sexpr.py`); no KiCad code and no third-party KiCad parser is in Form Studio.
+
 ## Fonts
 
 The typefaces in the app, on the website and in the README's drawings. Each licence text sits beside its font file.

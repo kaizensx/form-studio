@@ -501,6 +501,26 @@ def main(argv=None):
     bo.add_argument("--url", default="")
     bo.add_argument("--note", default="")
     bo.add_argument("--confirm", action="store_true", help="catalogue: really search after reading what is sent")
+    # -- circuit boards and their enclosures (form/board) --
+    bd = sub.add_parser("board", help="circuit boards: board read FILE | import FILE [--project P] [--step S] "
+                                      "[--heights JSON] [--regenerate] | check <project> [--fit|--board] [--fab F] | "
+                                      "fab <project> [--kinds gerbers,drill,pos,bom,step] | kicad (JSON)")
+    bd.add_argument("action", choices=("read", "import", "check", "fab", "kicad"))
+    bd.add_argument("args", nargs="*", help="read/import: the board file (.kicad_pcb or .emn); check/fab: the project")
+    bd.add_argument("--project", default="", help="import: the design whose board this replaces")
+    bd.add_argument("--name", default="")
+    bd.add_argument("--step", default="", help="import: KiCad's board STEP, for the parts' heights")
+    bd.add_argument("--kicad-step", action="store_true", help="import: have your KiCad export the board STEP for heights")
+    bd.add_argument("--heights", default="", help='import: part heights as JSON, e.g. {"C1": 10.5}')
+    bd.add_argument("--connectors", default="", help='import: overrides as JSON, e.g. {"J2": {"side": "+x"}}')
+    bd.add_argument("--regenerate", action="store_true", help="import into a project: make the enclosure again")
+    bd.add_argument("--lid-screw", type=float, default=3.0)
+    bd.add_argument("--fit", action="store_true", help="check: only the board against the enclosure")
+    bd.add_argument("--board", action="store_true", help="check: only KiCad's DRC/ERC and the fab limits")
+    bd.add_argument("--fab", action="append", help="check: a fab (jlcpcb, pcbway, oshpark); repeat")
+    bd.add_argument("--no-kicad", action="store_true", help="check: do not run KiCad even when it is installed")
+    bd.add_argument("--kinds", default="", help="fab: comma-separated kinds")
+    bd.add_argument("--expect-head", type=int)
     gd = sub.add_parser("diff", help="what changed between two revisions, computed on the solids: diff <project> A [B] [--png FILE]")
     gd.add_argument("project")
     gd.add_argument("a", type=int)
@@ -824,6 +844,33 @@ def main(argv=None):
                     _print(placement.place(st, p, spec_of(a.spec or (args[1] if len(args) > 1 else "")), xyz(a.at),
                                            xyz(a.normal) if a.normal else None, a.depth, a.qty, not a.no_cut,
                                            not a.no_snap, None, a.expect_head, origin="cli"))
+        elif a.cmd == "board":
+            from .board import api as board_api, kicad_cli, model as board_model
+            args = list(a.args)
+            if a.action == "kicad":
+                _print(kicad_cli.status(st.cfg))
+            elif not args:
+                raise StudioError(f"form board {a.action} needs " + ("a board file." if a.action in ("read", "import") else "a project."))
+            elif a.action == "read":
+                b = board_api.read(args[0])
+                _print({"summary": board_model.summary(b), "board": b})
+            elif a.action == "import":
+                _print(board_api.import_board(st, args[0], project=a.project or None, name=a.name, step=a.step or None,
+                                              heights=json.loads(a.heights) if a.heights else None,
+                                              connectors=json.loads(a.connectors) if a.connectors else None,
+                                              regenerate=a.regenerate, expect_head=a.expect_head, lid_screw=a.lid_screw,
+                                              use_kicad_step=a.kicad_step))
+            elif a.action == "check":
+                p = st.load(args[0])
+                out = {}
+                if not a.board:
+                    out["fit"] = board_api.fit(st, p)
+                if not a.fit:
+                    out["board"] = board_api.checks(st, p, a.fab, not a.no_kicad)
+                _print(out)
+            else:
+                p = st.load(args[0])
+                _print(board_api.fab_files(st, p, [k for k in a.kinds.split(",") if k] or None))
         elif a.cmd == "bom":
             from . import bom as bm
             args = list(a.args)

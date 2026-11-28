@@ -53,8 +53,9 @@ DEFAULTS = {
     # or commands (Linux/Windows). Empty means the system default for the file type.
     "apps": {"slicer": "BambuStudio", "cad": "", "viewer": ""},
     # Other CAD tools (optional). Empty = look in the usual places. OpenSCAD builds `language="openscad"` designs;
-    # FreeCADCmd, when found, re-imports each exported STEP as an extra check.
-    "cad": {"openscad": "", "freecad": "", "timeout_s": 120},
+    # FreeCADCmd, when found, re-imports each exported STEP as an extra check. KiCad's kicad-cli runs board checks
+    # and makes board fab files for a design made around a circuit board (form/board).
+    "cad": {"openscad": "", "freecad": "", "kicad_cli": "", "timeout_s": 120},
     # Chat runs the agent you choose with Form Studio's tools: an agent CLI headless on your account, or a model
     # provider's API (key in Settings › Agents & models), or a local model server. agent / model / effort are what a new
     # conversation starts with (the app's model picker writes them here); agent "" = the first one available.
@@ -74,7 +75,7 @@ DEFAULTS = {
     # Both are the "Use in Form Studio" switches of Settings › Engines & software (form/use.py).
     "recon": {"cadfit": False, "learned": True},
     # "Use in Form Studio" for the other optional engines and apps (form/use.py): false = installed but never called.
-    "use": {"coacd": True, "corpus": True, "blender": True, "freecad": True, "openscad": True,
+    "use": {"coacd": True, "corpus": True, "blender": True, "freecad": True, "openscad": True, "kicad": True,
             "bambu": True, "orca": True, "prusa": True, "superslicer": True, "qidi": True, "elegoo": True,
             "snapmaker": True},
     # Design refinement (form/refine): after every build, named and reversible refine features (fillet tiers, parting

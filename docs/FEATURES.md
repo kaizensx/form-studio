@@ -318,6 +318,24 @@ each one named as it arrives.
   you. No provider is configured yet, so nothing is sent.
 
 
+## Boards and enclosures
+
+- **A board read without KiCad.** A KiCad `.kicad_pcb` (KiCad 5 to 9) is read by Form Studio's own parser: outline
+  with its holes and cut-outs, thickness, every footprint's courtyard, side and the height it states, mounting holes
+  with the screw that fits, connectors and the edge they mate through, keep-outs, track widths, drills and annular
+  rings, and the rules in its `.kicad_pro`. IDF 3.0 (`.emn` with `.emp`) too. A board STEP gives measured heights.
+- **An enclosure made around it, as editable features.** Corner lugs clear of the board, standoffs under the mounting
+  holes, an opening for each connector sized from its plug's envelope and centred on its face, a lid with a lip printed
+  beside the box, vents, heat-set inserts and screws from the standard-parts tables in the parts list.
+- **Proved to fit, on the solids.** Board to wall, a standoff under each hole, each plug swept out through its wall,
+  every part of known height under the lid, a screwdriver's way to each board screw. Bring the changed board in and
+  the checks say what no longer lines up, and what moved. Bench › Board and enclosure.
+- **Your own KiCad for the rest.** KiCad's DRC and ERC reported as KiCad's, Gerbers, drill files, pick-and-place, BOM
+  and the board STEP, when kicad-cli is installed (an opt-in engine otherwise). JLCPCB, PCBWay and OSH Park's published
+  limits, quoted with page and date. MCP `board_import`, `board_check`, `board_fab`; `form board`. See
+  [BOARDS.md](BOARDS.md).
+
+
 ## Meshes rebuilt as clean CAD by the agent
 
 When you bring meshes to make editable or to understand, the agent rebuilds them as CAD that reads like a part
@@ -646,7 +664,7 @@ either. A real thin fin still fails.
 | OpenSCAD | Builds `.scad` designs; Customizer ranges become parameters |
 | Blender | Photoreal renders; its 3D-Print Toolbox checks when the add-on is installed |
 | Your slicer | Slices, and opens the 3MF or G-code in it |
-| Any MCP client | The full engine over 103 tools ([MCP reference](MCP.md)) |
+| Any MCP client | The full engine over 106 tools ([MCP reference](MCP.md)) |
 
 When a program's version outside the supported range is why something failed, the error names the supported versions
 and what to do.
