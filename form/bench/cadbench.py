@@ -359,7 +359,7 @@ def _git(*args) -> str:
 
 def provenance() -> dict:
     from .. import __version__
-    return {"form_version": __version__, "commit": _git("rev-parse", "HEAD"), "dirty": bool(_git("status", "--porcelain")),
+    return {"form_version": __version__, "commit": _git("rev-parse", "HEAD"), "dirty": bool(_git("status", "--porcelain", "--", "form", "scripts")),
             "machine": f"{platform.machine()}, {platform.system()} {platform.release()}, {os.cpu_count()} cores",
             "python": platform.python_version(), "date": _dt.date.today().isoformat()}
 
