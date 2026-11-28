@@ -135,3 +135,103 @@ def walk(node):
         if isinstance(x, list):
             yield x
             st.extend(reversed([c for c in x if isinstance(c, list)]))
+
+
+# ---- writing -------------------------------------------------------------------------------------------------------
+def sym(x) -> Sym:
+    """A bare atom: a keyword, or a number written the way KiCad writes it (no trailing zeros, no exponent)."""
+    if isinstance(x, bool):
+        return Sym("yes" if x else "no")
+    if isinstance(x, int):
+        return Sym(str(x))
+    if isinstance(x, float):
+        s = f"{x:.6f}".rstrip("0").rstrip(".")
+        return Sym("0" if s in ("-0", "") else s)
+    return Sym(str(x))
+
+
+def quote(s: str) -> str:
+    return '"' + (s.replace("\\", "\\\\").replace('"', '\\"').replace("\n", "\\n").replace("\r", "\\r")
+                  .replace("\t", "\\t")) + '"'
+
+
+def _atom(a) -> str:
+    if isinstance(a, Sym) and a and not any(ch in ' \t\r\n()"' for ch in a):
+        return str(a)
+    return quote(str(a))
+
+
+def _flat(node, limit: int) -> str | None:
+    """node on one line, or None when that line would pass limit characters."""
+    buf, n = [], 0
+    st: list = [node]
+    while st:
+        x = st.pop()
+        if x is None:
+            buf.append(")")
+            n += 1
+        elif isinstance(x, list):
+            buf.append("(")
+            n += 1
+            st.append(None)
+            st.extend(reversed(x))
+        else:
+            s = _atom(x)
+            buf.append(s)
+            n += len(s) + 1
+        if n > limit:
+            return None
+    return " ".join(buf).replace("( ", "(").replace(" )", ")")
+
+
+def dump(tree: list, indent: str = "\t", width: int = 100) -> str:
+    """The tree as text KiCad reads. A quoted string stays quoted and a bare symbol stays bare, so
+    parse(dump(parse(text))) is the tree of text, atom for atom (`same`). A list that fits on one line is written
+    on one; otherwise its leading atoms stay on the opening line and every later item starts its own line."""
+    out: list[str] = []
+    st: list = [(tree, 0)]
+    while st:
+        node, d = st.pop()
+        if node is None:
+            out.append(indent * d + ")")
+            continue
+        if not isinstance(node, list):
+            out.append(indent * d + _atom(node))
+            continue
+        one = _flat(node, width)
+        if one is not None:
+            out.append(indent * d + one)
+            continue
+        i = 0
+        while i < len(node) and not isinstance(node[i], list):
+            i += 1
+        out.append(indent * d + "(" + " ".join(_atom(a) for a in node[:i]))
+        st.append((None, d))
+        st.extend((c, d + 1) for c in reversed(node[i:]))
+    return "\n".join(out) + "\n"
+
+
+def same(a, b) -> bool:
+    """Two trees equal atom for atom, quoted against quoted and bare against bare."""
+    st = [(a, b)]
+    while st:
+        x, y = st.pop()
+        if isinstance(x, list) != isinstance(y, list):
+            return False
+        if isinstance(x, list):
+            if len(x) != len(y):
+                return False
+            st.extend(zip(x, y))
+        elif x != y or isinstance(x, Sym) != isinstance(y, Sym):
+            return False
+    return True
+
+
+def set_value(node: list, name: str, *vals) -> list:
+    """Replace (or add) the child (name v...) of node; returns the child."""
+    c = first(node, name)
+    if c is None:
+        c = [Sym(name)]
+        node.append(c)
+    c[1:] = list(vals)
+    return c

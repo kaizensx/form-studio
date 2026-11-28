@@ -72,6 +72,30 @@
 
 ### New
 
+- **A board designed here: schematic, placement and routing on KiCad's files** (wave K2, `form/board/`,
+  [docs/BOARDS.md](docs/BOARDS.md)). **`board_schematic`**, **`board_place`**, **`board_route`** (MCP, 145 tools) and
+  **`form board schematic|place|route|copper`** (terminal, JSON). All of it is Form Studio's own code.
+  - *Schematic.* `.kicad_sch` read and written back atom for atom; the netlist (wires, junctions, labels, power
+    symbols; this sheet only); operations an agent sends (place a symbol from the KiCad libraries on this computer,
+    join pins, label, annotate), all or nothing; a new board from the netlist with footprints from the person's
+    libraries. **Form Studio's ERC is a subset and says so** (open pins, power inputs nothing drives, inputs nothing
+    drives, outputs that fight, dangling labels, references); KiCad's own ERC runs beside it when kicad-cli is
+    installed.
+  - *Placement.* Force-directed, then every constraint made exact: connectors stay on their wall openings, the
+    standoff and screw head at each mounting hole are keep-outs, a part must fit under the lid (less under its lip)
+    and under the board, the board's keep-outs and outline. A part with no legal place is reported and left alone.
+  - *Routing.* A grid maze router (A\*, Lee's wavefront on small grids) on two layers with vias, rip-up and reroute,
+    PathFinder negotiated congestion, and a pull-tight pass to straight and 45° tracks; widths, clearances and via
+    sizes from the net classes in the `.kicad_pro`. Real segments and vias in the `.kicad_pcb`. A net that cannot be
+    finished is reported with the pad it could not reach.
+  - *Checked, and by whom.* Every routed board is read back from the file and measured by **Form Studio's own
+    geometric check** (closed-form gaps between copper shapes; labelled, with what it does not look at), and by
+    **KiCad's DRC when kicad-cli is installed**; without KiCad the result says KiCad did not run.
+  - *Freerouting, opt-in.* Your own Freerouting (a separate GPL-3.0 program; off until you install it and switch it
+    on) through a Specctra `.dsn` and `.ses`. None of its code is in Form Studio and it is never downloaded.
+  - The Bench: **Board copper**, **Board placement**, **Schematic checks**. In a design, the board's own copy is
+    changed and the version before is kept in `board/history/`; a file outside a design is never written over.
+  - Not yet verified against KiCad or Freerouting themselves on a machine that has them (see docs/BOARDS.md).
 - **FreeCAD PartDesign export with editable history.** **`freecad_partdesign`** (MCP, 142 tools) and **`form export
   fcstd <project> [--out f.FCStd] [--edit key=value]`** (terminal, JSON) write the design as a native PartDesign
   Body, not a baked solid: sketches with Sketcher constraints and named dimensions, Pad, Pocket, Revolution, Groove,

@@ -115,7 +115,7 @@ instead.
 
 ## Tools at a glance
 
-142 tools. Read-only tools never change a project.
+145 tools. Read-only tools never change a project.
 
 | Tool | Access | What it does |
 |---|---|---|
@@ -167,6 +167,9 @@ instead.
 | [`board_import`](#board_import) | changes | Bring a circuit board in and get an enclosure that is checked against it. |
 | [`board_check`](#board_check) | read-only | Check a design's board and its enclosure. |
 | [`board_fab`](#board_fab) | changes | Fab files for a design's board through the person's KiCad (kicad-cli): kinds from gerbers, drill, pos (pick-and-place), bom (from the schematic beside the board) and step (the board STEP); default all. |
+| [`board_schematic`](#board_schematic) | changes | A KiCad schematic (.kicad_sch), read and written by Form Studio's own code. |
+| [`board_place`](#board_place) | changes | Place a board's parts against its enclosure (force-directed, then every constraint made exact). |
+| [`board_route`](#board_route) | changes | Route a KiCad board: real segments and vias written into the .kicad_pcb. |
 | [`remove_feature`](#remove_feature) | changes | Remove a feature as a new revision: a standard feature added with add_feature ("boss_1", "hook_1"), or any feature of a FeatureDesign (its method goes; the features before it load from their checkpoints). |
 | [`compare_printers`](#compare_printers) | read-only | Slice the head revision's exported model for real on every printer set up in every installed slicer (the selected printers first, up to limit; or only the printer ids given, from list_printers) and return each one's simulated print time, filament grams and cost from the user's prices, with the fastest, least filament and cheapest. |
 | [`make_lighter`](#make_lighter) | read-only | Make it lighter: search changes that reduce mass while every check that passes now still passes. |
@@ -1310,6 +1313,111 @@ made, from Form Studio's plain board model (slab and part boxes), and said so; t
 |---|---|---|
 | `project` | string | yes |
 | `kinds` | array \| null |  |
+
+### `board_schematic`
+
+A KiCad schematic (.kicad_sch), read and written by Form Studio's own code. project: a design with a board
+(its copy of the schematic; a change keeps the previous version in board/history/). file: a schematic on its
+own (an existing file is never written over: an edit goes to out=, default <name>-edited.kicad_sch; a path
+that does not exist yet starts a new schematic). action:
+"read": symbols, nets and sub-sheets. "netlist": every net with its pins (reference, pin, pin type) and
+every part with value and footprint; this sheet only (sub-sheets are listed, not opened).
+"erc": Form Studio's own electrical checks, a subset and labelled so (pins not connected, power inputs no
+power output or PWR_FLAG drives, inputs nothing drives, outputs that fight, dangling labels, missing or
+duplicate references), then KiCad's own ERC when kicad-cli is installed, reported as KiCad's; without KiCad
+the result says it did not run. "symbols": query= finds symbols in the KiCad libraries on this computer
+(libraries=[...] adds .kicad_sym files or folders); an exact "Lib:Name" also returns its pins.
+"edit": ops, in order, all or nothing: {"op": "place", "lib_id": "Device:R", "at": [x, y], "ref"?, "value"?,
+"footprint"?, "rot"?: 0|90|180|270, "mirror"?: "x"|"y", "unit"?}; {"op": "net", "name": "VBUS", "pins":
+["R1.1", "J1.2"], "kind"?: "local"|"global"} (a label on each pin: the usual way to join pins);
+{"op": "connect", "from": "R1.2", "to": "C1.1"} (a wire, refused when it would run over another pin);
+{"op": "wire", "points": [[x, y], ...]}; {"op": "label", "name", "at" | "pin", "kind"?}; {"op": "power",
+"lib_id": "power:GND", "pin": "C1.2"}; {"op": "junction", "at"}; {"op": "no_connect", "pin"}; {"op": "set",
+"ref", "name", "value"} (a field, e.g. Footprint); {"op": "remove", "ref"}; {"op": "annotate"} (R? becomes
+R1). Returns what was done and the ERC subset of the result. "to_board" (file= only): a new .kicad_pcb of
+size=[w, d] with each part's footprint from the KiCad footprint libraries on this computer and its pads on
+their nets; a part whose footprint is not found is listed, never substituted. Then board_place, board_route.
+
+| Argument | Type | Required |
+|---|---|---|
+| `action` | string |  |
+| `project` | string |  |
+| `file` | string |  |
+| `ops` | array \| null |  |
+| `libraries` | array \| null |  |
+| `query` | string |  |
+| `out` | string |  |
+| `size` | array \| null |  |
+| `overwrite` | boolean |  |
+| `kicad` | boolean |  |
+
+### `board_place`
+
+Place a board's parts against its enclosure (force-directed, then every constraint made exact). project: a
+design with a KiCad board; the constraints come from its enclosure: a connector that mates through a wall
+stays on its opening, the standoff and screw head at each mounting hole are keep-outs, a part must fit under
+the lid (less under the lid's lip) and under the board down to the floor, the board's own keep-out areas
+that forbid footprints, the outline, and a gap between courtyards. file: a .kicad_pcb on its own (the result
+goes to out=, default <name>-placed.kicad_pcb; give max_height for the room over the board). fixed={"U1":
+"why"} holds parts; keepouts=[{"polygon": [[x, y], ...] | "circle": [[x, y], r], "side": top|bottom|both,
+"why"}] in the board file's mm; only=[refs] moves just those; rotate=False keeps rotations.
+check_only=True measures the placement as it is and changes nothing. Returns what moved, the wire length
+before and after (half-perimeter estimate), the constraints with where each came from, and the check of the
+result: computed on courtyard rectangles in the plane, not a 3D fit (board_check what="fit" measures that on
+the solids). A part with no legal position stays where it was and is listed; a part without a height is "not
+checked" against the lid. Tracks of nets whose parts moved are removed (they no longer reach) and counted.
+
+| Argument | Type | Required |
+|---|---|---|
+| `project` | string |  |
+| `file` | string |  |
+| `out` | string |  |
+| `fixed` | object \| null |  |
+| `keepouts` | array \| null |  |
+| `max_height` | number \| null |  |
+| `rotate` | boolean |  |
+| `only` | array \| null |  |
+| `check_only` | boolean |  |
+| `overwrite` | boolean |  |
+
+### `board_route`
+
+Route a KiCad board: real segments and vias written into the .kicad_pcb. project: a design's board (the
+previous version is kept in board/history/). file: a .kicad_pcb on its own (the result goes to out=, default
+<name>-routed.kicad_pcb; the file given is never changed). engine="form": Form Studio's own router: a grid
+maze router (A*, or Lee's wavefront on a small grid; algorithm=auto|astar|lee) on F.Cu and B.Cu with vias,
+rip-up and reroute, then PathFinder negotiated congestion for what is left (strategy=auto|ripup|negotiated),
+then a pull-tight pass to straight and 45 degree segments. Width, clearance and via size come from the net
+classes in the .kicad_pro beside the board; without one, KiCad's defaults are used and marked assumed.
+nets=/skip= choose nets; layers=["F.Cu"] routes one side; keep_existing=False removes the tracks first;
+pitch= sets the grid (default: chosen from the rules). engine="freerouting": the person's own Freerouting (a
+separate GPL program, off until they install it and switch it on): Form Studio writes a Specctra .dsn, runs
+it, reads the .ses; when it is not there the result says so and nothing is routed. Every result is read back
+from the written file and checked: "check" is Form Studio's own geometric check (clearances in closed form,
+board edge, keep-outs, holes, connections not made; labelled, with what it does not look at), and
+"kicad_drc" is KiCad's DRC when kicad-cli is installed, otherwise it says it did not run. A net that could
+not be finished is in "unrouted" with the reason and the pads left out; it is never dropped. Zone fills are
+not seen: fill the zones again in KiCad. Never report a routed board as clean without saying who checked.
+
+| Argument | Type | Required |
+|---|---|---|
+| `project` | string |  |
+| `file` | string |  |
+| `out` | string |  |
+| `engine` | string |  |
+| `nets` | array \| null |  |
+| `skip` | array \| null |  |
+| `layers` | array \| null |  |
+| `pitch` | number \| null |  |
+| `strategy` | string |  |
+| `algorithm` | string |  |
+| `keep_existing` | boolean |  |
+| `vias` | boolean |  |
+| `smooth` | boolean |  |
+| `passes` | integer |  |
+| `time_limit` | number |  |
+| `kicad` | boolean |  |
+| `overwrite` | boolean |  |
 
 ### `remove_feature`
 

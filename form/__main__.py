@@ -699,9 +699,38 @@ def main(argv=None):
     # -- circuit boards and their enclosures (form/board) --
     bd = sub.add_parser("board", help="circuit boards: board read FILE | import FILE [--project P] [--step S] "
                                       "[--heights JSON] [--regenerate] | check <project> [--fit|--board] [--fab F] | "
-                                      "fab <project> [--kinds gerbers,drill,pos,bom,step] | kicad (JSON)")
-    bd.add_argument("action", choices=("read", "import", "check", "fab", "kicad"))
-    bd.add_argument("args", nargs="*", help="read/import: the board file (.kicad_pcb or .emn); check/fab: the project")
+                                      "fab <project> [--kinds gerbers,drill,pos,bom,step] | kicad | "
+                                      "schematic read|netlist|erc|edit|symbols|to_board <project or .kicad_sch> [--ops JSON] | "
+                                      "place <project or .kicad_pcb> | route <project or .kicad_pcb> [--engine form|freerouting] | "
+                                      "copper <project or .kicad_pcb> (JSON)")
+    bd.add_argument("action", choices=("read", "import", "check", "fab", "kicad", "schematic", "place", "route", "copper"))
+    bd.add_argument("args", nargs="*", help="read/import: the board file (.kicad_pcb or .emn); check/fab: the project; "
+                                            "schematic: the action, then a project or a .kicad_sch; place/route/copper: a "
+                                            "project or a .kicad_pcb")
+    bd.add_argument("--ops", default="", help="schematic edit: operations as JSON, or @file.json")
+    bd.add_argument("--lib", action="append", help="schematic: a .kicad_sym file or a folder of libraries; repeat")
+    bd.add_argument("--query", default="", help="schematic symbols: what to look for")
+    bd.add_argument("--out", default="", help="schematic/place/route on a file: where the result goes")
+    bd.add_argument("--size", default="", help="schematic to_board: the new board's W,D in mm")
+    bd.add_argument("--overwrite", action="store_true")
+    bd.add_argument("--engine", default="form", help="route: form (Form Studio's router) or freerouting (yours)")
+    bd.add_argument("--nets", default="", help="route: only these nets, comma-separated")
+    bd.add_argument("--skip", default="", help="route: not these nets, comma-separated")
+    bd.add_argument("--layers", default="", help="route: F.Cu,B.Cu (default) or one of them")
+    bd.add_argument("--pitch", type=float, help="route: grid pitch in mm (default: chosen from the rules)")
+    bd.add_argument("--strategy", default="auto", help="route: auto, ripup or negotiated")
+    bd.add_argument("--algorithm", default="auto", help="route: auto, astar or lee")
+    bd.add_argument("--rip-existing", action="store_true", help="route: remove the tracks on the board first")
+    bd.add_argument("--no-vias", action="store_true")
+    bd.add_argument("--no-smooth", action="store_true", help="route: keep the grid paths (no pull-tight pass)")
+    bd.add_argument("--passes", type=int, default=20, help="route --engine freerouting: its pass limit")
+    bd.add_argument("--time-limit", type=float, default=120.0)
+    bd.add_argument("--fixed", default="", help='place: parts to hold, as JSON {"U1": "why"}')
+    bd.add_argument("--keepouts", default="", help="place: extra keep-outs as JSON")
+    bd.add_argument("--max-height", type=float, help="place on a file: the room over the board, mm")
+    bd.add_argument("--no-rotate", action="store_true")
+    bd.add_argument("--only", default="", help="place: only these parts, comma-separated")
+    bd.add_argument("--check-only", action="store_true", help="place: measure the placement, change nothing")
     bd.add_argument("--project", default="", help="import: the design whose board this replaces")
     bd.add_argument("--name", default="")
     bd.add_argument("--step", default="", help="import: KiCad's board STEP, for the parts' heights")
@@ -1232,8 +1261,43 @@ def main(argv=None):
         elif a.cmd == "board":
             from .board import api as board_api, kicad_cli, model as board_model
             args = list(a.args)
+            csv = lambda s: [x for x in s.split(",") if x] or None
+            target = lambda t, ext: ({"file": t} if t.lower().endswith(ext) else {"project": t})
             if a.action == "kicad":
-                _print(kicad_cli.status(st.cfg))
+                from .board import specctra
+                _print({**kicad_cli.status(st.cfg), "freerouting": specctra.status(st.cfg)})
+            elif a.action == "schematic":
+                from .board import k2
+                act = args[0] if args else "read"
+                if act != "symbols" and len(args) < 2:
+                    raise StudioError("form board schematic ACTION needs a project or a .kicad_sch file.",
+                                      "Actions: " + ", ".join(k2.ACTIONS) + ".")
+                ops = None
+                if a.ops:
+                    ops = json.loads(Path(a.ops[1:]).read_text(encoding="utf-8") if a.ops.startswith("@") else a.ops)
+                _print(k2.schematic(st, act, ops=ops, libraries=a.lib, query=a.query or " ".join(args[1:] if act == "symbols" else []),
+                                    out=a.out or None, size=[float(x) for x in a.size.split(",")] if a.size else None,
+                                    overwrite=a.overwrite, kicad=not a.no_kicad,
+                                    **(target(args[1], ".kicad_sch") if act != "symbols" else {})))
+            elif a.action in ("place", "route", "copper"):
+                from .board import k2
+                if not args:
+                    raise StudioError(f"form board {a.action} needs a project or a .kicad_pcb file.")
+                t = target(args[0], ".kicad_pcb")
+                if a.action == "place":
+                    _print(k2.place(st, out=a.out or None, fixed=json.loads(a.fixed) if a.fixed else None,
+                                    keepouts=json.loads(a.keepouts) if a.keepouts else None, max_height=a.max_height,
+                                    rotate=not a.no_rotate, only=csv(a.only), check_only=a.check_only, overwrite=a.overwrite, **t))
+                elif a.action == "route":
+                    _print(k2.route(st, out=a.out or None, engine=a.engine, nets=csv(a.nets), skip=csv(a.skip),
+                                    layers=csv(a.layers), pitch=a.pitch, strategy=a.strategy, algorithm=a.algorithm,
+                                    keep_existing=not a.rip_existing, vias=not a.no_vias, smooth=not a.no_smooth,
+                                    passes=a.passes, time_limit=a.time_limit, kicad=not a.no_kicad, overwrite=a.overwrite, **t))
+                elif "file" in t:
+                    from .board import drc as board_drc, pcb as board_pcb
+                    _print(board_drc.check(board_pcb.Pcb.load(t["file"])))
+                else:
+                    _print(k2.copper_check(st, st.load(t["project"]), kicad=not a.no_kicad))
             elif not args:
                 raise StudioError(f"form board {a.action} needs " + ("a board file." if a.action in ("read", "import") else "a project."))
             elif a.action == "read":

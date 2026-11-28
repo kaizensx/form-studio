@@ -57,6 +57,7 @@ GROUPS = [("engine", "Form Studio itself"), ("ai", "Claude Code"), ("agents", "O
 # group → the capability (form/capabilities.py) a registry item belongs to, unless it names its own
 CAPABILITY_OF_GROUP = {"engine": "core", "slicer": "print", "ai": "agent", "agents": "agent", "form": "core"}
 CAPABILITY_OF_ID = {"parts": "parts", "blender": "render", "freecad": "exchange", "openscad": "exchange", "kicad": "exchange",
+                    "freerouting": "exchange",
                     "recon.learned": "mesh", "recon.cadfit": "mesh", "exemplars.cadevolve": "core",
                     "game.coacd": "render", "fea": "core", "robot.mujoco": "exchange"}
 
@@ -288,6 +289,15 @@ def _d_kicad(cfg, ctx) -> Found:
                                 "boards are read and enclosures checked without it.")
     v = kicad_cli.version(exe)
     return Found("ok", f"kicad-cli {v} · {exe}", version=v, path=exe)
+
+
+def _d_freerouting(cfg, ctx) -> Found:
+    from .board import specctra
+    exe = specctra.find(cfg)
+    if not exe:
+        return Found("missing", "Not installed, or its path is not set in [cad] freerouting. Form Studio routes boards "
+                                "with its own router without it.")
+    return Found("ok", f"Freerouting · {exe}", path=exe)
 
 
 def _d_blender(cfg, ctx) -> Found:
@@ -1013,6 +1023,16 @@ REGISTRY: list[Software] = [
                    "run KiCad's own DRC and ERC and report KiCad's findings as KiCad's, and Board fab files makes "
                    "Gerbers, drill files, pick-and-place, the BOM and the board STEP through its kicad-cli.",
              gives="KiCad's own DRC and ERC on your board, and its Gerbers, drill files and board STEP."),
+    Software("freerouting", "Freerouting", "A second board router, run as its own program when you ask for it.",
+             "optional", "cad", _d_freerouting, lambda platform, ctx: [_open("https://github.com/freerouting/freerouting/releases",
+                                                                           "Open Freerouting's releases page")],
+             homepage="https://github.com/freerouting/freerouting", licence="GPL-3.0",
+             licence_url="https://github.com/freerouting/freerouting/blob/master/LICENSE",
+             about="Freerouting, an open-source board autorouter (GPL-3.0, needs Java). Form Studio routes boards with "
+                   "its own router; with Freerouting installed, its path set in [cad] freerouting and this switch on, "
+                   "board_route can hand it a Specctra .dsn and read back its .ses. It runs as a separate program on "
+                   "this computer; none of its code is in Form Studio, and Form Studio does not download it.",
+             gives="A second autorouter for your boards, checked the same way as Form Studio's own."),
 ]
 
 

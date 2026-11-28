@@ -11,7 +11,9 @@ form board fab <project>                                # Gerbers, drill, pick-a
 ```
 
 MCP: `board_import`, `board_check`, `board_fab`. The Bench lists **Board and enclosure**, **Board checks** and
-**Board fab files** for a design with a board. The code is `form/board/`.
+**Board fab files** for a design with a board. The code is `form/board/`. The board itself (schematic, placement,
+routing) is designed with `board_schematic`, `board_place` and `board_route`: see
+[K2](#k2-schematic-placement-and-routing) below.
 
 ## Reading a board
 
@@ -112,42 +114,166 @@ the `.emn` with its `.emp`) and never changed where they are. `board.json` is th
 the file, its SHA-256 and its key. The fit check is keyed by the head's geometry and the board model; the board
 checks by the board, KiCad's version and the fab table's date; a change to any of them makes the Bench entry stale.
 
-## K2: schematic and routing (planned, not built)
+## K2: schematic, placement and routing
 
-The owner chose the full loop: wave K first (the board as a constraint on the enclosure, the person's KiCad for its
-rules and outputs), then K2: schematic capture and routing inside Form Studio, on KiCad's file formats and with its
-rule checks, so a product's board and its enclosure are designed together.
+The board itself is designed here, on KiCad's file formats, so a product's board and its enclosure are designed
+together. Everything below is Form Studio's own code; no KiCad code and no Freerouting code is in it.
 
-**Schematic.** Read and write `.kicad_sch` with the same S-expression reader (symbols, wires, labels, sheets); a
-netlist from it; edits as operations an agent sends (place symbol, connect pins, label a net), each a new revision
-of the schematic file. ERC stays KiCad's (`kicad-cli sch erc`), reported as KiCad's.
+```
+form board schematic edit new.kicad_sch --lib My.kicad_sym --ops @ops.json   # place symbols, join pins, annotate
+form board schematic netlist <project or file.kicad_sch>                     # nets with their pins, parts with footprints
+form board schematic erc <project or file.kicad_sch>                         # Form Studio's subset, then KiCad's when installed
+form board schematic to_board file.kicad_sch --size 40,30 --out board.kicad_pcb
+form board place <project or board.kicad_pcb> [--check-only]                 # against the enclosure's constraints
+form board route <project or board.kicad_pcb> [--engine form|freerouting]    # segments and vias into the .kicad_pcb
+form board copper <project or board.kicad_pcb>                               # Form Studio's geometric check of the copper
+```
 
-**Placement.** Footprints from the person's KiCad libraries, placed against the enclosure's constraints wave K
-already measures: connectors on the wall openings, tall parts where the lid has room, keep-outs from the standoffs
-and the screwdriver paths. The enclosure's solids become a placement keep-out map.
+MCP: `board_schematic`, `board_place`, `board_route`. The Bench adds **Board copper**, **Board placement** and
+**Schematic checks**. In a design the files worked on are the copies in `<project>/board/`; every change keeps the
+version it replaced in `<project>/board/history/`, and the board model is read again so the fit check goes stale. On
+a file outside a design the result goes to a new file (`out=`, default `<name>-routed.kicad_pcb` and the like); the
+file given is never written.
 
-**Routing, Form Studio's own router.** On a grid of 0.05 to 0.1 mm per layer, with the board's clearance and track
-widths from its rules:
+### Who checked what
 
-1. *Lee maze routing* (breadth-first wavefront) for a first, exact shortest path where the grid is small; *A\** with
-   an octile heuristic and a bend and via cost for the rest. Both expand only free cells (copper of other nets
-   dilated by clearance + half the track width).
-2. *Net order*: shortest Manhattan span first; multi-pin nets joined as a minimum spanning tree (Prim) of their pads,
-   each edge routed to the tree grown so far.
-3. *Rip-up and reroute*: when a net fails, the nets whose copper blocks its cheapest relaxed path are removed and
-   queued after it; a bounded number of passes.
-4. *Negotiated congestion* (PathFinder, McMurchie and Ebeling, 1995): every net routes with sharing allowed; a cell's
-   cost grows with its present and historical overuse each iteration until no cell is shared. This is the step past
-   a router without rip-up.
-5. *Pull-tight*: each path is shortened to the farthest clear straight or 45° segment, then checked again.
-6. Every result is written to the `.kicad_pcb` and checked by KiCad's own DRC; Form Studio reports KiCad's findings
-   and never claims a routed board is clean on its own say.
+| Result | Whose it is | When it runs |
+|---|---|---|
+| `check` of `board_route`, **Board copper** | "Form Studio geometric check (not KiCad's DRC)" | always |
+| `kicad_drc` of `board_route` | KiCad's DRC report, read as KiCad wrote it | only when kicad-cli is installed; otherwise it says it did not run |
+| `form` of `board_schematic erc`, **Schematic checks** | "Form Studio ERC (a subset; not KiCad's ERC)" | always |
+| `kicad` of `board_schematic erc` | KiCad's ERC report | only when kicad-cli is installed |
 
-**Or Freerouting.** Freerouting (GPL-3.0, a separate Java program the person installs) reads a Specctra `.dsn` and
-writes a `.ses`. The interface: export DSN (`kicad-cli` does not export DSN today; Form Studio would write it from
-the board model), run `freerouting -de board.dsn -do board.ses -mp <passes>` as a separate process, import the session's
-wires and vias back into the `.kicad_pcb`, then KiCad's DRC. It would be an opt-in engine in the installer, like
-KiCad; no Freerouting code would be in Form Studio.
+No findings from Form Studio's checks is not KiCad's verdict, and neither is a manufacturability approval. Each
+result lists what it does not look at (`not_checked`).
 
-**Tests K2 needs.** Known small boards routed to completion with zero KiCad DRC errors; a net that cannot fit
-reported as unrouted, never dropped; the same board routed twice gives the same copper (deterministic order).
+### Schematic (`form/board/schematic.py`)
+
+`.kicad_sch` (KiCad 6 to 9) is read into a tree and written back atom for atom: a quoted string stays quoted, a bare
+symbol stays bare, and what Form Studio does not understand is kept as it was.
+
+**The netlist.** A pin's connection point is its symbol's position plus the pin's library position turned by the
+symbol's rotation (KiCad's orientation matrices: 0° x, −y; 90° −y, −x; 180° −x, y; 270° y, x) and then its mirror.
+A wire joins what is at its two ends; a pin, label, junction or another wire's end lying on a wire joins it; two
+wires that only cross do not join without a junction. Labels with the same text name one net; a power symbol names a
+global net by its Value. Unnamed nets are `Net-(R1-Pad1)`, single pins `unconnected-(U2-PA1)`. This sheet only:
+sub-sheets are listed, not opened, and buses are not expanded; the result says so.
+
+**Form Studio's ERC subset.** Pins not connected (a no-connect mark or a no-connect pin excuses one), power inputs
+no power output or `PWR_FLAG` drives, inputs nothing drives, two drivers on one net (output and power-output pairs,
+open collector against a push-pull output), dangling labels, missing and duplicate references. The pin-pair table is
+Form Studio's own short list, not KiCad's full matrix.
+
+**Editing.** Operations in order, all or nothing: `place` (the library symbol is copied into the file, as KiCad
+does; `extends` is resolved), `net` (a label on each pin), `connect` (a wire; refused when it would run over another
+pin), `wire`, `label`, `power`, `junction`, `no_connect`, `set`, `remove`, `annotate`. Symbols come from the
+`.kicad_sym` libraries on the person's computer: KiCad's standard folders where it is installed, `[cad]
+kicad_symbols`, or `libraries=[...]`. A symbol is found by its block in the file, so a large library costs only the
+symbol asked for. Nothing is downloaded.
+
+**To a board.** `to_board` makes a new `.kicad_pcb` from the netlist: each part's footprint is read from the
+person's `.pretty` folders and its pads are given their nets. A part whose footprint is not named or not found is
+listed in `missing`, never replaced by a guess. Footprints go on the top side.
+
+### Placement (`form/board/place.py`)
+
+| Constraint | Where it comes from |
+|---|---|
+| a connector that mates through a wall stays put | the board model's connectors (the enclosure's openings are cut for them) |
+| the screw head and its driver over each mounting hole, the standoff under it | the mounting holes; the head diameter from the standard-parts tables + 0.5 mm, the standoff's diameter from the enclosure's parameters |
+| the room under the lid, less under the lid's lip along the walls | the enclosure's `board_layout()` and `lip_h`, `lip_wall`, `lip_clearance` |
+| the room under the board | the standoff height above the floor |
+| the board's own keep-out areas that forbid footprints, the outline, cut-outs | the board file |
+| a gap between courtyards (0.25 mm) and to the edge (0.5 mm) | assumed, and said |
+
+Forces first (a spring from each pad to the centroid of its net's other pads, a push off overlaps, out of keep-outs
+and back inside the outline, a step that shrinks; no random numbers), then each part goes to the nearest position on
+a 0.5 mm grid where every constraint holds, largest first, then rotations and swaps of like parts that shorten the
+wires. A part with no legal position stays where it was and is reported. A part without a height is "not checked"
+against the lid. The check is on courtyard rectangles in the plane; the 3D fit is `board_check what="fit"`.
+
+### The router (`form/board/route.py`)
+
+1. **The grid.** Track centres run on a square grid. For each net class every cell is marked with the copper a track
+   of that class centred there would come too close to: pads, kept tracks and vias of other nets, the board edge,
+   non-plated holes, keep-out areas. A second map does the same for a via centre.
+2. **Why a grid path is legal between its points.** For a need R (half the track width plus the clearance to the
+   other copper) cells are blocked within ρ = √(R² + g²/2) of that copper, g the pitch. Take a point P of the other
+   copper and a step AB of length s ≤ g√2 between two free cells. If the nearest point Q of AB to P is inside the
+   step, PA² = PQ² + QA² and one end is within s/2 of Q, so min(PA, PB)² ≤ PQ² + g²/2; both ends are at least ρ
+   away, so PQ ≥ R. The pitch is chosen so that tracks k cells apart are exactly at their rule:
+   g = (w + c)/√(k² − ½), 0.1017 mm for 0.2 mm tracks 0.2 mm apart.
+3. **Search.** A\* over (layer, cell), eight moves, an octile heuristic to the target's box, a cost per bend and per
+   via; or Lee's wavefront (four moves, cells expanded in order of cost) on grids under 40 000 cells. Multi-pin nets
+   are joined as a minimum spanning tree (Prim), each pad routed to the tree grown so far.
+4. **Net order.** Shortest span first, ties by name; nothing is random, so the same board gives the same file.
+5. **Rip-up and reroute.** A net with no way is routed once more with other nets' copper allowed at a high cost; the
+   nets that path crosses are removed and queued behind it. A net can force at most four rip-ups.
+6. **Negotiated congestion** (PathFinder; McMurchie and Ebeling, 1995), for what rip-up leaves: every net is routed
+   with sharing allowed, and a cell's cost grows with its present sharing and its history of sharing until no two
+   nets share. When it does not settle, the nets still in conflict are removed and reported.
+7. **Pull-tight.** Each path is shortened to straight and 45° legs. Every new segment is tested in closed form
+   against the real copper shapes (`form/board/geom.py`), not the grid, before it replaces the grid path. Junctions,
+   vias and pad entries stay where they are.
+8. **Rules.** Width, clearance, via size and drill per net class from the `.kicad_pro` beside the board (classes,
+   `netclass_patterns`, `netclass_assignments`), the board's edge and hole clearances from its design rules. Without
+   a `.kicad_pro`, KiCad's values for a new project are used and marked assumed.
+9. **Output.** `(segment ...)` and `(via ...)` in the `.kicad_pcb`, with ids derived from the copper so a rerun
+   writes the same file.
+
+A net that cannot be finished is in `unrouted` with the reason, the pads left out and the pads that were joined.
+
+**Numbers on the synthetic boards** (`form/board/synth.py`; made-up boards, this machine, pure Python):
+
+| Board | Nets routed | Segments | Vias | Rip-ups | Negotiation rounds | Own check | Time |
+|---|---|---|---|---|---|---|---|
+| header, SOIC-16, eight 0603 parts, 40 × 30 mm, 2 layers | 16 of 16 | 114 | 4 | 0 | 0 | 0 findings, tightest gap 0.210 mm (0.2 needed) | 0.3 s |
+| the same with a pad walled in by a keep-out | 15 of 16, the pad named | 114 | 4 | 0 | 0 | 0 findings, 1 connection not made | 0.3 s |
+| rooms (one layer), first pass only | 1 of 2 | | | 0 | 0 | | 0.1 s |
+| rooms, rip-up and reroute | 2 of 2 | 15 | 0 | 1 | 0 | 0 findings | 0.1 s |
+| rooms, negotiated congestion only | 2 of 2 | 13 | 0 | 0 | 8 | 0 findings | 0.4 s |
+| channel of 8 tracks (one layer), first pass only | 7 of 8 | | | 0 | 0 | | 0.2 s |
+| channel of 8 tracks, rip-up and reroute | 8 of 8 | | 0 | 1 | 0 | 0 findings | 0.2 s |
+| channel of 8 tracks, negotiated congestion only | 7 of 8 | | | 0 | 40, not settled | 0 findings, 1 connection not made | 9 s |
+
+Negotiation alone does not settle a channel that holds exactly its tracks; rip-up does. None of these boards was
+checked by KiCad's DRC here: this machine has no KiCad.
+
+**Limits.** Two layers (F.Cu and B.Cu; inner layers are left alone). Through vias only. Zone fills are not seen:
+fill the zones again in KiCad. No differential pairs, length matching or teardrops. Arcs already on the board are
+treated as their chord. Pure Python: a board is capped at 450 000 cells per layer, above which the pitch grows and
+the result says so.
+
+### Form Studio's geometric check (`form/board/drc.py`)
+
+Every copper shape is a convex skeleton grown by a radius (a circle is a point, a track or oval pad a segment, a
+rectangle its corners, a rounded rectangle the rectangle shrunk by its corner radius), so the gap between two is the
+distance between skeletons minus both radii, exactly. It reports copper of different nets closer than the larger of
+their class clearances, tracks and vias against the board edge, non-plated holes and keep-outs, drilled holes too
+close, widths under the board's minimum, and for each net the groups of pads its copper does not join. Not looked
+at, and listed: zone fills, mask and silkscreen, courtyards, annular rings, differential pairs, `.kicad_dru` rules,
+pads of one footprint against each other; a custom-shaped pad is its bounding rectangle.
+
+### Freerouting, the person's own (`form/board/specctra.py`)
+
+Freerouting (GPL-3.0) is a separate program. Form Studio does not contain it and does not download it. It is an
+opt-in engine: Settings › Engines & software › Freerouting opens its releases page, `[cad] freerouting` gives the
+path of the `.jar` or launcher, and `[use] freerouting` is off until the person turns it on. `board_route
+engine="freerouting"` then writes a Specctra `.dsn` (outline, keep-outs, every pad's shape where it is on the board,
+nets, classes, kept wiring as protected), runs `freerouting -de board.dsn -do board.ses -mp <passes>` as its own
+process, reads the `.ses` and writes its wires and vias into the `.kicad_pcb`, checked like any other copper. When
+it is not installed or not on, the result says so and nothing is routed.
+
+### What is tested, and what is not
+
+`tests/test_board_k2.py`, on synthetic boards and libraries: the writer gives back the tree it read (board and
+schematic); the netlist of hand-written wires, junctions, crossings, rotations and mirrors; the ERC subset's
+findings; the router to completion with no clearance violation, measured by the check and again by a separate
+segment-distance formula; an unreachable pad reported; rip-up and negotiation each finishing the rooms board;
+determinism; planted violations found by the check; placement constraints; the `.dsn` and `.ses`; Freerouting never
+started unless installed and on.
+
+Not verified here, because this machine has neither program: a routed board through KiCad's own DRC (the test is
+skipped without kicad-cli), files written here opened in KiCad itself, the pin positions of a schematic drawn in
+KiCad (the matrices above are KiCad's as documented, exercised only on hand-written files), and the `.dsn` read by
+Freerouting itself (the hand-over is exercised with a stand-in program).

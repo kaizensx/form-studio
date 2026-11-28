@@ -10,8 +10,21 @@
     fabs.py       JLCPCB, PCBWay and OSH Park's published limits, quoted with page and date
     api.py        the loop for a project, and the Bench entries
 
+Wave K2, the board itself designed here on KiCad's file formats:
+
+    schematic.py  .kicad_sch read, changed and written; the netlist; Form Studio's ERC subset; symbol libraries
+    pcb.py        the .kicad_pcb as a document: pads, nets, tracks, vias, net-class rules; written back atom for atom
+    geom.py       copper shapes and the distances between them, in closed form
+    drc.py        Form Studio's own geometric check of the copper (never called KiCad's DRC)
+    route.py      the router: grid A* / Lee, rip-up and reroute, negotiated congestion, pull-tight
+    place.py      placement against the enclosure's constraints (force-directed, then exact)
+    specctra.py   Specctra .dsn out and .ses in; the person's own Freerouting as a separate program
+    synth.py      synthetic boards and libraries for tests and demos
+    k2.py         schematic, place and route for a project or a file; their Bench entries
+
 Nothing here imports OCCT at import time; fit.py's ops run in the kernel worker. Headless: MCP board_import,
-board_check, board_fab and `form board ...` (JSON). docs/BOARDS.md has the whole loop and the K2 routing plan.
+board_check, board_fab, board_schematic, board_place, board_route and `form board ...` (JSON). docs/BOARDS.md has
+the whole loop.
 """
 from __future__ import annotations
 

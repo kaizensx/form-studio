@@ -1956,6 +1956,93 @@ def build() -> MCPServer:
         return await _run(go)
 
     @mcp.tool(annotations=RW)
+    async def board_schematic(action: str = "read", project: str = "", file: str = "", ops: list[dict] | None = None,
+                              libraries: list[str] | None = None, query: str = "", out: str = "",
+                              size: list[float] | None = None, overwrite: bool = False, kicad: bool = True) -> dict:
+        """A KiCad schematic (.kicad_sch), read and written by Form Studio's own code. project: a design with a board
+        (its copy of the schematic; a change keeps the previous version in board/history/). file: a schematic on its
+        own (an existing file is never written over: an edit goes to out=, default <name>-edited.kicad_sch; a path
+        that does not exist yet starts a new schematic). action:
+        "read": symbols, nets and sub-sheets. "netlist": every net with its pins (reference, pin, pin type) and
+        every part with value and footprint; this sheet only (sub-sheets are listed, not opened).
+        "erc": Form Studio's own electrical checks, a subset and labelled so (pins not connected, power inputs no
+        power output or PWR_FLAG drives, inputs nothing drives, outputs that fight, dangling labels, missing or
+        duplicate references), then KiCad's own ERC when kicad-cli is installed, reported as KiCad's; without KiCad
+        the result says it did not run. "symbols": query= finds symbols in the KiCad libraries on this computer
+        (libraries=[...] adds .kicad_sym files or folders); an exact "Lib:Name" also returns its pins.
+        "edit": ops, in order, all or nothing: {"op": "place", "lib_id": "Device:R", "at": [x, y], "ref"?, "value"?,
+        "footprint"?, "rot"?: 0|90|180|270, "mirror"?: "x"|"y", "unit"?}; {"op": "net", "name": "VBUS", "pins":
+        ["R1.1", "J1.2"], "kind"?: "local"|"global"} (a label on each pin: the usual way to join pins);
+        {"op": "connect", "from": "R1.2", "to": "C1.1"} (a wire, refused when it would run over another pin);
+        {"op": "wire", "points": [[x, y], ...]}; {"op": "label", "name", "at" | "pin", "kind"?}; {"op": "power",
+        "lib_id": "power:GND", "pin": "C1.2"}; {"op": "junction", "at"}; {"op": "no_connect", "pin"}; {"op": "set",
+        "ref", "name", "value"} (a field, e.g. Footprint); {"op": "remove", "ref"}; {"op": "annotate"} (R? becomes
+        R1). Returns what was done and the ERC subset of the result. "to_board" (file= only): a new .kicad_pcb of
+        size=[w, d] with each part's footprint from the KiCad footprint libraries on this computer and its pads on
+        their nets; a part whose footprint is not found is listed, never substituted. Then board_place, board_route."""
+        st = studio()
+        def go():
+            from .board import k2
+            return k2.schematic(st, action, project=project or None, file=file or None, ops=ops, libraries=libraries,
+                                query=query, out=out or None, size=size, overwrite=overwrite, kicad=kicad)
+        return await _run(go)
+
+    @mcp.tool(annotations=RW)
+    async def board_place(project: str = "", file: str = "", out: str = "", fixed: dict[str, str] | None = None,
+                          keepouts: list[dict] | None = None, max_height: float | None = None, rotate: bool = True,
+                          only: list[str] | None = None, check_only: bool = False, overwrite: bool = False) -> dict:
+        """Place a board's parts against its enclosure (force-directed, then every constraint made exact). project: a
+        design with a KiCad board; the constraints come from its enclosure: a connector that mates through a wall
+        stays on its opening, the standoff and screw head at each mounting hole are keep-outs, a part must fit under
+        the lid (less under the lid's lip) and under the board down to the floor, the board's own keep-out areas
+        that forbid footprints, the outline, and a gap between courtyards. file: a .kicad_pcb on its own (the result
+        goes to out=, default <name>-placed.kicad_pcb; give max_height for the room over the board). fixed={"U1":
+        "why"} holds parts; keepouts=[{"polygon": [[x, y], ...] | "circle": [[x, y], r], "side": top|bottom|both,
+        "why"}] in the board file's mm; only=[refs] moves just those; rotate=False keeps rotations.
+        check_only=True measures the placement as it is and changes nothing. Returns what moved, the wire length
+        before and after (half-perimeter estimate), the constraints with where each came from, and the check of the
+        result: computed on courtyard rectangles in the plane, not a 3D fit (board_check what="fit" measures that on
+        the solids). A part with no legal position stays where it was and is listed; a part without a height is "not
+        checked" against the lid. Tracks of nets whose parts moved are removed (they no longer reach) and counted."""
+        st = studio()
+        def go():
+            from .board import k2
+            return k2.place(st, project=project or None, file=file or None, out=out or None, fixed=fixed, keepouts=keepouts,
+                            max_height=max_height, rotate=rotate, only=only, check_only=check_only, overwrite=overwrite)
+        return await _run(go)
+
+    @mcp.tool(annotations=RW)
+    async def board_route(project: str = "", file: str = "", out: str = "", engine: str = "form",
+                          nets: list[str] | None = None, skip: list[str] | None = None, layers: list[str] | None = None,
+                          pitch: float | None = None, strategy: str = "auto", algorithm: str = "auto",
+                          keep_existing: bool = True, vias: bool = True, smooth: bool = True, passes: int = 20,
+                          time_limit: float = 120.0, kicad: bool = True, overwrite: bool = False) -> dict:
+        """Route a KiCad board: real segments and vias written into the .kicad_pcb. project: a design's board (the
+        previous version is kept in board/history/). file: a .kicad_pcb on its own (the result goes to out=, default
+        <name>-routed.kicad_pcb; the file given is never changed). engine="form": Form Studio's own router: a grid
+        maze router (A*, or Lee's wavefront on a small grid; algorithm=auto|astar|lee) on F.Cu and B.Cu with vias,
+        rip-up and reroute, then PathFinder negotiated congestion for what is left (strategy=auto|ripup|negotiated),
+        then a pull-tight pass to straight and 45 degree segments. Width, clearance and via size come from the net
+        classes in the .kicad_pro beside the board; without one, KiCad's defaults are used and marked assumed.
+        nets=/skip= choose nets; layers=["F.Cu"] routes one side; keep_existing=False removes the tracks first;
+        pitch= sets the grid (default: chosen from the rules). engine="freerouting": the person's own Freerouting (a
+        separate GPL program, off until they install it and switch it on): Form Studio writes a Specctra .dsn, runs
+        it, reads the .ses; when it is not there the result says so and nothing is routed. Every result is read back
+        from the written file and checked: "check" is Form Studio's own geometric check (clearances in closed form,
+        board edge, keep-outs, holes, connections not made; labelled, with what it does not look at), and
+        "kicad_drc" is KiCad's DRC when kicad-cli is installed, otherwise it says it did not run. A net that could
+        not be finished is in "unrouted" with the reason and the pads left out; it is never dropped. Zone fills are
+        not seen: fill the zones again in KiCad. Never report a routed board as clean without saying who checked."""
+        st = studio()
+        def go():
+            from .board import k2
+            return k2.route(st, project=project or None, file=file or None, out=out or None, engine=engine, nets=nets,
+                            skip=skip, layers=layers, pitch=pitch, strategy=strategy, algorithm=algorithm,
+                            keep_existing=keep_existing, vias=vias, smooth=smooth, passes=passes, time_limit=time_limit,
+                            kicad=kicad, overwrite=overwrite)
+        return await _run(go)
+
+    @mcp.tool(annotations=RW)
     async def remove_feature(project: str, feature_id: str, expect_head: int | None = None) -> dict:
         """Remove a feature as a new revision: a standard feature added with add_feature ("boss_1", "hook_1"), or any
         feature of a FeatureDesign (its method goes; the features before it load from their checkpoints)."""
