@@ -34,7 +34,10 @@ Item {
         var c = [], w = Store.screen === "work"
         function add(g, id, icon, text, hint, run, keys) { c.push({ g: g, id: id, icon: icon, text: text, hint: hint || "", run: run, keys: keys || "" }) }
         if (w) {
-            Store.stages.forEach(function (s, i) { add("Go to", "stage." + s.id, "arrow_right", s.title, s.hint, function () { Store.setStage(s.id) }, "Ctrl+" + Store.stageKey[s.id]) })
+            // a mode also answers to what it was called and to what it holds (`also`: words that find it, never shown)
+            var also = { shape: "shape tree program features model", prove: "review prove studies checks", release: "release routes export print", document: "documents drawings report" }
+            Store.stages.forEach(function (s, i) { add("Go to", "stage." + s.id, "arrow_right", s.title, s.hint, function () { Store.setStage(s.id) }, "Ctrl+" + Store.stageKey[s.id]); c[c.length - 1].also = also[s.id] || "" })
+            add("Go to", "bench.sheet", "list_checks", "Bench", "Every study, route and document on one sheet", function () { Store.toggleBench() }, "Ctrl+B")
             add("Go to", "stage.brief", "file_text", "Overview", "Describe: the brief, what is known about the object, the revisions", function () { Store.setStage("brief") }, "Ctrl+I")
             if (Store.printUi) add("Go to", "stage.fit", "arrow_right", "Fit study", "Check: clearance under uncertainty, a model", function () { Store.setStage("fit") })
         }
@@ -126,18 +129,45 @@ Item {
         return c
     }
     // loose match: every letter of the query, in order. Returns { score, at: [indices] } or null.
+    // How close a command is to what was typed, in tiers, so a nearer kind of match always beats a farther one:
+    //   3000  the name is exactly the words typed          2000  the name starts with them
+    //   1600  a word it also answers to starts with them  1500  a word of the name starts with them
+    //   1000  they are inside the name                      700  a word of its hint starts with them
+    //   < 600 the letters appear in order in the name (fuzzy)
+    // Inside a tier: the earlier the match and the shorter the name, the higher. A verb in front of a Bench entry's
+    // name ("Run: ", "Ask for: ") is not part of the name. `at` is where to light the letters in the text shown.
+    function wordStart(low, t) {
+        for (var i = low.indexOf(t); i >= 0; i = low.indexOf(t, i + 1)) if (i === 0 || /[^a-z0-9]/.test(low[i - 1])) return i
+        return -1
+    }
     function match(text, t) {
-        var low = text.toLowerCase(), at = [], i = low.indexOf(t)
-        if (i >= 0) { for (var k = 0; k < t.length; k++) at.push(i + k); return { score: 1000 - i * 2 + (i === 0 || low[i - 1] === " " ? 60 : 0), at: at } }
+        var pre = /^(Run|Ask for): /.exec(text), off = pre ? pre[0].length : 0
+        var low = text.slice(off).toLowerCase(), at = [], i = low.indexOf(t), k
+        if (i >= 0) {
+            for (k = 0; k < t.length; k++) at.push(off + i + k)
+            var w = pal.wordStart(low, t)
+            if (w >= 0 && w !== i) { at = []; for (k = 0; k < t.length; k++) at.push(off + w + k); i = w }
+            var tier = low === t ? 3000 : i === 0 ? 2000 : w >= 0 ? 1500 : 1000
+            return { score: tier - i * 2 - Math.min(40, low.length - t.length) * 0.5, at: at }
+        }
         var p = 0, score = 0, last = -2
         for (var j = 0; j < t.length; j++) {
             if (t[j] === " ") continue
             var f = low.indexOf(t[j], p)
             if (f < 0) return null
             score += (f === last + 1 ? 14 : 0) + (f === 0 || low[f - 1] === " " ? 10 : 0) - (f - p)
-            at.push(f); last = f; p = f + 1
+            at.push(off + f); last = f; p = f + 1
         }
-        return { score: score, at: at }
+        return { score: Math.min(590, score), at: at }
+    }
+    function rank(c, t) {
+        var best = pal.match(c.text, t)
+        if (c.also && pal.wordStart(c.also, t) >= 0 && (!best || best.score < 1600)) best = { score: 1600, at: [] }
+        var h = t.length >= 3 ? pal.wordStart(String(c.hint).toLowerCase(), t) : -1
+        if (h >= 0 && (!best || best.score < 700 - Math.min(80, h))) best = { score: 700 - Math.min(80, h), at: [] }
+        if (!best) return null
+        // the modes are the map of the app: at an equal match they come first; what was used lately, next
+        return { at: best.at, score: best.score + (c.g === "Go to" ? 30 : 0) + (Store.paletteRecent.indexOf(c.id) >= 0 ? 25 : 0) }
     }
     // the rows shown: headers and commands, in group order
     readonly property var rows: {
@@ -152,11 +182,10 @@ Item {
         } else {
             var hit = []
             for (i = 0; i < items.length; i++) {
-                var m = pal.match(items[i].text, t), h = m ? null : pal.match(items[i].hint, t)
-                if (m) hit.push(Object.assign({}, items[i], { at: m.at, score: m.score + (Store.paletteRecent.indexOf(items[i].id) >= 0 ? 25 : 0) }))
-                else if (h && h.score > 900) hit.push(Object.assign({}, items[i], { at: [], score: h.score - 600 }))
+                var m = pal.rank(items[i], t)
+                if (m) hit.push(Object.assign({}, items[i], { at: m.at, score: m.score, n: i }))
             }
-            hit.sort(function (a, b) { return b.score - a.score })
+            hit.sort(function (a, b) { return b.score - a.score || a.n - b.n })
             items = hit.slice(0, 14)
         }
         pal.groups.forEach(function (g) {
