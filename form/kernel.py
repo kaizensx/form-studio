@@ -1391,3 +1391,5 @@ from .appearance import KERNEL_OPS as _APPEARANCE_OPS  # noqa: E402  (material z
 OPS.update(_APPEARANCE_OPS)
 from .candidates import KERNEL_OPS as _CANDIDATE_OPS  # noqa: E402  (several candidates built and scored)
 OPS.update(_CANDIDATE_OPS)
+from .handfeat import KERNEL_OPS as _HAND_OPS  # noqa: E402  (picked edges and faces as stable queries)
+OPS.update(_HAND_OPS)

@@ -152,6 +152,8 @@ instead.
 | [`geometry_diff`](#geometry_diff) | changes | Diff the geometry of two revisions. |
 | [`add_text`](#add_text) | changes | Put raised (or, with sunk, cut-in) lettering on a flat face of a Python design, as a real feature of its source: a new revision whose build adds a stage text_N with Form Studio's bundled font. |
 | [`add_feature`](#add_feature) | changes | Add a feature to a Python design as a new revision. |
+| [`get_sketch`](#get_sketch) | read-only | Get the sketch of a feature made from one (extrude, cut, revolve): its plane, points, entities (line, circle, arc) and constraints, solved by form.sketch2d: point positions, the profile, degrees of freedom left, and the named dimensions with their values (each is a parameter "<feature>_<name>"). |
+| [`edit_sketch`](#edit_sketch) | changes | Edit a feature's sketch with ops (or send the whole sketch), as one revision. |
 | [`remove_feature`](#remove_feature) | changes | Remove a feature as a new revision: a standard feature added with add_feature ("boss_1", "hook_1"), or any feature of a FeatureDesign (its method goes; the features before it load from their checkpoints). |
 | [`compare_printers`](#compare_printers) | read-only | Slice the head revision's exported model for real on every printer set up in every installed slicer (the selected printers first, up to limit; or only the printer ids given, from list_printers) and return each one's simulated print time, filament grams and cost from the user's prices, with the fastest, least filament and cheapest. |
 | [`make_lighter`](#make_lighter) | read-only | Make it lighter: search changes that reduce mass while every check that passes now still passes. |
@@ -578,6 +580,10 @@ derived, setup); {"op": "replace", "find": "exact text", "with": "new text"}  te
 "label": "Rib thickness", "default": 2, "min": 1, "max": 4}}; {"op": "delete", "feature" | "def" | "param": name};
 {"op": "set_param", "param": "wall", "value": 2.4}  this revision's value; with default, min, max, step,
 label or doc it changes the declaration too (a new default is also the value).
+The feature tree: {"op": "suppress" | "restore", "feature": "ribs"} (kept in the source, not built);
+{"op": "move", "feature": "ribs", "after" | "before": "body"} (refused when a feature would come before one it
+reads); {"op": "rename", "feature": "ribs", "label": "Stiffeners", "id": "stiffeners"} (a new id is carried
+to every place the source names it).
 A design written as a plain Recipe is edited in its canonical form: its build() is lifted into one method
 per Stage, built once and accepted only when volume, face count and bounding box are unchanged (computed);
 get_design_source returns that form, and its feature ids are what ops name.
@@ -663,7 +669,8 @@ The head comes in canonical form, one method per feature: a FeatureDesign as it 
 (form: "features" when its build() split into feature methods, "skeleton" when it is one feature, "none"
 with the reason when it stays as written), kernel-checked to be the same solid. features lists the ids
 edit_design addresses; source_sha names this text. feature="holes" returns only that method (and the
-parameters it reads). canonical=False, or a rev, returns the stored text.
+parameters it reads). canonical=False, or a rev, returns the stored text. tree: per feature its place in the build order,
+whether it is suppressed, and what it depends on (parameters it reads, features it names, helpers, members).
 
 | Argument | Type | Required |
 |---|---|---|
@@ -760,6 +767,8 @@ Render the part as an image. Look at the part. Returns a PNG rendered from the r
 view: iso, iso_back, front, back, left, right, top, bottom, "sheet" (four views at once), or for a design with
 several parts "assembled" (put together) and "exploded" (pulled apart along its explode offsets).
 highlight: a feature id to pick out. values: render an uncommitted candidate (same as preview_change).
+upto: a feature id: the head as it stood after that feature (the rollback bar; the features up to it load from
+their checkpoints, nothing is saved).
 
 | Argument | Type | Required |
 |---|---|---|
@@ -768,6 +777,7 @@ highlight: a feature id to pick out. values: render an uncommitted candidate (sa
 | `highlight` | string \| null |  |
 | `rev` | integer \| null |  |
 | `values` | object \| null |  |
+| `upto` | string |  |
 
 ### `animate`
 
@@ -848,6 +858,22 @@ a cantilever snap-fit hook (length, thickness, width, lip = undercut, lip_height
 at / normal: a point on the face and its outward normal (analyze_selection gives them). Returns the new head, the
 features and check rows: boss wall vs the nozzle; hook strain 1.5·t·y/L² vs allow_strain (a rule of thumb when
 not given). Remove one with remove_feature.
+Picked features (written as one named method plus its parameters, through the edit protocol; previewed in the
+kernel first and refused with the reason when a feature would be left out; the checks then run again):
+kind="fillet" (picks near edges, radius), "chamfer" (picks near edges, length), "hole" (one pick on a flat face;
+standard clearance (size M2..M6, fit close|normal|loose: ISO 273), tapped (size: tap drill), iso286 (nominal and
+fit such as H7: ISO 286, modelled at mid-tolerance) or plain (d); style plain|counterbore|countersink; depth
+0 = through), "pattern" (of = a feature id; mode linear: axis x|y|z or [x,y,z], count, pitch mm; polar: axis,
+origin, count, angle step degrees), "shell" (thickness; one pick on the face to leave open, or none).
+picks: [{"at": [x, y, z]}] in design mm (analyze_selection gives points on edges and faces). Edges and faces
+are kept as stable queries (the features that made them, their class, direction and place), not indexes;
+a rebuild that cannot find one leaves the feature out and says which. preview=True builds and reports
+(volume, box, faces, build log) and saves nothing. A pattern's direction can come from a picked edge (picks:
+a line gives linear along it; a circle, polar about its axis).
+From a sketch: kind="extrude" | "cut" | "revolve" with sketch = {plane, points, entities, constraints}
+(get_sketch shows the form; plane {"datum": "XY"|"XZ"|"YZ", "offset"} or a picked face: give picks=[{"at": ...}]
+on it), depth (mm; a cut with depth 0 goes through), angle and axis_entity (a line of the sketch) for revolve.
+Named dimensions become parameters "<feature>_<name>"; the sketch must solve and close.
 
 | Argument | Type | Required |
 |---|---|---|
@@ -875,6 +901,61 @@ not given). Remove one with remove_feature.
 | `role` | string |  |
 | `after` | string |  |
 | `partial` | boolean |  |
+| `picks` | array \| null |  |
+| `radius` | number \| null |  |
+| `standard` | string |  |
+| `fit` | string |  |
+| `nominal` | number \| null |  |
+| `d` | number \| null |  |
+| `style` | string |  |
+| `depth` | number \| null |  |
+| `of` | string |  |
+| `mode` | string |  |
+| `count` | integer \| null |  |
+| `pitch` | number \| null |  |
+| `angle` | number \| null |  |
+| `axis` |  |  |
+| `origin` | array \| null |  |
+| `preview` | boolean |  |
+| `sketch` | object \| null |  |
+| `axis_entity` | integer \| null |  |
+
+### `get_sketch`
+
+*Read-only.*
+
+Get the sketch of a feature made from one (extrude, cut, revolve): its plane, points, entities (line, circle,
+arc) and constraints, solved by form.sketch2d: point positions, the profile, degrees of freedom left, and the
+named dimensions with their values (each is a parameter "<feature>_<name>"). Change it with edit_sketch.
+
+| Argument | Type | Required |
+|---|---|---|
+| `project` | string | yes |
+| `feature` | string | yes |
+
+### `edit_sketch`
+
+Edit a feature's sketch with ops (or send the whole sketch), as one revision. Ops, in order:
+{"op": "add_point", "at": [x, y]}; {"op": "add_line", "from": i | [x, y], "to": ...};
+{"op": "add_polyline", "points": [...], "close": true} (lines within 2 degrees of horizontal or vertical get that
+constraint); {"op": "add_rect", "at": [x, y], "size": [w, h]}; {"op": "add_circle", "center": i | [x, y], "r": 5};
+{"op": "add_arc", "center", "start", "end"}; {"op": "constrain", "kind": coincident|horizontal|vertical|parallel|
+perpendicular|tangent|equal|midpoint|on|symmetric|fix, "entities": [...], "points": [...]};
+{"op": "dimension", "kind": length|distance|hdist|vdist|radius|diameter|angle, "entities"|"points", "value",
+"name"} (a name makes it a parameter; "" keeps it fixed); {"op": "set", "name": "w", "value": 70};
+{"op": "move", "point": i, "to": [x, y]}; {"op": "delete", "constraint" | "entity": i};
+{"op": "construction", "entity": i}. "Make it symmetric" is a symmetric constraint about a construction line.
+Refused with the reason when the sketch would not solve (over-constrained, out of reach) or not close; nothing
+is saved then. preview=True builds and reports. The checks run again on the saved revision.
+
+| Argument | Type | Required |
+|---|---|---|
+| `project` | string | yes |
+| `feature` | string | yes |
+| `ops` | array \| null |  |
+| `sketch` | object \| null |  |
+| `expect_head` | integer \| null |  |
+| `preview` | boolean |  |
 
 ### `remove_feature`
 

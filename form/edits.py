@@ -15,6 +15,11 @@ An op is a dict with "op" and one target:
     {"op": "delete",  "feature": "ribs"} | {"op": "delete", "def": "ring"} | {"op": "delete", "param": "rib_t"}
     {"op": "set_param", "param": "wall", "value": 2.4}                                 this revision's value
     {"op": "set_param", "param": "wall", "default": 2.4, "min": 1.2}                   the declaration (and the value)
+    {"op": "suppress", "feature": "ribs"} | {"op": "restore", "feature": "ribs"}       in the source, built or not
+    {"op": "move", "feature": "ribs", "after": "body"} | "before": ...                 the build order
+    {"op": "rename", "feature": "ribs", "label": "Stiffening ribs", "id": "stiffeners"}  label, id or both
+
+The last four are the feature tree's ops (form/modelling.py, which says when each is refused).
 
 Every op is checked before any is applied, and every problem is reported at once. Ops apply in order to the same
 text, so a later op sees what an earlier one did.
@@ -33,7 +38,7 @@ import textwrap
 
 from . import canon, featureprog
 
-OPS = ("replace", "insert", "delete", "set_param")
+OPS = ("replace", "insert", "delete", "set_param", "suppress", "restore", "move", "rename")
 PARAM_FIELDS = ("key", "label", "default", "min", "max", "step", "unit", "group", "feature", "doc", "provenance")
 VERIFY_VERSION = 1
 
@@ -354,6 +359,12 @@ def _apply_one(source: str, op: dict, values: dict) -> str:
         raise _Bad(f"unknown op “{kind}”", "Ops: " + ", ".join(OPS) + ".")
     if kind == "set_param":
         return _set_param(source, op, values)
+    if kind in ("suppress", "restore", "move", "rename"):
+        from . import modelling
+        if not featureprog.is_feature_design(source):
+            raise _Bad(f"{kind} works on a design written as features",
+                       "get_design_source shows the canonical form; a design that stays as written has no tree.")
+        return modelling.apply_tree_op(source, op)
     t = _targets(op)
     if len(t) != 1:
         raise _Bad(f"{kind} needs exactly one target", "feature, def, find (replace only) or param.")
@@ -438,7 +449,8 @@ def diff(a: str, b: str) -> dict:
     cb, rb = parts(b)
     return {"features": {"changed": [k for k in cb if k in ca and ca[k] != cb[k]],
                          "added": [k for k in cb if k not in ca], "removed": [k for k in ca if k not in cb]},
-            "shared": ra != rb, "source_changed": a != b}
+            "shared": ra != rb, "source_changed": a != b,
+            "order_changed": [k for k in cb if k in ca] != [k for k in ca if k in cb]}
 
 
 # ---- the canonical source of a project ---------------------------------------------------------------------------
@@ -560,7 +572,7 @@ def edit(st, p: dict, ops: list, expect_head: int | None = None, note: str = "",
     head = st.rev(p)
     log = head.get("build_log") or []
     out = {"project": p, "head": p["head"], "source_sha": st.rid(p).split(":", 1)[-1],
-           "changed": [e for e in log if e.get("status") != "checkpoint"],
+           "changed": [e for e in log if e.get("status") not in ("checkpoint", "suppressed")],
            "reused": [e["feature"] for e in log if e.get("status") == "checkpoint"],
            "edit": {k: info[k] for k in ("features", "shared", "values")},
            "canonical": {k: c[k] for k in ("mode", "why") if c.get(k)}}
