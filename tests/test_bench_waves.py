@@ -29,6 +29,7 @@ class Providers(unittest.TestCase):
             self.assertEqual(reg[sid].group, "study")
         self.assertEqual(reg["mass"].tool, "mass_properties")
         self.assertEqual(reg["mass"].evidence, massprops.EVIDENCE_BREP)
+        self.assertEqual((reg["mass"].label, reg["mass"].tool), (massprops.BENCH["label"], massprops.BENCH["mcp"]))
         self.assertTrue(reg["materials"].live and reg["features"].live)
         self.assertIn("features", studies.APPLIES)
 

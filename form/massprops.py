@@ -473,10 +473,12 @@ def _materials_live(ctx) -> dict:
 def register_studies(register) -> None:
     """Wave C's entries on the Bench (form/studies.py PROVIDERS): mass and inertia, and the materials with sources."""
     from .studies import Study
-    register(Study("mass", "study", "Mass & inertia", "Mass, centre of mass, inertia tensor and principal axes on the "
-                   "B-rep, per part and assembled, in each part's material.", EVIDENCE_BREP,
-                   run=_bench_run, probe=_bench_probe, key=lambda ctx: study_key(ctx.st, ctx.p),
-                   inputs=("geometry", "materials", "densities"), app="mass", tool="mass_properties", order=16))
+    b = BENCH                                      # the entry this module declares; the Bench's own fields from it
+    register(Study(b["id"], "study", b["label"], "Mass, centre of mass, inertia tensor and principal axes on the "
+                   "B-rep, per part and assembled, in each part's material.", b["evidence"],
+                   run=_bench_run, probe=_bench_probe, key=lambda ctx: b["key"](ctx.st, ctx.p),
+                   inputs=("geometry", "materials", "densities"), app="mass", tool=b["mcp"], order=16,
+                   extra={"cli": b["cli"], "options": list(b["inputs"])}))
     register(Study("materials", "study", "Materials & sources", "The materials the design is given, each density and "
                    "property with the document it was read from, and which values no source gives.",
                    "specified (datasheet)", run=_materials_live, live=True, inputs=("materials",), app="materials",
