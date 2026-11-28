@@ -79,7 +79,7 @@ Glass {
                     Rectangle { anchors.fill: parent; radius: 10; color: cm.pressed ? Theme.washPress : cm.containsMouse ? Theme.washHover : "transparent" }
                     Icon { anchors.centerIn: parent; name: "x"; size: 12; color: cm.containsMouse ? Theme.ink : Theme.ink3 }
                     MouseArea { id: cm; anchors.fill: parent; hoverEnabled: true; onClicked: Frame.close(tab.modelData.key) } }
-                Tip { show: tm.containsMouse && !tm.pressed; below: true; text: tab.modelData.title
+                Tip { show: tm.containsMouse && !tm.pressed; below: true; text: tab.modelData.full || tab.modelData.title
                     keys: tab.at < 9 ? Theme.tabMod + "+" + (tab.at + 1) : "" }
             }
         }
@@ -91,7 +91,7 @@ Glass {
                 Txt { mono: true; font.pixelSize: 12; text: "+" + ts.hidden; anchors.verticalCenter: parent.verticalCenter; wrapMode: Text.NoWrap }
                 Icon { name: "chevron_down"; size: 12; color: Theme.ink3; anchors.verticalCenter: parent.verticalCenter } }
             MouseArea { id: rm; anchors.fill: parent; hoverEnabled: true; onClicked: restMenu.opened ? restMenu.close() : restMenu.open() }
-            Tip { show: rm.containsMouse; below: true; text: ts.model.length + " open: " + ts.model.map(function (t) { return t.title }).join(", ") }
+            Tip { show: rm.containsMouse; below: true; text: ts.model.length + " open: " + ts.model.map(function (t) { return t.full || t.title }).join(", ") }
             PopMenu { id: restMenu; y: parent.height + 12; width: 240
                 model: ts.model.map(function (t, i) { return { name: "docTabMenu-" + t.key, icon: t.icon, text: t.title, checked: t.key === Frame.active,
                                                                keys: i < 9 ? Theme.tabMod + "+" + (i + 1) : "", run: function () { Frame.activate(t.key) } } }) }

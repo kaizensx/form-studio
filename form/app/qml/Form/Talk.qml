@@ -30,7 +30,10 @@ Rectangle {
     // the bar takes as little of the stage as it can (the stage is the hero): while nothing is being written it is one
     // line, 52 px. The suggestions, the agent and model and the hints come when the prompt is taken up.
     readonly property bool typing: ta.activeFocus || ta.text !== "" || Store.chatAttach.length > 0 || Store.chatLinks.length > 0
-    readonly property bool slim: bar && !expanded && (!empty || cueing || !typing)          // just the prompt, on one line
+    // (the column's composer keeps the same rule: one line while idle; the agent and model row and the hint come with
+    // the focus, and stay while the agent works or asks, so what it is doing is said)
+    readonly property bool slim: (bar && !expanded && (!empty || cueing || !typing))          // just the prompt, on one line
+                                 || (docked && !bar && !typing && !Store.chatBusy && !Store.chatAsking)
     readonly property bool suggOn: bar && empty && !cueing && typing && Store.chat.available && !!Store.project && forProject.length > 0
     // the status line says what the agent is doing, or that none is connected; "Ask about this design" is what the
     // empty prompt already says, so with nothing going on there is no line over the bar
@@ -619,7 +622,7 @@ Rectangle {
 
     // ── composer ──
     Item {
-        id: foot; width: parent.width; height: comp.height + sugg.height + (talk.bar ? 12 : talk.docked ? 42 : 36); z: 2; opacity: talk.veil
+        id: foot; width: parent.width; height: comp.height + sugg.height + (talk.bar || talk.slim ? 12 : talk.docked ? 42 : 36); z: 2; opacity: talk.veil
         y: talk.height - height
         // numbered suggestions for the open design, from its real state; keys 1 to 4 pick them while the prompt is empty
         Grid {

@@ -137,7 +137,7 @@ Glass {
                 Row { required property var modelData; spacing: 6
                     readonly property int n: { var c = 0, rows = ls.d.rows || []; for (var i = 0; i < rows.length; i++) if (rows[i].status === String(modelData.label).replace(" ", "_")) c++; return c }
                     Rectangle { width: 22; height: 10; radius: 5; color: modelData.color; anchors.verticalCenter: parent.verticalCenter }
-                    Txt { mono: true; font.pixelSize: 11; font.weight: Theme.wMedium; tone: 2; wrapMode: Text.NoWrap; text: modelData.label + " " + parent.n; anchors.verticalCenter: parent.verticalCenter } } }
+                    Txt { mono: true; count: true; font.pixelSize: 11; font.weight: Theme.wMedium; tone: 2; wrapMode: Text.NoWrap; text: modelData.label + " " + parent.n; anchors.verticalCenter: parent.verticalCenter } } }
             Txt { visible: ls.dk === "dfm" && !!ls.d.parting; font.pixelSize: 11; tone: 3; wrapMode: Text.NoWrap; anchors.verticalCenter: parent.verticalCenter
                 text: "— parting line, proposed" ; color: Theme.datum } }
 

@@ -98,8 +98,14 @@ var MODES = {
     ]
 }
 
-// the four tools of every mode: they stay in the dock, the ribbon does not repeat them (except Section in Check,
-// where it is a way of looking at the part like the maps)
+// the four tools of every mode. With the ribbon showing they are its first group, icons only and never moved into
+// More, and no mode's group repeats them; with the ribbon hidden they head the dock at the stage's edge.
 var UNIVERSAL = ["select", "measure", "section", "annotate"]
+var COMMON = { id: "common", caption: "", fixed: true, tools: [
+    { id: "select", icon: "mouse_pointer_2", label: "Select", keys: "V", hint: "Click a feature to edit it. Drag to orbit, shift-drag to pan." },
+    { id: "measure", icon: "pencil_ruler", label: "Measure", keys: "M", hint: "Distances, faces and hole diameters, computed from the part’s surface." },
+    { id: "section", icon: "scissors", label: "Section", keys: "X", hint: "Cut the part open along X, Y or Z." },
+    { id: "annotate", icon: "map_pin", label: "Annotate", keys: "N", hint: "Pick faces, edges and points or paint a region; see what the solid says there, keep it with a note, ask the agent about it." }
+] }
 
 function modeOf(stage) { return stage === "fit" ? "prove" : stage === "brief" ? "shape" : (MODES[stage] ? stage : "shape") }

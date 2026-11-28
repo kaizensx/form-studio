@@ -6,10 +6,13 @@ import QtQuick
 Text {
     property string kind: "body"
     property bool mono: false
+    // a count read in a sentence ("0 rules fail", "fail 0"): the sans with tabular lining figures. Geist Mono's zero is
+    // slashed, and beside words it reads as a diameter sign; values with units stay mono.
+    property bool count: false
     property int tone: 1                 // 1 primary … 4 muted
     color: kind === "cap" ? Theme.ink3 : kind === "fine" ? (tone === 1 ? Theme.ink3 : [Theme.ink, Theme.ink2, Theme.ink3, Theme.ink4][tone - 1])
          : [Theme.ink, Theme.ink2, Theme.ink3, Theme.ink4][tone - 1]
-    font.family: mono || kind === "cap" ? Theme.mono : Theme.sans      // captions are lettered like a drawing's: mono capitals
+    font.family: (mono || kind === "cap") && !count ? Theme.mono : Theme.sans      // captions are lettered like a drawing's: mono capitals
     font.pixelSize: ({ body: Theme.tBody, fine: Theme.tFine, cap: Theme.tCap, lead: Theme.tLead, h3: Theme.tH3, h2: Theme.tH2, h1: Theme.tH1, hero: Theme.tHero })[kind] || Theme.tBody
     font.weight: kind === "cap" ? Theme.wMedium : (kind === "h1" || kind === "h2" || kind === "h3" || kind === "hero") ? Theme.wSemi : Theme.wBody
     font.letterSpacing: kind === "cap" ? 1.1 : kind === "hero" ? -1.8 : kind === "h1" ? -1.0 : kind === "h2" ? -0.5 : kind === "h3" ? -0.3 : mono ? -0.1 : kind === "lead" ? -0.1 : 0
@@ -26,4 +29,5 @@ Text {
     wrapMode: Text.WordWrap
     elide: Text.ElideNone
     renderType: Theme.textRender
+    font.features: count ? { "tnum": 1 } : ({})
 }

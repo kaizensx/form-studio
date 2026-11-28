@@ -3,7 +3,9 @@
 Four tools are always there and never move: Select, Measure, Section, Annotate. Under a thin rule stand the tools of
 the mode you are in. Changing mode cross-fades that group in 180 ms: the four stay where they are, and nothing else
 on the stage moves. The options of the active tool are one capsule at the head of the stage, in the same place for
-every tool. Each mode's tools answer to their keys in that mode only. Idle, the dock and the capsule redraw nothing."""
+every tool. Each mode's tools answer to their keys in that mode only. Idle, the dock and the capsule redraw nothing.
+With the ribbon showing (the default) there is no dock: the four are the ribbon's first group. The capsule shows only
+while a tool has something to say, one line sized to its content."""
 import os
 import time
 
@@ -61,15 +63,28 @@ def run(ui):
     toasts_gone(ui)
     goto(ui, "shape")
     ui.settle(500)
-    # ── with the ribbon (the default) the dock keeps the four; the mode's tools are labelled in the ribbon ──
+    # ── with the ribbon (the default) the four are its first group and there is no dock; the mode's tools follow ──
     ui.check(ui._shown(ui.item("toolRibbon")), "the ribbon shows by default")
-    ui.check(not ui.exists("railSep") and not ui.exists("railSketch"), "the dock keeps the four alone")
+    ui.check(not ui.exists("toolDock"), "no dock while the ribbon shows")
     for mode, first in (("prove", "analyze"), ("release", "render"), ("document", "views"), ("shape", "sketch")):
         ui.click("stage-" + mode)
         ui.wait_until(lambda: ui.exists("ribbon-" + first), 3, f"{mode}: {first} in the ribbon")
         ui.settle(250)
-        d = rect(ui, "toolDock")
-        ui.check(d[1] >= rect(ui, "toolRibbon")[1] + 38, f"{mode}: the dock stands under the ribbon")
+        for t in ("select", "measure", "section", "annotate"):
+            ui.check(ui.exists("ribbon-" + t), f"{mode}: {t} at the ribbon's left end")
+    # an idle tool leaves no capsule: a map's Analyze goes with the map, and Check's tools stay in Check
+    ui.click("stage-prove")
+    ui.run_js("Store.setAnalysis('thickness')")
+    ui.wait_until(lambda: ui.js("Ws.tool") == "analyze" and ui.exists("toolCapsule"), 30, "a map takes Analyze with it")
+    c = rect(ui, "toolCapsule")
+    ui.check(c[3] <= 40.5, f"the capsule is one line, about 40 px: {c}")
+    ui.check(c[2] <= 0.6 * (rect(ui, "viewCube")[0] - rect(ui, "toolRibbon")[0]), f"sized to what it says, not stage-wide: {c}")
+    ui.run_js("Store.setAnalysis('')")
+    ui.wait_until(lambda: ui.js("Ws.tool") == "select" and not ui.exists("toolCapsule"), 3, "the map gone: Select, no capsule")
+    ui.click("ribbon-analyze")
+    ui.wait_until(lambda: ui.exists("toolCapsule"), 3, "Analyze picked by hand: its capsule")
+    ui.click("stage-shape")
+    ui.wait_until(lambda: ui.js("Ws.tool") == "select" and not ui.exists("toolCapsule"), 3, "Design: Check's tool put down, no capsule")
     # the rest of this journey is the dock as it is with the ribbon folded away (its Hide, remembered)
     ui.hover("ribbonHide")                           # the pointer arrives first: a mode's tooltip just above is gone
     ui.settle(200)

@@ -20,7 +20,7 @@ QtObject {
     property real footTop: 0
 
     // ── the tabs ──
-    property var tabs: []                  // [{ key, kind, id, title, icon }] of the design in front; the model is not in it
+    property var tabs: []                  // [{ key, kind, id, title, full, icon }] of the design in front; the model is not in it
     property string _pid: ""
     property string _pending: ""           // the tab that was in front when the design was last open, put back once the Bench is in
     readonly property string active: {
@@ -37,10 +37,21 @@ QtObject {
         return ({ strength: "gauge", dfm: "factory", cam: "drill", sheet: "fold_horizontal", drawing: "drafting_compass", motion: "orbit",
                   stack: "align_vertical_space_around", topology: "sparkles", inverse: "sparkles", printOrient: "rotate_3d" })[a] || "file_check"
     }
+    // a tab's name is short enough to stand whole in the row ("CNC check", "Strength", "Drawing"); the entry's full
+    // name is its tooltip
+    readonly property var _dfm: ({ cnc: "CNC", injection: "Moulding", fdm: "FDM", sla: "SLA", sls: "SLS", mjf: "MJF", lpbf: "LPBF" })
+    function _short(id, e) {
+        if (id.indexOf("dfm_") === 0) return (_dfm[id.slice(4)] || id.slice(4).toUpperCase()) + " check"
+        if (id === "report") return "Report"
+        var a = e && e.app || ""
+        var s = ({ strength: "Strength", cam: "CAM", sheet: "Flat pattern", drawing: "Drawing", motion: "Motion", stack: "Stack-up",
+                   topology: "Topology", inverse: "Variants", printOrient: "Orientation" })[a]
+        return s || (e ? e.label : id)
+    }
     function _describe(key) {
-        if (key.indexOf("compare:") === 0) { var r = parseInt(key.slice(8)); return { key: key, kind: "compare", id: String(r), title: "Compare " + Store.revWord(r), icon: "git_compare" } }
+        if (key.indexOf("compare:") === 0) { var r = parseInt(key.slice(8)); return { key: key, kind: "compare", id: String(r), title: "Compare " + Store.revWord(r), full: "Compare with " + Store.revWord(r), icon: "git_compare" } }
         var id = key.slice(key.indexOf(":") + 1), e = Store.benchEntry(id)
-        return { key: key, kind: key.indexOf("doc:") === 0 ? "doc" : "result", id: id, title: e ? e.label : id, icon: _icon(e) }
+        return { key: key, kind: key.indexOf("doc:") === 0 ? "doc" : "result", id: id, title: _short(id, e), full: e ? e.label : id, icon: _icon(e) }
     }
     onActiveChanged: {
         if (active === "design" || !Store.pid || _pid !== Store.pid) return
@@ -97,7 +108,7 @@ QtObject {
     function _save() {
         if (!_pid) return
         var all = _read()
-        all[_pid] = { tabs: tabs.map(function (t) { return { key: t.key, kind: t.kind, id: t.id, title: t.title, icon: t.icon } }), active: active }
+        all[_pid] = { tabs: tabs.map(function (t) { return { key: t.key, kind: t.kind, id: t.id, title: t.title, full: t.full || t.title, icon: t.icon } }), active: active }
         _mem.tabs = JSON.stringify(all)
     }
     property var _watch: Connections {

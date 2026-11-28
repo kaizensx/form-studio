@@ -27,6 +27,9 @@ Rectangle {
     readonly property string openWord: !e ? "" : (e.app || "").indexOf("map.") === 0 ? "Show on the part" : e.app === "simulate" ? "Play it" : e.app === "mass" ? "Show the centre of mass"
         : e.app === "slicerOpen" ? "Open in the slicer" : surface ? "Open" : "Show the file"
     function act() { if (!e) return; if (drawn && e.state === "current") Store.runStudy(e.id, true); else if (opens && surface) Store.openStudy(e); else if (opens) Bridge.reveal(Bridge.fileUrl(e.files[0])); else Store.runStudy(e.id, e.state === "current") }
+    // the foot of the card's buttons, in the card: a pane too short to show them keeps a copy at its own foot
+    readonly property real actsFoot: col.y + acts.y + acts.height
+    readonly property bool actsOn: acts.visible
     width: parent ? parent.width : 0
     height: e ? col.implicitHeight + 28 : 0; visible: !!e
     radius: 14; color: Theme.alpha(Theme.lineBase, Theme.dark ? 0.045 : 0.035); border.color: Theme.rule
@@ -42,7 +45,7 @@ Rectangle {
                 text: card.e ? Store.benchSays(card.e) : "" } }
         // the number, then how it is known
         Flow { visible: card.has; width: parent.width; spacing: 8
-            Txt { objectName: "cardNumber"; visible: text !== ""; text: card.cut[0]; mono: true; font.pixelSize: 28; font.weight: Font.Light; tone: 1; wrapMode: Text.NoWrap; height: 34; verticalAlignment: Text.AlignBottom }
+            Txt { objectName: "cardNumber"; visible: text !== ""; text: card.cut[0]; mono: true; count: /^\d+$/.test(text); font.pixelSize: 28; font.weight: Font.Light; tone: 1; wrapMode: Text.NoWrap; height: 34; verticalAlignment: Text.AlignBottom }
             Txt { visible: text !== ""; text: card.cut[1]; tone: 2; width: Math.min(implicitWidth, col.width); height: 31; verticalAlignment: Text.AlignBottom; elide: Text.ElideRight; wrapMode: Text.NoWrap }
             Ev { objectName: "cardEvidence"; text: card.e ? (rcard.lead ? Store.evWord(card.e.evidence) : card.e.evidence || "") : ""; lit: true; height: 30; verticalAlignment: Text.AlignBottom } }
         Txt { visible: !!card.e && card.e.state === "failed"; width: parent.width; color: Theme.signal
@@ -60,7 +63,7 @@ Rectangle {
         Rectangle { visible: rq.text !== ""; width: parent.width; height: rq.implicitHeight + 14; radius: 8; color: Theme.glassWell
             Txt { id: rq; objectName: "cardRequest"; x: 9; y: 7; width: parent.width - 18; mono: true; font.pixelSize: 11; tone: 2; wrapMode: Text.WrapAnywhere
                 text: card.e && !card.off ? Store.benchRequest(card.e) : "" } }
-        Row { spacing: 8; visible: card.action !== "" || (!!card.e && card.e.state === "running")
+        Row { id: acts; spacing: 8; visible: card.action !== "" || (!!card.e && card.e.state === "running")
             Btn { objectName: "cardRun"; small: true; kind: "primary"; visible: card.action !== ""; text: card.action
                 icon: card.e && card.e.by === "agent" ? "sparkles" : ""; onClicked: card.act() }
             Btn { objectName: "cardAgain"; small: true; visible: card.opens && !card.drawn; text: "Run again"; onClicked: Store.runStudy(card.e.id, true) }

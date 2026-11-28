@@ -447,6 +447,11 @@ Item {
     // how much air the framing leaves around the part (1 = its bounding sphere touches the free area). A workspace
     // frames the part large, as a product photograph does; thumbnails keep more air.
     property real slack: 1.5
+    // A workspace frames the whole part by its box, not its sphere: the box (with its dimension lines) takes `fill` of
+    // the free area's binding side, height or width. 0: the sphere's framing with `slack`, as thumbnails keep.
+    property real fill: 0
+    // the part stands this many pixels above the free area's middle: the eye reads a centred part as low
+    property real lift: 0
     // where the scale cue sits (its left edge and its foot, in view pixels); -1: bottom right of the free area
     property real scaleLeft: -1
     property real scaleFoot: -1
@@ -484,16 +489,18 @@ Item {
     function homeDist(a, e) {
         var d = frame(bounds, slack)
         if (!interactive || lite || !model) return d
-        return Math.min(3000, Math.max(d, fitDist(a === undefined ? az : a, e === undefined ? el : e)))
+        var f = fitDist(a === undefined ? az : a, e === undefined ? el : e)
+        return Math.min(3000, fill > 0 ? f : Math.max(d, f))
     }
     function fitDist(a, e) {
         var H = Math.max(1, height), W = Math.max(1, width), F = H / 2 / Math.tan(13 * Math.PI / 180)
         var fw = Math.max(40, Math.min(120, W), _fin(W - insetLeft - insetRight, W))
         var fh = Math.max(40, Math.min(120, H), _fin(H - insetTop - insetBottom, H))
-        var offX = (insetLeft - insetRight) / 2, offY = (insetTop - insetBottom) / 2
+        var offX = (insetLeft - insetRight) / 2, offY = (insetTop - insetBottom) / 2 - lift
         // margins: the numbers of the dimension lines stand on the lines (21 px tall, about 60 wide), plus some air
         var mx = showDims ? 40 : 16, my = showDims ? 22 : 16
-        var hx = Math.max(10, fw / 2 - mx), hy = Math.max(10, fh / 2 - my)
+        var hx = Math.max(10, fw / 2 - mx), hy = Math.max(10, fh / 2 - my - lift)
+        if (fill > 0) { hx = Math.min(hx, fill * fw / 2); hy = Math.min(hy, fill * fh / 2) }
         var ra = a * Math.PI / 180, re = Math.max(-89, Math.min(89, e)) * Math.PI / 180
         var back = Qt.vector3d(Math.sin(ra) * Math.cos(re), -Math.cos(ra) * Math.cos(re), Math.sin(re))
         var look = Quaternion.lookAt(Qt.vector3d(0, 0, 0), scene(back.times(-1)))
@@ -873,7 +880,7 @@ Item {
             readonly property real re: Math.max(-89, Math.min(89, vp.el)) * Math.PI / 180
             // the look-at point, moved so the orbit centre lands in the middle of the free area
             readonly property real ox: (vp.shownLeft - vp.shownRight) / 2 * vp.mmPerPx
-            readonly property real oy: (vp.shownTop - vp.shownBottom) / 2 * vp.mmPerPx
+            readonly property real oy: ((vp.shownTop - vp.shownBottom) / 2 - vp.lift) * vp.mmPerPx
             // (along the camera's own right and up, as lookAt turns it for this direction: it rolls the camera a few
             // degrees, and a shift along the level right and the plain up lands the centre low when the free area is
             // off to one side: 31 px for 200 px of offset)

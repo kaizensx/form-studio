@@ -26,7 +26,7 @@ Glass {
     readonly property int sepW: 17            // a group's rule and the room either side of it
     readonly property int tail: 32 + 4        // Hide
     function _full(t) { return Math.ceil(fmLabel.advanceWidth(t.label)) + 44 }
-    function _capW(g) { return Math.ceil(fmCap.advanceWidth(g.caption.toUpperCase()) + 1.1 * g.caption.length) + 10 }
+    function _capW(g) { if (!g.caption) return 0; return Math.ceil(fmCap.advanceWidth(g.caption.toUpperCase()) + 1.1 * g.caption.length) + 10 }
     function _width(gs, compact, caps, shown, more) {
         var w = 2 * pad + tail, n = 0
         for (var i = 0; i < gs.length; i++) {
@@ -42,19 +42,21 @@ Glass {
     }
     // In this order, until it fits: the groups after the first give up their labels, from the right; the tools used
     // least (`extra` in ToolSet.js: sweep, loft, rib, mirror, draft, split, move face, the planes) go into More, from
-    // the end; the captions go; the first group gives up its labels; then the last tools go into More.
+    // the end; the captions go; the first group gives up its labels; then the last tools go into More. A `fixed` group (the four tools of every
+    // mode, first) is icons only from the start and never gives a tool to More.
     readonly property var plan: {
         var gs = groups || [], room = maxWidth, n = gs.length
-        var compact = gs.map(function () { return false }), shown = gs.map(function (g) { return g.tools.slice() })
+        var compact = gs.map(function (g) { return !!g.fixed }), shown = gs.map(function (g) { return g.tools.slice() })
+        var f0 = n && gs[0].fixed ? 1 : 0
         var caps = true, more = []
         function fits() { return rb._width(gs, compact, caps, shown, more.length > 0) <= room }
         function out(i, j) { more.push({ group: gs[i].caption, gi: i, ti: gs[i].tools.indexOf(shown[i][j]), tool: shown[i][j] }); shown[i].splice(j, 1) }
-        for (var i = n - 1; i >= 1 && !fits(); i--) compact[i] = true
-        for (var g = n - 1; g >= 0 && !fits(); g--)
+        for (var i = n - 1; i >= f0 + 1 && !fits(); i--) compact[i] = true
+        for (var g = n - 1; g >= f0 && !fits(); g--)
             for (var j = shown[g].length - 1; j >= 0 && !fits(); j--) if (shown[g][j].extra) out(g, j)
         if (!fits()) caps = false
-        if (!fits() && n) compact[0] = true
-        for (var q = n - 1; q >= 0 && !fits(); q--)
+        if (!fits() && n > f0) compact[f0] = true
+        for (var q = n - 1; q >= f0 && !fits(); q--)
             while (shown[q].length && !fits()) out(q, shown[q].length - 1)
         more.sort(function (x, y) { return x.gi - y.gi || x.ti - y.ti })
         return { compact: compact, caps: caps, shown: shown, more: more }
@@ -85,7 +87,7 @@ Glass {
                     height: parent.height; spacing: 0
                     Item { visible: !grp.first; width: rb.sepW; height: parent.height
                         Rectangle { x: 8; anchors.verticalCenter: parent.verticalCenter; width: 1; height: 18; color: Theme.rule } }
-                    Item { visible: rb.plan.caps; width: rb._capW(grp.modelData); height: parent.height
+                    Item { visible: rb.plan.caps && !!grp.modelData.caption; width: rb._capW(grp.modelData); height: parent.height
                         Txt { objectName: "ribbonCaption-" + grp.modelData.id; kind: "cap"; text: grp.modelData.caption; x: 6
                             anchors.verticalCenter: parent.verticalCenter; wrapMode: Text.NoWrap } }
                     Row {

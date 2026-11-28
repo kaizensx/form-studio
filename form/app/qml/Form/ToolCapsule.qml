@@ -16,8 +16,13 @@ Glass {
     readonly property real lead: ttl.visible ? Math.ceil(ttl.width) + 26 : 6
     readonly property real room: Math.max(80, maxWidth - lead - 6)
     radius: 20
-    width: Math.round(Math.min(maxWidth, lead + flow.childrenRect.width + 6))
-    height: Math.max(40, Math.round(flow.childrenRect.height + 12))
+    // what is shown in it (childrenRect counts hidden children too: a hidden bar made it stage-wide and two lines tall)
+    readonly property var shownRect: { var w = 0, h = 0, c = flow.children
+        for (var i = 0; i < c.length; i++) if (c[i].visible && c[i].width > 0) { w = Math.max(w, c[i].x + c[i].width); h = Math.max(h, c[i].y + c[i].height) }
+        return { w: w, h: h } }
+    readonly property bool empty: shownRect.w <= 0
+    width: Math.round(Math.min(maxWidth, lead + shownRect.w + 6))
+    height: Math.max(40, Math.round(shownRect.h + 12))
     Txt { id: ttl; objectName: "toolCapsuleTitle"; x: 14; height: 40; verticalAlignment: Text.AlignVCenter; visible: tc.title !== ""
         text: tc.title; font.pixelSize: 13; font.weight: Theme.wSemi; wrapMode: Text.NoWrap
         width: Math.min(implicitWidth, tc.titleMax); elide: Text.ElideRight }

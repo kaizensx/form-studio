@@ -77,7 +77,7 @@ Item {
     // (the project rail opened takes 220 px at the left: with the conversation folded the stage starts right of it)
     property real shift: col ? Store.talkCol + Theme.gap - Theme.edge : (Frame.railOpen && !Store.focusView ? 220 + Theme.gap : 0)
     // the folded rail stands under the dock, above the size line (ProjectRail.qml, placed by Main.qml)
-    Binding { target: Frame; property: "dockFoot"; value: rail.y + rail.height }
+    Binding { target: Frame; property: "dockFoot"; value: rail.visible ? rail.y + rail.height : ws.headY - 12 }
     Binding { target: Frame; property: "footTop"; value: status.y - 48 }
     Behavior on shift { enabled: insp.settled && !Store.talkDragging; NumberAnimation { duration: Motion.camera; easing.type: Easing.BezierSpline; easing.bezierCurve: Motion.out } }
     // a design that declares how its parts go together: assembled / exploded / as printed. Separate bodies
@@ -108,6 +108,8 @@ Item {
     function setRibbon(on) { wsMem.ribbon = on }
     // where the stage's head begins: under the ribbon when it shows (38 + 6: the stage gives up 44 px, no more)
     readonly property real headY: Theme.paneTop + (ribbonOn ? 44 : 0)
+    // the folded project rail stands on the stage's left edge (the conversation folded, the rail not opened; Main.qml)
+    readonly property bool railOnStage: !col && !Frame.railOpen && !Store.focusView
     // the feature kinds the engine builds (GET /studio, form/modelling.py KINDS): a tool waiting for one appears
     // when it is listed (sweep, loft, rib, mirror, draft, split, move face, planes)
     readonly property var kinds: Store.studio && Store.studio.feature_kinds ? Store.studio.feature_kinds
@@ -146,16 +148,22 @@ Item {
     // time would make the ribbon's buttons anew under the pointer, dropping a click)
     readonly property string _groupsSig: {
         Store.bench; Store.assembly; Store.printUi; Store.shown; ws.kinds         // what availability reads
-        return JSON.stringify((ToolSet.MODES[Store.mode] || []).map(function (g) {
-            return { id: g.id, caption: g.caption, tools: g.tools.filter(function (t) { return ws.toolAvail(t) }) }
-        }).filter(function (g) { return g.tools.length > 0 }))
+        // the four of every mode first (Select, Measure, Section, Annotate: the dock's, while the ribbon shows);
+        // no mode's group repeats them
+        return JSON.stringify([ToolSet.COMMON].concat((ToolSet.MODES[Store.mode] || []).map(function (g) {
+            return { id: g.id, caption: g.caption, tools: g.tools.filter(function (t) { return ToolSet.UNIVERSAL.indexOf(t.id) < 0 && ws.toolAvail(t) }) }
+        })).filter(function (g) { return g.tools.length > 0 }))
     }
     readonly property var ribbonGroups: JSON.parse(_groupsSig)
+    property bool _mapTool: false            // Analyze was taken up by a map switched on, not by its button
     readonly property var _sketchKinds: ["sketch", "extrude", "cut", "revolve"]
     readonly property var _annotateKinds: ["fillet", "chamfer", "hole", "shell", "part", "text"]
     // what the ribbon shows of a tool: lit, marked, off, and the label of a switch
     function toolState(id) {
         var t = ws._toolDef(id), sim = ws.sim
+        if (id === "select") return { active: ws.tool === "select" && !sim && !sketch.busyHere && !Ws.want }
+        if (id === "measure") return { active: ws.tool === "measure" && !sim, marked: Store.measures.length > 0 }
+        if (id === "annotate") return { active: ws.tool === "annotate" && !sim && !Ws.want, marked: Store.annotations.length > 0 || Store.selItems.length > 0 }
         if (_sketchKinds.indexOf(id) >= 0) return { active: sketch.busyHere && Ws.want === id, enabled: !sim && !Store.hasDraft,
                                                     hint: Store.hasDraft ? "Commit or discard the draft first." : undefined }
         if (_annotateKinds.indexOf(id) >= 0) return { active: ws.tool === "annotate" && Ws.want === id, enabled: !sim }
@@ -188,7 +196,7 @@ Item {
         if (_sketchKinds.indexOf(id) >= 0) { ws.setTool("sketch", id); return }
         if (_annotateKinds.indexOf(id) >= 0) { ws.setTool("annotate", id); return }
         if (id === "pattern") { ws.setTool("select", "pattern"); return }
-        if (id === "analyze" || id === "section" || id === "assembly" || id === "history" || id === "views") { ws.setTool(id); return }
+        if (id === "select" || id === "measure" || id === "annotate" || id === "analyze" || id === "section" || id === "assembly" || id === "history" || id === "views") { ws.setTool(id); return }
         if (id === "mass") { Store.massOn = !Store.massOn; return }
         if (id === "holds") { Store.toggleCompanions(); return }
         if (id === "plates") { if (ws.tool !== "assembly") ws.setTool("assembly"); Store.setAsmMode("print"); return }
@@ -220,6 +228,7 @@ Item {
         if (sketch.busyHere) sketch.end()
         if (t === Ws.tool && want === Ws.want && t !== "select") { t = "select"; want = "" }   // the active tool, clicked again, hands back to Select
         var was = Ws.tool
+        ws._mapTool = false
         Ws.want = want
         if (t === "annotate" && want) Store.selMode = want === "fillet" || want === "chamfer" ? "edge" : "face"
         if (was === t) return
@@ -242,10 +251,19 @@ Item {
             var on = !!(Store.section && Store.section.axis)
             if (on && Ws.tool === "select") Ws.tool = "section"; else if (!on && Ws.tool === "section") Ws.tool = "select"
         }
-        function onAnalysisMapChanged() { if (Store.analysisMap && Ws.tool === "select") Ws.tool = "analyze" }
+        // a map switched on with no tool in hand takes Analyze with it, and gives it back when the map goes: the
+        // capsule never stays on to say only that no map is shown
+        function onAnalysisMapChanged() {
+            if (Store.analysisMap && Ws.tool === "select") { Ws.tool = "analyze"; ws._mapTool = true }
+            else if (!Store.analysisMap && Ws.tool === "analyze" && ws._mapTool) { Ws.tool = "select"; ws._mapTool = false }
+        }
         function onAsmModeChanged() { if (Store.asmMode !== "print" && Ws.tool === "select" && Store.assembly) Ws.tool = "assembly" }
         function onPidChanged() { sketch.end(); Ws.tool = "select"; Ws.want = ""; Ws.refineWant = -1; Store.overview = false }
-        function onModeChanged() { if (Store.mode !== "shape" && (sketch.busyHere || Ws.want)) ws.setTool("select") }
+        function onModeChanged() {
+            if (Store.mode !== "shape" && (sketch.busyHere || Ws.want)) ws.setTool("select")
+            // Check's own tools (Analyze, History, Assembly) are put down when you leave Check; a map stays on the part
+            else if (Store.mode !== "prove" && ["analyze", "history", "assembly"].indexOf(Ws.tool) >= 0) ws.setTool("select")
+        }
         function onFadeTo(apply) { vp.swap(apply) }                 // the timeline and anything else that swaps the geometry
     }
     // a design that has just opened has the keyboard on the part, not in the conversation box Home left it in
@@ -345,7 +363,9 @@ Item {
             // The tool dock floats inside the stage at its left edge, over the room: it takes no column of its own.
             // The frame starts 28 px right of it: a part's left dimension line and its number stand outside the part's
             // own box, and must stay clear of the dock.
-            readonly property real freeL: Theme.edge + 76 + ws.shift
+            // With the ribbon showing there is no dock: the stage starts 16 px in, or right of the folded project rail
+            // where it stands on the stage's edge (the conversation folded to the bar).
+            readonly property real freeL: Theme.edge + ws.shift + (!ws.ribbonOn ? 76 : ws.railOnStage ? 44 + 16 : 16)
             readonly property real freeR: ws.paneX - 12
             // The part stands on the bar's centre line (the window's) whenever the free stage has room on both sides
             // of it: at least 60 % of its width. Otherwise, a legend open or a narrow window, it stands in the middle
@@ -375,6 +395,9 @@ Item {
             objectName: "viewport"
             labelRight: ws.paneX
             slack: 0.98
+            // the part's box takes about three quarters of the free stage's binding side (0.86 with its dimension lines and
+            // their numbers: the box alone is measured at 75-78 %, stage_space), a little above its middle
+            fill: 0.86; lift: Math.round(0.03 * (lay.bottom - lay.top))
             scaleLeft: status.x; scaleFoot: status.y - 12
             floorGrid: Store.floorGrid
             results: true                // results of the later engines are drawn on the part here (Results.qml)
@@ -425,7 +448,7 @@ Item {
             onHoveredValue: function (v, x, y, on) { vchip.on = on; vchip.v = v; vchip.x = Math.min(x + 14, centre.width - vchip.width - 8); vchip.y = y + 14 }
         }
         Loader { id: lv; anchors.fill: parent; active: !!Store.layers; source: "LayerView.qml"
-            onLoaded: { item.leftInset = Qt.binding(function () { return Theme.edge + 62 + ws.shift }); item.topInset = Qt.binding(function () { return ws.headY + 4 }); item.rightInset = Qt.binding(function () { return centre.width - ws.paneX + 12 }); item.stripHeight = Qt.binding(function () { return Math.max(60, centre.height - Store.barY) }); item.axisX = Qt.binding(function () { return lay.mid }) } }
+            onLoaded: { item.leftInset = Qt.binding(function () { return lay.freeL - 14 }); item.topInset = Qt.binding(function () { return ws.headY + 4 }); item.rightInset = Qt.binding(function () { return centre.width - ws.paneX + 12 }); item.stripHeight = Qt.binding(function () { return Math.max(60, centre.height - Store.barY) }); item.axisX = Qt.binding(function () { return lay.mid }) } }
         // the corners of the room fall away
         Room { anchors.fill: parent; wall: false; poolK: 0; visible: !Store.layers }
         }
@@ -445,7 +468,7 @@ Item {
 
         // a sketch drawn on the part: the profile on its plane, its tools in the capsule, what to make of it at the foot
         SketchOnPart { id: sketch; anchors.fill: parent; z: 4; vp: vp; source: studio
-            capX: Theme.edge + 60 + ws.shift; capY: ws.headY + 2
+            capX: Theme.edge + ws.shift + (ws.ribbonOn ? (ws.railOnStage ? 52 : 0) : 60); capY: ws.headY + 2
             capMax: Math.max(240, ws.paneX - capX - Theme.gap - (cube.visible ? cube.width + Theme.gap : 0))
             midX: ws.col ? (lay.freeL + lay.freeR) / 2 : lay.mid
             footL: rail.visible && rail.y + rail.height + 8 > footY - 44 ? capX : Theme.edge + ws.shift; footR: ws.paneX - Theme.gap
@@ -559,7 +582,8 @@ Item {
             id: rail; objectName: "toolDock"
             source: studio; arrive: 3
             x: Theme.edge + ws.shift; y: ws.headY; z: 6; width: 48; height: railCol.height + 12; radius: 24
-            visible: !!Store.view
+            // with the ribbon showing, its first group holds the four: no dock, and the stage keeps its column
+            visible: !!Store.view && !ws.ribbonOn
             readonly property string mode: Store.mode
             // while a build plays the tools step back: the part and its cue have the room
             // (as one picture while it is dimmed, so the filled disc and its icon fade together and not one through the other)
@@ -665,17 +689,23 @@ Item {
             opacity: ws.cueOn ? 0.45 : 1; Behavior on opacity { NumberAnimation { duration: Theme.cross } }
         }
 
-        // ── options of the active tool: one capsule at the head of the stage, always in the same place ──
+        // ── options of the active tool: one compact capsule, sized to what it says, shown only while it says something ──
+        // With the ribbon it stands at the ribbon's right end, on the same line, when that line has room for it; else
+        // under the ribbon's left end. Without the ribbon, right of the dock as before.
         Item {
             id: opts
-            x: Theme.edge + 60 + ws.shift; y: ws.headY + 2; z: 5; visible: !ws.sim && !!Store.view && !sketch.busyHere
+            readonly property real x0: Theme.edge + ws.shift + (ws.ribbonOn ? (ws.railOnStage ? 52 : 0) : 60)
+            readonly property real rowEnd: (cube.visible ? cube.x : ws.paneX) - Theme.gap
+            readonly property bool inRow: ws.ribbonOn && ribbon.x + ribbon.width + Theme.gap + capsule.width <= rowEnd
+            x: inRow ? Math.round(ribbon.x + ribbon.width + Theme.gap) : x0; y: inRow ? Theme.paneTop - 1 : ws.headY + 2
+            z: 5; visible: !ws.sim && !!Store.view && !sketch.busyHere
             readonly property real room: Math.max(160, capsule.maxWidth - capsule.lead - 6)
             readonly property bool any: ws.tool === "annotate" || ws.tool === "measure" || ws.tool === "section" || ws.tool === "analyze" || ws.tool === "views"
                                         || (ws.tool === "assembly" && !!Store.assembly) || Ws.want === "pattern"
-            height: any ? capsule.height : 0
+            height: any && !capsule.empty ? capsule.height : 0
             ToolCapsule {
                 id: capsule; objectName: "toolCapsule"; source: studio; visible: opts.any
-                maxWidth: Math.max(200, ws.paneX - opts.x - Theme.gap - (cube.visible ? cube.width + Theme.gap : 0))
+                maxWidth: Math.max(200, opts.rowEnd - opts.x0)
                 title: Ws.want === "pattern" ? "Pattern" : ws.tool === "annotate" ? ({ fillet: "Fillet", chamfer: "Chamfer", hole: "Hole", shell: "Shell", part: "Part here", text: "Text" }[Ws.want] || "Annotate")
                      : ws.tool === "measure" ? "Measure" : ws.tool === "section" ? "Section" : ws.tool === "analyze" ? "Analyze" : ws.tool === "assembly" ? "Assembly" : ws.tool === "views" ? "Views" : ""
             HudBar { id: viewsBar; objectName: "viewsBar"; shown: ws.tool === "views"; maxWidth: opts.room; cut: true
@@ -789,8 +819,10 @@ Item {
         ResultStrip { id: strip; source: studio; z: 5
             on: !!Store.analysisMap && !ws.mapBlocked && !ws.sim && !!Store.view
             map: Store.analysis; busy: Store.analysisBusy; pending: Store.analysisLabel(Store.analysisMap); check: Store.analysis ? Store.analysisCheck() : null
-            width: Math.round(Math.max(300, Math.min(616, lay.freeR - lay.freeL - 4)))
-            x: Math.round(Math.max(lay.freeL, Math.min(lay.freeR - width, (ws.col ? (lay.freeL + lay.freeR) / 2 : lay.mid) - width / 2)))
+            // clear of the scale cue at the stage's foot (it stands at the size line's left, at most 140 px long)
+            readonly property real room0: Math.max(lay.freeL, status.x + 152)
+            width: Math.round(Math.max(300, Math.min(616, lay.freeR - room0 - 4)))
+            x: Math.round(Math.max(room0, Math.min(lay.freeR - width, (ws.col ? (lay.freeL + lay.freeR) / 2 : lay.mid) - width / 2)))
             y: Math.round((ws.col ? centre.height - Theme.edge : Math.min(centre.height - Theme.edge, Store.barY - Theme.gap)) - height) }
 
         // the same strip for a result of the later engines (strength, manufacturability, CNC, flat pattern, motion)
@@ -1005,7 +1037,7 @@ Item {
         Flickable {
             id: scroll
             objectName: "inspector"
-            anchors.top: stageHead.bottom; anchors.bottom: foot.top; anchors.left: parent.left; anchors.right: parent.right
+            anchors.top: stageHead.bottom; anchors.bottom: stuck.top; anchors.left: parent.left; anchors.right: parent.right
             // while a toast is up, the last rows can still be scrolled clear of it
             contentHeight: body.implicitHeight + 16; clip: true; boundsBehavior: Flickable.StopAtBounds
             ScrollBar.vertical: ScrollBar { width: 6 }
@@ -1028,12 +1060,21 @@ Item {
                     readonly property var pick: chap.visible ? Store.benchSelected(chap.chapter) : null
                     readonly property bool home: !pick || pick.id === Store.benchHome[chap.chapter]
                     e: home ? null : pick
-                    // a long chapter: the opened row comes into view under the last rows of the list
+                    // a long chapter: the opened card comes into view whole, down to its buttons, when the pane can
+                    // hold it; a card taller than the pane shows from its top. Its result arrives a moment after it opens
+                    // and makes it taller: for a second and a half it is brought into view again as it grows.
                     readonly property string shownId: e ? e.id : ""
-                    onShownIdChanged: if (shownId !== "") reveal.restart()
+                    onShownIdChanged: if (shownId !== "") { growing.restart(); reveal.restart() }
+                    onHeightChanged: if (e && growing.running) reveal.restart()
+                    Timer { id: growing; interval: 1500 }
                     Timer { id: reveal; interval: 80       // once the card has its height
-                        onTriggered: if (opened.e && opened.y + Math.min(opened.height, 200) > scroll.contentY + scroll.height)
-                            scroll.contentY = Math.max(0, Math.min(scroll.contentHeight - scroll.height, opened.y - 104)) } }
+                        onTriggered: {
+                            if (!opened.e) return
+                            var top = opened.y - 8, foot = opened.y + opened.height + 16 - scroll.height
+                            var want = opened.height + 24 <= scroll.height ? Math.max(foot, Math.min(scroll.contentY, top)) : top
+                            if (opened.y + opened.height + 8 > scroll.contentY + scroll.height || opened.y < scroll.contentY)
+                                scroll.contentY = Math.max(0, Math.min(scroll.contentHeight - scroll.height, want))
+                        } } }
                 BenchRow { objectName: "studyBack"; x: 6 - body.x; width: insp.width - 12; visible: Store.stage === "fit"; chevron: true; selected: true
                     name: "Fit"; value: ws.d && ws.d.fit ? Math.round(ws.d.fit.yield * 100) + " %" : ""; evidence: ws.d && ws.d.fit ? "modelled" : ""
                     onClicked: Store.setStage("prove") }
@@ -1055,6 +1096,22 @@ Item {
             anchors.bottom: parent.bottom; anchors.left: parent.left; anchors.right: parent.right; height: 42
             Rectangle { x: 14; width: parent.width - 28; height: 1; color: Theme.rule }
             Pipeline { id: pipe; flat: true; x: 8; y: 5; width: parent.width - 16; height: 34 }
+        }
+        // the opened card's buttons, kept at the pane's foot while the card is taller than what the pane shows of it:
+        // Run again (or Run, Show on the part) is never cut by the pane's edge. Scrolled down to the card's own
+        // buttons, the copy goes.
+        Item {
+            id: stuck; objectName: "cardFoot"
+            anchors.bottom: foot.top; anchors.left: parent.left; anchors.right: parent.right
+            readonly property real avail: insp.height - stageHead.height - foot.height - pipeRow.height
+            readonly property bool on: chap.visible && !!opened.e && opened.actsOn && opened.action !== ""
+                                       && opened.y + opened.actsFoot + 8 > scroll.contentY + avail
+            height: on ? 46 : 0; visible: on; clip: true
+            Rectangle { x: 14; width: parent.width - 28; height: 1; color: Theme.rule }
+            Row { x: 20; anchors.verticalCenter: parent.verticalCenter; spacing: 8
+                Btn { objectName: "cardRunStuck"; small: true; kind: "primary"; text: opened.action
+                    icon: opened.e && opened.e.by === "agent" ? "sparkles" : ""; onClicked: opened.act() }
+                Btn { small: true; visible: opened.opens && !opened.drawn; text: "Run again"; onClicked: Store.runStudy(opened.e.id, true) } }
         }
         // the open draft and its Commit stay in reach at the foot of the inspector, whatever the panel's length
         Item {

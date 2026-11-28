@@ -1,10 +1,11 @@
 """The pro frame around a design: the labelled ribbon per mode, the document tabs, the project rail.
 
-- The ribbon: at the head of the stage, the mode's tools with their labels in captioned groups; the dock keeps the four
-  universal tools. A tool whose feature kind the engine does not list is not shown, and appears when it is listed.
-  Keys are in the tooltips. Nothing wraps: in a narrow window groups lose their labels, then the captions go, then
-  tools move into More. Hide folds it into the dock (remembered: a design opened again still has it hidden); the stage
-  gives up the ribbon's 44 px and no more.
+- The ribbon: at the head of the stage, the four universal tools first (icons, never in More), then the mode's tools
+  with their labels in captioned groups; there is no dock while it shows. A tool whose feature kind the engine does
+  not list is not shown, and appears when it is listed. Keys are in the tooltips. Nothing wraps: in a narrow window
+  groups lose their labels, then the captions go, then tools move into More. The options capsule of a tool stands at
+  the ribbon's right end when the line has room, else under its left end. Hide folds it into the dock (remembered: a
+  design opened again still has it hidden); the stage gives up the ribbon's 44 px and no more.
 - The tabs: the model is always there; a result opened anywhere is a tab; tabs switch with ⌘1..9 (Alt elsewhere),
   close and reorder, and come back when the design is opened again.
 - The rail: Home, the Bench, recent designs with their conversation counts, Trash and Settings. Folded it is 44 px
@@ -97,24 +98,22 @@ def journey_ribbon(ui):
     ui.click("stage-shape")
     ui.settle(400)
     ui.check(ui.exists("toolRibbon") and ui._shown(ui.item("toolRibbon")), "the ribbon is at the head of the stage")
-    r, d = rect(ui, "toolRibbon"), rect(ui, "toolDock")
+    r = rect(ui, "toolRibbon")
     ui.eq(r[3], 38.0, "one slim band")
-    ui.check(d[1] >= r[1] + r[3] + 4, f"the dock stands under it: {d} / {r}")
     ui.check(r[0] + r[2] <= rect(ui, "viewCube")[0] - 4, f"clear of the view cube: {r}")
-    # the dock keeps the four universal tools
-    for n in ("railSelect", "railMeasure", "railSection", "railAnnotate"):
-        ui.check(ui._shown(ui.item(n)), f"{n} in the dock")
-    for n in ("railSketch", "railRound", "railSep"):
-        ui.check(not ui.exists(n), f"{n} is not in the dock while the ribbon shows")
-    ui.check(d[3] < 4 * 38 + 24, f"the dock holds the four alone: {d}")
+    # the four universal tools are the ribbon's first group, icons only; no dock on the stage
+    ui.check(not ui.exists("toolDock"), "no dock while the ribbon shows")
+    for t in ("select", "measure", "section", "annotate"):
+        ui.check(ui._shown(ui.item("ribbon-" + t)), f"{t} in the ribbon's first group")
+        ui.eq(ui.item("ribbon-" + t).property("compact"), True, f"{t}: an icon, its name in the tooltip")
 
     # ── each mode: its groups, captioned; the tools that have an engine; keys in the tooltips ──
     want = {"shape": ({"create": ["sketch", "extrude", "cut", "revolve"], "modify": ["fillet", "chamfer", "hole", "pattern", "shell"],
                        "insert": ["part", "text"]}, []),
-            "prove": ({"inspect": ["analyze", "mass", "section"], "review": ["history"]}, []),
+            "prove": ({"common": ["section"], "inspect": ["analyze", "mass"], "review": ["history"]}, []),
             "release": ({"output": ["render"]}, ["slice", "plates"]),
             "document": ({"sheets": ["views", "dims"], "picture": ["frame"]}, [])}
-    four = [rect(ui, n) for n in ("railSelect", "railMeasure", "railSection", "railAnnotate")]
+    four = [rect(ui, "ribbon-" + n) for n in ("select", "measure", "section", "annotate")]
     for mode, (groups, absent) in want.items():
         # every value the tools' opacity takes on the way, from the item's own signal (a slow machine draws few frames)
         body, seen = ui.item("ribbonBody"), []
@@ -136,14 +135,18 @@ def journey_ribbon(ui):
                 ui.check(ui.exists("ribbon-" + t) or ui.exists("ribbonMore"), f"{mode}: {t} in the ribbon (or its More)")
         for t in absent:
             ui.check(t not in listed(ui), f"{mode}: {t} is not shown: it does not apply to this design")
-        ui.eq([rect(ui, n) for n in ("railSelect", "railMeasure", "railSection", "railAnnotate")], four, f"{mode}: the four have not moved")
+        ui.eq([rect(ui, "ribbon-" + n) for n in ("select", "measure", "section", "annotate")], four, f"{mode}: the four have not moved")
+        ui.eq(listed(ui).count("section"), 1, f"{mode}: Section once, in the first group")
         ui.eq(rect(ui, "toolRibbon")[3], 38.0, f"{mode}: one line, nothing wraps")
-        crop(ui, ["toolRibbon", "toolDock"], "ribbon-" + mode)
+        crop(ui, ["toolRibbon"], "ribbon-" + mode)
     ui.click("stage-shape")
     ui.settle(300)
     ui.eq(ui.item("ribbon-sketch").property("keys"), "S", "Sketch says its key")
     ui.eq(ui.item("ribbon-fillet").property("keys"), "Shift+F", "Fillet says its key")
-    if ui.win.width() >= 1440:                    # narrower, the band may have given up its captions
+    # (the band gives up its captions when it is short of room: with the four first, it does so in more windows)
+    plan = ui.item("toolRibbon").property("plan")
+    plan = plan.toVariant() if hasattr(plan, "toVariant") else plan
+    if plan["caps"]:
         ui.check(ui.exists("ribbonCaption-create") and ui.item("ribbonCaption-create").property("text") == "Create", "the Create caption")
 
     # ── a tool waits for its feature kind: the capability check reads GET /studio feature_kinds ──
@@ -169,9 +172,14 @@ def journey_ribbon(ui):
     tool(ui, "fillet")
     ui.wait_until(lambda: ui.js("Ws.tool") == "annotate" and ui.js("Ws.want") == "fillet", 3, "Fillet from the ribbon picks edges")
     ui.check(ui.item("ribbon-fillet").property("active") is True, "the ribbon lights Fillet")
-    c = rect(ui, "toolCapsule")
-    ui.check(c[1] >= r[1] + r[3] and c[0] >= rect(ui, "toolDock")[0] + 48 + 8, f"the capsule stands under the ribbon, right of the dock: {c}")
-    crop(ui, ["toolRibbon", "toolDock", "toolCapsule"], "ribbon-fillet")
+    c, r = rect(ui, "toolCapsule"), rect(ui, "toolRibbon")
+    # one compact line sized to what it says: at the ribbon's right end on its line, or under its left end
+    ui.check(c[3] <= 40.5, f"the capsule is one line: {c}")
+    row = abs(c[1] + c[3] / 2 - (r[1] + r[3] / 2)) < 2 and c[0] >= r[0] + r[2]
+    under = c[1] >= r[1] + r[3] and c[0] <= r[0] + 60
+    ui.check(row or under, f"the capsule at the ribbon's end or under it: {c} / {r}")
+    ui.check(c[0] + c[2] <= rect(ui, "viewCube")[0] - 4, f"the capsule clear of the view cube: {c}")
+    crop(ui, ["toolRibbon", "toolCapsule"], "ribbon-fillet")
     ui.key("Escape")
     ui.wait_until(lambda: ui.js("Ws.tool") == "select", 3, "Esc hands back to Select")
     ui.key("S")
@@ -203,6 +211,7 @@ def journey_ribbon(ui):
     ui.settle(900)
     off = free(ui)
     ui.eq(on[2] - off[2], 44, "the stage gains back exactly the ribbon's 44 px")
+    ui.check(ui._shown(ui.item("railSelect")), "the dock is back, with the four")
     ui.check(ui._shown(ui.item("railSketch")) and ui._shown(ui.item("railRibbon")), "the dock has the mode's tools again, and a way back")
     crop(ui, ["toolDock"], "dock-hidden")
     ui.run_js("Store.home()")
@@ -273,7 +282,9 @@ def journey_tabs(ui):
     ui.click("docTab-design")
     ui.wait_until(lambda: ui.js("Frame.active") == "design", 3, "a click on the model tab")
     # reorder: the compare dragged before the report
-    ui.drag("docTab-compare:1", (-int(rect(ui, "docTab-doc:report")[2]) - 10, 0), steps=10)
+    # (by the distance between the two tabs' middles and a little more: the names are short now, the tabs unequal)
+    a, b = rect(ui, "docTab-compare:1"), rect(ui, "docTab-doc:report")
+    ui.drag("docTab-compare:1", (-int((a[0] + a[2] / 2) - (b[0] + b[2] / 2)) - 10, 0), steps=10)
     ui.settle(300)
     ui.eq([t["key"] for t in ui.js("Frame.all")], ["design", "compare:1", "doc:report"], "dragged to a new place")
     # restore: the tabs come back with the design
@@ -309,10 +320,12 @@ def journey_rail(ui):
                 ui.eq(ui.js("Store.talkCol"), ui.js("Theme.edge") + min(480, max(300, min(w - 700, 340))), f"{w}: the conversation gives the rail its room; the stage starts where it did")
                 ui.check(rect(ui, "talk")[0] >= rr[0] + rr[2] + 4, f"{w}: the conversation stands right of the rail")
             else:
-                ui.check(rr[1] >= rect(ui, "toolDock")[1] + rect(ui, "toolDock")[3], f"{w}: under the dock, in its column")
-                ui.eq(ui.js("Store.viewer.insetLeft") >= rect(ui, "toolDock")[0] + 48, True, f"{w}: the stage starts right of the dock, as before")
+                # no dock with the ribbon: the rail stands under the ribbon at the stage's edge, and the stage starts right of it
+                rb = rect(ui, "toolRibbon")
+                ui.check(rr[1] >= rb[1] + rb[3], f"{w}: under the ribbon, at the stage's edge: {rr} / {rb}")
+                ui.check(ui.js("Store.viewer.insetLeft") >= rr[0] + rr[2] + 8, f"{w}: the stage starts right of the rail")
             print(f"STAGE {w} col={col}: free {free(ui)}", flush=True)
-            crop(ui, ["projectRail", "toolDock"], "rail")
+            crop(ui, ["projectRail", "toolRibbon"], "rail")
     ui.resize(1440, 900)
     column(ui, False)
     # the recent designs: the one in front lit, another one click away; Home, Bench, Settings

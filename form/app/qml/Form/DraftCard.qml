@@ -22,7 +22,7 @@ Rectangle {
             Row { spacing: 6; anchors.verticalCenter: parent.verticalCenter
                 Rectangle { width: 6; height: 6; radius: 3; color: Theme.blueprint; anchors.verticalCenter: parent.verticalCenter }
                 Txt { kind: "cap"; text: Store.draftAgent ? "Draft by " + Store.draftAgent : "Draft change"; color: Theme.blueprint } }
-            Txt { kind: "fine"; mono: true; anchors.right: parent.right; text: Store.preview ? "rebuilt in " + Math.round(Store.preview.timing.total_s * 1000) + " ms" : "" } }
+            Txt { kind: "fine"; mono: true; count: true; anchors.right: parent.right; text: Store.preview ? "rebuilt in " + Math.round(Store.preview.timing.total_s * 1000) + " ms" : "" } }
         Note { visible: !!Store.draftError; kind: "red"; title: Store.draftError ? Store.draftError.message : ""
             text: (Store.draftError && Store.draftError.hint ? Store.draftError.hint + " " : "") + "The view still shows the last version that built. Nothing has been saved."
             FixBtn { subject: "this draft does not build"

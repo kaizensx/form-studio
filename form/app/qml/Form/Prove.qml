@@ -59,7 +59,7 @@ Column {
                 model: [{ n: root.roll.PASS, l: "pass", c: Theme.pass }, { n: root.roll.WARN, l: "to review", c: Theme.amber }, { n: root.roll.FAIL, l: "failed", c: Theme.signal }]
                 Column { required property var modelData; required property int index
                     width: parent.width / 3; spacing: 0
-                    Tick { decimals: 0; value: modelData.n; countIn: true; font.pixelSize: Theme.tH1; font.weight: 600; font.letterSpacing: -0.6
+                    Tick { decimals: 0; value: modelData.n; countIn: true; count: true; font.pixelSize: Theme.tH1; font.weight: 600; font.letterSpacing: -0.6
                         color: modelData.n > 0 ? modelData.c : Theme.ink4 }
                     Txt { kind: "cap"; text: modelData.l; color: modelData.n > 0 ? Theme.ink2 : Theme.ink4 } }
             }

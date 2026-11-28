@@ -341,7 +341,7 @@ Item {
                 Arrive { item: shelfHead; lift: shelfLift; beat: 3 }
                 Row { spacing: 14; anchors.verticalCenter: parent.verticalCenter
                     Txt { text: "Designs"; font.pixelSize: 20; font.weight: Theme.wSemi; font.letterSpacing: -0.4; lineHeight: 1.0 }
-                    Txt { mono: true; tone: 3; font.pixelSize: 12; text: home.everything.length + (home.grouped > 0 ? " · " + home.families.length + (home.families.length === 1 ? " family" : " families") : "") + (home.released ? " · " + home.released + " released" : ""); anchors.baseline: parent.children[0].baseline } }
+                    Txt { mono: true; count: true; tone: 3; font.pixelSize: 12; text: home.everything.length + (home.grouped > 0 ? " · " + home.families.length + (home.families.length === 1 ? " family" : " families") : "") + (home.released ? " · " + home.released + " released" : ""); anchors.baseline: parent.children[0].baseline } }
                 Row { anchors.right: parent.right; anchors.verticalCenter: parent.verticalCenter; spacing: 2
                     Seg { visible: home.everything.length > 6; anchors.verticalCenter: parent.verticalCenter; implicitHeight: 34; value: home.filter; onPicked: function (v) { home.filter = v }
                         model: [{ value: "all", text: "All" }, { value: "open", text: "In progress" }, { value: "released", text: "Released" }] }
