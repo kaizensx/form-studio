@@ -81,6 +81,11 @@ A printed filament is solved as a solid isotropic part with the in-plane modulus
 strength is the weakest sourced direction, the ultimate strength across the layers when the datasheet has it, and the
 datasheet's Z / X-Y ratio is named in the result as the knock-down applied. Layers, infill and walls are not simulated.
 
+A study with a `layers` block solves the printed part as a layered (transversely isotropic) solid instead: the
+datasheet's in-plane and Z moduli, turned to the print orientation, with the safety factor across the layers and in
+them and the same loads solved for the other orientations. `print_strength` defines one;
+[PRINT_PHYSICS.md](PRINT_PHYSICS.md#strength-as-printed) has where each constant comes from and what is assumed.
+
 ## How the error is stated
 
 The mesh is refined until the answer stops changing.
@@ -187,7 +192,8 @@ lower infill or fewer walls: the study is of a solid part.
 - **Small strain and small displacement.** The load does not change the shape it acts on.
 - **Curved faces are followed by quadratic element sides,** not exactly. Where a curved side would turn an element
   inside out, the whole mesh falls back to straight sides and the result's `mesh.element` says so.
-- **Isotropic, homogeneous solids.** A printed part's layers and infill are not in the model.
+- **Isotropic, homogeneous solids,** unless the study has a `layers` block (a printed part as a transversely
+  isotropic solid, static studies of one solid only). Infill, walls and raster direction are never in the model.
 - **Bonded contact only.** Parts are joined where they touch; sliding, opening and friction are not modelled.
 - **Linear buckling** is the load of the perfect elastic part. A real part, never perfectly straight, buckles
   earlier.
@@ -233,27 +239,39 @@ tolerance it must meet. `tests/test_fea_verification.py` runs the suite; this ta
 | Thermal stress in a thick cylinder | hoop stress at the bore (hot side, compression) | Timoshenko and Goodier, Theory of Elasticity, art. 151: long cylinder, steady radial heat flow | -330.47 MPa | -329.97 MPa | 0.15 % | 2.0 % | PASS |
 |  | hoop stress at the outside (cold side, tension) | the same solution at r = ro | 209.53 MPa | 209.17 MPa | 0.17 % | 2.0 % | PASS |
 | Sharp inside corner (singularity) | the sharp inside corner is named and its stress left out | Williams (1952): the stress at a re-entrant corner is unbounded | yes | yes |  |  | PASS |
+| Layered material pulled at 30 degrees to its build direction | elongation of the bar | sigma L / E(30 deg), Lekhnitskii / Jones eq. 2.97 | 0.028005 mm | 0.028005 mm | 0.00 % | 0.1 % | PASS |
+|  | stress along the bar, everywhere | F / A | 1 MPa | 1 MPa | 0.00 % | 0.1 % | PASS |
+|  | largest tension across the layers | sigma cos^2(30 deg): the normal stress on a plane at 30 deg | 0.75 MPa | 0.75 MPa | 0.00 % | 0.1 % | PASS |
+|  | largest shear between the layers | sigma sin cos | 0.43301 MPa | 0.43301 MPa | 0.00 % | 0.1 % | PASS |
+|  | safety factor across the layers | Z strength / tension across | 33.333 | 33.333 | 0.00 % | 0.1 % | PASS |
+| Cantilever of a layered material, three build directions | tip deflection, printed standing (E across the layers along the beam) | Timoshenko beam: F L^3/(3 E I) + F L/(kappa G A), E along the beam, G of the bending plane | 2.0133 mm | 2.0132 mm | 0.01 % | 1.0 % | PASS |
+|  | largest displacement, printed flat (in-plane E along the beam) | Timoshenko beam: F L^3/(3 E I) + F L/(kappa G A), E along the beam, G of the bending plane | 1.5518 mm | 1.5561 mm | 0.27 % | 1.5 % | PASS |
+|  | largest displacement, printed on its side (bending in the layer plane) | Timoshenko beam: F L^3/(3 E I) + F L/(kappa G A), E along the beam, G of the bending plane; in the layers G = E_p / (2 (1 + nu_p)) | 1.5477 mm | 1.552 mm | 0.28 % | 1.5 % | PASS |
+|  | deflection standing / flat | ratio of the two | 1.2974 | 1.2974 | 0.00 % | 1.0 % | PASS |
+|  | bending stress near mid-span, top fibre (tension across the layers, standing) | M c / I at that node: statically determinate, the same for any material | 3.0399 MPa | 3.0402 MPa | 0.01 % | 2.0 % | PASS |
 
 | Case | Study | Refinements | Unknowns | Stated error | Converged | Time |
 |---|---|---|---|---|---|---|
-| Cantilever beam, end load | static | 3 | 4,380 | 0.5 % | yes | 0.25 s |
-| Plate with a hole in tension | static | 4 | 43,461 | 0.7 % | yes | 2.7 s |
-| Thick cylinder under internal pressure | static | 3 | 12,345 | 0.3 % | yes | 0.68 s |
-| Cantilever under its own weight | static | 3 | 2,574 | 0.1 % | yes | 0.09 s |
-| Two bonded solids in series | static | 3 | 3,996 | 0.1 % | yes | 0.16 s |
-| Block under a bolt preload | static | 3 | 27,339 | 0.1 % | yes | 1.36 s |
-| NAFEMS LE1: elliptic membrane | static | 4 | 27,453 | 0.6 % | yes | 1.35 s |
-| NAFEMS LE10: thick plate under pressure | static | 4 | 70,632 | 1.9 % | yes | 5.01 s |
-| Natural frequencies of a cantilever | modal | 3 | 3,474 | 0.2 % | yes | 0.16 s |
-| Natural frequencies of a free beam | modal | 3 | 3,474 | 0.1 % | yes | 0.16 s |
-| Euler buckling of a column | buckling | 3 | 5,541 | 0.5 % | yes | 0.22 s |
-| Heat through a wall with convection | thermal | 3 | 15,379 | 0.1 % | yes | 1.23 s |
-| Heat through a pipe wall | thermal | 3 | 3,489 | 0.1 % | yes | 0.18 s |
-| Thermal stress in a bar that cannot expand | static | 3 | 5,418 | 0.1 % | yes | 0.25 s |
-| Thermal stress in a thick cylinder | static | 4 | 32,976 | 0.3 % | yes | 1.89 s |
-| Sharp inside corner (singularity) | static | 5 | 105,135 | 4.5 % | yes | 6.4 s |
+| Cantilever beam, end load | static | 3 | 4,380 | 0.5 % | yes | 0.26 s |
+| Plate with a hole in tension | static | 4 | 43,461 | 0.7 % | yes | 2.91 s |
+| Thick cylinder under internal pressure | static | 3 | 12,345 | 0.3 % | yes | 0.72 s |
+| Cantilever under its own weight | static | 3 | 2,574 | 0.1 % | yes | 0.1 s |
+| Two bonded solids in series | static | 3 | 3,996 | 0.1 % | yes | 0.18 s |
+| Block under a bolt preload | static | 3 | 27,339 | 0.1 % | yes | 1.49 s |
+| NAFEMS LE1: elliptic membrane | static | 4 | 27,453 | 0.6 % | yes | 1.72 s |
+| NAFEMS LE10: thick plate under pressure | static | 4 | 70,632 | 1.9 % | yes | 5.54 s |
+| Natural frequencies of a cantilever | modal | 3 | 3,474 | 0.2 % | yes | 0.18 s |
+| Natural frequencies of a free beam | modal | 3 | 3,474 | 0.1 % | yes | 0.17 s |
+| Euler buckling of a column | buckling | 3 | 5,541 | 0.5 % | yes | 0.24 s |
+| Heat through a wall with convection | thermal | 3 | 15,379 | 0.1 % | yes | 1.42 s |
+| Heat through a pipe wall | thermal | 3 | 3,489 | 0.1 % | yes | 0.21 s |
+| Thermal stress in a bar that cannot expand | static | 3 | 5,418 | 0.1 % | yes | 0.26 s |
+| Thermal stress in a thick cylinder | static | 4 | 32,976 | 0.3 % | yes | 2.05 s |
+| Sharp inside corner (singularity) | static | 5 | 105,135 | 4.5 % | yes | 7.22 s |
+| Layered material pulled at 30 degrees to its build direction | static | 3 | 38,457 | 0.1 % | yes | 2.01 s |
+| Cantilever of a layered material, three build directions | static | 3 | 4,563 | 0.6 % | yes | 0.3 s |
 
-30 quantities in 16 cases, all within tolerance; 22.09 s in total. Run on 2026-11-28 with Netgen 6.2.2608, scikit-fem 12.0.2, SciPy 1.18.1, PyAMG 5.4.1 and NumPy 2.5.5.
+40 quantities in 18 cases, all within tolerance; 26.98 s in total. Run on 2026-11-28 with Netgen 6.2.2608, scikit-fem 12.0.2, SciPy 1.18.1, PyAMG 5.4.1 and NumPy 2.5.5.
 <!-- verification:end -->
 
 The cases:
@@ -306,9 +324,9 @@ three 6 mm holes, fixed at the two base holes and loaded at the hole of the upri
 <!-- timings:begin -->
 | Study | Time | Unknowns | Tetrahedra | Refinements | Evidence | Result |
 |---|---|---|---|---|---|---|
-| static | 8.5 s | 106,110 | 22,470 | 3 | simulated (FEA, linear static, converged to 1.8 %) | peak von Mises 50.4 MPa, safety factor 5.48 |
-| modal | 8.6 s | 71,583 | 13,103 | 3 | simulated (FEA, modal, converged to 0.5 %) | first frequencies 925, 1357, 3154 Hz |
-| buckling | 9.7 s | 71,583 | 13,103 | 3 | simulated (FEA, linear buckling, converged to 0.4 %) | load factor 151.6 |
+| static | 9.2 s | 106,110 | 22,470 | 3 | simulated (FEA, linear static, converged to 1.8 %) | peak von Mises 50.4 MPa, safety factor 5.48 |
+| modal | 9.4 s | 71,583 | 13,103 | 3 | simulated (FEA, modal, converged to 0.5 %) | first frequencies 925, 1357, 3154 Hz |
+| buckling | 10.8 s | 71,583 | 13,103 | 3 | simulated (FEA, linear buckling, converged to 0.4 %) | load factor 151.6 |
 
 Machine: arm64, Darwin 27.3.0, 18 cores. The time is the whole study in the engine: every mesh, every solve, the stress recovery and the field data.
 <!-- timings:end -->
@@ -397,13 +415,17 @@ For the viewport: the outside surface of the finest mesh with per-vertex results
 - `safety_factor`: strength over von Mises stress at that vertex; absent when no strength is sourced.
 - `singular`: 1 where the vertex lies in a singular zone that was left out of the verdict. Draw these differently:
   their stress is not a result.
+- `stress`: MPa, the smoothed stress tensor per vertex, six components (xx, yy, zz, xy, yz, zx) in the study's frame.
+  The orientation search reads it to find the tension across the layers in any print orientation.
+- A layered study adds `across_layers` (MPa, the tension normal to the layer plane, 0 where it is compressive) and
+  `interlayer_shear` (MPa).
 - A heat study has `temperature` (°C) and `heat_flux` (W/m²); a thermal stress study adds `temperature` to the
   static fields.
 - A modal or buckling study has `modes` instead: `count` shapes of 3 components per vertex, each scaled so its largest
   component is 1, with `mode_frequencies_Hz` or `mode_load_factors`.
 - `frame` is `as built` for one solid and `assembled` for a design of several parts.
 
-About 90 bytes per vertex; a bracket's field is 0.2 to 0.5 MB.
+About 120 bytes per vertex; a bracket's field is 0.3 to 0.7 MB.
 
 ## The engine and its licences
 

@@ -23,6 +23,10 @@ The reference formulas and where they are from:
 * Steady conduction through a plane wall with a convective side, and through a cylinder wall: Incropera and DeWitt,
   Fundamentals of Heat and Mass Transfer, chapter 3. Thermal stress in a long thick cylinder with steady radial heat
   flow: Timoshenko and Goodier, Theory of Elasticity, art. 151.
+* Transversely isotropic (layered) material: Young's modulus along a direction at an angle to the axis of symmetry,
+  1/E = cos^4/E_z + sin^4/E_p + (1/G_zp - 2 nu_zp/E_z) sin^2 cos^2 (Lekhnitskii, Theory of Elasticity of an
+  Anisotropic Body, 1963; Jones, Mechanics of Composite Materials, 2nd ed., eq. 2.97); the Timoshenko beam with the
+  modulus along the beam and the shear modulus of the bending plane.
 * NAFEMS LE1 and LE10: The Standard NAFEMS Benchmarks, NAFEMS (1990), linear elastic tests 1 and 10; the target
   values are the published ones (92.7 MPa and -5.38 MPa for the direct stress yy at point D).
 """
@@ -419,12 +423,91 @@ def sharp_corner():
     return shape, spec, check
 
 
+LAYERED = {"E_p": 2600.0, "E_z": 2000.0, "nu_p": 0.33, "nu_zp": 0.25, "G_zp": 900.0, "S_xy": 35.0, "S_z": 25.0,
+           "S_shear": None}
+
+
+def _layered(axis, **kw):
+    ly = {**LAYERED, **kw, "axis": list(map(float, axis))}
+    return [{"name": "layered polymer (verification)", "E": ly["E_p"], "nu": ly["nu_p"], "density": 1240.0,
+             "yield": ly["S_xy"], "layers": ly}]
+
+
+def layered_tension():
+    """A bar 60 x 10 x 10 mm of a layered (transversely isotropic) material pulled along its length with 1 MPa, the
+    build direction at 30 degrees to the bar in the x-z plane. Held so the stress is uniform: the end face may not
+    move along the bar, one of its edges not up or down, another not sideways."""
+    from netgen.occ import Box, Pnt
+    from . import solve
+    L, b, h, s, th = 60.0, 10.0, 10.0, 1.0, 30.0
+    ax = (math.cos(math.radians(th)), 0.0, math.sin(math.radians(th)))
+    shape = Box(Pnt(0, 0, 0), Pnt(L, b, h))
+    end, bottom, side = _face((0, 5, 5), area=b * h), _face((30, 5, 0), area=L * b), _face((30, 0, 5), area=L * h)
+    spec = {"kind": "static", "materials": _layered(ax),
+            "fixtures": [{"type": "hold", "faces": [end], "directions": [[1, 0, 0]]},
+                         {"type": "hold", "faces": [end], "faces_b": [bottom], "directions": [[0, 0, 1]]},
+                         {"type": "hold", "faces": [end], "faces_b": [side], "directions": [[0, 1, 0]]}],
+            "loads": [{"type": "force", "faces": [_face((L, 5, 5), area=b * h)], "vector": [s * b * h, 0, 0]}]}
+
+    def check(res, keep):
+        E = solve.young_along(LAYERED["E_p"], LAYERED["E_z"], LAYERED["nu_zp"], LAYERED["G_zp"], th)
+        X = keep["model"].sp.X
+        ux = float(keep["u"][X[:, 0] > L - 1e-6][:, 0].mean())
+        c2 = math.cos(math.radians(th)) ** 2
+        return [_row("elongation of the bar", s * L / E, ux, 1e-3, "mm", "sigma L / E(30 deg), Lekhnitskii / Jones eq. 2.97"),
+                _row("stress along the bar, everywhere", s, float(keep["stress"][:, 0].mean()), 1e-3, "MPa", "F / A"),
+                _row("largest tension across the layers", s * c2, res["layers"]["across_layers"]["peak_tension_MPa"], 1e-3,
+                     "MPa", "sigma cos^2(30 deg): the normal stress on a plane at 30 deg"),
+                _row("largest shear between the layers", s * math.sin(math.radians(th)) * math.cos(math.radians(th)),
+                     res["layers"]["interlayer_shear"]["peak_MPa"], 1e-3, "MPa", "sigma sin cos"),
+                _row("safety factor across the layers", LAYERED["S_z"] / (s * c2),
+                     res["layers"]["across_layers"]["safety_factor"]["value"], 1e-3, "", "Z strength / tension across")]
+    return shape, spec, check
+
+
+def layered_cantilever():
+    """Cantilever 100 x 10 x 10 mm of a layered material, end load 10 N, Poisson's ratios 0 (so the fixed end is the
+    beam-theory clamp). Printed standing (layers stacked along the beam), and solved again lying flat and on its
+    side: the modulus along the beam and the shear modulus of the bending plane change with the build direction."""
+    from netgen.occ import Box, Pnt
+    L, b, h, F = 100.0, 10.0, 10.0, 10.0
+    Ep, Ez, G = LAYERED["E_p"], LAYERED["E_z"], LAYERED["G_zp"]
+    shape = Box(Pnt(0, 0, 0), Pnt(L, b, h))
+    spec = {"kind": "static", "materials": _layered((1, 0, 0), nu_p=0.0, nu_zp=0.0),
+            "layers": {"id": "standing", "sweep": [{"id": "flat", "axis": [0, 0, 1]}, {"id": "on its side", "axis": [0, 1, 0]}]},
+            "fixtures": [{"type": "fixed", "faces": [_face((0, 5, 5), area=b * h)]}],
+            "loads": [{"type": "force", "faces": [_face((L, 5, 5), area=b * h)], "vector": [0, 0, -F]}]}
+
+    def check(res, keep):
+        I, A, kappa = b * h ** 3 / 12, b * h, 5.0 / 6.0
+
+        def tim(E, Gs):
+            return F * L ** 3 / (3 * E * I) + F * L / (kappa * Gs * A)
+        tip = -float(keep["u"][keep["model"].sp.X[:, 0] > L - 1e-6][:, 2].mean())
+        k = _probe(keep, (L / 2, b / 2, h))
+        x, _, z = keep["model"].sp.X[k]
+        rows = {r["id"]: r for r in res["layers"]["by_orientation"]}
+        src = "Timoshenko beam: F L^3/(3 E I) + F L/(kappa G A), E along the beam, G of the bending plane"
+        return [_row("tip deflection, printed standing (E across the layers along the beam)", tim(Ez, G), tip, 0.01, "mm", src),
+                _row("largest displacement, printed flat (in-plane E along the beam)", tim(Ep, G),
+                     rows["flat"]["max_displacement_mm"], 0.015, "mm", src),
+                _row("largest displacement, printed on its side (bending in the layer plane)", tim(Ep, Ep / 2),
+                     rows["on its side"]["max_displacement_mm"], 0.015, "mm", src + "; in the layers G = E_p / (2 (1 + nu_p))"),
+                _row("deflection standing / flat", tim(Ez, G) / tim(Ep, G),
+                     rows["standing"]["max_displacement_mm"] / rows["flat"]["max_displacement_mm"], 0.01, "", "ratio of the two"),
+                _row("bending stress near mid-span, top fibre (tension across the layers, standing)",
+                     F * (L - x) * (z - h / 2) / I, float(keep["stress"][k, 0]), 0.02, "MPa",
+                     "M c / I at that node: statically determinate, the same for any material")]
+    return shape, spec, check
+
+
 CASES = {"cantilever": cantilever, "plate_with_hole": plate_with_hole, "thick_cylinder": thick_cylinder,
          "self_weight": self_weight, "bonded_bar": bonded_bar, "preload_block": preload_block,
          "nafems_le1": nafems_le1, "nafems_le10": nafems_le10,
          "modal_cantilever": modal_cantilever, "modal_free": modal_free, "euler_column": euler_column,
          "thermal_slab": thermal_slab, "thermal_cylinder": thermal_cylinder, "thermal_stress_bar": thermal_stress_bar,
-         "thermal_stress_cylinder": thermal_stress_cylinder, "sharp_corner": sharp_corner}
+         "thermal_stress_cylinder": thermal_stress_cylinder, "sharp_corner": sharp_corner,
+         "layered_tension": layered_tension, "layered_cantilever": layered_cantilever}
 TITLES = {"cantilever": "Cantilever beam, end load", "plate_with_hole": "Plate with a hole in tension",
           "thick_cylinder": "Thick cylinder under internal pressure", "self_weight": "Cantilever under its own weight",
           "bonded_bar": "Two bonded solids in series", "preload_block": "Block under a bolt preload",
@@ -433,7 +516,9 @@ TITLES = {"cantilever": "Cantilever beam, end load", "plate_with_hole": "Plate w
           "euler_column": "Euler buckling of a column", "sharp_corner": "Sharp inside corner (singularity)",
           "thermal_slab": "Heat through a wall with convection", "thermal_cylinder": "Heat through a pipe wall",
           "thermal_stress_bar": "Thermal stress in a bar that cannot expand",
-          "thermal_stress_cylinder": "Thermal stress in a thick cylinder"}
+          "thermal_stress_cylinder": "Thermal stress in a thick cylinder",
+          "layered_tension": "Layered material pulled at 30 degrees to its build direction",
+          "layered_cantilever": "Cantilever of a layered material, three build directions"}
 
 
 def bracket():

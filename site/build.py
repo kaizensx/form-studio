@@ -38,6 +38,7 @@ PAGES = [
     ("mcp", "docs/MCP.md", "MCP tools", "Every tool an agent can call, generated from the server itself."),
     ("architecture", "docs/ARCHITECTURE.md", "Architecture", "The engine, the kernel worker, adapters, staleness and the fit model."),
     ("strength", "docs/STRENGTH.md", "Strength studies", "Stress, displacement and a safety factor with a stated error, and the verification table."),
+    ("print-physics", "docs/PRINT_PHYSICS.md", "Print physics", "Orientation as a Pareto front, strength as printed with a layered material, and a warp-risk indicator, each number with how it is known."),
     ("verification", "docs/VERIFICATION.md", "Compatibility", "Platforms, agents, programs and slicers, and what CI exercises."),
     ("changelog", "CHANGELOG.md", "Changelog", "What changed in each version."),
     ("releasing", "docs/RELEASING.md", "Releases", "Stable, preview and patch releases, and how versions are numbered."),

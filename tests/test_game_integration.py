@@ -31,7 +31,7 @@ class Wiring(unittest.TestCase):
         t = tools()
         self.assertIn("model_mesh", t)
         self.assertIn("game_asset", t)
-        self.assertEqual(len(t), 127)  # prepare_recipe_submission retired; edit_design, triage, mass_properties, the Bench (3), sketches (2), strength_study, get_strength_study, calculate, manufacturability (2), sheet metal (4), drawing, export_pmi, check_drawing, standard_part, bom, motion_study, robot_files, assembly_sequence, cam_plan, cam_post, cam_simulate, board_import, board_check, board_fab and freecad_partdesign added
+        self.assertEqual(len(t), 127)  # prepare_recipe_submission retired; edit_design, triage, mass_properties, the Bench (3), sketches (2), strength_study, get_strength_study, calculate, manufacturability (2), sheet metal (4), drawing, export_pmi, check_drawing, standard_part, bom, motion_study, robot_files, assembly_sequence, cam_plan, cam_post, cam_simulate, board_import, board_check, board_fab and freecad_partdesign added; print physics (3)
         self.assertIn("hybrid", t["design_guide"].description)
         self.assertIn("game", t["design_guide"].description)
         self.assertIn("route", t["plan_design"].description)

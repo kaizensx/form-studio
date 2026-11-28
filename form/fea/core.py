@@ -114,6 +114,37 @@ class Model:
         self.k = np.array([(mats[i].get("k") or 0.0) * 1e-3 for i in range(len(mats))], float)[md]
         self.alpha = np.array([(mats[i].get("cte") or 0.0) for i in range(len(mats))], float)[md]
         self.has_cte = all(mats[i].get("cte") for i in range(len(mats)))
+        # a printed part as a layered (transversely isotropic) solid: the elasticity tensor of every material
+        self.md = md
+        self.layers = [mats[i].get("layers") for i in range(len(mats))]
+        self.layered = any(self.layers)
+        self.aniso = None
+        self.axes = [None] * len(mats)
+        if self.layered:
+            self.set_axes([ly["axis"] if ly else None for ly in self.layers])
+
+    def set_axes(self, axes) -> None:
+        """(Re)build the elasticity tensors with these build directions (one per material; None: isotropic)."""
+        mats = self.spec["materials"]
+        C, Sc = [], []
+        for i, mt in enumerate(mats):
+            ly = self.layers[i]
+            if ly and axes[i] is not None:
+                c, sc = S.transverse_isotropic(ly["E_p"], ly["E_z"], ly["nu_p"], ly["nu_zp"], ly["G_zp"], axes[i])
+            else:
+                lam, mu = S.lame(mt["E"], mt["nu"])
+                c = S.isotropic_tensor(float(lam), float(mu))
+                sc = S.transverse_isotropic(mt["E"], mt["E"], mt["nu"], mt["nu"], mt["E"] / (2 * (1 + mt["nu"])), [0, 0, 1])[1]
+            C.append(c)
+            Sc.append(sc)
+        self.aniso = (C, Sc, self.md)
+        self.axes = [None if a is None else (np.asarray(a, float) / np.linalg.norm(a)) for a in axes]
+
+    def stiffness(self):
+        return self.sp.stiffness_c(self.aniso[0], self.md) if self.aniso else self.sp.stiffness(self.lam, self.mu)
+
+    def stress_of(self, u, thermal=None) -> dict:
+        return self.sp.stress(u, self.lam, self.mu, self.dom, thermal=thermal, aniso=self.aniso)
 
     def _domains(self, mats) -> np.ndarray:
         """Material number of each mesh solid: the material whose solid centre is nearest."""
@@ -339,9 +370,13 @@ def _where(model: Model, node: int) -> dict:
 def _static_level(model: Model, cancelled, direct: bool | None = None) -> dict:
     t0 = time.perf_counter()
     sp = model.sp
-    K = sp.stiffness(model.lam, model.mu)
+    K = model.stiffness()
     f, loads = model.load_vector()
     thermal_info = T = th_el = None
+    if model.spec.get("thermal") and model.layered:
+        raise StudyError("Thermal stress in a layered (printed) material is not supported: the expansion across the "
+                         "layers differs from the expansion in them, and no source here gives both.",
+                         "Run the thermal stress study without layers (an isotropic solid).")
     if model.spec.get("thermal"):                        # the temperature field first, then its expansion as a load
         from . import thermal as thermal_mod
         if not model.has_cte:
@@ -367,7 +402,7 @@ def _static_level(model: Model, cancelled, direct: bool | None = None) -> dict:
         system.prepare(direct=direct)
     r = S.solve_static(system, f)
     t2 = time.perf_counter()
-    st = sp.stress(r["u"], model.lam, model.mu, model.dom, thermal=th_el)
+    st = model.stress_of(r["u"], th_el)
     vm = S.von_mises(st["nodal"])
     unorm = np.linalg.norm(r["u"].reshape(-1, 3), axis=1)
     eta_rel = float(np.sqrt((st["eta"] ** 2).sum() / max(2 * r["energy"] + (st["eta"] ** 2).sum(), 1e-300)))
@@ -485,8 +520,11 @@ def run_static(geo, spec, progress, cancelled) -> tuple[dict, dict]:
                            for i in ids} | {i for ld, ids in zip(spec.get("loads") or [], faces["loads"]) if ld["type"] == "preload"
                                             for i in list(ids[0]) + list(ids[1])})
         lv["zones"] = model.zones(fixed_ids, load_ids, line_pairs)
+        lv["rz"] = rz
         lv["model"] = model
         lv["util"] = _utilisation(model, lv["stress"])
+        if model.layered:
+            lv["layer"] = _across_layers(lv["stress"]["nodal"], model.axes[0])
         sol = lv["sol"]
         lv["record"] = {"level": n + 1, "h_mean_mm": round(m.info["h_mean"], 4), "h_min_mm": round(m.info["h_min"], 4),
                         "tets": m.info["tets"], "nodes": int(model.sp.N), "unknowns": int(model.sp.ndof),
@@ -618,7 +656,16 @@ def _static_result(geo, spec, opt, rz, levels, stop, seconds, left_out) -> tuple
         out["hand_estimate"] = hand.estimate(model, spec, model.faces, sol["u"].reshape(-1, 3), out["peak_von_mises_MPa"])
     except Exception as e:                               # noqa: BLE001 - the estimate is an extra, never a failure
         out["hand_estimate"] = {"applies": False, "why": f"the estimate could not be made ({type(e).__name__}: {e})"}
-    data = {"displacement": sol["u"].reshape(-1, 3), "von_mises": lv["vm"], "safety_factor": sf_field, "singular": ~ok_nodes}
+    if model.layered and out["hand_estimate"].get("applies"):
+        out["hand_estimate"]["note"] = ("The estimate is isotropic beam theory with the in-plane modulus; the layered "
+                                        "material's stiffness along the bar may differ.")
+    data = {"displacement": sol["u"].reshape(-1, 3), "von_mises": lv["vm"], "safety_factor": sf_field, "singular": ~ok_nodes,
+            "stress": lv["stress"]["nodal"]}
+    if model.layered:
+        _layered_result(out, model, levels, peak, ok_nodes, converged, spec)
+        data["across_layers"] = lv["layer"]["tension"]
+        data["interlayer_shear"] = lv["layer"]["shear"]
+        out["evidence"] = evidence(out)
     if lv.get("T") is not None:
         out["thermal"] = {**lv["thermal"], "reference_C": float(spec["thermal"].get("reference", 20.0)),
                           "temperature_by_refinement": [x["record"].get("t_max_C") for x in levels]}
@@ -680,6 +727,155 @@ def _surface_field(model: Model, data: dict) -> dict:
 
 FIELD_FORMAT = "form.fea.field/1"
 _KEEP: dict | None = None
+_CANCELLED = None
+_PROGRESS = None
+
+
+# ---- a printed part: layers --------------------------------------------------------------------------------------
+
+LAYER_ASSUMPTIONS = [
+    "the printed part is a homogeneous, transversely isotropic solid: one stiffness in the layers, another across "
+    "them (the build direction); infill, walls, raster direction and voids are not modelled",
+    "strength by a maximum-stress criterion: tension across the layers against the Z strength, von Mises stress "
+    "against the in-plane strength; compression across the layers is not taken as a failure",
+]
+
+
+def _across_layers(nodal: np.ndarray, axis) -> dict:
+    """Per node: tension across the layers (the normal stress on the layer plane, 0 where it is compressive) and the
+    shear stress in the layer plane, for the build direction `axis`."""
+    b = np.asarray(axis, float)
+    b = b / np.linalg.norm(b)
+    s = nodal
+    t = np.stack([s[:, 0] * b[0] + s[:, 3] * b[1] + s[:, 5] * b[2],
+                  s[:, 3] * b[0] + s[:, 1] * b[1] + s[:, 4] * b[2],
+                  s[:, 5] * b[0] + s[:, 4] * b[1] + s[:, 2] * b[2]], axis=1)
+    sn = t @ b
+    return {"tension": np.maximum(sn, 0.0), "normal": sn,
+            "shear": np.sqrt(np.maximum((t * t).sum(axis=1) - sn * sn, 0.0))}
+
+
+def _layer_factors(ly: dict, tension: float, shear: float, vm: float) -> dict:
+    """Safety factors of a layered material for peak values (MPa): across the layers, in the layers, between them."""
+    out = {"across_layers": (ly["S_z"] / tension) if ly.get("S_z") and tension > 0 else None,
+           "in_plane": (ly["S_xy"] / vm) if ly.get("S_xy") and vm > 0 else None,
+           "interlayer_shear": (ly["S_shear"] / shear) if ly.get("S_shear") and shear > 0 else None}
+    have = {k: v for k, v in out.items() if v is not None}
+    out["governing"] = min(have, key=have.get) if have else None
+    out["value"] = have[out["governing"]] if have else None
+    return out
+
+
+def _layered_result(out, model, levels, peak, ok_nodes, converged, spec) -> None:
+    """Adds out["layers"]: the safety factor across the layers (the weak direction) with its own stated error, the
+    in-plane one, and how both change with the build direction (each direction solved on the finest mesh)."""
+    cancelled_fn, progress = _CANCELLED, _PROGRESS
+    lv = levels[-1]
+    ly = model.layers[0]
+    rz_ok = []
+    for x in levels:                                             # the same zones left out at every level
+        ok = np.ones(len(x["vm"]), bool)
+        for z in peak["excluded"]:
+            ok &= x["zones"][z] > x["rz"]
+        if not ok.any():
+            ok[:] = True
+        rz_ok.append(ok)
+    tens = series([float(np.where(ok, x["layer"]["tension"], 0).max()) for x, ok in zip(levels, rz_ok)])
+    shear = series([float(np.where(ok, x["layer"]["shear"], 0).max()) for x, ok in zip(levels, rz_ok)])
+    k_t = int(np.argmax(np.where(ok_nodes, lv["layer"]["tension"], -1)))
+    k_s = int(np.argmax(np.where(ok_nodes, lv["layer"]["shear"], -1)))
+    vm_peak = out["peak_von_mises_MPa"]
+    f = _layer_factors(ly, tens["value"], shear["value"], vm_peak)
+    err_t = tens["error"]
+    err_v = out["discretisation_error"]["stress"] or 0.0
+    tol_s = out["convergence"]["tolerance"]["stress"]
+    # the tension across the layers matters to the verdict only when it governs; then it must have settled too
+    governs_t = f["governing"] == "across_layers"
+    conv_t = bool(not governs_t or (err_t is not None and err_t <= 2 * tol_s))
+    layers = {
+        "axis": [float(x) for x in model.axes[0]],
+        "criterion": "maximum stress: tension across the layers against the Z strength; von Mises stress against the "
+                     "in-plane strength" + ("; shear between the layers against the shear strength given"
+                                            if ly.get("S_shear") else ""),
+        "across_layers": {"peak_tension_MPa": tens["value"], "at": _where(model, k_t)["at"], "strength_MPa": ly.get("S_z"),
+                          "error": err_t, "by_refinement": tens["values"]},
+        "in_plane": {"peak_von_mises_MPa": vm_peak, "strength_MPa": ly.get("S_xy"), "error": err_v},
+        "interlayer_shear": {"peak_MPa": shear["value"], "at": _where(model, k_s)["at"], "strength_MPa": ly.get("S_shear"),
+                             "error": shear["error"]},
+        "elastic": {k: ly[k] for k in ("E_p", "E_z", "nu_p", "nu_zp", "G_zp")},
+    }
+    if not ly.get("S_shear"):
+        layers["interlayer_shear"]["note"] = ("No shear strength between the layers is sourced or given, so the peak is "
+                                              "reported without a safety factor.")
+    if not ly.get("S_z"):
+        layers["across_layers"]["note"] = ("No strength across the layers is sourced or given, so there is no safety "
+                                           "factor in the weak direction.")
+    if converged and conv_t:
+        if f["across_layers"] is not None:
+            layers["across_layers"]["safety_factor"] = {"value": f["across_layers"],
+                                                        "low": f["across_layers"] / (1 + (err_t or 0.0))}
+        elif ly.get("S_z"):
+            layers["across_layers"]["safety_factor"] = None
+            layers["across_layers"]["note"] = "Nothing pulls the layers apart under these loads (no tension across them)."
+        if f["in_plane"] is not None:
+            layers["in_plane"]["safety_factor"] = {"value": f["in_plane"], "low": f["in_plane"] / (1 + err_v)}
+        if f["interlayer_shear"] is not None:
+            layers["interlayer_shear"]["safety_factor"] = {"value": f["interlayer_shear"],
+                                                           "low": f["interlayer_shear"] / (1 + (shear["error"] or 0.0))}
+        if f["governing"]:
+            g = layers[f["governing"]]["safety_factor"]
+            layers["governing"] = f["governing"]
+            out["safety_factor"] = {"value": g["value"], "low": g["low"], "against": f["governing"],
+                                    "at": layers[f["governing"]].get("at") or out["peak_at"],
+                                    "note": "the lowest of the layered material's factors (across the layers, in the "
+                                            "layers, between them where a shear strength is given); `low` applies the "
+                                            "stated discretisation error"}
+            out.pop("safety_factor_withheld", None)
+        else:
+            out["safety_factor"] = None
+            out["safety_factor_withheld"] = "No strength is sourced or given for the layered material."
+    else:
+        out["safety_factor"] = None
+        if converged and not conv_t:
+            out["converged"] = False
+            out["not_converged_because"] = ("the peak tension across the layers still changes by "
+                                            f"{100 * (err_t or 0):.1f} % per refinement at {layers['across_layers']['at']} "
+                                            f"(tolerance {100 * 2 * tol_s:.0f} %).")
+        out["safety_factor_withheld"] = "The study did not converge, so no safety factor is given."
+    # how it changes with the build direction: the same mesh, loads and supports, the material turned
+    sweep = (spec.get("layers") or {}).get("sweep") or []
+
+    def row(rid, chosen, t_, s_, v_, disp, fi):
+        return {"id": rid, "axis": [float(x) for x in model.axes[0]], "chosen": chosen, "peak_tension_across_MPa": t_,
+                "peak_von_mises_MPa": v_, "peak_interlayer_shear_MPa": s_, "max_displacement_mm": disp,
+                "sf_across_layers": fi["across_layers"], "sf_in_plane": fi["in_plane"],
+                "sf_interlayer_shear": fi["interlayer_shear"], "governing": fi["governing"], "safety_factor": fi["value"]}
+    rows = [row((spec.get("layers") or {}).get("id") or "chosen", True, tens["value"], shear["value"], vm_peak,
+                out["max_displacement_mm"], f)]
+    if sweep and out["converged"]:
+        axes0 = list(model.axes)
+        for i, sw in enumerate(sweep):
+            if cancelled_fn is not None and cancelled_fn():
+                raise StudyError("Cancelled.", kind="cancelled")
+            if progress is not None:
+                progress(f"Build direction {i + 1} of {len(sweep)}: {sw.get('id', '')}", 0.96)
+            model.set_axes([sw["axis"]])
+            system = S.System(model.sp, model.stiffness(), model.constraints(), cancelled_fn)
+            r = S.solve_static(system, lv["f"])
+            st = model.stress_of(r["u"])
+            la = _across_layers(st["nodal"], model.axes[0])
+            vm = S.von_mises(st["nodal"])
+            t_, s_, v_ = (float(np.where(ok_nodes, a, 0).max()) for a in (la["tension"], la["shear"], vm))
+            rows.append(row(sw.get("id") or f"direction {i + 1}", False, t_, s_, v_,
+                            float(np.linalg.norm(r["u"].reshape(-1, 3), axis=1).max()), _layer_factors(ly, t_, s_, v_)))
+        model.set_axes(axes0)
+    layers["by_orientation"] = rows
+    layers["by_orientation_note"] = ("Each build direction is solved on the finest mesh of the chosen one, with the "
+                                     "same supports, loads and left-out zones. Only the chosen direction was refined "
+                                     "until it stopped changing, so the others carry no stated error of their own.")
+    out["layers"] = layers
+    out["model"] = "linear static, transversely isotropic (layered) material"
+    out["assumptions"] = [a for a in out["assumptions"] if not a.startswith("isotropic")] + LAYER_ASSUMPTIONS
 
 
 # ---- modal and buckling ------------------------------------------------------------------------------------------
@@ -907,10 +1103,16 @@ def run(geo, spec: dict, progress=None, cancelled=None, keep: dict | None = None
     """Solve a study on a mesh_mod.Geometry. Returns (result, field). Raises StudyError when the study cannot be set
     up (no such face, a part that is not held) and mesh_mod.MeshError when the solid cannot be meshed.
     keep: a dict that receives the finest level's model, displacement and stress (for probes in the verification)."""
-    global _KEEP
+    global _KEEP, _CANCELLED, _PROGRESS
     _KEEP = keep
     progress = progress or (lambda text, fraction=None: None)
     cancelled = cancelled or (lambda: False)
+    _CANCELLED, _PROGRESS = cancelled, progress
+    if any(mt.get("layers") for mt in spec.get("materials") or []):
+        if spec.get("kind", "static") != "static":
+            raise StudyError("A layered (printed) material is supported in a static study only.")
+        if len(spec["materials"]) != 1:
+            raise StudyError("A layered (printed) material is supported for a design of one solid only.")
     kind = spec.get("kind", "static")
     if not spec.get("materials"):
         raise StudyError("A study needs a material (E and Poisson's ratio at least).")

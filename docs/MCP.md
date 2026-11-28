@@ -246,6 +246,9 @@ instead.
 | [`strength_study`](#strength_study) | changes | Run a strength study on the design: will it hold? |
 | [`get_strength_study`](#get_strength_study) | read-only | Read a strength study: its state (never, running with progress, current, stale with the revision the stored result describes, failed with why), and the result. |
 | [`calculate`](#calculate) | changes | Size a part from requirements with a standard's equations, and write it as a design. |
+| [`print_orient`](#print_orient) | changes | Find the print orientation over several objectives at once. |
+| [`print_strength`](#print_strength) | changes | Strength of the part as printed, layer by layer. |
+| [`print_warp`](#print_warp) | read-only | Warp risk of the part as printed: an indicator, never a predicted lift in millimetres. |
 
 ## Tools
 
@@ -2048,7 +2051,8 @@ Rank the ways the part can lie on the plate: the six axis orientations plus ever
 Returns a picture of the top three as printed and, for each candidate, the numbers behind its score (support
 volume, overhang area, plate contact, height, smallest layer cross-section through the structure features) and
 each term's contribution. The score formula is in the result. It ranks computed geometry; it does not predict
-print success. Apply one with set_print_setup(project, orientation=<id>).
+print success. Apply one with set_print_setup(project, orientation=<id>). print_orient searches every direction
+over support, time, strength, surface and tip-over and returns the Pareto front.
 
 | Argument | Type | Required |
 |---|---|---|
@@ -2671,6 +2675,118 @@ strength study that checks a cantilever hook's deflection by finite elements (ne
 | `expect_head` | integer \| null |  |
 | `purpose` | string \| null |  |
 | `fea` | boolean |  |
+
+### `print_orient`
+
+Find the print orientation over several objectives at once. Returns the Pareto front: the orientations no
+other one beats on everything. Objectives: support volume (mm3) and support contact on the part (mm2), both
+computed from the facets that overhang past the critical angle, with each support column going down to the
+plate or to the part below; print time by a layer-time model; strength along the load; surface quality on
+the faces marked cosmetic; and the tilt at which the part tips off its plate contact.
+cosmetic: points on the faces that show, [[x, y, z], ...] in design millimetres (stair height and support
+marks on them become objectives). study: a static strength study whose stress field gives the tension across
+the layers in every orientation, against the material's Z strength from its datasheet (left out: the design's
+one current static study); or load_direction=[x, y, z] when only the direction of the load is known. Without
+either, strength is not an objective and the result says so.
+The search is the six axis orientations, every flat face the part can lie on, and a geodesic grid over all
+directions (level 2: 162, about 16 degrees apart; 1: 42; 3: 642), then a local refinement down to 1 degree.
+The front is taken over the orientations in which the part stands on the plate on its own (a flat face on it,
+the centre of mass over it); free=True also admits orientations that rest on supports.
+The front is ranked by weights you can change (weights={"support_mm3": 0.4, "time_s": 0.1, ...}); the ranking
+is a convention, the front is not. Each row says how every number is known: computed, modelled, simulated.
+Print time is uncalibrated unless a real slice exists: calibrate=True slices the current orientation once
+(supports on) and scales the model by it, stating the factor; "auto" uses such a slice only if it is already
+there. verify=N slices the N best-ranked candidates with the real slicer and reports the model's error in time
+and in support filament per candidate (a slice each: about a minute).
+Nothing is written to the print setup by a search. The person picks: pick="<id>" writes that orientation to
+the design's print setup (ask before picking for them). A call with only the project repeats the last
+search's inputs. critical_deg: the steepest overhang printed without support, from vertical (default: the
+slicer preset's threshold, else 45). Not a print-success prediction: slice the pick to confirm.
+
+| Argument | Type | Required |
+|---|---|---|
+| `project` | string | yes |
+| `cosmetic` | array \| null |  |
+| `study` | string |  |
+| `load_direction` | array \| null |  |
+| `weights` | object \| null |  |
+| `level` | integer |  |
+| `calibrate` | boolean \| string |  |
+| `verify` | integer |  |
+| `critical_deg` | number \| null |  |
+| `pick` | string |  |
+| `top` | integer |  |
+| `free` | boolean |  |
+
+### `print_strength`
+
+Strength of the part as printed, layer by layer. A static strength study with a layered (transversely
+isotropic) material, stiff and strong in the layers, weaker across them, turned to the print orientation. Gives the safety factor
+in the weak direction (tension across the layers against the datasheet's Z strength, with its own stated
+discretisation error), the in-plane one (von Mises against the X-Y strength), the lower of the two as the
+verdict, and how they change with the orientation: the same mesh and loads solved for each other build
+direction.
+study: an existing static strength study whose supports, loads and material are reused (strength_study defines
+them); or give fixtures, loads and material as for strength_study. orientation: "setup" (the design's print
+setup; the result goes stale when the setup changes) or an orientation id (as_modelled, on_back, ..., or a
+"down:x,y,z" id from print_orient). sweep: "auto" (the six axis orientations), a list of up to eight ids, or
+[] for none.
+The material: in-plane modulus and strength and the Z modulus and strength are the filament datasheet's
+(X-Y and Z specimens, each with its document). Poisson's ratio is in no filament datasheet: a value measured
+on printed specimens of the same polymer is used where a paper gives one, and named; otherwise give it
+(material={"key": "PETG", "poisson": 0.38, "source": "..."}). Two constants no source has are assumed by a
+stated rule unless you give them in assume: {"poisson_z": ..., "G_z_MPa": ..., "E_z_GPa": ..., "uts_z_MPa":
+..., "uts_xy_MPa": ..., "shear_strength_MPa": ..., "source": "..."}; every assumed value is listed in
+result.layers.material.assumed, and a study with assumed values says so in its evidence. Without a Z strength
+there is no safety factor in the weak direction. No arguments but project: the design's layered studies.
+It runs in the background like any strength study: read it with get_strength_study(project, study, wait_s);
+the layered part is result.layers. Infill, walls, raster direction and voids are not modelled: the part is a
+homogeneous solid with the datasheet's 100 % infill values. Needs the optional strength engine.
+
+| Argument | Type | Required |
+|---|---|---|
+| `project` | string | yes |
+| `study` | string |  |
+| `fixtures` | array \| null |  |
+| `loads` | array \| null |  |
+| `material` | string \| object \| null |  |
+| `orientation` | string |  |
+| `sweep` | array \| string |  |
+| `assume` | object \| null |  |
+| `mesh` | object \| null |  |
+| `name` | string |  |
+| `run_now` | boolean |  |
+| `force` | boolean |  |
+
+### `print_warp`
+
+*Read-only.*
+
+Warp risk of the part as printed: an indicator, never a predicted lift in millimetres. It is the layer-
+shrinkage model of Wang, Xi and Jin (2007): every layer shortens by alpha x (Tg - chamber temperature) on the
+stack below it, which bends a part of n layers over its longest span on the plate; the index is that model's
+end lift over one layer height. Inputs, each with how it is known: the material's thermal expansion and glass
+transition (sourced from a paper or a resin datasheet of the same polymer, named; or given with alpha_per_K,
+tg_C and source), the chamber temperature (given, else assumed 25 C for an open printer), and from the
+geometry in the print orientation the first-layer area, the longest span, the footprint's aspect ratio, the
+height in layers and the sharp corners at its ends. The band (low, moderate, high) is a stated convention on
+the index, raised by sharp corners and by a footprint that touches the plate on little of its extent.
+Returns the index, the band and what raised it, every input, the footprint's corners (where it lifts first),
+and the same index for the six axis orientations so they can be compared. orientation: default the design's
+print setup. Without a sourced expansion coefficient or glass transition for the material the call is
+refused, naming what to give. It does not know the plate, its temperature, the adhesive, a brim, infill or
+drafts, and the model is not calibrated to any print.
+
+| Argument | Type | Required |
+|---|---|---|
+| `project` | string | yes |
+| `orientation` | string \| null |  |
+| `material` | string \| null |  |
+| `chamber_C` | number \| null |  |
+| `alpha_per_K` | number \| null |  |
+| `tg_C` | number \| null |  |
+| `layer_height_mm` | number \| null |  |
+| `source` | string |  |
 
 ## Prompts
 

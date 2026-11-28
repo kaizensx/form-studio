@@ -48,6 +48,7 @@ computed change impact, checks with evidence classes, the fit model, printer cal
 | Drawings | `form/drawing/`, `form/iso286.py` | Hidden-line views, sections and details, dimensions bound to parameters, ISO 286 fits (the one ISO 286 module), GD&T, AP242 PMI, the drawing check |
 | Motion and robot files | `form/motion.py`, `form/robot.py`, `form/sequence.py` | Mechanisms played over time, URDF/SRDF/MJCF with inertia from the B-rep, assembly order and insertion directions |
 | Boards and enclosures | `form/board/` | KiCad and IDF boards read by Form Studio's own parsers, the enclosure made around them, the fit proved on the solids; KiCad's DRC/ERC and fab files through the person's own KiCad |
+| Print physics | `form/printphys/` | Print orientation as a Pareto front over support, time, strength, surface and tip-over, checked against real slices; strength as printed with a layered material (solved by `form/fea/`); a warp-risk indicator from a cited model |
 | The Bench | `form/studies.py` | Every study, route and document of a design with its state from the head revision's keys; each wave registers through `PROVIDERS` |
 | MCP server | `form/mcp_server.py` | 127 tools over stdio |
 | CLI | `form/__main__.py` | Every capability as a JSON-printing command |

@@ -584,6 +584,9 @@ answer stops changing. The full method and the verification table are in [STRENG
   which ones those were.
 - **Stored with the revision.** A result goes stale after any change to the geometry, the loads, the material or
   the engine, and says which revision it describes.
+- **As printed:** `print_strength` solves the same loads with a layered material in the print orientation, and
+  `print_orient` and `print_warp` cover what the orientation does to supports, time, surface and warping
+  ([PRINT_PHYSICS.md](PRINT_PHYSICS.md)).
 - **Headless:** `strength_study`, `get_strength_study`; `form strength
   static|modal|buckling|thermal|thermal_stress|run|list|show|verify`. Runs in the background with progress and
   cancel; a typical bracket converges in about 10 s.

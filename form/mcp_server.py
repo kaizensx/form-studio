@@ -2837,7 +2837,8 @@ def build() -> MCPServer:
         Returns a picture of the top three as printed and, for each candidate, the numbers behind its score (support
         volume, overhang area, plate contact, height, smallest layer cross-section through the structure features) and
         each term's contribution. The score formula is in the result. It ranks computed geometry; it does not predict
-        print success. Apply one with set_print_setup(project, orientation=<id>)."""
+        print success. Apply one with set_print_setup(project, orientation=<id>). print_orient searches every direction
+        over support, time, strength, surface and tip-over and returns the Pareto front."""
         st = studio()
         from . import analysis
         def go():
@@ -3407,6 +3408,8 @@ def build() -> MCPServer:
     fea_tools.register_tools(mcp, studio, _run, RO, RW, _origin)
     from .calc import tools as calc_tools     # engineering calculators that write geometry: calculate (form/calc)
     calc_tools.register_tools(mcp, studio, _run, RO, RW, _origin)
+    from .printphys import tools as print_tools   # print physics: print_orient, print_strength, print_warp (form/printphys)
+    print_tools.register_tools(mcp, studio, _run, RO, RW, _origin)
     return mcp
 
 
