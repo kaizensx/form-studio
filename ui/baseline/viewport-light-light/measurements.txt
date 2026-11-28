@@ -1,18 +1,18 @@
-iso: part 153.2 (340 px)  frame 208.8  bright 1.00
-iso: part 153.2 (340 px)  frame 208.8  bright 1.00
-front: part 168.7 (174 px)  frame 226.5  bright 1.00
-side: part 139.7 (123 px)  frame 227.4  bright 1.00
-back: part 141.3 (205 px)  frame 217.1  bright 1.00
-top: part 195.1 (442 px)  frame 224.9  bright 1.00
-under: part 187.0 (346 px)  frame 235.3  bright 1.00
-sweep d=30: darkest el -17 part 142.1, brightest 192.2
+iso: part 155.8 (301 px)  frame 210.8  bright 1.00
+iso: part 155.8 (301 px)  frame 210.8  bright 1.00
+front: part 176.8 (174 px)  frame 228.0  bright 1.00
+side: part 137.0 (126 px)  frame 225.2  bright 1.00
+back: part 137.4 (256 px)  frame 213.9  bright 1.00
+top: part 198.9 (496 px)  frame 223.8  bright 1.00
+under: part 187.3 (344 px)  frame 236.0  bright 1.00
+sweep d=30: darkest el -19 part 140.8, brightest 191.2
+orbiting at distance 30: el -27 → el -25 goes through the part's wall (the cut colour), not compared
 orbiting at distance 30: el -23 → el -21 goes through the part's wall (the cut colour), not compared
-orbiting at distance 30: el -21 → el -19 goes through the part's wall (the cut colour), not compared
-orbiting at distance 30: worst step part 0.131 of iso, frame 0.078
-sweep d=420: darkest el 3 part 141.8, brightest 201.8
-orbiting at distance 420: worst step part 0.151 of iso, frame 0.022
-sweep d=3000: darkest el 31 part 138.3, brightest 198.7
-orbiting at distance 3000: worst step part 0.102 of iso, frame 0.017
-zooming at elevation 28.4: worst step part 0.041 of iso, frame 0.032
-zooming at elevation -30: worst step part 0.084 of iso, frame 0.022
-zooming at elevation 6: worst step part 0.240 of iso, frame 0.024
+orbiting at distance 30: worst step part 0.127 of iso, frame 0.078
+sweep d=420: darkest el -1 part 142.5, brightest 199.6
+orbiting at distance 420: worst step part 0.179 of iso, frame 0.018
+sweep d=3000: darkest el 29 part 140.3, brightest 198.8
+orbiting at distance 3000: worst step part 0.118 of iso, frame 0.017
+zooming at elevation 28.4: worst step part 0.050 of iso, frame 0.020
+zooming at elevation -30: worst step part 0.083 of iso, frame 0.022
+zooming at elevation 6: worst step part 0.061 of iso, frame 0.029
