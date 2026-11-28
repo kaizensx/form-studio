@@ -115,7 +115,7 @@ class Validation(unittest.TestCase):
         loop = self.problems(parts=[Part("a", "A", 0, attach="c"), Part("b", "B", 1, attach="a"), Part("c", "C", 2, attach="b")])
         self.assertIn("form a loop", loop)
         self.assertIn("lo < hi", self.problems(joints=[hinge("b", (1, 0, 0), (0, 0, 0), (9, 0))]))
-        self.assertIn("kind must be hinge, slide or fixed", self.problems(joints=[Joint("x", "X", "b", "spin", (1, 0, 0))]))
+        self.assertIn("kind must be hinge, slide, cylindrical, ball or fixed", self.problems(joints=[Joint("x", "X", "b", "spin", (1, 0, 0))]))
         self.assertIn("Mate a/zz names unknown part", self.problems(mates=[Mate("a", "zz")]))
         self.assertIn("kind must be one of", self.problems(mates=[Mate("a", "b", "glue")]))
         self.assertIn("step must be", self.problems(joints=[hinge("b", (1, 0, 0), (0, 0, 0), (0, 9), step=30)]))

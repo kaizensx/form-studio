@@ -139,8 +139,11 @@ class Fits(unittest.TestCase):
         self.assertEqual(fits.iso_fit("H7/p6", 10)["kind"], "interference")
         self.assertEqual(fits.iso_fit("H7/k6", 20)["kind"], "transition")
         self.assertEqual(fits.shaft_limits("js", 6, 25), (25 - 0.0065, 25 + 0.0065))
+        # s comes from the one ISO 286 module (form/iso286.py): verified against the published table up to 180 mm
+        self.assertEqual(fits.shaft_limits("s", 6, 120), (120.079, 120.101))     # ei 79 µm, IT6 22 µm (100-120)
+        self.assertEqual(fits.iso_fit("H7/s6", 120)["kind"], "interference")
         with self.assertRaises(RecipeError):
-            fits.iso_fit("H7/s6", 120)                                    # s is tabulated up to 50 mm only
+            fits.iso_fit("H7/s6", 250)                                    # beyond the range verified for s
         self.assertEqual(fits.bearing_fit("608")["tolerance"], "k5")
 
 

@@ -1,0 +1,64 @@
+# Polymer powder bed fusion by laser (SLS). Read on 2026-11-28.
+
+[process]
+id = "sls"
+label = "SLS printing"
+evidence = "computed (B-rep)"
+options = ["up", "machine"]
+needs = []
+machine_note = "Formlabs Fuse series, Nylon 12 powder (the source's table)"
+machine = [159.8, 159.8, 295.5]
+not_judged = "Warping of large flat areas, porosity, powder ageing and packing are not judged. Overhangs need no supports in a powder bed, so they are not checked."
+
+[[source]]
+id = "formlabs-fuse"
+title = "Fuse Series SLS Design Guide"
+publisher = "Formlabs, white paper"
+url = "https://formlabs.com/global/white-papers/fuse-series-sls-design-guide/"
+published = "undated"
+read = "2026-11-28"
+
+[[rule]]
+id = "sls.wall"
+title = "Thinnest wall"
+measure = "wall_min_mm"
+op = ">="
+fail = 0.6
+unit = "mm"
+source = "formlabs-fuse"
+quote = "Supported and unsupported walls, Nylon 12: 0.6 mm vertical, 0.3 mm horizontal (the vertical value is checked everywhere)."
+fix = "thicken"
+
+[[rule]]
+id = "sls.hole"
+title = "Smallest hole"
+measure = "hole_d_mm"
+op = ">="
+fail = 1.0
+unit = "mm"
+source = "formlabs-fuse"
+quote = "Hole diameter: recommended minimum 1.0 mm."
+
+[[rule]]
+id = "sls.trapped"
+title = "No closed hollow without escape holes"
+measure = "trapped_voids"
+op = "<="
+fail = 0
+unit = "voids"
+source = "computed"
+why = "A closed void keeps its unsintered powder."
+fix = "escape_holes"
+hole_d = 3.5
+hole_n = 2
+hole_source = "formlabs-fuse"
+hole_quote = "At least two drain holes per enclosed cavity, each at least 3.5 mm in diameter."
+
+[[rule]]
+id = "sls.size"
+title = "Fits the machine"
+measure = "fits_machine"
+op = "fits"
+unit = "mm"
+source = "formlabs-fuse"
+quote = "Max part size, Nylon 12: 159.8 × 159.8 × 295.5 mm."

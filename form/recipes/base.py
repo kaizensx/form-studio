@@ -9,7 +9,8 @@ from __future__ import annotations
 from dataclasses import dataclass, field, asdict
 from typing import Any, Callable
 
-from .assembly import Access, Assembly, Hardware, Joint, Mate, Part, fixed, hinge, slide, slider  # noqa: F401  (part of the recipe contract)
+from .assembly import (Access, Assembly, Coupling, Hardware, Joint, Loop, Mate, Part, ball, cam,  # noqa: F401
+                       cylindrical, fixed, gears, hinge, lead_screw, rack, slide, slider)  # (the recipe contract)
 
 
 @dataclass(frozen=True)

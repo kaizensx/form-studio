@@ -22,6 +22,10 @@ def main() -> int:
     if argv[:2] == ["-m", "form.meshguard"]:   # the export's mesher in a child process (form/meshguard.py)
         from form.meshguard import main as meshguard
         return meshguard(argv[2:]) or 0
+    if argv[:2] == ["-m", "form.drawing.qtpaint"]:   # drawings painted and PDFs read by Qt in a child process
+        from form.drawing.qtpaint import main as qtpaint
+        sys.argv = [sys.argv[0], *argv[2:]]
+        return qtpaint() or 0
     if argv[:1] == ["cli"]:
         from form.__main__ import main as cli
         return cli(argv[1:]) or 0

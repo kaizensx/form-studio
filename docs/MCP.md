@@ -42,38 +42,37 @@ Rules:
 - preview_change before commit_change; pass expect_head so a newer revision is never overwritten.
 - Provenance is evidence. Mark a value "measured" only when the user measured it and told you the number. Never invent
   physical results: record_physical_result is only for what the user reports.
-- Printing: a slice is a simulation, not a print, and fit yield is a model. Say so.
+- A slice is a simulation, not a print; fit yield is a model. Say so.
 - You cannot approve a release: request_release returns a link the user opens in Form Studio. Nothing here starts a
   print or sends files anywhere.
-- Every design has a purpose, "print" or "model" (just a 3D model): get_project reports it. For a model never ask about
-  a printer, slicer, filament or orientation. Pass purpose to create_project/create_design when the person says it. A
+- Every design has a purpose, "print" or "model" (just a 3D model; get_project says). For a model never ask about a
+  printer, slicer, filament or orientation. Pass purpose to create_project/create_design when the person says it; a
   "Purpose:" line in the message is binding.
 - Ask the person only what changes fit, load or safety and you cannot look up: ask_user, one question at a time, at
-  most three a task; ask_measurement for a dimension. If the person cannot be reached, the result says to ask in your
-  own interface.
-- A new idea that is not a precise specification: propose_concepts with 3-4 structurally different real designs, one
-  line of rationale each; then stop: the person picks. Do not offer recipes.
-- Anything the person brings (mesh, STEP, photo, sketch, PDF, link, words): triage(source) first. It classes the input,
-  chooses the route and names the calls in order. Take that route. Ask the person only when triage returns "ask", and
-  say what "cannot" lists.
+  most three a task; ask_measurement for a dimension. Unreachable: the result says to ask in your own interface.
+- A new idea, not a precise specification: propose_concepts with 3-4 structurally different real designs, a line of
+  rationale each; then stop: the person picks. Do not offer recipes.
+- Anything the person brings (mesh, STEP, photo, sketch, PDF, link, words): triage(source) first; it names the route
+  and the calls in order. Take it. Ask the person only when it returns "ask"; say what "cannot" lists.
 - A mesh to make editable: reconstruct(path). It triages, repairs what is safe and takes the route (a mechanical part:
   sketches, holes and fillets verified against the mesh; a sculpt or scan: a surface or mesh body,
   design_guide(topic="organic"); several bodies: one design, a part each). Report its headline as it is: the measured
-  distance, and what it is not.
+  distance and what it is not.
 - A refusal's hint names the next call. Never repeat a failed call with the same arguments. A design's exceptions are
   not a way to print: what a build says comes back in the result.
-- Rebuilding a mechanical mesh by hand: never embed the mesh as the design. design_guide(topic="reference_parts"):
-  analyze_reference (analyze_assembly for several parts) -> named features -> build123d with Params ->
-  compare_to_reference until within tolerance (default 0.1 mm).
-- Photos: scale from a reference object (bank card 85.60 x 53.98 mm, coin, ruler); photo dimensions stay assumed until
-  measured. A Form Studio sketch's JSON overrides the picture. STEP: import_reference. PDF drawings: read_document.
-  Their links: fetch_link, never a shell. Download only what they gave.
+- Rebuilding a mechanical mesh by hand: never embed the mesh. design_guide(topic="reference_parts"): analyze_reference
+  (analyze_assembly for several) -> named features -> build123d with Params -> compare_to_reference (0.1 mm by default).
+- Photos: scale from a reference (bank card 85.60 x 53.98 mm, coin, ruler); their sizes stay assumed until measured.
+  A Form Studio sketch's JSON overrides the picture. STEP: import_reference. PDFs: read_document. Links: fetch_link,
+  never a shell. Download only what they gave.
 - One request makes one design. Several files of one product: one design, several parts (reconstruct files=[...],
   create_design relation="part_of"). A second create_design in a conversation says its relation: replaces, part_of,
   alternative or new.
+- "Will it hold?": strength_study, then get_strength_study (design_guide(topic="strength")). Quote its evidence and
+  lower safety factor; not converged means none.
 - Complex designs (mechanisms, organic or styled forms, textures, several parts) are staged: design_brief ->
   design_guide(topic=...), design_examples -> plan_design -> create_design(plan=...) -> look at the sheet -> critique
-  -> update_design. The design_guide topics and this server's skills hold each workflow.
+  -> update_design. The design_guide topics and the skills hold each workflow.
 ```
 
 ## Skills
@@ -116,7 +115,7 @@ instead.
 
 ## Tools at a glance
 
-104 tools. Read-only tools never change a project.
+127 tools. Read-only tools never change a project.
 
 | Tool | Access | What it does |
 |---|---|---|
@@ -150,10 +149,24 @@ instead.
 | [`animate`](#animate) | read-only | Animate a design. Make motion from real geometry. |
 | [`compare_revisions`](#compare_revisions) | read-only | Compare two revisions. What changed between two revisions: parameters, features, interfaces, stability, fit. |
 | [`geometry_diff`](#geometry_diff) | changes | Diff the geometry of two revisions. |
+| [`manufacturability`](#manufacturability) | changes | Check a design for a manufacturing process. |
+| [`apply_fix`](#apply_fix) | changes | Fix a manufacturability finding and prove it. |
+| [`flat_pattern`](#flat_pattern) | changes | Lay a part flat for cutting and write the DXF. |
+| [`cut_file_check`](#cut_file_check) | read-only | Check a DXF before a shop cuts it, or a design's own flat pattern or profile (written to DXF and read back). |
+| [`bend_order`](#bend_order) | changes | Find an order in which a press brake can form every bend of a sheet-metal part, with a stated tool model: a V-die of 8 × t (Bystronic's rule, cited), an 88° groove, a gooseneck punch of stated dimensions sectioned to the bend's length, the part air-bent and checked at 25, 50, 75 and 100 % of each bend against punch, ram, die and bed, turned end for end when that helps. |
+| [`service_preflight`](#service_preflight) | read-only | Check a part against a cutting and bending service's published materials, thicknesses and limits before a person sends it: material offered, thickness on the service's list, bending offered at that thickness, bend angle, flat size of a bent part, smallest laser hole, and the cut-file rules. |
+| [`cam_plan`](#cam_plan) | changes | Plan the CNC machining of a design on a 3-axis mill or router. |
+| [`cam_post`](#cam_post) | changes | Write the G-code of the design's CAM plan for a controller, read it back and simulate it from the file. |
+| [`cam_simulate`](#cam_simulate) | changes | Simulate the design's posted CNC program again from its file and say where it stands. |
 | [`add_text`](#add_text) | changes | Put raised (or, with sunk, cut-in) lettering on a flat face of a Python design, as a real feature of its source: a new revision whose build adds a stage text_N with Form Studio's bundled font. |
 | [`add_feature`](#add_feature) | changes | Add a feature to a Python design as a new revision. |
 | [`get_sketch`](#get_sketch) | read-only | Get the sketch of a feature made from one (extrude, cut, revolve): its plane, points, entities (line, circle, arc) and constraints, solved by form.sketch2d: point positions, the profile, degrees of freedom left, and the named dimensions with their values (each is a parameter "<feature>_<name>"). |
 | [`edit_sketch`](#edit_sketch) | changes | Edit a feature's sketch with ops (or send the whole sketch), as one revision. |
+| [`standard_part`](#standard_part) | changes | Standard parts to buy (screws, nuts, washers, inserts, bearings, dowels, collars, shafts, LM bushings, GT2 pulleys and belts, NEMA motors, V-Slot extrusion and T-nuts, magnets, O-rings), generated from published tables: every dimension names its standard and table, or the maker's datasheet. |
+| [`bom`](#bom) | changes | The parts list a buyer orders from: purchased items grouped by standard designation (e.g. "ISO 4762 M5×12 A2-70") with quantity, material and mass (the maker's catalogue value, else the modelled volume on the B-rep times the sourced density, else none), the made parts with their mass (mass_properties), and supplier numbers. |
+| [`board_import`](#board_import) | changes | Bring a circuit board in and get an enclosure that is checked against it. |
+| [`board_check`](#board_check) | read-only | Check a design's board and its enclosure. |
+| [`board_fab`](#board_fab) | changes | Fab files for a design's board through the person's KiCad (kicad-cli): kinds from gerbers, drill, pos (pick-and-place), bom (from the schematic beside the board) and step (the board STEP); default all. |
 | [`remove_feature`](#remove_feature) | changes | Remove a feature as a new revision: a standard feature added with add_feature ("boss_1", "hook_1"), or any feature of a FeatureDesign (its method goes; the features before it load from their checkpoints). |
 | [`compare_printers`](#compare_printers) | read-only | Slice the head revision's exported model for real on every printer set up in every installed slicer (the selected printers first, up to limit; or only the printer ids given, from list_printers) and return each one's simulated print time, filament grams and cost from the user's prices, with the fastest, least filament and cheapest. |
 | [`make_lighter`](#make_lighter) | read-only | Make it lighter: search changes that reduce mass while every check that passes now still passes. |
@@ -161,13 +174,16 @@ instead.
 | [`replace_part_guide`](#replace_part_guide) | read-only | Guide a replacement part from a photo. |
 | [`turntable`](#turntable) | read-only | Render a turntable of the head revision from the kernel's mesh. |
 | [`remove_text`](#remove_text) | changes | Remove lettering added with add_text (mark_id like "text_1"; get_design_source shows the block). |
-| [`assembly_instructions`](#assembly_instructions) | changes | Write assembly instructions. Assembly instructions as a PDF from the design's assembly declaration: a parts page with computed volumes, then one page per part going on (in the declaration's parent order, at its explode offset, with arrows). |
+| [`assembly_instructions`](#assembly_instructions) | changes | Write assembly instructions. Assembly instructions as a PDF from the design's assembly declaration: a parts page with computed volumes, then one page per part going on (in the declaration's parent order, at its explode offset, with arrows; after assembly_sequence, in the computed order with each arrow along the proved insertion direction). |
+| [`drawing`](#drawing) | changes | Make the engineering drawing. A shop drawing made from the solid: views by OCCT hidden-line removal (first or third angle, a section through the bores, a detail of small features, an isometric), the largest ISO scale that fits the sheet (A4-A0, ANSI A-E), dimensions measured on the B-rep and placed without overlaps, an ISO 7200 title block. |
+| [`export_pmi`](#export_pmi) | changes | Export STEP AP242 with PMI. The solid as STEP AP242 with semantic PMI attached to its faces: every dimension of the drawing with its tolerance (fits as limits), the datums and the geometric tolerances, written through OCCT's XCAF document. |
+| [`check_drawing`](#check_drawing) | changes | Check a drawing against the part. |
 | [`checkout_revision`](#checkout_revision) | changes | Make an earlier revision the head again (nothing is deleted). |
 | [`set_print_setup`](#set_print_setup) | changes | Set the print setup. Print orientation (as_modelled, on_back, on_front, on_left, on_right, inverted, or a "down:x,y,z" id from suggest_orientation), the acceptable total fit gap window, and whether the pipeline slices automatically. |
 | [`explore_alternatives`](#explore_alternatives) | read-only | Build a small grid of real variants (1-2 parameters, up to 5 values each) and rank them. |
 | [`optimize`](#optimize) | read-only | Optimize a design. Goal seek: search parameter ranges for the best design that meets constraints. |
 | [`slice_test_piece`](#slice_test_piece) | changes | Cut a thin ring through the fit interface of this revision and slice it, so a cheap test print can check the fit before the whole part. |
-| [`record_physical_result`](#record_physical_result) | changes | Record what the USER observed after a real print. |
+| [`record_physical_result`](#record_physical_result) | changes | Record what the USER observed after a real print or a real machining run. |
 | [`request_release`](#request_release) | read-only | Check whether the head revision can be released and hand the decision to the user. |
 | [`verify_release`](#verify_release) | read-only | Re-hash every file of a release against its manifest and say whether it still matches the head revision. |
 | [`open_in`](#open_in) | changes | Open a current output in the user's own software: what = step \| stl \| 3mf \| gcode \| folder. |
@@ -186,6 +202,9 @@ instead.
 | [`analyze`](#analyze) | read-only | Analyze the part as a map. An analysis map of the part, computed from the real geometry: a picture with its legend, and the statistics. |
 | [`measure`](#measure) | read-only | Measure distances and features of the part. |
 | [`mass_properties`](#mass_properties) | read-only | Mass, centre of mass, inertia tensor and principal axes, computed on the B-rep (OCCT), per part and for the whole. |
+| [`motion_study`](#motion_study) | read-only | Play a mechanism over time and check it along the whole motion. |
+| [`robot_files`](#robot_files) | read-only | Write robot files from the assembly: URDF, SRDF and MJCF (MuJoCo) with one link per part, joints from the declared joints with their limits (hinge revolute or continuous, slide prismatic; cylindrical and ball split in URDF, native in MJCF), couplings as mimic and equality joints, loops as MJCF equality connects (URDF is a tree: listed), inertia per link from the B-rep mass properties (mass, centre of mass and tensor in the link frame, the part's sourced density), visual STL per link and collision as CoACD convex pieces when installed, else a convex hull (collision="hull" \| "box" \| "coacd"). |
+| [`assembly_sequence`](#assembly_sequence) | read-only | Compute an order the parts can go together in, and each part's insertion direction: by disassembly, taking out one part at a time that can leave on a straight line (local freedom from the contact normals, then a collision sweep until it is clear); the assembly order is the reverse. |
 | [`analyze_selection`](#analyze_selection) | read-only | Analyse a selection on the CAD solid without saving it. |
 | [`list_annotations`](#list_annotations) | read-only | List annotations. The selections the person named and kept on this design (annotations): name, note, the revision they were made on, the picked items and their computed analysis, and `text` describing each. |
 | [`annotate`](#annotate) | changes | Keep a selection on the head revision with a name and a note (for example a place you want the person to look at, or one you changed). |
@@ -224,6 +243,9 @@ instead.
 | [`list_studies`](#list_studies) | read-only | List every study, route and document of a design with its state: the Bench. |
 | [`run_study`](#run_study) | changes | Run one Bench entry for the head revision (ids from list_studies). |
 | [`get_study`](#get_study) | read-only | Read one Bench entry: its state, the revision it describes, its headline with evidence, its files and stored numbers, and the log of its runs. |
+| [`strength_study`](#strength_study) | changes | Run a strength study on the design: will it hold? |
+| [`get_strength_study`](#get_strength_study) | read-only | Read a strength study: its state (never, running with progress, current, stale with the revision the stored result describes, failed with why), and the result. |
+| [`calculate`](#calculate) | changes | Size a part from requirements with a standard's equations, and write it as a design. |
 
 ## Tools
 
@@ -277,7 +299,8 @@ mechanisms, organic, texture, aesthetics, dfm (design for printing; not applicab
 reference_parts (meshes to rebuild as clean editable CAD: analyze, plan, write, compare, refine),
 hybrid (a construction route per feature: kernel, subd_cage, sculpt_recon or procedural, and when to model a
 cage in Blender with model_mesh), game (purpose "game": budgets, LODs, UVs, bakes, collision and engine
-presets, built with game_asset).
+presets, built with game_asset), strength (strength studies: supports and loads on picked faces, reading
+convergence, singularities and the safety factor).
 They document form.craft, the helper library for lofts, shells, hinges, snaps, gears, organic bodies and
 textures. Then design_examples for a close exemplar, and create_design.
 
@@ -787,7 +810,8 @@ their checkpoints, nothing is saved).
 
 Animate a design. Make motion from real geometry. kind="turntable" spins the head revision. kind="morph" builds every in-between
 design from from_rev (default: head) to to_rev or to_values, so you can show how a change transforms the part.
-Returns the file path and a still. fmt: gif or webp.
+kind="motion" plays the mechanism (motion_study's default driver, loops solved) as an MP4 film (ffmpeg; frames
+is the frame count). Returns the file path and a still. fmt: gif or webp (turntable and morph).
 
 | Argument | Type | Required |
 |---|---|---|
@@ -822,6 +846,196 @@ the B-rep. Also writes a picture (added green, removed red, the rest grey); look
 | `project` | string | yes |
 | `a` | integer | yes |
 | `b` | integer \| null |  |
+
+### `manufacturability`
+
+Check a design for a manufacturing process. Every rule of the process measured on the exact solid, each
+limit with the published guide it comes from (title, publisher, the date it was read) or "computed" when it
+is geometry: process cnc (3/4/5-axis access for a flat end mill, internal corners against the tool and the
+cavity depth, tool reach, thin walls, holes, setups), injection (a proposed pull direction and parting line,
+undercuts with the side action or lifter each needs, draft per face, wall range per resin, projected area,
+clamp tonnage), fdm, sla, sls, mjf, lpbf (walls, overhangs, holes, enclosed voids, build volume), sheet_metal
+(the part unfolded and folded back, flange length, holes to edge and bend, hems; flat_pattern has the rest).
+Default process: the design's own (purpose print: fdm).
+options: cnc {tool_d (mm, needed), material: metal|plastic, axes: 3|4|5, flute_l, holder_d, rotary_axis};
+injection {resin: abs|pc|pp|nylon|..., pull: [x,y,z] or "auto", cavities, textured}; printing {up: [x,y,z],
+machine: [x,y,z] mm, alloy for lpbf}; sheet_metal {material, k, method: table|din6935, forming}; any process {overrides: {rule_id: {fail, warn}}} for a shop's limits
+(recorded as specified). A rule whose input is missing is not checked, and the verdict is then "not proven",
+never a pass. Returns rows (one per rule), findings (where, value, limit), the proposed fixes (apply_fix),
+the overlay file the viewport draws (form-dfm-overlay/1) and, with view (iso, top, ...), a picture.
+
+| Argument | Type | Required |
+|---|---|---|
+| `project` | string | yes |
+| `process` | string |  |
+| `options` | object \| null |  |
+| `rev` | integer \| null |  |
+| `view` | string |  |
+
+### `apply_fix`
+
+Fix a manufacturability finding and prove it. Takes a fix id or rule id from manufacturability (default the
+first fix proposed): draft on the faces along the pull, internal corners raised to the tool radius, escape
+holes from enclosed voids, a wall or hole set by a parameter. The edit is written into the design's source
+as edit_design ops (a parameter and a feature, or set_param), built and checked without saving (the preview),
+then saved as a new revision and checked again on the new head from a fresh measurement. Returns fixed (true
+only when that second check passes the rule), the ops, the rows before and after, any other rule the change
+made worse (a trade: not applied unless accept_trades), and before and after pictures. apply=false stops
+after the preview. Pass the same options as manufacturability and expect_head.
+
+| Argument | Type | Required |
+|---|---|---|
+| `project` | string | yes |
+| `process` | string |  |
+| `fix` | string |  |
+| `options` | object \| null |  |
+| `apply` | boolean |  |
+| `accept_trades` | boolean |  |
+| `expect_head` | integer \| null |  |
+
+### `flat_pattern`
+
+Lay a part flat for cutting and write the DXF. kind "flat" (a bent sheet-metal part): the solid's skin
+recognised (flat faces and cylindrical bends of one thickness), unfolded with a bend allowance θ·(r + K·t)
+whose K-factor comes from a sourced table (options: material al_5052_h32|al_6061_t6|steel_mild|steel_304|
+copper, method table|din6935, forming air|bottoming|coining, or k for your shop's own value, recorded as
+specified), then folded back from the flat pattern's own numbers and compared with the solid (verify.max_mm
+against 0.01 mm). The DXF has CUT (closed contours), BEND_UP and BEND_DOWN (centre lines), ETCH (label as
+outlines: options.label) and NOTES (angle, radius, K, allowance per bend). What cannot be unfolded is named
+with the face and why (a louvre, an edge round, two thicknesses). kind "profile" (any flat part for laser,
+waterjet or router): the outline of its largest flat face, with kerf (mm) offsetting the cutter's path half
+the kerf away from the material. "auto": flat when the part has bends, else profile. Returns the summary,
+the bends, the verification, dxf and png paths. out: write the DXF there too.
+
+| Argument | Type | Required |
+|---|---|---|
+| `project` | string | yes |
+| `kind` | string |  |
+| `options` | object \| null |  |
+| `kerf` | number |  |
+| `rev` | integer \| null |  |
+| `out` | string |  |
+
+### `cut_file_check`
+
+*Read-only.*
+
+Check a DXF before a shop cuts it, or a design's own flat pattern or profile (written to DXF and read
+back). process laser|waterjet|router. Layers are read by intent from their names (cut, bend, etch, ignore;
+an unknown layer is taken as cut and listed). Rules, each with the fabricator page it came from (SendCutSend,
+Protolabs) or marked unsourced: closed contours, duplicate and overlapping lines, crossing contours, tiny
+segments, text not converted to outlines, cut geometry on one layer, units, the smallest hole or slot (per
+process; laser 50 % of t), hole to edge, hole to bend line, inside corner radius (waterjet, router), part
+size (router). options: t (thickness, mm; needed for the rules in multiples of t), units (mm|in, overrides
+the file), material (router size limit). Returns rows, findings with places, and the layers it read.
+
+| Argument | Type | Required |
+|---|---|---|
+| `path` | string |  |
+| `project` | string |  |
+| `process` | string |  |
+| `options` | object \| null |  |
+
+### `bend_order`
+
+Find an order in which a press brake can form every bend of a sheet-metal part, with a stated tool model:
+a V-die of 8 × t (Bystronic's rule, cited), an 88° groove, a gooseneck punch of stated dimensions sectioned to
+the bend's length, the part air-bent and checked at 25, 50, 75 and 100 % of each bend against punch, ram,
+die and bed, turned end for end when that helps. Returns the sequence (or that none exists with these
+tools, or that the search budget ran out), each bend's collisions alone and after all others, the model with
+its dimensions and evidence, and its limits (2D cross-section, no springback, hems need other tools).
+options: punch gooseneck|straight, die_v (mm), and the flat_pattern K-factor options.
+
+| Argument | Type | Required |
+|---|---|---|
+| `project` | string | yes |
+| `options` | object \| null |  |
+| `rev` | integer \| null |  |
+
+### `service_preflight`
+
+*Read-only.*
+
+Check a part against a cutting and bending service's published materials, thicknesses and limits before
+a person sends it: material offered, thickness on the service's list, bending offered at that thickness,
+bend angle, flat size of a bent part, smallest laser hole, and the cut-file rules. Every limit names the page
+and the date it was read; a table read more than 90 days ago says so. Nothing is uploaded and nothing is
+ordered. project (its flat pattern or profile) or path (a DXF; give thickness in mm). service: sendcutsend.
+material: al_5052_h32 or steel_mild (or their names).
+
+| Argument | Type | Required |
+|---|---|---|
+| `project` | string |  |
+| `path` | string |  |
+| `service` | string |  |
+| `material` | string |  |
+| `thickness` | number \| null |  |
+
+### `cam_plan`
+
+Plan the CNC machining of a design on a 3-axis mill or router. Operations come from the part's shape:
+facing, drilling (pecking when deep) and helical boring, adaptive clearing at constant engagement, 2.5D
+finishing of floors and walls, 3D finishing (parallel and waterline, by drop-cutter), chamfering, and the
+outline cut through with tabs. tools: short names ("6mm-flat", "3mm-ball", "6mm-bull-r1", "5mm-drill",
+"6mm-chamfer-90") or {kind: flat|ball|bull|drill|chamfer, d, flutes, flute_l, length, holder_d, holder_l,
+corner_r, angle}; a tool whose flute length or stick-out was not given is "assumed". material: a row of the
+speeds table (aluminum, brass, steel, stainless, acrylic, polycarbonate, ...); speed and feed are
+chip load x flutes x RPM from a cited table, each number marked sourced/computed, specified or assumed.
+options: {machine: {rapid, accel, junction_deviation, max_feed, max_rpm}, stock: {margin_xy, margin_top} or
+{size: [x, y, z]}, setups: "auto" (from the manufacturability check's access analysis) or ["+Z", "-Z", ...],
+origin: corner|center, zero: top|bottom, ops: [{op: face|adaptive|finish|contour|drill|bore|chamfer|raster|
+waterline, tool, stepover, stepdown, feeds: {rpm, feed, plunge}, ...}], feeds: {tool_id: {rpm, feed,
+plunge}} (the person's own numbers: specified), tolerance, chamfer (mm), tabs, cutout}. Returns the setups
+with their operations, speeds and feeds with sources, what is assumed (each blocks a release) and notes.
+A plan is not checked: cam_post writes the G-code and simulates it.
+
+| Argument | Type | Required |
+|---|---|---|
+| `project` | string | yes |
+| `tools` | array \| null |  |
+| `material` | string |  |
+| `options` | object \| null |  |
+| `rev` | integer \| null |  |
+
+### `cam_post`
+
+Write the G-code of the design's CAM plan for a controller, read it back and simulate it from the file.
+machine: grbl, linuxcnc, fanuc (generic), haas or marlin (Marlin with a spindle). units mm or inch; wcs G54
+to G59. Each dialect gets its own modal codes, tool changes (M6 and G43 where the controller has them, a
+pause where it does not), drilling cycles (G81/G83 or written out) and ending. The posted file is parsed as
+that controller reads it, compared with the plan move for move, and run on a stock model with the tools'
+real shapes: gouge (exact distance of the part's surface into the cutter), leftover volume and places,
+rapids through stock, shank and holder collisions, cycle time under the machine's stated limits. Every
+result is "simulated, not proven on a machine". include=true asks for the program to go into the next
+release: that needs a current simulation with no gouge or collision, no assumed tool, speed or feed, and
+the person's approval (request_release). options: plan first with these (as cam_plan). Returns the files,
+the first lines, the simulation and the release status.
+
+| Argument | Type | Required |
+|---|---|---|
+| `project` | string | yes |
+| `machine` | string |  |
+| `units` | string |  |
+| `wcs` | string |  |
+| `include` | boolean \| null |  |
+| `options` | object \| null |  |
+| `line_numbers` | boolean |  |
+
+### `cam_simulate`
+
+Simulate the design's posted CNC program again from its file and say where it stands. The stock is a
+height field (cell: mm, default a quarter of the smallest tool radius, at most 0.25); the tool's real shape
+is swept along the motion parsed from the G-code. Returns per setup: gouge (max mm, where, which
+operation), leftover (volume, max, regions), collisions, removed volume and cycle time per operation, with
+the machine limits used; the file the viewport draws (form-cam-view/1: toolpaths coloured by operation, the
+stock with gouge and leftover marked); and status: current, or stale and why (the design, tools, options,
+speeds table or post changed, or the file was edited). Simulated, not proven on a machine.
+
+| Argument | Type | Required |
+|---|---|---|
+| `project` | string | yes |
+| `cell` | number \| null |  |
+| `force` | boolean |  |
 
 ### `add_text`
 
@@ -959,6 +1173,129 @@ is saved then. preview=True builds and reports. The checks run again on the save
 | `expect_head` | integer \| null |  |
 | `preview` | boolean |  |
 
+### `standard_part`
+
+Standard parts to buy (screws, nuts, washers, inserts, bearings, dowels, collars, shafts, LM bushings, GT2
+pulleys and belts, NEMA motors, V-Slot extrusion and T-nuts, magnets, O-rings), generated from published
+tables: every dimension names its standard and table, or the maker's datasheet. Threads are cosmetic.
+action="search": query such as "m5 socket 12", "608", "lm8uu", "nema 17", "o-ring 010" -> candidates with
+spec and designation (local tables; nothing is sent anywhere). "families": every family, its sizes and
+options. "describe": spec={family, size, ...} -> designation, dimensions with sources, the mating cut, the
+material; step=True also builds it (real CAD, measured on the B-rep), gives its mass with the evidence and
+writes a STEP. "din": query "DIN 912" -> what it is ordered as today.
+On a Python design (project): "snap" (at) -> what is there: a hole (snapped to its axis and opening) or a flat
+face, and the host's thickness. "place" (spec, at, optional normal, depth, qty, cut) -> one action: snaps to
+the hole or face, cuts the matching clearance hole and counterbore, insert pocket, bearing seat, nut trap or
+motor mount into the host as a feature of the source (a new revision), records the part as purchased with
+its designation (in assembly() when the design has one), picks a screw's stock length from the host's
+thickness when none is given, and checks the fit: interference on the B-rep and the clearance per side from
+the tables (computed). "list", "fit", "remove" (part_id like "std_1").
+
+| Argument | Type | Required |
+|---|---|---|
+| `action` | string |  |
+| `query` | string |  |
+| `spec` | object \| null |  |
+| `project` | string |  |
+| `at` | array \| null |  |
+| `normal` | array \| null |  |
+| `depth` | number \| null |  |
+| `qty` | integer |  |
+| `cut` | boolean |  |
+| `snap` | boolean |  |
+| `part_id` | string |  |
+| `step` | boolean |  |
+| `expect_head` | integer \| null |  |
+
+### `bom`
+
+The parts list a buyer orders from: purchased items grouped by standard designation (e.g. "ISO 4762
+M5×12 A2-70") with quantity, material and mass (the maker's catalogue value, else the modelled volume on the
+B-rep times the sourced density, else none), the made parts with their mass (mass_properties), and supplier
+numbers. action="list": format json (default), csv or pdf (a page for the drawing set; returns the path).
+Supplier numbers are taken only from the person or from a page at a link the person gave:
+action="add_supplier" (designation, supplier, part_number, and url: the page the person linked, read with
+fetch_link; or from_person=True when the person typed the number to you) or "remove_supplier"; never make
+one up or look one up unasked. action="catalogue": the optional catalogue
+service (Settings, off by default) - its state, and with query what would be sent and to whom; it searches
+only with confirm=True after the person agreed. No provider ships, so the state says "no provider configured".
+
+| Argument | Type | Required |
+|---|---|---|
+| `project` | string | yes |
+| `action` | string |  |
+| `format` | string |  |
+| `designation` | string |  |
+| `supplier` | string |  |
+| `part_number` | string |  |
+| `url` | string |  |
+| `note` | string |  |
+| `query` | string |  |
+| `confirm` | boolean |  |
+| `from_person` | boolean |  |
+
+### `board_import`
+
+Bring a circuit board in and get an enclosure that is checked against it. file: a KiCad .kicad_pcb (read
+by Form Studio's own parser, no KiCad needed; its .kicad_pro and .kicad_sch are copied with it) or an IDF 3.0
+.emn (with its .emp). Read: outline and holes, thickness, each part's courtyard and the height the footprint
+states, connectors and the board edge they mate through, mounting holes (with the screw that fits), keep-outs.
+Without project: a new design is made around the board, as editable features (shell with corner lugs,
+cavity, standoffs under the mounting holes with heat-set inserts, openings sized from each plug's envelope
+and aligned to its connector's face, a lid printed beside the box with a lip, vents, the inserts and screws
+from the standard-parts tables). With project: the board replaces that design's board and the enclosure is
+kept (regenerate=True makes it again), so board_check says what no longer fits; "changes" lists what moved.
+Heights are never guessed: step= a board STEP KiCad exported (heights measured over each courtyard),
+use_kicad_step=True to have the person's KiCad export it, or heights={"C1": 10.5} from the person; parts
+without one are "not checked". connectors={"J2": {"side": "+x", "plug": [w, h]}} overrides a mating side
+(-x, +x, -y, +y, up) or gives a plug's size.
+
+| Argument | Type | Required |
+|---|---|---|
+| `file` | string | yes |
+| `project` | string |  |
+| `name` | string |  |
+| `step` | string |  |
+| `heights` | object \| null |  |
+| `connectors` | object \| null |  |
+| `regenerate` | boolean |  |
+| `use_kicad_step` | boolean |  |
+| `lid_screw` | number |  |
+| `purpose` | string \| null |  |
+| `expect_head` | integer \| null |  |
+
+### `board_check`
+
+*Read-only.*
+
+Check a design's board and its enclosure. what="fit": the board as it is now against the head revision's
+enclosure, measured on the solids (computed): board to wall gap, a standoff under each mounting hole, each
+connector's plug envelope swept out through its wall, every part of known height against the box and the
+lid as assembled, a screwdriver's way to each board screw. what="board": KiCad's own DRC and ERC through the
+person's kicad-cli (KiCad's report, read as it is; when KiCad is not installed this says so and gives the
+install route, and nothing is run in its place), and the board's track width, spacing, drills, annular
+rings, size and thickness against the published limits of fabs (jlcpcb, pcbway, oshpark; each limit quoted
+with its page and the date it was read). what="all": both. No findings is not a manufacturability approval.
+
+| Argument | Type | Required |
+|---|---|---|
+| `project` | string | yes |
+| `what` | string |  |
+| `fabs` | array \| null |  |
+| `kicad` | boolean |  |
+
+### `board_fab`
+
+Fab files for a design's board through the person's KiCad (kicad-cli): kinds from gerbers, drill, pos
+(pick-and-place), bom (from the schematic beside the board) and step (the board STEP); default all. Written
+under <project>/board/fab/<board hash>/; nothing is uploaded or sent to a fab. Without KiCad only "step" is
+made, from Form Studio's plain board model (slab and part boxes), and said so; the rest name the install route.
+
+| Argument | Type | Required |
+|---|---|---|
+| `project` | string | yes |
+| `kinds` | array \| null |  |
+
 ### `remove_feature`
 
 Remove a feature as a new revision: a standard feature added with add_feature ("boss_1", "hook_1"), or any
@@ -996,11 +1333,17 @@ interface dimension is dropped), building a ladder of values in the kernel, then
 through the real checks and slicer. Also slices lower infill and one wall fewer over the slicer's process. Returns
 the baseline and candidates (id, changes and/or settings, computed mass_g, slicer slice_g, every check before and
 after) and what was rejected and why. Nothing is committed: keep one with apply_lighter.
+require: strength constraints a lighter design must still meet, e.g. ["fea.safety_factor >= 2"], read from the
+design's static strength_study (study="<id>" when it has several): the study is solved on each geometry
+candidate that kept its checks, and one that fails is rejected with its numbers. With a strength requirement
+the print-setting candidates (less infill, fewer walls) are not offered: the study is of a solid part.
 
 | Argument | Type | Required |
 |---|---|---|
 | `project` | string | yes |
 | `builds` | integer |  |
+| `require` | array \| null |  |
+| `study` | string |  |
 
 ### `apply_lighter`
 
@@ -1052,13 +1395,64 @@ Remove lettering added with add_text (mark_id like "text_1"; get_design_source s
 ### `assembly_instructions`
 
 Write assembly instructions. Assembly instructions as a PDF from the design's assembly declaration: a parts page with computed volumes, then
-one page per part going on (in the declaration's parent order, at its explode offset, with arrows). Step text is
+one page per part going on (in the declaration's parent order, at its explode offset, with arrows; after
+assembly_sequence, in the computed order with each arrow along the proved insertion direction). Step text is
 the part's note, or what the declaration says. Returns the PDF path, page images and the steps. A design without
 an assembly() has none.
 
 | Argument | Type | Required |
 |---|---|---|
 | `project` | string | yes |
+| `rev` | integer \| null |  |
+
+### `drawing`
+
+Make the engineering drawing. A shop drawing made from the solid: views by OCCT hidden-line removal (first or third angle, a
+section through the bores, a detail of small features, an isometric), the largest ISO scale that fits the sheet
+(A4-A0, ANSI A-E), dimensions measured on the B-rep and placed without overlaps, an ISO 7200 title block. Each
+size parameter is bound to the dimension it is (proved by a nudged rebuild when prove=True); the report says
+"N of N size parameters dimensioned, 0 twice", what each unshown parameter drives, and each dimension's param
+(change it with commit_change). spec adds what the person states (stored with the design): {"datums": [{"letter":
+"A", "at": selector}], "gdt": [{"type": "flatness"|"position"|..., "value": mm, "datums": [...], "at": selector}],
+"fits": [{"class": "H7", "at": selector}], "surface": [{"ra": 1.6, "at": selector}], "general": "m",
+"holes": "baseline"|"chain", "notes": [...]}; selector: {"feature": id, "normal": [x,y,z]}, {"feature": id,
+"cylinder": true, "d": mm}, {"param": key} or {"face": i}. GD&T is drawn only where declared. Returns the PDF,
+SVG, DXF, PNG previews (paper and night) and the sheet scene (JSON) paths, and the report.
+
+| Argument | Type | Required |
+|---|---|---|
+| `project` | string | yes |
+| `sheet` | string |  |
+| `projection` | string |  |
+| `rev` | integer \| null |  |
+| `spec` | object \| null |  |
+| `prove` | boolean |  |
+
+### `export_pmi`
+
+Export STEP AP242 with PMI. The solid as STEP AP242 with semantic PMI attached to its faces: every dimension of the drawing with its
+tolerance (fits as limits), the datums and the geometric tolerances, written through OCCT's XCAF document. The
+file is read back and each annotation compared with what was written (PASS/FAIL per row, on the same faces).
+
+| Argument | Type | Required |
+|---|---|---|
+| `project` | string | yes |
+| `rev` | integer \| null |  |
+
+### `check_drawing`
+
+Check a drawing against the part. One row per dimension on a person's drawing (PDF, DXF or image): expected value and
+tolerance, the size measured on the B-rep, PASS, FAIL or UNSURE, a crop of the sheet where it is printed and a
+render with the measured feature lit. A PDF text layer and DXF dimensions are read exactly; for an image or a
+scan, read it with read_document and pass rows=[{"text": "Ø8 H7", "box": [x0, y0, x1, y1] (page fractions from
+the top left), "page": 1, "unsure": false}]. Mark a row unsure whenever you are not certain of a digit; never
+guess. The verdict is computed here (ISO 286 classes, written limits, or the sheet's ISO 2768 class).
+
+| Argument | Type | Required |
+|---|---|---|
+| `project` | string | yes |
+| `source` | string | yes |
+| `rows` | array \| null |  |
 | `rev` | integer \| null |  |
 
 ### `checkout_revision`
@@ -1117,6 +1511,11 @@ objective: {"minimize": "solid_mass_g"} or {"maximize": "statics.safety_factor"}
 constraints: ["statics.safety_factor >= 3", "overhang_mm2 <= 1", "derived.usable_depth >= 30", "fit_yield >= 0.9"].
 Metrics: volume_cm3, solid_mass_g, width, depth, height, overhang_mm2, contact_mm2, min_wall_mm, fit_yield,
 derived.<key>, statics.<key>. Nothing is saved: preview_change/render the best, then commit_change.
+A strength study as a constraint: "fea.safety_factor >= 2" (also fea.peak_von_mises_MPa, fea.max_displacement_mm)
+reads the design's static strength_study (study="<id>" when it has several). Each value is a full solve, so
+the search runs first and the study is then solved on its candidates, best first, within 8 solves and 300 s:
+"strength" in the result lists every candidate solved with its numbers and evidence, and only those count as
+feasible. fea.safety_factor is the lower value (stated error applied); not an objective.
 
 | Argument | Type | Required |
 |---|---|---|
@@ -1125,6 +1524,7 @@ derived.<key>, statics.<key>. Nothing is saved: preview_change/render the best, 
 | `objective` | object | yes |
 | `constraints` | array \| null |  |
 | `budget` | integer |  |
+| `study` | string |  |
 
 ### `slice_test_piece`
 
@@ -1137,10 +1537,14 @@ before the whole part. Returns its STL path and simulated time and material.
 
 ### `record_physical_result`
 
-Record what the USER observed after a real print. Never call this with values the user did not report.
+Record what the USER observed after a real print or a real machining run. Never call this with values
+the user did not report.
 kind="fit": result is too_tight | good | too_loose for this revision.
 kind="widths": measured pairs [{"nominal": mm, "measured": mm}] from a coupon (source="coupon") or this part
 (source="part"); they calibrate this printer profile for every future design.
+kind="machined": the posted CNC program was run on a machine; result is good | gouged | collision |
+left_material | scrapped. It belongs to that program (its file hashes); until one is recorded the program
+is labelled "simulated, not proven on a machine".
 
 | Argument | Type | Required |
 |---|---|---|
@@ -1495,6 +1899,84 @@ computed (closed mesh) for a mesh design; a printed part is taken solid (100 % i
 | `frame` | string \| null |  |
 | `rev` | integer \| null |  |
 | `library` | boolean |  |
+
+### `motion_study`
+
+*Read-only.*
+
+Play a mechanism over time and check it along the whole motion. drivers: [{"joint": id, "from": deg|mm,
+"to": ...}] (a ramp over duration_s), or {"joint", "keys": [[t_s, value], ...]}, {"joint", "speed", "start"},
+{"joint", "sine": {"amplitude", "center", "period_s", "phase_deg"}}; "dof": 1 drives a cylindrical joint's slide.
+Default: the first joint no coupling drives, over its range. The design's couplings (gears, rack, lead screw,
+belt, cam) drive their joints, and closed loops (Loop: a four-bar's coupler pinned to its rocker) are solved per
+frame by Newton's method on the loop-closure equations; a frame the linkage cannot reach is reported as not
+closing, never posed. Returns per frame every joint's value, velocity and acceleration; traces ([{"part", "at":
+[x, y, z]}], default the loop pins or the moving parts' centres) with path, velocity and acceleration;
+clearance between every pair moving relative to each other at every frame, with the minimum gap, its time and
+pair, the first contact, and the intervals between frames proven free or only sampled; holding torque on each
+driven joint under gravity (virtual work; needs materials, or assume_material for a labelled what-if).
+video=True also renders an MP4 (ffmpeg; never a GIF). Evidence: computed (kinematics), computed (mesh distance),
+computed (virtual work, quasi-static, gravity only). Stored by geometry key and inputs.
+
+| Argument | Type | Required |
+|---|---|---|
+| `project` | string | yes |
+| `drivers` | array \| null |  |
+| `duration_s` | number |  |
+| `frames` | integer |  |
+| `hold` | object \| null |  |
+| `traces` | array \| null |  |
+| `clearance` | boolean |  |
+| `torque` | boolean |  |
+| `video` | boolean |  |
+| `budget_s` | number |  |
+| `assume_material` | string \| null |  |
+| `gravity` | array \| null |  |
+| `rev` | integer \| null |  |
+
+### `robot_files`
+
+*Read-only.*
+
+Write robot files from the assembly: URDF, SRDF and MJCF (MuJoCo) with one link per part, joints from the
+declared joints with their limits (hinge revolute or continuous, slide prismatic; cylindrical and ball split in
+URDF, native in MJCF), couplings as mimic and equality joints, loops as MJCF equality connects (URDF is a tree:
+listed), inertia per link from the B-rep mass properties (mass, centre of mass and tensor in the link frame,
+the part's sourced density), visual STL per link and collision as CoACD convex pieces when installed, else a
+convex hull (collision="hull" | "box" | "coacd"). limits: {joint: {"effort", "velocity"}} (else 0, flagged).
+SRDF disables Adjacent, Default (joined by design or touching at rest) and Never pairs (no contact at `samples`
+random poses within limits: sampled, not proven). Health checks: positive-definite inertia, triangle
+inequality, mesh paths, unit joint axes, one tree, no self-collision at the zero pose. The files are then loaded
+by yourdfpy or urdfpy and MuJoCo where installed (here or the robot.mujoco engine; the MJCF also stepped 1 s,
+simulated), else validated structurally, and the result says which. Returns the file paths, checks and
+validation.
+
+| Argument | Type | Required |
+|---|---|---|
+| `project` | string | yes |
+| `collision` | string |  |
+| `assume_material` | string \| null |  |
+| `limits` | object \| null |  |
+| `samples` | integer |  |
+| `rev` | integer \| null |  |
+
+### `assembly_sequence`
+
+*Read-only.*
+
+Compute an order the parts can go together in, and each part's insertion direction: by disassembly, taking
+out one part at a time that can leave on a straight line (local freedom from the contact normals, then a
+collision sweep until it is clear); the assembly order is the reverse. Threads unscrew along their Mate axis,
+snaps deflect, press fits push. Smallest parts are tried first. The exploded view and assembly_instructions then
+follow it (each part along its own free direction; the arrows are the proved directions). A set that cannot
+come apart one at a time is reported, never ordered by guess. Evidence: computed (geometric feasibility); the
+limits (no gravity, fixtures, tool access or flexible parts) come with every result.
+
+| Argument | Type | Required |
+|---|---|---|
+| `project` | string | yes |
+| `budget_s` | number |  |
+| `rev` | integer \| null |  |
 
 ### `analyze_selection`
 
@@ -2077,6 +2559,118 @@ stored numbers, and the log of its runs. Reads only.
 |---|---|---|
 | `project` | string | yes |
 | `id` | string | yes |
+
+### `strength_study`
+
+Run a strength study on the design: will it hold? Finite elements on the B-rep (quadratic tetrahedra, Netgen
+mesh), refined until the answer stops changing, with the discretisation error stated. kind: "static" (stress,
+displacement, safety factor against the material's yield), "modal" (natural frequencies; no supports = free
+body; loads ignored), "buckling" (the factor on the loads at which it buckles), "thermal" (steady heat conduction:
+temperatures and the heat through the part) or "thermal_stress" (the stress from that temperature field, with
+any loads; reference_C is the temperature at which the part is stress free).
+thermal: [{"type": "temperature", "faces": [...], "value_C": 80}, {"type": "convection", "faces": [...],
+"h_W_m2K": 10, "ambient_C": 20}, {"type": "heat", "faces": [...], "value_W": 5}, {"type": "heat_flux", "faces":
+[...], "value_W_m2": 2000}]; a face with none is insulated. A heat study needs the material's conductivity
+("k_W_mK"), thermal stress also its expansion ("cte_per_K").
+Faces are picked as points on the part, [x, y, z] in design millimetres, each part as printed (as for
+analyze_selection, which shows the face a point lands on).
+fixtures: [{"type": "fixed" | "roller" | "pin" | "hold", "faces": [[x, y, z], ...]}]. fixed: no movement. roller: slides
+in the face, cannot leave it (a symmetry plane). pin: a cylindrical face that may turn about its axis. hold:
+no movement along "directions": [[x, y, z], ...], free in the others.
+loads: [{"type": "force", "faces": [...], "vector": [Fx, Fy, Fz]}] newtons, spread over the faces (or
+"magnitude" and "direction"); {"type": "pressure", "faces": [...], "value_MPa": p}; {"type": "preload",
+"faces": [under the head], "faces_b": [under the nut], "force_N": N} a bolt's clamping force as a modelled
+connector; {"type": "gravity", "g": 1, "direction": [0, 0, -1]}.
+material: a key of the materials library ("AL-6061", "PETG": E, Poisson's ratio, yield and density with their
+sources), or values with where they are from: {"name", "E_GPa", "poisson", "yield_MPa", "density_kg_m3",
+"source"}; left out: the design's material (set_appearance). materials: {part id: material} for several parts,
+which are solved assembled and bonded where they touch. Nothing is assumed: without E or Poisson's ratio the
+study is refused; without a yield strength there is no safety factor.
+mesh: optional {"h0" start size mm, "levels_max", "dof_max", "budget_s", "tol_stress" 0.05, "tol_disp" 0.01,
+"singular_radius" mm}. The study is saved in the project and runs in the background: read it with
+get_strength_study(project, study, wait_s). study="<id>" alone runs a saved study again (after a change it is
+stale); with a definition it replaces that study; remove=True deletes it. No arguments but project: the
+design's studies with their states. Evidence class: simulated (FEA, <kind>, converged to N %), or "not
+converged", which gives no safety factor. Stress at a sharp inside corner is named as singular and left out.
+Linear elastic, small strain; a printed part is solved solid and isotropic. Needs the optional strength engine
+(setup_status); without it nothing is computed and the call says so.
+
+| Argument | Type | Required |
+|---|---|---|
+| `project` | string | yes |
+| `kind` | string |  |
+| `fixtures` | array \| null |  |
+| `loads` | array \| null |  |
+| `material` | string \| object \| null |  |
+| `materials` | object \| null |  |
+| `modes` | integer \| null |  |
+| `mesh` | object \| null |  |
+| `name` | string |  |
+| `study` | string |  |
+| `run_now` | boolean |  |
+| `force` | boolean |  |
+| `remove` | boolean |  |
+| `thermal` | array \| null |  |
+| `reference_C` | number |  |
+
+### `get_strength_study`
+
+*Read-only.*
+
+Read a strength study: its state (never, running with progress, current, stale with the revision the
+stored result describes, failed with why), and the result. Waits up to wait_s seconds for a running study.
+The result gives the headline, the evidence class, the safety factor with its lower value under the stated
+error and the source of the strength it is against, peak von Mises stress and where, largest displacement,
+natural frequencies or the buckling load factor, the discretisation error, every singularity that was left
+out (where, why, how the stress there grew with refinement), the balance of reactions and loads, the mesh, the
+material's numbers with their sources and the assumptions. converged=false means the tolerance was not
+reached: the numbers are reported with why, and no safety factor is given. full=True adds every refinement
+level's record. field_file is the path of the field data for a viewer (per-vertex displacement, von Mises
+stress and safety factor on the surface mesh; docs/STRENGTH.md); field=True returns it inline (large).
+cancel=True stops a running study; nothing is stored for a cancelled run.
+
+| Argument | Type | Required |
+|---|---|---|
+| `project` | string | yes |
+| `study` | string | yes |
+| `wait_s` | number |  |
+| `full` | boolean |  |
+| `field` | boolean |  |
+| `cancel` | boolean |  |
+
+### `calculate`
+
+Size a part from requirements with a standard's equations, and write it as a design. calculator: "snapfit"
+(cantilever or annular snap joints by permissible strain; Bayer's snap-fit guide), "hinge" (living hinge:
+elastic by strain, or moulded PP/PE from cited practice), "spring" (compression, extension, torsion; EN
+13906-1/-2/-3, with a printed-spring mode), "fastener" (screw size from the load, preload, tightening torque,
+thread stripping, or a boss with a heat-set insert; VDI 2230 Part 1 simplified), "gear" (involute spur and
+helical pairs with profile shift, internal pairs, rack and pinion; contact ratio, backlash, Lewis bending),
+"cam" (plate cam from a motion law; pressure angle, undercut), "fit" (an ISO 286 fit over a temperature span
+from the materials' sourced expansion). No calculator: the list, with every input and its unit.
+inputs: plain numbers and words in mm, N, N·mm, degrees, MPa, °C; materials are keys of the materials library
+(mass_properties library=True lists them). The result is a sheet: values (each with unit, evidence = computed,
+specified or assumed, its equation and its source), checks (PASS, WARN, FAIL with why), equations (text and
+source), sources (title, url), caveats, and not_computed (what was left out because an input has no source,
+and what to give). Nothing is assumed silently: a missing material value leaves its result out.
+build=True writes the geometry as a new design with a parameter per sized dimension (name= names it); every
+later revision runs the calculation again on its values. project= with at=[x, y, z] and normal=[x, y, z] puts
+a snap hook or an insert boss on that face of an existing design instead. project= alone (no calculator):
+the sheet of a design a calculator wrote, for its head revision. fea=True with build=True also defines a
+strength study that checks a cantilever hook's deflection by finite elements (needs the strength engine).
+
+| Argument | Type | Required |
+|---|---|---|
+| `calculator` | string |  |
+| `inputs` | object \| null |  |
+| `build` | boolean |  |
+| `name` | string |  |
+| `project` | string |  |
+| `at` | array \| null |  |
+| `normal` | array \| null |  |
+| `expect_head` | integer \| null |  |
+| `purpose` | string \| null |  |
+| `fea` | boolean |  |
 
 ## Prompts
 

@@ -25,3 +25,10 @@ engagement; `joint.hardware(qty, after=...)` and `parts.bearing("608").bom()` gi
 and a computed mass. Lead screws (`trapezoidal_thread`), bottle caps (`bottle_thread`), sprockets and chain
 (`sprocket`, `chain_drive`) and stock pipe (`pipe_socket`) come from published standards too. Exemplars:
 `lead_screw_axis`, `chain_drive`, `bottle_pipe_adapter`.
+
+On a design that already exists, `standard_part` does it in one action: `standard_part(action="search", query="m3
+socket")` finds the part in the standards' tables, and `standard_part(action="place", project=..., spec=...,
+at=[x, y, z])` snaps to the hole or face at that point, cuts the matching hole, counterbore, pocket or seat as a
+feature of the source, records the part as purchased and checks its fit on the B-rep. `bom(project)` is the parts list
+by designation with quantity, material and mass; add a supplier's part number only when the person gives it, or from a
+page at a link they gave (`bom(action="add_supplier", url=...)`).

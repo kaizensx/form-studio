@@ -37,6 +37,7 @@ PAGES = [
     ("cli", "docs/CLI.md", "Command line", "Every form command, with its arguments."),
     ("mcp", "docs/MCP.md", "MCP tools", "Every tool an agent can call, generated from the server itself."),
     ("architecture", "docs/ARCHITECTURE.md", "Architecture", "The engine, the kernel worker, adapters, staleness and the fit model."),
+    ("strength", "docs/STRENGTH.md", "Strength studies", "Stress, displacement and a safety factor with a stated error, and the verification table."),
     ("verification", "docs/VERIFICATION.md", "Compatibility", "Platforms, agents, programs and slicers, and what CI exercises."),
     ("changelog", "CHANGELOG.md", "Changelog", "What changed in each version."),
     ("releasing", "docs/RELEASING.md", "Releases", "Stable, preview and patch releases, and how versions are numbered."),

@@ -29,6 +29,15 @@ datas = [(str(ROOT / "form" / "app" / "qml"), "form/app/qml"),
          (str(ROOT / "form" / "partdesign_fc.py"), "form")]
 # the game pipeline as files too (form/game): its runner path is resolved from them on disk
 datas += [(str(p), "form/game") for p in sorted((ROOT / "form" / "game").glob("*.py"))]
+# tables read as TOML at run time: manufacturability (form/dfm/rules), sheet metal (form/sheet), CAM (form/cam)
+datas += [(str(ROOT / "form" / "dfm" / "rules"), "form/dfm/rules"),
+          (str(ROOT / "form" / "sheet" / "rules"), "form/sheet/rules"),
+          (str(ROOT / "form" / "sheet" / "tables"), "form/sheet/tables"),
+          (str(ROOT / "form" / "sheet" / "services"), "form/sheet/services"),
+          # CAM's speeds and feeds table with its sources (form/cam/feeds.py)
+          (str(ROOT / "form" / "cam" / "feeds.toml"), "form/cam"),
+          # the API names the design preflight checks against (form/preflight.py; scripts/gen_preflight_api.py)
+          (str(ROOT / "form" / "preflight_api.json"), "form")]
 binaries, hidden = [], []
 for pkg in ("OCP", "build123d", "ocp_gordon", "ocpsvg", "lib3mf", "mcp", "pypdfium2", "pypdfium2_raw",
             "bd_warehouse", "bd_materials", "py_gearworks", "manifold3d"):   # parts libraries, materials, mesh booleans
@@ -59,18 +68,26 @@ for sub in ("", "vendor"):
 ENGINE_SRC += [(ROOT / "form" / "recon" / "cadfit" / n, "engine_src/form/recon/cadfit") for n in ("LICENSE", "PERMISSION.md")]
 # CoACD (game collision, form/engines.py "game.coacd") runs `python -m form.game.lod coacd ...` in its environment
 ENGINE_SRC += [(p, "engine_src/form/game") for p in sorted((ROOT / "form" / "game").glob("*.py"))]
+# Strength studies (form/engines.py "fea") run `python -m form.fea.run <job>` in their environment
+ENGINE_SRC += [(p, "engine_src/form/fea") for p in sorted((ROOT / "form" / "fea").glob("*.py"))]
+# The MuJoCo check for robot files (form/engines.py "robot.mujoco") runs `python -m form.robot validate ...` there
+ENGINE_SRC += [(ROOT / "form" / "robot.py", "engine_src/form")]
 datas += [(str(p), dest) for p, dest in ENGINE_SRC]
 # Inside the app itself, CADFit's search code and trimesh (which only that code imports) stay out: the search runs in
 # its own environment. Its reader (cqrun) and _compat stay in: the app reads the program CADFit sends back.
 CADFIT_ONLY = ("form.recon.cadfit.vendor", "form.recon.cadfit.driver")
-hidden += [m for m in collect_submodules("form") if not m.startswith(CADFIT_ONLY)]
+# The same for the strength solver: core, mesh, solve, verify and run import Netgen, scikit-fem and PyAMG, which only
+# the FEA engine's environment has; the app keeps the definition, storage, tools and CLI side of form/fea.
+FEA_ONLY = ("form.fea.core", "form.fea.mesh", "form.fea.solve", "form.fea.verify", "form.fea.run")
+hidden += [m for m in collect_submodules("form") if not m.startswith(CADFIT_ONLY + FEA_ONLY)]
 datas += collect_data_files("form", include_py_files=False)
 # exemplar designs are read as source text by design_examples, so they ship as files too
 datas += [(str(p), "form/exemplars") for p in (ROOT / "form" / "exemplars").glob("*.py") if not p.name.startswith("_")]
 datas += [(str(ROOT / "form" / "exemplars" / "LICENSE-CADEvolve"), "form/exemplars")]   # ported exemplars carry their licence
 
 # Qt modules the interface does not use; leaving them out halves the download
-EXCLUDE = ["PySide6.QtWebEngineCore", "PySide6.QtWebEngineWidgets", "PySide6.QtWebEngineQuick", "PySide6.QtPdf", "PySide6.QtPdfWidgets",
+# (QtPdf stays: the drawing check reads a person's PDF drawing with it, form/drawing/qtpaint.py)
+EXCLUDE = ["PySide6.QtWebEngineCore", "PySide6.QtWebEngineWidgets", "PySide6.QtWebEngineQuick", "PySide6.QtPdfWidgets",
            "PySide6.QtCharts", "PySide6.QtDataVisualization", "PySide6.QtGraphs", "PySide6.QtMultimedia", "PySide6.QtMultimediaWidgets",
            "PySide6.QtBluetooth", "PySide6.QtNfc", "PySide6.QtSensors", "PySide6.QtSerialPort", "PySide6.QtPositioning", "PySide6.QtLocation",
            "PySide6.QtWebSockets", "PySide6.QtWebChannel", "PySide6.QtRemoteObjects", "PySide6.QtScxml", "PySide6.QtSql", "PySide6.QtTest",

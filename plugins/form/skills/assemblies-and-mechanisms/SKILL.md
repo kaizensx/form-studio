@@ -5,7 +5,7 @@ description: Design multi-part FORM assemblies and moving parts — hinges, slid
 
 # Assemblies and mechanisms
 
-FORM tools: `design_guide()`, `create_design()`, `update_design()`, `render()`, `animate()`, `explore_alternatives()`,
+FORM tools: `design_guide()`, `create_design()`, `update_design()`, `render()`, `animate()`, `explore_alternatives()`, `calculate()`,
 `slice_test_piece()`.
 
 Read `references/mechanisms.md` (the same text as `design_guide(topic="mechanisms")`): the form.craft helpers for
@@ -17,6 +17,11 @@ Modelling
 - Define motion first: travel, range of angle, speed, load, ratio. Then shafts, bearing surfaces, axial retention,
   backlash convention and fastener access.
 - Print the smallest mechanism first (one hinge knuckle, one gear pair) before the full assembly.
+- Size it before you draw it: `calculate` runs a standard's equations for a snap fit, a living hinge, a spring, a
+  bolted joint, a gear pair, a cam or a fit at temperature (`calculate()` lists them with every input). Each number
+  comes back as computed, specified or assumed with its source; report those words as they are. `not_computed` names
+  what a missing material value left out: ask for it or say it is missing, never fill it in. `build=True` writes the
+  part as a design; `project=` with `at=` and `normal=` puts a snap hook or an insert boss on a face.
 
 Declaring the assembly (`design_guide()`, section ASSEMBLIES)
 - Parts form a tree. Give every part at most one parent: a part with `attach="arm"` for a part fixed to another (a bolt,
@@ -38,9 +43,17 @@ Motion: be exact about what was evaluated
 - The checks run in a time budget (`[assembly].budget_s`, or `budget_s` on the Assembly). A partial row says which range
   was checked ("checked -60 to 15°, not beyond"); never report the unchecked part as clear.
 - `animate(kind="morph", from_rev=..., to_rev=...)` builds every in-between revision for real; it shows a design change,
-  not a mechanism moving.
+  not a mechanism moving. `animate(kind="motion")` and `motion_study(video=True)` film the mechanism moving (MP4).
+- Linkages, gears and cams: declare `loops=[Loop(...)]` and `couplings=[gears(...), rack(...), cam(...)]`, then
+  `motion_study`: loops are solved per frame (frames the linkage cannot reach are reported, never posed), clearance is
+  checked at every frame with the minimum gap and when it happens, and holding torque under gravity comes from the
+  parts' masses. Quote the evidence classes it gives (kinematics, mesh distance, virtual work).
+- `robot_files` writes URDF, SRDF and MJCF with inertia from the B-rep; give every part a material first. Report which
+  parser loaded the files (yourdfpy, MuJoCo) or that they were validated structurally only.
 
 Documentation
 - Parts list: printed bodies with material and orientation; purchased parts with standard and size (no invented SKUs).
-- Assembly steps in order, with tool access and the removal or service path.
+- Assembly steps in order, with tool access and the removal or service path. `assembly_sequence` computes a feasible
+  order and each part's insertion direction (geometric feasibility only: say so); the exploded view and
+  `assembly_instructions` then follow it. A set it cannot take apart one at a time is reported: do not invent an order.
 - `render(view="sheet")` of the assembled layout; describe an exploded order in words if no exploded model exists.

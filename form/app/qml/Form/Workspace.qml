@@ -522,7 +522,7 @@ Item {
                     value: Store.explode; onMoved: function (v) { Store.setExplode(v) } }
                 Repeater { model: Store.assembly && Store.asmMode !== "print" ? Store.assembly.joints.filter(function (j) { return j.kind !== "fixed" }) : []
                     HudSlider { required property var modelData
-                        label: modelData.label; unit: modelData.kind === "hinge" ? "°" : " mm"
+                        label: modelData.label; unit: modelData.kind === "slide" ? " mm" : "°"
                         objectName: "jointSlider_" + modelData.id
                         from: modelData.range[0]; to: modelData.range[1]; step: modelData.step > 0 ? modelData.step : 1; base: 0
                         value: Store.pose[modelData.id] || 0

@@ -1,0 +1,61 @@
+# Metal laser powder bed fusion (DMLS, SLM, LPBF). Read on 2026-11-28.
+
+[process]
+id = "lpbf"
+label = "Metal printing (LPBF)"
+evidence = "computed (B-rep)"
+options = ["up", "machine", "alloy"]
+needs = []
+machine_note = "Protolabs DMLS, normal resolution (the source's table)"
+machine = [245.0, 245.0, 330.0]
+not_judged = "Residual stress, distortion, support removal access, heat treatment and machining allowance are not judged."
+
+[[source]]
+id = "protolabs-dmls"
+title = "Designing for Metal 3D Printing (DMLS design guide)"
+publisher = "Protolabs"
+url = "https://www.protolabs.com/media/bn1dvyuy/pl_3dp_dmls_design_guide_en.pdf"
+published = "undated (file metadata 2021)"
+read = "2026-11-28"
+
+[[rule]]
+id = "lpbf.wall"
+title = "Walls of 1 mm or more"
+measure = "wall_min_mm"
+op = ">="
+warn = 1.0
+fail = 0.381
+unit = "mm"
+source = "protolabs-dmls"
+quote = "Walls under 0.040 in. (1 mm) have a high risk for build defects; minimum feature size 0.015 in. (0.381 mm) at normal resolution."
+fix = "thicken"
+
+[[rule]]
+id = "lpbf.overhang"
+title = "Self-supporting surfaces at least 45° from the plate"
+measure = "overhang_from_level_deg"
+op = ">="
+fail = { default = 45.0, "316l" = 55.0, cunisicr = 55.0 }
+by = "alloy"
+unit = "° from the build plate"
+source = "protolabs-dmls"
+quote = "Angle self-supported features no less than 45 degrees from the build plate; 55 degrees for 316L stainless steel and copper CuNi2SiCr."
+
+[[rule]]
+id = "lpbf.trapped"
+title = "No closed hollow"
+measure = "trapped_voids"
+op = "<="
+fail = 0
+unit = "voids"
+source = "computed"
+why = "A closed void keeps its unfused powder. No escape hole size was found in a source for this process, so no hole is proposed."
+
+[[rule]]
+id = "lpbf.size"
+title = "Fits the machine"
+measure = "fits_machine"
+op = "fits"
+unit = "mm"
+source = "protolabs-dmls"
+quote = "Maximum dimensions, normal resolution: 9.6 × 9.6 × 13.0 in. (245 × 245 × 330 mm)."

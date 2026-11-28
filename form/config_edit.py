@@ -43,8 +43,8 @@ SCHEMA: dict[str, dict] = {
                       "help": "false: CAD-Recode is never asked, also when it is installed (non-commercial licence)."},
     **{"use." + k: {"type": "bool", "tab": "software", "hidden": True, "label": "Use " + n,
                     "help": "false: " + n + " is never called, also when it is installed."}
-       for k, n in (("coacd", "CoACD"), ("corpus", "the CADEvolve corpus"), ("blender", "Blender"), ("freecad", "FreeCAD"),
-                    ("openscad", "OpenSCAD"), ("bambu", "Bambu Studio"), ("orca", "OrcaSlicer"), ("prusa", "PrusaSlicer"),
+       for k, n in (("coacd", "CoACD"), ("mujoco", "MuJoCo"), ("corpus", "the CADEvolve corpus"), ("blender", "Blender"), ("freecad", "FreeCAD"),
+                    ("openscad", "OpenSCAD"), ("kicad", "KiCad"), ("bambu", "Bambu Studio"), ("orca", "OrcaSlicer"), ("prusa", "PrusaSlicer"),
                     ("superslicer", "SuperSlicer"), ("qidi", "QIDISlicer"), ("elegoo", "ElegooSlicer"),
                     ("snapmaker", "Snapmaker Orca"))},
     "refine.enabled": {"type": "bool", "tab": "general", "label": "Refine every design after it builds",
@@ -58,6 +58,13 @@ SCHEMA: dict[str, dict] = {
     "data.dir": {"type": "path", "tab": "general", "label": "Project folder", "restart": True,
                  "help": "Where designs, their history and releases are kept. Takes effect when Form Studio restarts; "
                          "existing projects are not moved."},
+    "parts.catalogue": {"type": "bool", "tab": "general", "label": "Supplier catalogue service (parts list)",
+                        "help": "Off by default. On: the parts list can search a supplier catalogue for part numbers; before "
+                                "each search it shows what is sent (the designation only) and to whom, and waits for you. "
+                                "No provider is configured yet, so nothing is sent; supplier numbers come from you or a "
+                                "link you give."},
+    "parts.catalogue_provider": {"type": "str", "tab": "general", "hidden": True, "label": "Catalogue provider",
+                                 "help": "The provider id (form/bom.py PROVIDERS). Empty: none."},
     "updates.check": {"type": "bool", "tab": "updates", "label": "Check for a newer Form Studio once a day",
                       "help": "Reads public release information from GitHub. Nothing is downloaded or installed."},
     "updates.channel": {"type": "choice", "tab": "updates", "label": "Update channel", "choices": ["stable", "preview"],
@@ -125,6 +132,9 @@ SCHEMA: dict[str, dict] = {
                      "help": "Optional. Empty: found in the usual places."},
     "cad.freecad": {"type": "path", "tab": "apps", "label": "FreeCAD (FreeCADCmd)", "unlocks": "“Open in FreeCAD” and a re-import check of each STEP",
                     "help": "Optional. Empty: found in the usual places."},
+    "cad.kicad_cli": {"type": "path", "tab": "apps", "label": "KiCad (kicad-cli)",
+                      "unlocks": "KiCad's own DRC and ERC on a design's board, and its Gerbers, drill files and board STEP",
+                      "help": "Optional. Empty: found in the usual places."},
     "apps.cad": {"type": "str", "tab": "apps", "label": "“Open in CAD” uses", "help": "An application name or a command. Empty: the system default."},
     "apps.viewer": {"type": "str", "tab": "apps", "label": "“Open in viewer” uses", "help": "Empty: the system default."},
 }
@@ -398,6 +408,8 @@ def _detect(cfg: dict) -> dict:
         from . import cad_bridges
         out["cad.openscad"] = short(cad_bridges.find_openscad(cfg) or "")
         out["cad.freecad"] = short(cad_bridges.find_freecad(cfg) or "")
+        from .board import kicad_cli
+        out["cad.kicad_cli"] = short(kicad_cli.find(cfg) or "")
     except Exception:
         pass
     try:

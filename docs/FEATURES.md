@@ -11,6 +11,8 @@ as an MCP tool ([MCP reference](MCP.md)), unless noted. 3D printing is optional 
 - [Optimisation and alternatives](#optimisation-and-alternatives)
 - [Parts you already have](#parts-you-already-have)
 - [Checks and evidence](#checks-and-evidence)
+- [Strength studies](#strength-studies)
+- [Engineering calculators](#engineering-calculators)
 - [Analysis, measurement and annotations](#analysis-measurement-and-annotations)
 - [Revisions, branches and variants](#revisions-branches-and-variants)
 - [Colours and materials](#colours-and-materials)
@@ -259,6 +261,21 @@ each one named as it arrives.
 - **Assembly instructions as a PDF.** A parts page with each part's computed volume, then one page per part in the
   order the assembly attaches them, at its exploded offset with an arrow to where it seats. `form instructions`; MCP
   `assembly_instructions`.
+- **Cylindrical and ball joints, couplings and closed loops.** `cylindrical(...)`, `ball(...)`; `gears`, `rack`,
+  `lead_screw`, `cam` or any `Coupling(driver, follower, ratio, offset)`; `Loop(a, b, at, axis)` closes a linkage.
+- **Motion studies.** Drivers over time (ramp, keyframes, speed, sine), couplings applied and loops solved per frame
+  by Newton's method on the loop-closure equations; frames a linkage cannot reach are listed, near-dead points flagged.
+  Traces of points with path, velocity and acceleration; joints with theirs. Clearance between every pair moving
+  relative to each other at every frame (smallest gap, when, the first contact; intervals between frames proven free
+  or sampled only). Holding torque under gravity per driven joint, by virtual work on the parts' masses. An MP4 of the
+  motion. `form motion`; MCP `motion_study`, `animate(kind="motion")`.
+- **Robot files.** URDF, SRDF and MJCF with a link per part, inertia from the B-rep (mass, centre and tensor in the
+  link frame), visual STL and collision (CoACD or convex hulls), health checks, and loading by yourdfpy and MuJoCo
+  when installed (the MJCF also stepped for a second, simulated), else structural validation, stated. `form urdf`,
+  `form mjcf`; MCP `robot_files`.
+- **Assembly sequence.** An order the parts can go together in and each part's insertion direction, from contact
+  normals and a collision sweep (geometric feasibility, limits stated). The exploded view and the instructions follow
+  it. `form sequence`; MCP `assembly_sequence`.
 
 | | |
 |---|---|
@@ -288,6 +305,52 @@ each one named as it arrives.
   where it broke. `form replace`; MCP `replace_part_guide`.
 - **Meshes stay honest.** An STL, 3MF or OpenSCAD mesh brought into the kernel keeps every triangle as a face. Volume,
   wall thickness and exports work on it; it is never written to STEP or called a CAD solid.
+
+## Standard parts and the parts list
+
+- **A library generated from the standards' tables.** Socket head cap screws (ISO 4762, and DIN 912 ordered as its
+  successor), button heads (ISO 7380-1), countersunk screws (ISO 10642), hex nuts (ISO 4032), washers (ISO 7089),
+  brass heat-set inserts (CNC Kitchen datasheet), deep-groove ball bearings 60x, 62x, 6xx and 608 (ISO 15), dowel pins
+  (ISO 8734), shaft collars (DIN 705 A), ground shafts and LM6/8/10/12UU bushings (THK catalogue), GT2 pulleys and
+  belts, NEMA 17 and 23 motors (NEMA ICS 16 envelope), V-Slot 2020 and 2040 extrusion with T-nuts (OpenBuilds), NdFeB
+  disc magnets with their grade (N35 to N52), and O-rings (ISO 3601-1) with their gland. Every dimension names its
+  table; a size that is not in a table is refused, and a value no source gives is marked assumed. Every part is real
+  CAD; threads are cosmetic and say so. Designations are the ones a buyer orders by ("ISO 4762 M5×12 A2-70").
+  MCP `standard_part`, `form parts`.
+- **Pick a hole or a face, and the part is placed in one action.** A point on a hole's wall snaps to the hole's axis
+  and opening; a point on a flat face to the face. The host's thickness there picks the cut depth and a screw's stock
+  length. The matching clearance hole and counterbore (ISO 273), insert pocket, nut trap, bearing seat, housing bore,
+  magnet pocket, gland or motor mount is cut into the design as a feature of its source (a new revision, built in the
+  kernel), and the part enters the assembly as purchased. The fit is checked on the B-rep: the part as fitted is
+  intersected with the cut host (a clearance part must not touch it; an insert or press-fit pin must grip), and the
+  clearance per side is computed from the two tables. In the app: select a point, **Part here…**, or Bench › Standard
+  parts.
+- **A parts list a buyer can order from.** Purchased items grouped by designation with quantity, material and mass
+  (the maker's catalogue value when it gives one, else the modelled volume on the B-rep times the sourced density,
+  else none), and the made parts with their mass (mass properties). CSV and a PDF page for the drawing set. Bench ›
+  Parts list; MCP `bom`; `form bom`.
+- **Supplier numbers only from you.** A part number is recorded only when you type it, or from a page at a link you
+  give, stamped with who added it, the link and the date; none is ever generated. An optional catalogue service is in
+  Settings, off by default: before each search it says what is sent (the designation only) and to whom, and waits for
+  you. No provider is configured yet, so nothing is sent.
+
+
+## Boards and enclosures
+
+- **A board read without KiCad.** A KiCad `.kicad_pcb` (KiCad 5 to 9) is read by Form Studio's own parser: outline
+  with its holes and cut-outs, thickness, every footprint's courtyard, side and the height it states, mounting holes
+  with the screw that fits, connectors and the edge they mate through, keep-outs, track widths, drills and annular
+  rings, and the rules in its `.kicad_pro`. IDF 3.0 (`.emn` with `.emp`) too. A board STEP gives measured heights.
+- **An enclosure made around it, as editable features.** Corner lugs clear of the board, standoffs under the mounting
+  holes, an opening for each connector sized from its plug's envelope and centred on its face, a lid with a lip printed
+  beside the box, vents, heat-set inserts and screws from the standard-parts tables in the parts list.
+- **Proved to fit, on the solids.** Board to wall, a standoff under each hole, each plug swept out through its wall,
+  every part of known height under the lid, a screwdriver's way to each board screw. Bring the changed board in and
+  the checks say what no longer lines up, and what moved. Bench › Board and enclosure.
+- **Your own KiCad for the rest.** KiCad's DRC and ERC reported as KiCad's, Gerbers, drill files, pick-and-place, BOM
+  and the board STEP, when kicad-cli is installed (an opt-in engine otherwise). JLCPCB, PCBWay and OSH Park's published
+  limits, quoted with page and date. MCP `board_import`, `board_check`, `board_fab`; `form board`. See
+  [BOARDS.md](BOARDS.md).
 
 
 ## Meshes rebuilt as clean CAD by the agent
@@ -489,6 +552,101 @@ shown as a pass.
 resting in its nut is not a 0 mm wall, and only faces within 30° of parallel count, so a tapered edge is not a wall
 either. A real thin fin still fails.
 
+## Strength studies
+
+"Will it hold?" on any design, with the error stated. Pick the faces that are held and the faces that are loaded;
+the solid is meshed into quadratic tetrahedra, finer on fillets and holes, and solved again and again until the
+answer stops changing. The full method and the verification table are in [STRENGTH.md](STRENGTH.md).
+
+| Study | Result |
+|---|---|
+| Linear static | Safety factor against the material's yield, peak von Mises stress ± its error, largest displacement |
+| Modal | Natural frequencies and mode shapes, held or as a free body |
+| Linear buckling | The factor on the loads at which the perfect elastic part buckles |
+| Steady heat | Temperature range, the heat through each condition, the heat balance |
+| Thermal stress | The static result of a temperature field, with any loads |
+
+- **Supports and loads on picked faces:** fixed, roller, pin and hold; force, pressure, a bolt's preload and gravity;
+  temperature, convection and heat for thermal studies. A
+  design of several parts is solved assembled, bonded where the parts touch, with a material for each.
+- **Evidence:** `simulated (FEA, linear static, converged to 1.1 %)`. The convergence of every refinement is kept,
+  the reactions are balanced against the loads, and a study that does not converge says so and gives no safety
+  factor.
+- **Singularities are named.** Stress at a sharp inside corner, or at the edge of a rigid support where it keeps
+  growing, is listed with its location and growth and left out of the verdict.
+- **Sourced materials.** Young's modulus, Poisson's ratio, yield and density come with their documents; nothing is
+  defaulted.
+- **Verified.** Sixteen cases, each quantity within its tolerance: beams, a plate with a hole, a thick cylinder,
+  NAFEMS LE1 and LE10, frequencies, Euler buckling, heat through a wall and a pipe, thermal stress.
+- **Curved elements.** Mid-side nodes lie on the geometry, so fillets and bores are curved in the model.
+- **A hand estimate** from beam theory sits beside the result where the part is a bar fixed at one end.
+- **As a constraint:** `optimize` and `make_lighter` keep `fea.safety_factor >= 2` on candidates they solve, and say
+  which ones those were.
+- **Stored with the revision.** A result goes stale after any change to the geometry, the loads, the material or
+  the engine, and says which revision it describes.
+- **Headless:** `strength_study`, `get_strength_study`; `form strength
+  static|modal|buckling|thermal|thermal_stress|run|list|show|verify`. Runs in the background with progress and
+  cancel; a typical bracket converges in about 10 s.
+- **Optional engine:** Netgen, scikit-fem, SciPy and PyAMG in a Python of their own (about 190 MB), installed from
+  Settings.
+
+## Engineering calculators
+
+A part sized from what it has to do, by a named standard's equations, and written as a design with parameters. The
+equations, the sources and the verification table are in [CALCULATORS.md](CALCULATORS.md).
+
+| Calculator | Sizes | Follows |
+|---|---|---|
+| Snap joint | Cantilever hooks (three arm designs) and annular snaps by permissible strain; deflection, mating and separation force | Bayer, *Snap-Fit Joints for Plastics* |
+| Living hinge | Elastic by strain for printed parts; moulded polypropylene and polyethylene from cited practice | Pure bending; Protolabs and moulders' guides |
+| Spring | Compression, extension and torsion: rate, corrected stress, solid length, buckling, natural frequency; a printed-spring mode | EN 13906-1, -2, -3 |
+| Bolted joint | Screw size from the load, preload, tightening torque, working stress, thread stripping; a boss with a heat-set insert | VDI 2230 Part 1 (simplified), ISO 898-1 |
+| Gears | Spur and helical pairs with profile shift, internal pairs, rack and pinion: contact ratio, undercut, backlash, bending | ISO 21771; Lewis bending |
+| Cam | A plate cam from a motion law: velocity and acceleration peaks, pressure angle, undercut | Norton, *Design of Machinery* |
+| Fit at temperature | An ISO 286 fit's clearance or interference over a temperature span | ISO 286, ISO 1, sourced expansion |
+
+- **Every number says how it is known:** computed (with its equation), specified (with its source) or assumed (with
+  why). A material value with no source is not guessed: the result that needs it is left out, and the sheet says what
+  to give.
+- **It writes the part.** One parameter per sized dimension, one feature per solid step. A snap hook or an insert
+  boss can also go onto a face of another design.
+- **The calculation stays with the design.** Every revision runs it again on its own values, so a dragged dimension
+  changes the verdict. The Bench entry *Engineering calculation* shows it.
+- **Verified.** 72 quantities from published worked examples and reference tables, each within its accepted error;
+  the solids are measured against their sheets, a gear's tooth against the exact involute to 0.002 mm, and meshed pairs share no volume.
+- **Simplifications are stated on the sheet:** the VDI 2230 core, Lewis bending with no ISO 6336 factors, printed
+  springs and hinges with their caveats.
+- **Headless:** `calculate`; `form calc <calculator> key=value ... [--build]`, `form calc list|show|verify`.
+**Manufacturability, with fixes that are proved.** For CNC (3, 4 and 5 axes), injection moulding and five printing
+technologies (FDM, SLA, SLS, MJF, LPBF), every rule is measured on the exact solid and every limit names its source
+and the date it was read. Moulding proposes a pull direction (searched over the Gaussian sphere for the least
+undercut) and the parting line, says which undercuts need a side action or a lifter, checks draft per face and
+estimates clamp tonnage; CNC finds what the stated cutter cannot reach, the fewest setups, internal corners against
+the tool and the cavity depth, tool reach and holes. Results are drawn on the part. A fix (draft, corner radius,
+escape holes, a wall or hole parameter) is written into the source, checked before it is saved, saved as a revision
+and checked again; it is called fixed only by that second check. `form dfm`; MCP `manufacturability`, `apply_fix`.
+See [MANUFACTURABILITY.md](MANUFACTURABILITY.md).
+
+**Sheet metal and cut parts.** Bent parts designed from flanges, hems, jogs, reliefs and louvres
+(`form.sheet.build`), unfolded on the exact solid with a K-factor from a cited table or your shop's value, and
+proved by folding the flat back onto the part within 0.01 mm. The flat pattern DXF has cut, bend (up and down, with
+angle, radius and K notes), etch and notes layers. Any DXF can be checked before a laser, waterjet or router cuts
+it, every rule with its fabricator source; a bend order is found with a stated press-brake model; flat parts export
+as profiles with optional kerf; a SendCutSend preflight checks material, thickness and limits without sending
+anything. `form sheet`; MCP `flat_pattern`, `cut_file_check`, `bend_order`, `service_preflight`. See
+[SHEET_METAL.md](SHEET_METAL.md).
+
+**CNC, 3-axis: toolpaths checked on a stock simulation.** Facing, adaptive clearing at constant engagement,
+finishing of floors and walls, the outline with tabs, drilling with pecks and helical boring, chamfering, and 3D
+finishing in parallel passes and waterlines, from the design's own solid with Form Studio's own drop-cutter. Speeds
+and feeds are chip load × flutes × RPM from a cited table; what no source covers is assumed and says so. The G-code
+is written for Grbl, LinuxCNC, Fanuc, Haas or Marlin, read back as that controller reads it, and run on a model of
+the stock with the tools' real shapes: gouge (the exact distance of the part's surface into the cutter), leftover
+volume and where it is, rapids through stock, shank and holder collisions, and the cycle time under your machine's
+limits. A program goes into a release only with a current simulation, nothing assumed and your approval, labelled
+"simulated, not proven on a machine" until you record what it did on one. MCP `cam_plan`, `cam_post`,
+`cam_simulate`; `form cam`. See [CAM.md](CAM.md).
+
 ## Analysis, measurement and annotations
 
 | | |
@@ -629,6 +787,40 @@ either. A real thin fin still fails.
 - **Save files…** puts every file of a release in one .zip (STEP, STL, the sliced 3MF, G-code, report, documents and
   manifest); **Show in Finder** opens its folder. `form release-files`.
 
+## Engineering drawings, GD&T and PMI
+
+- **Views from the B-rep.** OCCT hidden-line removal draws the front, top and right views in first or third angle
+  (ISO 5456-2) and an isometric; visible edges wide, tangent edges narrow, hidden edges dashed and left out where a
+  visible edge covers them (ISO 128-2). A full section through the bores with 45° hatching and its cutting plane; a
+  detail view, circled and lettered, of a chamfer too small to read at the sheet's scale.
+- **The sheet.** A4 to A0 and ANSI A to E, the largest ISO 5455 scale at which the views and their dimensions fit,
+  an ISO 5457 border with centring marks and an ISO 7200 title block: title, number, revision, date, material and
+  computed mass when the design has a material, the general tolerance, the projection symbol and the geometry hash
+  (the release hash once released). A field Form Studio does not know stays empty.
+- **Dimensions are the parameters.** Sizes are measured on the solid (plane levels, hole and boss diameters, radii,
+  pitches) and each size parameter is bound to the size it equals; with `prove` (the default) the design is built
+  again with the parameter nudged to prove which size moves. The report states "N of N size parameters dimensioned,
+  0 twice", lists the parameters with no size of their own and what each drives, and `form drawing set` (or the
+  app) changes a dimension by committing its parameter.
+- **Placement without overlaps.** Linear dimensions are packed into tiers per view side, shortest nearest the part;
+  text never sits on an extension line; baseline dimensions nest and chain dimensions share a line (ISO 129-1,
+  `"holes": "baseline" | "chain"`); leaders, frames and symbols search for free space. Every sheet reports its
+  overlaps (none on a good sheet).
+- **Tolerances.** ISO 286 fits computed from the standard's formulas (IT5 to IT11, shaft deviations d to u and their
+  holes with the delta rule), checked against the published tables; ISO 2768 general tolerances by class.
+- **GD&T and surface texture, only where declared.** Feature control frames (ISO 1101 / ASME Y14.5), datum
+  features (ISO 5459) and surface symbols (ISO 21920-1) from the design's `drawing(v)` method or the person's
+  `drawing(spec=...)`; a declaration that breaks the standard is refused with the reason.
+- **Files.** Vector PDF by Qt with the fonts embedded, SVG, DXF (one layer per line type), paper and night PNGs, and
+  the sheet as a scene graph (`sheet.json`) for the app's sheet pane.
+- **STEP AP242 with semantic PMI.** The drawing's dimensions with their limits, datums and geometric tolerances on
+  the solid's faces through OCCT's XCAF document; the file is read back and each annotation compared with what was
+  written. `export_pmi`, `form drawing pmi`.
+- **Check against a drawing.** `check_drawing` / `form drawing check` reads a person's drawing (a PDF's text layer
+  or DXF entities exactly; an image through the agent's rows, each with its place on the sheet), and gives one row
+  per dimension: expected and measured, the tolerance used, PASS, FAIL or UNSURE, a crop of the sheet and a render
+  with the measured feature lit. Form Studio runs no OCR, so nothing it was not sure of is reported as read.
+
 ## Working with other software
 
 | Program | What Form Studio does with it |
@@ -637,7 +829,7 @@ either. A real thin fin still fails.
 | OpenSCAD | Builds `.scad` designs; Customizer ranges become parameters |
 | Blender | Photoreal renders; its 3D-Print Toolbox checks when the add-on is installed |
 | Your slicer | Slices, and opens the 3MF or G-code in it |
-| Any MCP client | The full engine over 104 tools ([MCP reference](MCP.md)) |
+| Any MCP client | The full engine over 127 tools ([MCP reference](MCP.md)) |
 
 When a program's version outside the supported range is why something failed, the error names the supported versions
 and what to do.
