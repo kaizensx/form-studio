@@ -472,6 +472,16 @@ shown as a pass.
 resting in its nut is not a 0 mm wall, and only faces within 30° of parallel count, so a tapered edge is not a wall
 either. A real thin fin still fails.
 
+**Manufacturability, with fixes that are proved.** For CNC (3, 4 and 5 axes), injection moulding and five printing
+technologies (FDM, SLA, SLS, MJF, LPBF), every rule is measured on the exact solid and every limit names its source
+and the date it was read. Moulding proposes a pull direction (searched over the Gaussian sphere for the least
+undercut) and the parting line, says which undercuts need a side action or a lifter, checks draft per face and
+estimates clamp tonnage; CNC finds what the stated cutter cannot reach, the fewest setups, internal corners against
+the tool and the cavity depth, tool reach and holes. Results are drawn on the part. A fix (draft, corner radius,
+escape holes, a wall or hole parameter) is written into the source, checked before it is saved, saved as a revision
+and checked again; it is called fixed only by that second check. `form dfm`; MCP `manufacturability`, `apply_fix`.
+See [MANUFACTURABILITY.md](MANUFACTURABILITY.md).
+
 ## Analysis, measurement and annotations
 
 | | |
@@ -581,7 +591,7 @@ either. A real thin fin still fails.
 | OpenSCAD | Builds `.scad` designs; Customizer ranges become parameters |
 | Blender | Photoreal renders; its 3D-Print Toolbox checks when the add-on is installed |
 | Your slicer | Slices, and opens the 3MF or G-code in it |
-| Any MCP client | The full engine over 97 tools ([MCP reference](MCP.md)) |
+| Any MCP client | The full engine over 99 tools ([MCP reference](MCP.md)) |
 
 When a program's version outside the supported range is why something failed, the error names the supported versions
 and what to do.

@@ -180,8 +180,10 @@ class Projection:
         z = self.z[0][tri] + s * (self.z[1][tri] - self.z[0][tri]) + t * (self.z[2][tri] - self.z[0][tri])
         return np.where(ok, z, np.nan)
 
-    def blocked(self, pts: np.ndarray, sign: float = 1.0, eps: float = 1e-3, chunk: int = 20000) -> np.ndarray:
-        """For rays from pts along sign·d: True where the ray meets a triangle further than eps along it."""
+    def blocked(self, pts: np.ndarray, sign: float = 1.0, eps: float = 1e-3, chunk: int = 20000,
+                maxd: float | None = None) -> np.ndarray:
+        """For rays from pts along sign·d: True where the ray meets a triangle further than eps along it (and, with
+        maxd, no further than maxd: a stroke of that length is blocked)."""
         out = np.zeros(len(pts), bool)
         for i0 in range(0, len(pts), chunk):
             p = pts[i0:i0 + chunk]
@@ -191,7 +193,8 @@ class Projection:
             if not len(rid):
                 continue
             z = self._hits(q2, rid, tri)
-            ahead = sign * (z - z0[rid]) > eps
+            dz = sign * (z - z0[rid])
+            ahead = (dz > eps) if maxd is None else ((dz > eps) & (dz <= maxd))
             hit = np.zeros(len(p), bool)
             hit[rid[np.nan_to_num(ahead, nan=False).astype(bool)]] = True
             out[i0:i0 + chunk] = hit

@@ -116,7 +116,7 @@ instead.
 
 ## Tools at a glance
 
-97 tools. Read-only tools never change a project.
+99 tools. Read-only tools never change a project.
 
 | Tool | Access | What it does |
 |---|---|---|
@@ -150,6 +150,8 @@ instead.
 | [`animate`](#animate) | read-only | Animate a design. Make motion from real geometry. |
 | [`compare_revisions`](#compare_revisions) | read-only | Compare two revisions. What changed between two revisions: parameters, features, interfaces, stability, fit. |
 | [`geometry_diff`](#geometry_diff) | changes | Diff the geometry of two revisions. |
+| [`manufacturability`](#manufacturability) | changes | Check a design for a manufacturing process. |
+| [`apply_fix`](#apply_fix) | changes | Fix a manufacturability finding and prove it. |
 | [`add_text`](#add_text) | changes | Put raised (or, with sunk, cut-in) lettering on a flat face of a Python design, as a real feature of its source: a new revision whose build adds a stage text_N with Form Studio's bundled font. |
 | [`add_feature`](#add_feature) | changes | Add a feature to a Python design as a new revision. |
 | [`remove_feature`](#remove_feature) | changes | Remove a feature as a new revision: a standard feature added with add_feature ("boss_1", "hook_1"), or any feature of a FeatureDesign (its method goes; the features before it load from their checkpoints). |
@@ -807,6 +809,51 @@ the B-rep. Also writes a picture (added green, removed red, the rest grey); look
 | `project` | string | yes |
 | `a` | integer | yes |
 | `b` | integer \| null |  |
+
+### `manufacturability`
+
+Check a design for a manufacturing process. Every rule of the process measured on the exact solid, each
+limit with the published guide it comes from (title, publisher, the date it was read) or "computed" when it
+is geometry: process cnc (3/4/5-axis access for a flat end mill, internal corners against the tool and the
+cavity depth, tool reach, thin walls, holes, setups), injection (a proposed pull direction and parting line,
+undercuts with the side action or lifter each needs, draft per face, wall range per resin, projected area,
+clamp tonnage), fdm, sla, sls, mjf, lpbf (walls, overhangs, holes, enclosed voids, build volume), sheet_metal
+(routed to its own tool; not checked here). Default process: the design's own (purpose print: fdm).
+options: cnc {tool_d (mm, needed), material: metal|plastic, axes: 3|4|5, flute_l, holder_d, rotary_axis};
+injection {resin: abs|pc|pp|nylon|..., pull: [x,y,z] or "auto", cavities, textured}; printing {up: [x,y,z],
+machine: [x,y,z] mm, alloy for lpbf}; any process {overrides: {rule_id: {fail, warn}}} for a shop's limits
+(recorded as specified). A rule whose input is missing is not checked, and the verdict is then "not proven",
+never a pass. Returns rows (one per rule), findings (where, value, limit), the proposed fixes (apply_fix),
+the overlay file the viewport draws (form-dfm-overlay/1) and, with view (iso, top, ...), a picture.
+
+| Argument | Type | Required |
+|---|---|---|
+| `project` | string | yes |
+| `process` | string |  |
+| `options` | object \| null |  |
+| `rev` | integer \| null |  |
+| `view` | string |  |
+
+### `apply_fix`
+
+Fix a manufacturability finding and prove it. Takes a fix id or rule id from manufacturability (default the
+first fix proposed): draft on the faces along the pull, internal corners raised to the tool radius, escape
+holes from enclosed voids, a wall or hole set by a parameter. The edit is written into the design's source
+as edit_design ops (a parameter and a feature, or set_param), built and checked without saving (the preview),
+then saved as a new revision and checked again on the new head from a fresh measurement. Returns fixed (true
+only when that second check passes the rule), the ops, the rows before and after, any other rule the change
+made worse (a trade: not applied unless accept_trades), and before and after pictures. apply=false stops
+after the preview. Pass the same options as manufacturability and expect_head.
+
+| Argument | Type | Required |
+|---|---|---|
+| `project` | string | yes |
+| `process` | string |  |
+| `fix` | string |  |
+| `options` | object \| null |  |
+| `apply` | boolean |  |
+| `accept_trades` | boolean |  |
+| `expect_head` | integer \| null |  |
 
 ### `add_text`
 

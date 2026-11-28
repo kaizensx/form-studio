@@ -191,6 +191,14 @@ class Moulding(unittest.TestCase):
         self.assertAlmostEqual(sa[0]["direction"][0], -1.0, places=3)
         self.assertEqual(status("injection", cup(3.0, 40, 30, 20), "injection.undercut", self.ABS)[0], "pass")
 
+    def test_an_undercut_inside_the_part_needs_a_lifter(self):
+        g = cup(2.0, 40, 30, 20) - Pos(-18.5, 0, 4) * Box(1, 8, 3)       # a 1 mm groove in the inner wall
+        _rows, _e, out = run("injection", g, {**self.ABS, "pull": [0, 0, 1]})
+        sa = out["data"]["side_actions"]
+        self.assertEqual([s["action"] for s in sa], ["lifter"])
+        self.assertAlmostEqual(sa[0]["direction"][0], 1.0, places=3)      # inward, away from the wall
+        self.assertLess(sa[0]["stroke_mm"], 2.0)
+
     def test_pull_direction_and_parting_line_are_proposed(self):
         lying = cup(2.0).rotate(Axis.Y, 90)                         # its opening faces +X
         _rows, _e, out = run("injection", lying, self.ABS)

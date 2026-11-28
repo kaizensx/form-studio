@@ -322,10 +322,15 @@ def _clusters(P, link):
 
 
 def side_actions(surf, d, under_idx, cache) -> list:
-    """For each connected undercut region, the straight way out it has, if any: a side action (a direction in the
-    parting plane), else a lifter (a direction tilted from the pull, with its angle), else none (a collapsible core
-    or a change to the part). Directions searched: 16 around the parting plane and the region's own mean normal;
-    tilts of 15° to 75° in 15° steps."""
+    """For each connected undercut region, the way out it has, if any. Directions searched: 16 around the parting
+    plane and the region's own mean normal projected on it.
+
+    side action  a direction in the parting plane along which every sample of the region leaves the part (a slide
+                 pulled out sideways before the tool opens)
+    lifter       no way out, but a stroke along such a direction as long as the undercut is deep (+ 0.5 mm) is free:
+                 an insert that moves in by that stroke as the part is ejected (an undercut inside the part). The
+                 lifter's own path through the tool is not designed or checked
+    none         neither: a collapsible core, a split insert or a change to the part"""
     if not len(under_idx):
         return []
     lab = _clusters(surf.S[under_idx], 2.5 * surf.h)
@@ -338,9 +343,9 @@ def side_actions(surf, d, under_idx, cache) -> list:
             cache[k] = geom.Projection(surf, v, cells=96)
         return cache[k]
 
-    def free(idx, v):
+    def free(idx, v, maxd=None):
         S, N, A = surf.S[idx], surf.N[idx], surf.A[idx]
-        ok = (N @ v > -VERTICAL) & ~proj(v).blocked(S + N * 1e-3, +1)
+        ok = (N @ v > -VERTICAL) & ~proj(v).blocked(S + N * 1e-3, +1, maxd=maxd)
         return float(A[ok].sum()) / max(float(A.sum()), 1e-12)
     for c in range(int(lab.max()) + 1 if len(lab) else 0):
         idx = under_idx[lab == c]
@@ -360,22 +365,16 @@ def side_actions(surf, d, under_idx, cache) -> list:
             item.update({"action": "side action", "direction": _pt(best[1]), "released_share": round(best[0], 4)})
         else:
             found = None
-            for ang in (15, 30, 45, 60, 75):
-                a = math.radians(ang)
-                for sgn in (1, -1):
-                    for v in inplane[:17]:
-                        t = geom.unit(sgn * math.cos(a) * d + math.sin(a) * v)
-                        sh = free(idx, t)
-                        if sh >= FREE_SHARE:
-                            found = (ang, t, sh)
-                            break
-                    if found:
-                        break
-                if found:
-                    break
+            for v in inplane:
+                ps = surf.S[idx] @ v
+                stroke = float(ps.max() - ps.min()) + 0.5
+                sh = free(idx, v, maxd=stroke)
+                if sh >= FREE_SHARE and (found is None or stroke < found[0]):
+                    found = (stroke, v, sh)
             if found:
-                item.update({"action": "lifter", "tilt_deg": found[0], "direction": _pt(found[1]),
-                             "released_share": round(found[2], 4)})
+                item.update({"action": "lifter", "direction": _pt(found[1]), "stroke_mm": round(found[0], 3),
+                             "released_share": round(found[2], 4),
+                             "note": "The lifter's path through the tool is not designed or checked."})
             else:
                 item.update({"action": "none", "released_share": round(best[0], 4),
                              "note": "No straight release found: a collapsible core, a split insert or a change to "

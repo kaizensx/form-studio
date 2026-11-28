@@ -2,6 +2,20 @@
 
 ## Unreleased
 
+### New
+
+- **Manufacturability, with fixes that are proved.** Check a design for CNC milling (3, 4 or 5 axes), injection
+  moulding, or FDM, resin (SLA), SLS, MJF and metal (LPBF) printing. Every rule is measured on the exact solid and
+  every limit names the guide it was read from and the date (Protolabs, Protolabs Network, Formlabs, Materialise,
+  RJG), or says it is geometry. Moulding proposes the pull direction and the parting line, finds undercuts and says
+  which need a side action or a lifter, checks draft per face and estimates clamp tonnage with its range; CNC finds
+  what a cutter of your diameter cannot reach, the setups needed, internal corners against the tool and the cavity
+  depth, tool reach and holes. Problems are drawn on the part. Draft, internal corners, escape holes and walls or
+  holes set by a parameter can be fixed: the fix is written into the design as a parameter and a feature, checked
+  before it is saved, saved as a revision and checked again; it is called fixed only when that check passes. A rule
+  that could not be checked is never a pass. `manufacturability` and `apply_fix` over MCP (99 tools), `form dfm`,
+  and docs/MANUFACTURABILITY.md.
+
 ### Fixed
 
 - **Parts that do not fit one plate go onto more plates, never off the plate.** A design whose parts (or copies of
