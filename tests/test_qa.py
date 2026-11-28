@@ -120,6 +120,7 @@ class JourneyHooks(unittest.TestCase):
     def test_every_object_name_a_journey_uses_exists_in_the_qml(self):
         qml = "\n".join(p.read_text(encoding="utf-8") for p in QML.glob("*.qml"))
         declared = set(re.findall(r'objectName: "([A-Za-z-]+)"', qml)) | {m + "-" for m in re.findall(r'objectName: "([a-z]+-)" \+', qml)}
+        declared |= set(re.findall(r'\{ name: "([A-Za-z-]+)"', qml))      # a named entry of a menu (PopMenu gives it as the row's objectName)
         used = set()
         for f in (ROOT / "tests" / "journeys").glob("*.py"):
             src = f.read_text(encoding="utf-8")
