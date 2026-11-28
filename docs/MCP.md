@@ -116,7 +116,7 @@ instead.
 
 ## Tools at a glance
 
-97 tools. Read-only tools never change a project.
+100 tools. Read-only tools never change a project.
 
 | Tool | Access | What it does |
 |---|---|---|
@@ -160,6 +160,9 @@ instead.
 | [`turntable`](#turntable) | read-only | Render a turntable of the head revision from the kernel's mesh. |
 | [`remove_text`](#remove_text) | changes | Remove lettering added with add_text (mark_id like "text_1"; get_design_source shows the block). |
 | [`assembly_instructions`](#assembly_instructions) | changes | Write assembly instructions. Assembly instructions as a PDF from the design's assembly declaration: a parts page with computed volumes, then one page per part going on (in the declaration's parent order, at its explode offset, with arrows). |
+| [`drawing`](#drawing) | changes | Make the engineering drawing. A shop drawing made from the solid: views by OCCT hidden-line removal (first or third angle, a section through the bores, a detail of small features, an isometric), the largest ISO scale that fits the sheet (A4-A0, ANSI A-E), dimensions measured on the B-rep and placed without overlaps, an ISO 7200 title block. |
+| [`export_pmi`](#export_pmi) | changes | Export STEP AP242 with PMI. The solid as STEP AP242 with semantic PMI attached to its faces: every dimension of the drawing with its tolerance (fits as limits), the datums and the geometric tolerances, written through OCCT's XCAF document. |
+| [`check_drawing`](#check_drawing) | changes | Check a drawing against the part. |
 | [`checkout_revision`](#checkout_revision) | changes | Make an earlier revision the head again (nothing is deleted). |
 | [`set_print_setup`](#set_print_setup) | changes | Set the print setup. Print orientation (as_modelled, on_back, on_front, on_left, on_right, inverted, or a "down:x,y,z" id from suggest_orientation), the acceptable total fit gap window, and whether the pipeline slices automatically. |
 | [`explore_alternatives`](#explore_alternatives) | read-only | Build a small grid of real variants (1-2 parameters, up to 5 values each) and rank them. |
@@ -973,6 +976,56 @@ an assembly() has none.
 | Argument | Type | Required |
 |---|---|---|
 | `project` | string | yes |
+| `rev` | integer \| null |  |
+
+### `drawing`
+
+Make the engineering drawing. A shop drawing made from the solid: views by OCCT hidden-line removal (first or third angle, a
+section through the bores, a detail of small features, an isometric), the largest ISO scale that fits the sheet
+(A4-A0, ANSI A-E), dimensions measured on the B-rep and placed without overlaps, an ISO 7200 title block. Each
+size parameter is bound to the dimension it is (proved by a nudged rebuild when prove=True); the report says
+"N of N size parameters dimensioned, 0 twice", what each unshown parameter drives, and each dimension's param
+(change it with commit_change). spec adds what the person states (stored with the design): {"datums": [{"letter":
+"A", "at": selector}], "gdt": [{"type": "flatness"|"position"|..., "value": mm, "datums": [...], "at": selector}],
+"fits": [{"class": "H7", "at": selector}], "surface": [{"ra": 1.6, "at": selector}], "general": "m",
+"holes": "baseline"|"chain", "notes": [...]}; selector: {"feature": id, "normal": [x,y,z]}, {"feature": id,
+"cylinder": true, "d": mm}, {"param": key} or {"face": i}. GD&T is drawn only where declared. Returns the PDF,
+SVG, DXF, PNG previews (paper and night) and the sheet scene (JSON) paths, and the report.
+
+| Argument | Type | Required |
+|---|---|---|
+| `project` | string | yes |
+| `sheet` | string |  |
+| `projection` | string |  |
+| `rev` | integer \| null |  |
+| `spec` | object \| null |  |
+| `prove` | boolean |  |
+
+### `export_pmi`
+
+Export STEP AP242 with PMI. The solid as STEP AP242 with semantic PMI attached to its faces: every dimension of the drawing with its
+tolerance (fits as limits), the datums and the geometric tolerances, written through OCCT's XCAF document. The
+file is read back and each annotation compared with what was written (PASS/FAIL per row, on the same faces).
+
+| Argument | Type | Required |
+|---|---|---|
+| `project` | string | yes |
+| `rev` | integer \| null |  |
+
+### `check_drawing`
+
+Check a drawing against the part. One row per dimension on a person's drawing (PDF, DXF or image): expected value and
+tolerance, the size measured on the B-rep, PASS, FAIL or UNSURE, a crop of the sheet where it is printed and a
+render with the measured feature lit. A PDF text layer and DXF dimensions are read exactly; for an image or a
+scan, read it with read_document and pass rows=[{"text": "Ø8 H7", "box": [x0, y0, x1, y1] (page fractions from
+the top left), "page": 1, "unsure": false}]. Mark a row unsure whenever you are not certain of a digit; never
+guess. The verdict is computed here (ISO 286 classes, written limits, or the sheet's ISO 2768 class).
+
+| Argument | Type | Required |
+|---|---|---|
+| `project` | string | yes |
+| `source` | string | yes |
+| `rows` | array \| null |  |
 | `rev` | integer \| null |  |
 
 ### `checkout_revision`

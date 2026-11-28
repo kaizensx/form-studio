@@ -167,7 +167,7 @@ def frame(spec: dict, at, h: float = 3.5, gid: str = "", meta=None) -> dict:
     return S.group("gdt", kids, gid, {**(meta or {}), "spec": spec, "text": text(spec)})
 
 
-def datum_feature(letter: str, foot, direction, h: float = 3.5, gid: str = "", meta=None) -> dict:
+def datum_feature(letter: str, foot, direction, h: float = 3.5, gid: str = "", meta=None, lead: float | None = None) -> dict:
     """A datum feature symbol: a filled triangle on the feature at `foot`, a leader along `direction`, a boxed
     letter (ISO 5459)."""
     if letter not in LETTERS:
@@ -179,7 +179,8 @@ def datum_feature(letter: str, foot, direction, h: float = 3.5, gid: str = "", m
     base = (foot[0] + ux * t, foot[1] + uy * t)
     tri = S.polygon([(foot[0] - uy * t * 0.6, foot[1] + ux * t * 0.6), (foot[0] + uy * t * 0.6, foot[1] - ux * t * 0.6),
                      base], "gdt")
-    end = (base[0] + ux * h * 1.6, base[1] + uy * h * 1.6)
+    L = h * 1.6 if lead is None else lead
+    end = (base[0] + ux * L, base[1] + uy * L)
     s = h * 2.0
     cx, cy = end[0] + ux * s / 2, end[1] + uy * s / 2
     box = S.polyline([(cx - s / 2, cy - s / 2), (cx + s / 2, cy - s / 2), (cx + s / 2, cy + s / 2), (cx - s / 2, cy + s / 2)],

@@ -194,6 +194,13 @@ def H(*parts) -> str:
     return hashlib.sha256(json.dumps(parts, sort_keys=True, default=str).encode()).hexdigest()[:16]
 
 
+def _changed(a, b) -> bool:
+    """A derived value changed: numbers by more than 1e-6, anything else (a limits string, a name) when unequal."""
+    if isinstance(a, (int, float)) and isinstance(b, (int, float)):
+        return abs(a - b) > 1e-6
+    return a != b
+
+
 def _slicer_tag(s: dict) -> list:
     """Artifact keys name the slicer kind, except Bambu Studio's, whose keys predate other slicers."""
     kind = s.get("kind", "bambu")
@@ -1453,7 +1460,7 @@ class Studio:
         bd = {d["key"]: d for d in base["derived"]}
         derived = [{"key": d["key"], "label": d["label"], "unit": d["unit"], "from": bd[d["key"]]["value"], "to": d["value"],
                     "interface": bool(d.get("interface"))}
-                   for d in cand["derived"] if d["key"] in bd and abs(d["value"] - bd[d["key"]]["value"]) > 1e-6]
+                   for d in cand["derived"] if d["key"] in bd and _changed(d["value"], bd[d["key"]]["value"])]
         metrics = [{"key": "volume", "label": "Material volume", "unit": "cm³", "from": base["volume_mm3"] / 1000, "to": cand["volume_mm3"] / 1000}]
         bs, cs = base.get("statics") or {}, cand.get("statics") or {}
         for k, (label, unit) in STATICS_LABELS.items():

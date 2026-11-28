@@ -514,6 +514,19 @@ def main(argv=None):
     ins.add_argument("project")
     ins.add_argument("--rev", type=int)
     ins.add_argument("--out", help="copy the PDF here")
+    # -- engineering drawings, PMI and drawing checks (form/drawing) --
+    dr = sub.add_parser("drawing", help="engineering drawing from the solid: drawing <project> [--sheet A3] [--projection first] "
+                                        "[--out part.pdf]; drawing pmi <project>; drawing check <project> <file>; "
+                                        "drawing spec <project> <json>; drawing set <project> <dimension> <value>")
+    dr.add_argument("args", nargs="+", help="<project> | pmi <project> | check <project> <file> [--rows JSON] | "
+                                            "spec <project> <json> | set <project> <dimension id> <value>")
+    dr.add_argument("--sheet", default=None, help="A4-A0 or 'ANSI A'-'ANSI E' (A3 by default)")
+    dr.add_argument("--projection", default=None, choices=["first", "third"])
+    dr.add_argument("--rev", type=int)
+    dr.add_argument("--out", help="copy the PDF (or the STEP for pmi) here")
+    dr.add_argument("--rows", help="check: the rows an agent read off an image, as JSON")
+    dr.add_argument("--no-prove", action="store_true", help="bind parameters by value only (no nudged rebuilds)")
+    dr.add_argument("--expect-head", type=int)
     # -- selections, annotations, colours and materials (form/selection.py, form/materials.py) --
     se = sub.add_parser("select", help="analyse points, edges, faces or a painted region on the solid; --keep saves it as an annotation")
     se.add_argument("project")
@@ -740,6 +753,39 @@ def main(argv=None):
                 _sh.copyfile(geomdiff.png_path(st, p, d), a.png)
                 d["png"] = str(Path(a.png).resolve())
             _print(d)
+        elif a.cmd == "drawing":
+            import shutil as _sh
+            from . import drawing as _dr
+            args = list(a.args)
+            verb = args[0] if args[0] in ("pmi", "check", "spec", "set") and len(args) > 1 else "make"
+            if verb != "make":
+                args = args[1:]
+            p = st.load(args[0])
+            try:
+                if verb == "pmi":
+                    out = _dr.export_pmi(st, p, a.rev, sheet=a.sheet)
+                    if a.out:
+                        _sh.copyfile(out["path"], a.out)
+                        out["path"] = str(Path(a.out).resolve())
+                elif verb == "check":
+                    from .drawing import check as _chk
+                    if len(args) < 2:
+                        raise SystemExit("drawing check <project> <file>")
+                    out = _chk.run(st, p, args[1], json.loads(a.rows) if a.rows else None, a.rev)
+                elif verb == "spec":
+                    out = _dr.set_spec(st, p["id"], json.loads(args[1]) if len(args) > 1 else {})
+                elif verb == "set":
+                    if len(args) < 3:
+                        raise SystemExit("drawing set <project> <dimension id> <value>")
+                    out = _dr.set_dimension(st, p, args[1], float(args[2]), a.expect_head, a.rev)
+                else:
+                    out = _dr.build(st, p, a.rev, sheet=a.sheet, projection=a.projection, prove=not a.no_prove)
+                    if a.out:
+                        _sh.copyfile(out["paths"]["pdf"], a.out)
+                        out["paths"]["pdf"] = str(Path(a.out).resolve())
+            except _dr.DrawingError as e:
+                raise StudioError(str(e), e.hint)
+            _print(out)
         elif a.cmd == "instructions":
             from . import instructions
             import shutil as _sh

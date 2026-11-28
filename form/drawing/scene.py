@@ -87,7 +87,7 @@ def text_width(s: str, h: float) -> float:
     w = 0.0
     for ch in s:
         w += 0.42 if ch in _NARROW else 1.05 if ch in _WIDE else 0.78
-    return w * h
+    return w * h * 1.06              # a little over the font: a box measured here always holds the string
 
 
 def text_box(t: dict, pad: float = 0.0) -> list:

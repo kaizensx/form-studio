@@ -244,6 +244,8 @@ def _draw_linear(d: Dim, horiz: bool, sign: float):
     nodes.append(t)
     d.text_boxes.append(S.text_box(t, 0.4))
     d.nodes = nodes
+    # every drawn line (extensions, the line under text set outside) keeps frames and symbols away
+    d.line_boxes = [S.bbox(n) for n in nodes if n["kind"] == "line"]
 
 
 def seg_hits(p, q, box, pad=0.0) -> bool:
@@ -266,9 +268,10 @@ def seg_hits(p, q, box, pad=0.0) -> bool:
     return True
 
 
-def free_spot(w, h, anchor, occupied, region, start=8.0, step=3.0, avoid=()) -> tuple | None:
+def free_spot(w, h, anchor, occupied, region, start=8.0, step=3.0, avoid=(), foot=None, texts=()) -> tuple | None:
     """The nearest place for a w x h box (lower-left corner returned) around `anchor` that clears `occupied`
-    boxes, stays inside `region` and keeps out of `avoid` (view boxes)."""
+    boxes, stays inside `region` and keeps out of `avoid` (view boxes); with `foot`, the leader from the box to
+    the foot crosses none of `texts`."""
     for k in range(0, 60):
         rad = start + step * k
         n = 16 + 4 * k
@@ -280,6 +283,10 @@ def free_spot(w, h, anchor, occupied, region, start=8.0, step=3.0, avoid=()) -> 
                 continue
             if any(S.overlap(box, o, 0.8) for o in occupied) or any(S.overlap(box, a, 0.8) for a in avoid):
                 continue
+            if foot is not None:
+                near = (min(max(foot[0], box[0]), box[2]), min(max(foot[1], box[1]), box[3]))
+                if any(seg_hits(near, foot, t, 0.3) for t in texts):
+                    continue
             return box[0], box[1]
     return None
 
@@ -608,6 +615,40 @@ def layout_dims(views: list[View], occupied: list, region, view_boxes=()) -> lis
     return alld
 
 
+def cutting_planes(views) -> list:
+    """Cutting planes (ISO 128-40): a chain line through the view that shows the plane edge-on, thick at its ends,
+    arrows in the direction of viewing, the section's letter at each end."""
+    out = []
+    for sv in [v for v in views if v.kind == "section"]:
+        pl = sv.raw["plane"]
+        host = next((v for v in views if v.kind == "view" and abs(float(np.dot(V.basis(v.basis_view())[0], pl["normal"]))) < 1e-6), None)
+        if host is None:
+            continue
+        b = host.box()
+        o = host.at3(tuple(pl["origin"]))
+        nd = V.basis(host.basis_view())
+        n2 = (float(np.dot(pl["normal"], nd[1])), float(np.dot(pl["normal"], nd[2])))
+        t2 = (-n2[1], n2[0])
+        half = abs(t2[0]) * (b[2] - b[0]) / 2 + abs(t2[1]) * (b[3] - b[1]) / 2
+        cx, cy = (b[0] + b[2]) / 2, (b[1] + b[3]) / 2
+        c_along = (o[0] - cx) * t2[0] + (o[1] - cy) * t2[1]
+        base = (o[0] - t2[0] * c_along, o[1] - t2[1] * c_along)
+        L = half + 3.0
+        p0 = (base[0] - t2[0] * L, base[1] - t2[1] * L)
+        p1 = (base[0] + t2[0] * L, base[1] + t2[1] * L)
+        kids = [S.line(p0, p1, "center")]
+        letter = sv.raw.get("id", "A")
+        for q, sgn in ((p0, 1), (p1, -1)):
+            e = (q[0] + t2[0] * sgn * 4, q[1] + t2[1] * sgn * 4)
+            kids.append(S.line(q, e, "section"))
+            head = (q[0] - n2[0] * 6, q[1] - n2[1] * 6)       # the arrow points away from the viewer, into the part
+            kids += [S.line(q, head, "dimension"), S.arrow(head, q, 2.5)]
+            kids.append(S.text((head[0] - n2[0] * 3.2, head[1] - n2[1] * 3.2), letter, STD.TEXT_H["dimension"],
+                               "middle", "middle", layer="text"))
+        out.append(S.group("cutting_plane", kids, f"cut_{letter}", {"section": letter, "view": host.name}))
+    return out
+
+
 def compose(raw: dict, plan: list, annotations: dict, title: dict, sheet: str = "A3", projection: str = "first",
             theme: str = "night", details: list | None = None, cands=None) -> dict:
     if sheet not in STD.SHEETS:
@@ -674,35 +715,7 @@ def compose(raw: dict, plan: list, annotations: dict, title: dict, sheet: str = 
                                 {"view": v.name, "scale": v.s, "origin": [S.r(v.origin[0]), S.r(v.origin[1])],
                                  "basis": [list(map(float, b)) for b in V.basis(v.basis_view())]}))
     unplaced = []
-    # cutting planes (ISO 128-40): a chain line through the view that shows the plane edge-on, thick at its ends,
-    # arrows in the direction of viewing, the section's letter at each end
-    for sv in [v for v in views if v.kind == "section"]:
-        pl = sv.raw["plane"]
-        host = next((v for v in views if v.kind == "view" and abs(float(np.dot(V.basis(v.basis_view())[0], pl["normal"]))) < 1e-6), None)
-        if host is None:
-            continue
-        b = host.box()
-        o = host.at3(tuple(pl["origin"]))
-        nd = V.basis(host.basis_view())
-        n2 = (float(np.dot(pl["normal"], nd[1])), float(np.dot(pl["normal"], nd[2])))
-        t2 = (-n2[1], n2[0])
-        half = abs(t2[0]) * (b[2] - b[0]) / 2 + abs(t2[1]) * (b[3] - b[1]) / 2
-        cx, cy = (b[0] + b[2]) / 2, (b[1] + b[3]) / 2
-        c_along = (o[0] - cx) * t2[0] + (o[1] - cy) * t2[1]
-        base = (o[0] - t2[0] * c_along, o[1] - t2[1] * c_along)
-        L = half + 3.0
-        p0 = (base[0] - t2[0] * L, base[1] - t2[1] * L)
-        p1 = (base[0] + t2[0] * L, base[1] + t2[1] * L)
-        kids = [S.line(p0, p1, "center")]
-        letter = sv.raw.get("id", "A")
-        for q, sgn in ((p0, 1), (p1, -1)):
-            e = (q[0] + t2[0] * sgn * 4, q[1] + t2[1] * sgn * 4)
-            kids.append(S.line(q, e, "section"))
-            head = (q[0] - n2[0] * 6, q[1] - n2[1] * 6)       # the arrow points away from the viewer, into the part
-            kids += [S.line(q, head, "dimension"), S.arrow(head, q, 2.5)]
-            kids.append(S.text((head[0] - n2[0] * 3.2, head[1] - n2[1] * 3.2), letter, STD.TEXT_H["dimension"],
-                               "middle", "middle", layer="text"))
-        children.append(S.group("cutting_plane", kids, f"cut_{letter}", {"section": letter, "view": host.name}))
+    children += cutting_planes(views)
     for d in dims:
         if getattr(d, "failed", False) or not d.nodes:
             unplaced.append(d.spec["id"])
@@ -724,7 +737,7 @@ def compose(raw: dict, plan: list, annotations: dict, title: dict, sheet: str = 
     # datums, frames and surface symbols where a view shows their face edge-on
     for kind in ("datum", "gdt", "surface"):
         for a in annotations.get(kind, []):
-            g = _annotate(a, kind, views, occupied + lines, region, vboxes)
+            g = _annotate(a, kind, views, occupied + lines, region, vboxes, occupied)
             if g is None:
                 unplaced.append(a.get("id") or a.get("letter"))
                 continue
@@ -742,7 +755,7 @@ def compose(raw: dict, plan: list, annotations: dict, title: dict, sheet: str = 
     return sheet_node
 
 
-def _annotate(a, kind, views, occupied, region, vboxes):
+def _annotate(a, kind, views, occupied, region, vboxes, texts=()):
     """Place a datum triangle, a feature control frame or a surface symbol on the face's edge in the first view
     that shows the face edge-on (a plane parallel to the view direction), with a leader."""
     hits = []                 # (view, foot, outward direction): every place the face shows, in view order
@@ -769,12 +782,16 @@ def _annotate(a, kind, views, occupied, region, vboxes):
                 for ang in (225, 315, 135, 45, 180, 0, 270, 90):
                     u = (math.cos(math.radians(ang)), math.sin(math.radians(ang)))
                     hits.append((v, (ctr[0] + u[0] * f["r"] * v.s, ctr[1] + u[1] * f["r"] * v.s), u))
+    if kind == "datum" and a.get("_faces_geo") and a["_faces_geo"][0]["type"] == "cylinder":
+        # a datum on a bore or a pin (a size feature, ISO 5459): on its circle, where its diameter is dimensioned
+        hits.sort(key=lambda h: _dir2(h[0], a["_faces_geo"][0]["axis"]) is not None)
     for v, foot, out in hits:
         if kind == "datum":
             for k in range(1, 12):
                 g = G.datum_feature(a["letter"], foot, out, STD.TEXT_H["dimension"], f"datum_{a['letter']}",
-                                    {"faces": a.get("faces"), "view": v.name, "letter": a["letter"]})
-                g = _shift_until_free(g, foot, out, occupied, region, vboxes, k)
+                                    {"faces": a.get("faces"), "view": v.name, "letter": a["letter"]},
+                                    lead=STD.TEXT_H["dimension"] * 1.6 + 4.0 * (k - 1))
+                g = _datum_free(g, foot, occupied, region, vboxes, texts)
                 if g is not None:
                     return g
             continue
@@ -784,7 +801,8 @@ def _annotate(a, kind, views, occupied, region, vboxes):
             g0 = G.surface_symbol(a, (0, 0), STD.TEXT_H["dimension"], f"surface_{a.get('id', '')}",
                                   {"faces": a.get("faces"), "view": v.name})
         w, h = g0["bbox"][2] - g0["bbox"][0], g0["bbox"][3] - g0["bbox"][1]
-        spot = free_spot(w, h, (foot[0] + out[0] * 14, foot[1] + out[1] * 14), occupied, region, 4.0, 3.0, vboxes)
+        spot = free_spot(w, h, (foot[0] + out[0] * 14, foot[1] + out[1] * 14), occupied, region, 4.0, 3.0, vboxes,
+                         foot=foot, texts=texts)
         if spot is None:
             continue
         dx, dy = spot[0] - g0["bbox"][0], spot[1] - g0["bbox"][1]
@@ -801,24 +819,20 @@ def _annotate(a, kind, views, occupied, region, vboxes):
     return None
 
 
-def _shift_until_free(g, foot, out, occupied, region, vboxes, k):
-    box = g["bbox"]
-    tri_box = [foot[0] - 3, foot[1] - 3, foot[0] + 3, foot[1] + 3]
-    # the boxed letter is the part that must be clear (the triangle sits on the part)
+def _datum_free(g, foot, occupied, region, vboxes, texts):
+    """A datum symbol is placed when its boxed letter clears everything and its triangle and leader cross no text."""
     letter = [c for c in g["children"] if c["kind"] == "polyline"][0]
     lb = S.bbox(letter)
-    if k > 1:
-        L = 4.0 * (k - 1)
-        g = _translate(g, out[0] * L, out[1] * L)
-        g["children"].append(S.line(foot, (foot[0] + out[0] * L, foot[1] + out[1] * L), "gdt"))
-        lb = [lb[0] + out[0] * L, lb[1] + out[1] * L, lb[2] + out[0] * L, lb[3] + out[1] * L]
-        g["bbox"] = S.bbox(g)
+    tri = S.bbox([c for c in g["children"] if c["kind"] == "polygon"][0])
+    lead = [c for c in g["children"] if c["kind"] == "line"][0]
     if lb[0] < region[0] or lb[2] > region[2] or lb[1] < region[1] or lb[3] > region[3]:
         return None
     if any(S.overlap(lb, o, 0.8) for o in occupied) or any(S.overlap(lb, vb, 0.3) for vb in vboxes):
         return None
+    if any(S.overlap(tri, t, 0.3) for t in texts) or any(seg_hits(lead["a"], lead["b"], t, 0.3) for t in texts):
+        return None
     g["meta"]["box"] = lb
-    del box, tri_box
+    g["meta"]["triangle"] = tri
     return g
 
 
@@ -950,11 +964,12 @@ def _arrange(raw, plan, fits, s, method, frame, tb, details):
     if not ok:
         return None
     vbs = [v.box() for v in placed]
-    occupied = [tb] + vbs
+    cut_texts = [S.text_box(c, 0.6) for g in cutting_planes(placed) for c in g["children"] if c["kind"] == "text"]
+    occupied = [tb] + vbs + cut_texts
     dims = layout_dims([v for v in placed if v.dims], occupied, region, vbs)
     if any(getattr(d, "failed", False) for d in dims):
         return {"fits": False, "views": placed, "dims": dims}
-    tbox = [b for d in dims for b in d.text_boxes]
+    tbox = [b for d in dims for b in d.text_boxes] + cut_texts
     if any(S.overlap(tbox[i], tbox[j], -0.05) for i in range(len(tbox)) for j in range(i + 1, len(tbox))):
         return {"fits": False, "views": placed, "dims": dims}
     return {"fits": True, "views": placed, "dims": dims}
@@ -1069,16 +1084,27 @@ def overlaps(sheet: dict) -> list:
             items.append((g["id"], g["role"], g["meta"].get("box") or g["bbox"]))
         elif g["role"] == "datum":
             items.append((g["id"], "datum", g["meta"].get("box") or g["bbox"]))
+            if g["meta"].get("triangle"):
+                items.append((g["id"], "datum triangle", g["meta"]["triangle"]))
         elif g["role"] == "note":
             items.append((g["id"], "note", g["bbox"]))
     views = [(g["id"], "view", _geom_box(g)) for g in S.groups(sheet) if g["role"] in ("view", "section", "detail")]
     out = []
+    texts = [(i, b) for i, k, b in items if k in ("text", "note")]
+    for g in S.groups(sheet):                    # a leader of a frame, a symbol or a datum crosses no text
+        if g["role"] in ("gdt", "surface", "datum") and g["meta"].get("leader"):
+            a, b = g["meta"]["leader"]
+            out += [(g["id"], i) for i, t in texts if seg_hits(a, b, t, -0.05)]
+        if g["role"] == "datum":
+            ln = [c for c in g["children"] if c["kind"] == "line"]
+            if ln:
+                out += [(g["id"], i) for i, t in texts if seg_hits(ln[0]["a"], ln[0]["b"], t, -0.05)]
     for i in range(len(items)):
         for j in range(i + 1, len(items)):
             if S.overlap(items[i][2], items[j][2], -0.05):
                 out.append((items[i][0], items[j][0]))
         for vid, _k, vb in views:
-            if vb and S.overlap(items[i][2], vb, -0.05):
+            if vb and items[i][1] != "datum triangle" and S.overlap(items[i][2], vb, -0.05):   # it stands on the part
                 out.append((items[i][0], vid))
         if S.overlap(items[i][2], sheet["title_box"], -0.05):
             out.append((items[i][0], "title"))

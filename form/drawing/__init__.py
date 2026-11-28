@@ -458,5 +458,5 @@ def set_dimension(st, p: dict, dim_id: str, value: float, expect_head: int | Non
     b = next(x for x in d["report"]["bindings"] if x["param"] == row["param"])
     val = float(value) / float(b.get("factor") or 1.0)
     return {"param": row["param"], "value": val, "dimension": dim_id, "binding": b["status"],
-            "commit": st.commit(p["id"], {row["param"]: val}, expect_head=expect_head,
+            "commit": st.commit(p, {row["param"]: val}, expect_head=expect_head,
                                 note=f"Drawing: {row['text']} → {value:g}")}

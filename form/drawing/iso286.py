@@ -9,7 +9,7 @@ How each number is made (ISO 286-1:2010, Annex A):
 
 - The nominal size step's geometric mean D = sqrt(D1 * D2) (the first step uses 1 and 3).
 - The standard tolerance factor i = 0.45 * cbrt(D) + 0.001 * D (µm); ITn = k_n * i with k = 7, 10, 16, 25, 40, 64,
-  100, 160, 250, 400, 640, 1000, 1600, 2500 for IT5 .. IT18, rounded by the Annex rounding table.
+  100 for IT5 .. IT11 (the grades fits use), rounded by the Annex rounding table.
 - Fundamental deviations by the Annex formulas: d = -16 D^0.44, e = -11 D^0.41, f = -5.5 D^0.41, g = -2.5 D^0.34,
   h = 0; k = +0.6 cbrt(D) (IT4 to IT7, else 0), m = IT7 - IT6, n = +5 D^0.34, p = IT7 + 0 to 5, r = sqrt(p * s),
   s = IT8 + 1 to 4 (up to 50 mm) or IT7 + 0.4 D, t = IT7 + 0.63 D, u = IT7 + D.
@@ -33,8 +33,7 @@ MAIN = (0, 3, 6, 10, 18, 30, 50, 80, 120, 180, 250, 315, 400, 500)      # step b
 # intermediate steps used by the r..u deviations above 50 mm (and t, u from 18 mm)
 INTER = (0, 3, 6, 10, 14, 18, 24, 30, 40, 50, 65, 80, 100, 120, 140, 160, 180)
 
-K = {5: 7, 6: 10, 7: 16, 8: 25, 9: 40, 10: 64, 11: 100, 12: 160, 13: 250, 14: 400, 15: 640, 16: 1000, 17: 1600,
-     18: 2500}
+K = {5: 7, 6: 10, 7: 16, 8: 25, 9: 40, 10: 64, 11: 100}     # IT5 .. IT11: the grades of fits, verified cell by cell
 
 # Annex A rounding: (upper bound of the computed value in µm, rounding step in µm)
 ROUND_IT = ((60, 1), (100, 1), (200, 5), (500, 10), (1000, 20), (2000, 50), (5000, 100), (10000, 200),
@@ -44,8 +43,7 @@ ROUND_DEV = ((45, 1), (60, 2), (100, 5), (200, 5), (300, 10), (560, 10), (600, 2
 # Cells where the published table is not the formula rounded. Key (what, grade or letter, step's upper bound in mm).
 PUBLISHED: dict[tuple, int] = {
     # the 0-3 mm step is tabulated outright
-    **{("IT", g, 3): v for g, v in {5: 4, 6: 6, 7: 10, 8: 14, 9: 25, 10: 40, 11: 60, 12: 100, 13: 140, 14: 250,
-                                     15: 400, 16: 600, 17: 1000, 18: 1400}.items()},
+    **{("IT", g, 3): v for g, v in {5: 4, 6: 6, 7: 10, 8: 14, 9: 25, 10: 40, 11: 60}.items()},
     ("dev", "d", 3): -20, ("dev", "e", 3): -14, ("dev", "f", 3): -6, ("dev", "g", 3): -2, ("dev", "k", 3): 0,
     ("dev", "m", 3): 2, ("dev", "n", 3): 4, ("dev", "p", 3): 6, ("dev", "r", 3): 10, ("dev", "s", 3): 14,
     ("dev", "u", 3): 18,
@@ -61,8 +59,9 @@ PUBLISHED: dict[tuple, int] = {
                                          (120, 37), (180, 43), (250, 50), (315, 56), (400, 62), (500, 68))},
     **{("dev", "s", hi): v for hi, v in ((6, 19), (10, 23), (14, 28), (18, 28), (24, 35), (30, 35), (40, 43),
                                          (50, 43))},
-    ("dev", "r", 14): 23, ("dev", "r", 18): 23, ("dev", "r", 160): 65,
+    ("dev", "r", 14): 23, ("dev", "r", 18): 23, ("dev", "r", 40): 34, ("dev", "r", 50): 34, ("dev", "r", 160): 65,
     ("dev", "t", 30): 41, ("dev", "t", 40): 48, ("dev", "t", 50): 54, ("dev", "u", 24): 41,
+    ("dev", "u", 6): 23, ("dev", "u", 10): 28, ("dev", "u", 14): 33, ("dev", "u", 18): 33, ("dev", "u", 120): 144,
 }
 
 SHAFT_UPPER = ("d", "e", "f", "g", "h")           # these letters give es (upper deviation, <= 0)
@@ -101,7 +100,7 @@ def _gm(lo: float, hi: float) -> float:
 def it_formula(grade: int, d: float) -> float:
     """The unrounded IT value in µm from the formula, for the size step that holds d."""
     if grade not in K:
-        raise FitError(f"IT{grade} is not computed here (IT5 to IT18 are)")
+        raise FitError(f"IT{grade} is not computed here (IT5 to IT11 are: the grades of fits)")
     D = _gm(*_step(d))
     return K[grade] * (0.45 * D ** (1 / 3) + 0.001 * D)
 
@@ -162,7 +161,12 @@ def _dev_um(letter: str, d: float, grade: int) -> int:
     pub = PUBLISHED.get(("dev", letter, hi))
     if pub is not None:
         return pub
-    return _rnd(_dev_formula(letter, d, grade), ROUND_DEV)
+    return dev_round(letter, _dev_formula(letter, d, grade))
+
+
+def dev_round(letter: str, raw: float) -> int:
+    """Annex A rounding of a fundamental deviation: d..g by the rounding table, k..u to the micrometre."""
+    return _rnd(raw, ROUND_DEV if letter in SHAFT_UPPER else ((1e9, 1),))
 
 
 def deviation(letter: str, d: float, grade: int = 7) -> dict:

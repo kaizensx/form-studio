@@ -1540,6 +1540,66 @@ def build() -> MCPServer:
             return {**out, "page_images": [str(d / x) for x in out["pages"]]}
         return await _run(go)
 
+    # -- engineering drawings, PMI and drawing checks (form/drawing) ------------------------------------------
+    @mcp.tool(annotations=RW)
+    async def drawing(project: str, sheet: str = "A3", projection: str = "first", rev: int | None = None,
+                      spec: dict | None = None, prove: bool = True) -> dict:
+        """Make the engineering drawing. A shop drawing made from the solid: views by OCCT hidden-line removal (first or third angle, a
+        section through the bores, a detail of small features, an isometric), the largest ISO scale that fits the sheet
+        (A4-A0, ANSI A-E), dimensions measured on the B-rep and placed without overlaps, an ISO 7200 title block. Each
+        size parameter is bound to the dimension it is (proved by a nudged rebuild when prove=True); the report says
+        "N of N size parameters dimensioned, 0 twice", what each unshown parameter drives, and each dimension's param
+        (change it with commit_change). spec adds what the person states (stored with the design): {"datums": [{"letter":
+        "A", "at": selector}], "gdt": [{"type": "flatness"|"position"|..., "value": mm, "datums": [...], "at": selector}],
+        "fits": [{"class": "H7", "at": selector}], "surface": [{"ra": 1.6, "at": selector}], "general": "m",
+        "holes": "baseline"|"chain", "notes": [...]}; selector: {"feature": id, "normal": [x,y,z]}, {"feature": id,
+        "cylinder": true, "d": mm}, {"param": key} or {"face": i}. GD&T is drawn only where declared. Returns the PDF,
+        SVG, DXF, PNG previews (paper and night) and the sheet scene (JSON) paths, and the report."""
+        st = studio()
+        def go():
+            from . import drawing as D
+            p = st.load(project)
+            try:
+                if spec:
+                    D.set_spec(st, p["id"], spec)
+                return D.build(st, p, rev, sheet=sheet, projection=projection, prove=prove)
+            except D.DrawingError as e:
+                raise StudioError(str(e), e.hint)
+        out = await _run(go)
+        act(project, "make", f"Drawing, {sheet}: {out['report']['completeness']['text']}", None)
+        return out
+
+    @mcp.tool(annotations=RW)
+    async def export_pmi(project: str, rev: int | None = None) -> dict:
+        """Export STEP AP242 with PMI. The solid as STEP AP242 with semantic PMI attached to its faces: every dimension of the drawing with its
+        tolerance (fits as limits), the datums and the geometric tolerances, written through OCCT's XCAF document. The
+        file is read back and each annotation compared with what was written (PASS/FAIL per row, on the same faces)."""
+        st = studio()
+        def go():
+            from . import drawing as D
+            try:
+                return D.export_pmi(st, st.load(project), rev)
+            except D.DrawingError as e:
+                raise StudioError(str(e), e.hint)
+        return await _run(go)
+
+    @mcp.tool(annotations=RW)
+    async def check_drawing(project: str, source: str, rows: list[dict] | None = None, rev: int | None = None) -> dict:
+        """Check a drawing against the part. One row per dimension on a person's drawing (PDF, DXF or image): expected value and
+        tolerance, the size measured on the B-rep, PASS, FAIL or UNSURE, a crop of the sheet where it is printed and a
+        render with the measured feature lit. A PDF text layer and DXF dimensions are read exactly; for an image or a
+        scan, read it with read_document and pass rows=[{"text": "Ø8 H7", "box": [x0, y0, x1, y1] (page fractions from
+        the top left), "page": 1, "unsure": false}]. Mark a row unsure whenever you are not certain of a digit; never
+        guess. The verdict is computed here (ISO 286 classes, written limits, or the sheet's ISO 2768 class)."""
+        st = studio()
+        def go():
+            from .drawing import check
+            try:
+                return check.run(st, st.load(project), source, rows, rev)
+            except (FileNotFoundError, ValueError, RuntimeError) as e:
+                raise StudioError(str(e), "Give a local PDF, DXF, PNG, JPEG or WebP (fetch_link downloads one).")
+        return await _run(go)
+
     @mcp.tool(annotations=RW)
     async def checkout_revision(project: str, rev: int) -> dict:
         """Make an earlier revision the head again (nothing is deleted). Outputs for it are reused if still cached."""
