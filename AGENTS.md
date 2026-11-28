@@ -32,6 +32,7 @@ Prefer the MCP server (`form-mcp`). Without MCP, the `form` CLI does the same an
 | Put text on a flat face (a feature in the source) | `add_text`, `remove_text` | `form engrave <p> TEXT --at x,y,z --normal x,y,z` |
 | See what changed in the solid between revisions | `geometry_diff` | `form diff <p> 1 3 --png diff.png` |
 | Can it be made (CNC, moulding, FDM, SLA, SLS, MJF, LPBF), with fixes proved by checking again | `manufacturability` → `apply_fix` | `form dfm <p> --process cnc --set tool_d=6 --set material=metal [--fix RULE]` |
+| CNC, 3-axis: toolpaths, G-code for a controller, read back and run on a stock model (gouge, leftover, collisions, cycle time); simulated, not proven on a machine | `cam_plan` → `cam_post` → `cam_simulate` | `form cam plan <p> --tool 6mm-flat --material aluminum`, `form cam post <p> --machine grbl` |
 | Assess anything the person brings (mesh, STEP, photo, PDF, link, words) and get the route | `triage` | `form triage scan.stl` |
 | Turn an STL, OBJ or 3MF into a design by the route its triage chooses (parametric CAD, a surface body, a mesh body, parts) | `reconstruct` | `form reconstruct part.stl --tolerance 0.02` |
 | Rebuild a mesh by hand: what is left to add or cut, then tune the sizes | `reference_residual`, `fit_params`, `compare_to_reference` | — |
@@ -47,8 +48,8 @@ Rules that keep the record honest:
 1. **Units:** mm, degrees, grams. For a design started from a building block, only use parameter keys that `describe_recipe` lists.
 2. **Preview, then commit.** Pass `expect_head` so you never overwrite someone else's newer revision.
 3. **Provenance is evidence.** Mark a value `measured` only when the user measured it and gave you the number. Ask how they measured it, for example with calipers. Otherwise it stays `assumed`.
-4. **Never invent physical results.** `record_physical_result` is only for what the user reports after a real print.
-5. **Name evidence classes correctly.** A slice is a simulation. Fit yield is a statistical model. Checks are labelled computed, heuristic or model. Say which one you are reporting.
+4. **Never invent physical results.** `record_physical_result` is only for what the user reports after a real print or a real machining run.
+5. **Name evidence classes correctly.** A slice is a simulation. A CNC program is "simulated, not proven on a machine" until the person records what it did on one. Fit yield is a statistical model. Checks are labelled computed, heuristic or model. Say which one you are reporting.
 6. **You cannot approve a release.** The user approves in the app's Release stage, after reviewing the checks and acknowledging the warnings.
 7. **No printing, no uploads.** Form Studio never sends files to a printer or a service, and you must not either unless the user explicitly asks.
 

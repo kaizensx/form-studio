@@ -116,7 +116,7 @@ instead.
 
 ## Tools at a glance
 
-99 tools. Read-only tools never change a project.
+102 tools. Read-only tools never change a project.
 
 | Tool | Access | What it does |
 |---|---|---|
@@ -152,6 +152,9 @@ instead.
 | [`geometry_diff`](#geometry_diff) | changes | Diff the geometry of two revisions. |
 | [`manufacturability`](#manufacturability) | changes | Check a design for a manufacturing process. |
 | [`apply_fix`](#apply_fix) | changes | Fix a manufacturability finding and prove it. |
+| [`cam_plan`](#cam_plan) | changes | Plan the CNC machining of a design on a 3-axis mill or router. |
+| [`cam_post`](#cam_post) | changes | Write the G-code of the design's CAM plan for a controller, read it back and simulate it from the file. |
+| [`cam_simulate`](#cam_simulate) | changes | Simulate the design's posted CNC program again from its file and say where it stands. |
 | [`add_text`](#add_text) | changes | Put raised (or, with sunk, cut-in) lettering on a flat face of a Python design, as a real feature of its source: a new revision whose build adds a stage text_N with Form Studio's bundled font. |
 | [`add_feature`](#add_feature) | changes | Add a feature to a Python design as a new revision. |
 | [`remove_feature`](#remove_feature) | changes | Remove a feature as a new revision: a standard feature added with add_feature ("boss_1", "hook_1"), or any feature of a FeatureDesign (its method goes; the features before it load from their checkpoints). |
@@ -167,7 +170,7 @@ instead.
 | [`explore_alternatives`](#explore_alternatives) | read-only | Build a small grid of real variants (1-2 parameters, up to 5 values each) and rank them. |
 | [`optimize`](#optimize) | read-only | Optimize a design. Goal seek: search parameter ranges for the best design that meets constraints. |
 | [`slice_test_piece`](#slice_test_piece) | changes | Cut a thin ring through the fit interface of this revision and slice it, so a cheap test print can check the fit before the whole part. |
-| [`record_physical_result`](#record_physical_result) | changes | Record what the USER observed after a real print. |
+| [`record_physical_result`](#record_physical_result) | changes | Record what the USER observed after a real print or a real machining run. |
 | [`request_release`](#request_release) | read-only | Check whether the head revision can be released and hand the decision to the user. |
 | [`verify_release`](#verify_release) | read-only | Re-hash every file of a release against its manifest and say whether it still matches the head revision. |
 | [`open_in`](#open_in) | changes | Open a current output in the user's own software: what = step \| stl \| 3mf \| gcode \| folder. |
@@ -855,6 +858,72 @@ after the preview. Pass the same options as manufacturability and expect_head.
 | `accept_trades` | boolean |  |
 | `expect_head` | integer \| null |  |
 
+### `cam_plan`
+
+Plan the CNC machining of a design on a 3-axis mill or router. Operations come from the part's shape:
+facing, drilling (pecking when deep) and helical boring, adaptive clearing at constant engagement, 2.5D
+finishing of floors and walls, 3D finishing (parallel and waterline, by drop-cutter), chamfering, and the
+outline cut through with tabs. tools: short names ("6mm-flat", "3mm-ball", "6mm-bull-r1", "5mm-drill",
+"6mm-chamfer-90") or {kind: flat|ball|bull|drill|chamfer, d, flutes, flute_l, length, holder_d, holder_l,
+corner_r, angle}; a tool whose flute length or stick-out was not given is "assumed". material: a row of the
+speeds table (aluminum, brass, steel, stainless, acrylic, polycarbonate, ...); speed and feed are
+chip load x flutes x RPM from a cited table, each number marked sourced/computed, specified or assumed.
+options: {machine: {rapid, accel, junction_deviation, max_feed, max_rpm}, stock: {margin_xy, margin_top} or
+{size: [x, y, z]}, setups: "auto" (from the manufacturability check's access analysis) or ["+Z", "-Z", ...],
+origin: corner|center, zero: top|bottom, ops: [{op: face|adaptive|finish|contour|drill|bore|chamfer|raster|
+waterline, tool, stepover, stepdown, feeds: {rpm, feed, plunge}, ...}], feeds: {tool_id: {rpm, feed,
+plunge}} (the person's own numbers: specified), tolerance, chamfer (mm), tabs, cutout}. Returns the setups
+with their operations, speeds and feeds with sources, what is assumed (each blocks a release) and notes.
+A plan is not checked: cam_post writes the G-code and simulates it.
+
+| Argument | Type | Required |
+|---|---|---|
+| `project` | string | yes |
+| `tools` | array \| null |  |
+| `material` | string |  |
+| `options` | object \| null |  |
+| `rev` | integer \| null |  |
+
+### `cam_post`
+
+Write the G-code of the design's CAM plan for a controller, read it back and simulate it from the file.
+machine: grbl, linuxcnc, fanuc (generic), haas or marlin (Marlin with a spindle). units mm or inch; wcs G54
+to G59. Each dialect gets its own modal codes, tool changes (M6 and G43 where the controller has them, a
+pause where it does not), drilling cycles (G81/G83 or written out) and ending. The posted file is parsed as
+that controller reads it, compared with the plan move for move, and run on a stock model with the tools'
+real shapes: gouge (exact distance of the part's surface into the cutter), leftover volume and places,
+rapids through stock, shank and holder collisions, cycle time under the machine's stated limits. Every
+result is "simulated, not proven on a machine". include=true asks for the program to go into the next
+release: that needs a current simulation with no gouge or collision, no assumed tool, speed or feed, and
+the person's approval (request_release). options: plan first with these (as cam_plan). Returns the files,
+the first lines, the simulation and the release status.
+
+| Argument | Type | Required |
+|---|---|---|
+| `project` | string | yes |
+| `machine` | string |  |
+| `units` | string |  |
+| `wcs` | string |  |
+| `include` | boolean \| null |  |
+| `options` | object \| null |  |
+| `line_numbers` | boolean |  |
+
+### `cam_simulate`
+
+Simulate the design's posted CNC program again from its file and say where it stands. The stock is a
+height field (cell: mm, default a quarter of the smallest tool radius, at most 0.25); the tool's real shape
+is swept along the motion parsed from the G-code. Returns per setup: gouge (max mm, where, which
+operation), leftover (volume, max, regions), collisions, removed volume and cycle time per operation, with
+the machine limits used; the file the viewport draws (form-cam-view/1: toolpaths coloured by operation, the
+stock with gouge and leftover marked); and status: current, or stale and why (the design, tools, options,
+speeds table or post changed, or the file was edited). Simulated, not proven on a machine.
+
+| Argument | Type | Required |
+|---|---|---|
+| `project` | string | yes |
+| `cell` | number \| null |  |
+| `force` | boolean |  |
+
 ### `add_text`
 
 Put raised (or, with sunk, cut-in) lettering on a flat face of a Python design, as a real feature of its source:
@@ -1098,10 +1167,14 @@ before the whole part. Returns its STL path and simulated time and material.
 
 ### `record_physical_result`
 
-Record what the USER observed after a real print. Never call this with values the user did not report.
+Record what the USER observed after a real print or a real machining run. Never call this with values
+the user did not report.
 kind="fit": result is too_tight | good | too_loose for this revision.
 kind="widths": measured pairs [{"nominal": mm, "measured": mm}] from a coupon (source="coupon") or this part
 (source="part"); they calibrate this printer profile for every future design.
+kind="machined": the posted CNC program was run on a machine; result is good | gouged | collision |
+left_material | scrapped. It belongs to that program (its file hashes); until one is recorded the program
+is labelled "simulated, not proven on a machine".
 
 | Argument | Type | Required |
 |---|---|---|
