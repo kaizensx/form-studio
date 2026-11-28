@@ -9,7 +9,7 @@ import "F.js" as F
 Glass {
     id: ls
     objectName: "legendStrip"
-    readonly property var r: Results.on && Results.kind !== "drawing" ? Results.r : null
+    readonly property var r: Results.on && Results.kind !== "drawing" && Results.kind !== "front" ? Results.r : null
     readonly property string kind: r ? r.kind : ""
     readonly property bool on: !!r
     property var _last: null             // what it showed, kept while it leaves
@@ -27,7 +27,8 @@ Glass {
     MouseArea { anchors.fill: parent; acceptedButtons: Qt.AllButtons; onWheel: function (w) { w.accepted = true }; onPressed: Results.cut() }
 
     readonly property string title: !d ? "" : dk === "field" ? (d.quantity ? d.quantity.charAt(0).toUpperCase() + d.quantity.slice(1) : d.title)
-        : dk === "dfm" ? "Manufacturability" : dk === "cam" ? "CNC, 3-axis" : dk === "flat" ? "Flat pattern" : dk === "motion" ? "Motion" : d.title || ""
+        : dk === "dfm" ? "Manufacturability" : dk === "cam" ? "CNC, 3-axis" : dk === "flat" ? "Flat pattern" : dk === "motion" ? "Motion"
+        : dk === "stack" ? "Tolerance loop" : dk === "topology" ? "Material removed" : d.title || ""
     readonly property string sub: {
         if (!d) return ""
         var rev = F.pad(d.rev), bits = []
@@ -36,6 +37,8 @@ Glass {
         else if (dk === "cam") { var s = d.setups[Results.setup]; bits.push(rev); if (s) bits.push("setup " + s.n + " of " + d.setups.length + ", " + s.name); if (d.summary.cycle_time) bits.push(d.summary.cycle_time) }
         else if (dk === "flat") { bits.push(rev); if (d.size_mm) bits.push(F.fmt(d.size_mm[0], 1) + " × " + F.fmt(d.size_mm[1], 1) + " mm"); bits.push(d.bends.length + " bends"); bits.push("t " + d.t + " mm") }
         else if (dk === "motion") { bits.push(rev); bits.push((d.drivers || []).join("; ")) }
+        else if (dk === "stack") { bits.push(rev); if (d.name) bits.push(d.name); bits.push("gap " + Results.fmt(d.gap.nominal, "mm")) }
+        else if (dk === "topology") { bits.push(rev); bits.push("iteration " + Results.iteration + " of " + Results.duration); if (d.volfrac) bits.push(Math.round(d.volfrac * 100) + " % of the material kept") }
         return bits.filter(function (x) { return !!x }).join(" · ")
     }
     // how it is known, as the mockup letters it: SIMULATED · LINEAR STATIC
@@ -59,6 +62,9 @@ Glass {
         if (dk === "cam") return "Gouge " + d.summary.gouge_max_mm + " mm, leftover " + d.summary.leftover_mm3 + " mm³, " + d.summary.rapid_collisions + " rapid and " + d.summary.holder_collisions + " holder collisions."
         if (dk === "flat") return d.verify && d.verify.max_mm !== undefined && d.verify.max_mm !== null ? "Folded back onto the part: largest difference " + Number(d.verify.max_mm).toExponential(1) + " mm over " + d.verify.samples + " points." : ""
         if (dk === "motion") return d.clearance ? d.clearance.detail : ""
+        if (dk === "stack") return "Worst case " + Results.fmt(d.worst_case[0], "") + " to " + Results.fmt(d.worst_case[1], "mm") + ", RSS " + Results.fmt(d.rss[0], "") + " to " + Results.fmt(d.rss[1], "mm") + (d.cpk !== null && d.cpk !== undefined ? ", Cpk " + d.cpk.toFixed(2) : "") + "."
+        if (dk === "topology") { var h = d.history || [], a = h.length > 1 ? h[1] : null, b = h.length ? h[h.length - 1] : null
+            return (d.converged ? "Converged" : "Stopped before converging") + " after " + Math.max(0, h.length - 1) + " iterations" + (a && b && a.compliance && b.compliance ? "; compliance " + Results.fmt(a.compliance, "") + " to " + Results.fmt(b.compliance, "") : "") + "." }
         return ""
     }
     readonly property real late: Math.max(0, Math.min(1, (Results.settle - 0.4) / 0.6))      // the error line lights last
@@ -72,6 +78,21 @@ Glass {
             Ev { id: how; objectName: "legendEvidence"; anchors.right: parent.right; anchors.baseline: ttl.baseline; color: Theme.ink2; text: ls.how } }
 
         // ── the scale of a field: continuous, with the peak at its end and the value under the pointer ──
+        // topology: what the optimiser takes away, on the field's ramp (clay kept, white removed)
+        Item { objectName: "topologyScale"; width: parent.width; height: 26; visible: ls.dk === "topology"
+            Canvas { id: tbar; width: parent.width; height: 8; y: 2
+                onWidthChanged: requestPaint(); Component.onCompleted: requestPaint()
+                Connections { target: Theme; function onDarkChanged() { tbar.requestPaint() } }
+                onPaint: { var g = getContext("2d"), gr = g.createLinearGradient(0, 0, width, 0); g.reset()
+                    for (var i = 0; i <= 16; i++) gr.addColorStop(i / 16, Results.rampAt(i / 16))
+                    g.fillStyle = gr; g.beginPath(); g.roundedRect(0, 0, width, height, 4, 4); g.fill() } }
+            Txt { y: 14; font.pixelSize: 11; tone: 3; wrapMode: Text.NoWrap; text: "kept (density 1)" }
+            Txt { y: 14; anchors.right: parent.right; font.pixelSize: 11; tone: 3; wrapMode: Text.NoWrap; text: "removed (density 0)" } }
+        // stack: what each tolerance adds to the gap's spread
+        Row { objectName: "stackShares"; width: parent.width; spacing: 14; visible: ls.dk === "stack"
+            Repeater { model: ls.dk === "stack" ? ls.d.chart.slice(0, 3) : []
+                Txt { required property var modelData; font.pixelSize: 11; tone: 2; wrapMode: Text.NoWrap
+                    text: modelData.label + "  " + Math.round(modelData.percent) + " %" } } }
         Item { id: scaleRow; width: parent.width; height: 34; visible: ls.dk === "field"; opacity: 0.25 + 0.75 * Results.settle
             readonly property real lo: ls.dk === "field" ? ls.d.range[0] : 0
             readonly property real hi: ls.dk === "field" ? ls.d.range[1] : 1
@@ -123,7 +144,7 @@ Glass {
                 model: [{ value: false, text: "Folded" }, { value: true, text: "Flat" }]; value: Results.flat; onPicked: function (v) { Results.flat = v } } }
 
         // ── a timeline: the operations of a CNC setup, or a mechanism's smallest gap over its cycle ──
-        Item { id: tl; objectName: "timeline"; width: parent.width; height: ls.dk === "motion" ? 54 : 34; visible: ls.dk === "cam" || ls.dk === "motion"
+        Item { id: tl; objectName: "timeline"; width: parent.width; height: ls.dk === "motion" ? 54 : 34; visible: ls.dk === "cam" || ls.dk === "motion" || ls.dk === "topology"
             readonly property real dur: Math.max(1e-9, Results.duration)
             readonly property real x0: 34
             readonly property real w: width - x0
@@ -161,7 +182,8 @@ Glass {
                 function go(mx) { Results.scrub(Math.max(0, Math.min(1, mx / width)) * tl.dur) }
                 onPressed: function (e) { go(e.x) } onPositionChanged: function (e) { if (pressed) go(e.x) } }
             Txt { x: tl.x0; y: parent.height - 14; mono: true; font.pixelSize: 11; tone: 2; wrapMode: Text.NoWrap; lineHeight: 1; topPadding: 0; bottomPadding: 0
-                objectName: "scrubTime"; text: Results.clock(Results.t) + " of " + Results.clock(tl.dur) + (Results.playRate > 1 ? "  · played " + Results.playRate.toFixed(0) + "× faster" : "") }
+                objectName: "scrubTime"; text: ls.dk === "topology" ? "iteration " + Results.iteration + " of " + Results.duration + " · the run as it went"
+                    : Results.clock(Results.t) + " of " + Results.clock(tl.dur) + (Results.playRate > 1 ? "  · played " + Results.playRate.toFixed(0) + "× faster" : "") }
             Txt { visible: ls.dk === "cam"; anchors.right: parent.right; y: parent.height - 14; mono: true; font.pixelSize: 11; tone: 3; wrapMode: Text.NoWrap; lineHeight: 1; topPadding: 0; bottomPadding: 0
                 text: Results.t >= tl.dur - 1e-6 ? "stock: end of the setup" : "stock is drawn at the end of the setup" }
         }

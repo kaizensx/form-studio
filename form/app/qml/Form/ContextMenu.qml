@@ -73,7 +73,7 @@ Item {
         if (Store.feature) Store.toggleHidden(Store.feature)
         else if (Store.hidden.length) Store.showAll()
         else Store.toast("Select a feature to hide", "Click it on the model, then press H. Hiding is visual only.") } }
-    Shortcut { sequence: "Shift+H"; enabled: cm.keys; onActivated: Store.showAll() }
+    Shortcut { sequence: "Alt+H"; enabled: cm.keys; onActivated: Store.showAll() }       // (Shift+H is Hole, in Design)
     Shortcut { sequence: "X"; enabled: cm.keys; onActivated: Store.toggleSection() }
     Shortcut { sequence: "."; enabled: cm.keys; onActivated: Store.resetView() }
     Shortcut { sequences: ["?", "Shift+/"]; enabled: Store.screen === "work" && !Store.paletteOpen && !(cm.focusItem && cm.focusItem.cursorPosition !== undefined)

@@ -212,6 +212,12 @@ class Journeys(unittest.TestCase):
     def test_modelling_small(self):         # the smallest window: Preview and Add stay in view, pinned at the pane's foot
         self.journey("modelling.py", size="1120x700", env_extra={"FORM_APPEARANCE": "dark"})
 
+    def test_stack_topology(self):          # the tolerance loop and the topology run on the part, from real engine runs
+        self.journey("stack_topology.py")
+
+    def test_stage_idle(self):              # a still workspace draws nothing, active or not, in every mode; the caret alone blinks
+        self.journey("stage_idle.py")
+
     def test_dock_modes(self):              # the dock by mode, the capsule in one place, the modes' keys, idle redraws
         self.journey("dock_modes.py", env_extra={"FORM_APPEARANCE": "dark"})
 

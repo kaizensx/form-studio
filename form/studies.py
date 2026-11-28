@@ -26,6 +26,7 @@ from __future__ import annotations
 import importlib
 import json
 import os
+import re
 import threading
 import time
 import uuid
@@ -345,7 +346,7 @@ def _base(ctx, s: Study) -> dict:
 def _from_result(e: dict, res: dict, head: int) -> dict:
     e.update({"headline": res.get("headline") or "", "evidence": res.get("evidence") or e["evidence"],
               "detail": res.get("detail") or "", "files": res.get("files") or [], "rev": res.get("rev"),
-              "ran": res.get("ts"), "seconds": res.get("seconds")})
+              "ran": res.get("ts"), "seconds": res.get("seconds"), **({"row": res["row"]} if res.get("row") else {})})
     if res.get("rev") is not None and res["rev"] != head:
         e["note"] = (f"Computed for r{res['rev']:02d}, whose inputs are the same as r{head:02d}'s.")
     return e
@@ -373,9 +374,44 @@ def entry(ctx, s: Study, full: bool = False) -> dict:
         need = _ready(ctx, s)
         if need:
             e["state_before"], e["state"], e["why"] = e["state"], "unavailable", need
+    if e.get("headline"):
+        e["row"] = e.get("row") or row(e["headline"])
     if not full:
         e.pop("data", None)
     return e
+
+
+# ---- the row's number ----------------------------------------------------------------------------------------
+# A Bench row has room for one number and its unit (BenchRow: name, number, evidence word); the headline is the
+# sentence the opened card shows. `row` is the headline's leading figure, named the way the row reads it. An engine
+# may give its own ("row" in its result or state) and then this is not used.
+_ROWS = (
+    (r"(\d+) pockets, (\d+ %) lighter", "{1} lighter"),
+    (r"safety factor (\d[\d.]*)", "SF {}"),
+    (r"natural frequencies (\d[\d.]*)", "{} Hz"),
+    (r"buckles at (\d[\d.]*) x", "{} × the loads"),
+    (r"^(-?\d[\d.]* to -?\d[\d.]* °C)", "{}"),
+    (r"^gap (-?\d[\d.]* mm)", "gap {}"),
+    (r"first: [^(]*\((\d[\d.]* mm³) support", "{} support"),
+    (r"^(\d+) variants? on the front", "{} on the front"),
+    (r"^(\d+/\d+) frames close", "{} close"),
+    (r"clearance (-?\d[\d.]* ?mm)", "gap {}"),
+    (r"^(\d+ of \d+) annotations", "{} read back"),
+    (r"^(low|moderate|high|very high)\b", "{}"),
+)
+
+
+def row(headline: str) -> str:
+    """The short form of a headline for a Bench row: a number with its unit (`safety factor 2.41 (at least 2.1);
+    peak ...` gives `SF 2.41`), else the headline up to its first clause."""
+    h = (headline or "").strip()
+    for pat, fmt in _ROWS:
+        m = re.search(pat, h)
+        if m:
+            return fmt.format(*m.groups())
+    h = re.sub(r"^[A-Z][^:;]{1,30}: (?=\S)", "", h)          # "Injection moulding: review" -> "review": the name says it
+    cut = re.split(r";| · | \(|, (?=[a-z])", h, maxsplit=1)[0].strip()
+    return cut if len(cut) <= 28 else cut[:26].rstrip() + "…"
 
 
 def _node_state(ctx, s: Study) -> dict:

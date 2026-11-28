@@ -96,7 +96,7 @@ Item {
                     GradientStop { position: 0; color: "transparent" }
                     GradientStop { position: 0.5; color: b.kind === "primary" ? Qt.rgba(1, 1, 1, 0.22) : Qt.rgba(1, 1, 1, 0.06) }
                     GradientStop { position: 1; color: "transparent" } }
-                NumberAnimation on x { running: b._shown && !Theme.reduced; from: -sheen.width; to: face.width; duration: 1100; loops: Animation.Infinite } } }
+                NumberAnimation on x { running: b._shown && b.visible && !Theme.reduced; from: -sheen.width; to: face.width; duration: 1100; loops: Animation.Infinite } } }
     }
     FocusRing { on: b.activeFocus; radius: face.radius + 3 }
     Row {

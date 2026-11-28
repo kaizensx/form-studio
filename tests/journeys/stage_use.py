@@ -62,7 +62,7 @@ def run(ui):
     ui.eq(round(cur.height()), round(ui.item("startText").property("cursorRectangle").height()), "the caret is as tall as the line")
     ui.key("End")                                    # (a key through the window: it is the active one from here on)
     if not ui.js("Theme.reduced"):
-        ui.wait_until(lambda: ui.item("startCursor").property("beat") == 2, 3, "the caret to blink once the words are still")
+        ui.wait_until(lambda: ui.item("startCursor").property("beat") == 1, 3, "the caret to blink once the words are still")
     ui.clear()
 
     pid = make(ui, "enclosure", "Sensor case", open=False)

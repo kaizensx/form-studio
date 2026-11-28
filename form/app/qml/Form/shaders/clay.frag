@@ -23,6 +23,13 @@ void MAIN()
     // a soft sheen at grazing angles, as a studio's walls give a satin surface (never on an analysis map)
     vec3 sheen = BASE_COLOR.rgb * 0.05 * pow(edge, 3.0) * (1.0 - uMap);
     EMISSIVE_COLOR = ambient + sheen + uGlow.rgb + uRim.rgb * pow(edge, 2.6) * (1.0 - uMap);
+    // a ghost (uGhost → 1: a sketch is open on the part): the clay thinned to a veil, firmer where the surface turns
+    // away from the eye, so the silhouette still reads. The material blends it after a depth pass of its own
+    // (Viewport.qml), so only the nearest surface is drawn; its own light is halved, so no face burns out.
+    if (uGhost > 0.0) {
+        BASE_COLOR.a = mix(1.0, 0.2 + 0.4 * pow(edge, 1.6), uGhost);
+        EMISSIVE_COLOR *= mix(1.0, 0.5, uGhost);
+    }
     if (!gl_FrontFacing) {
         BASE_COLOR = vec4(0.0, 0.0, 0.0, 1.0);
         EMISSIVE_COLOR = vec3(0.36, 0.56, 0.49);

@@ -4,6 +4,7 @@
 //   pin   a finding or a measurement (an analysis marker, a check, a measured distance). Never hidden.
 //   dim   an overall dimension. Lives at the middle of its dimension line; slides along it to get out of the way.
 //   ref   a note on a reference outline (what the part holds). First to go when there is no room.
+//   keep  something already drawn that no label may cover (a marker, a ring): its one candidate is where it is.
 // Each item: { kind, w, h, cands: [{x, y}, …], prev } where cands are top-left corners in order of preference and
 // prev is the candidate it had last frame (-1: none). Returns, per item, { x, y, visible, c } (c: candidate used).
 var GAP = 4            // px kept clear between two labels
@@ -45,6 +46,8 @@ function place(items, view) {
         }
         return false
     }
+    // 0. what is already drawn holds its place
+    for (i = 0; i < items.length; i++) if (items[i].kind === "keep" && items[i].cands.length) put(i, rect(items[i], 0), 0)
     // 1. dimensions take their places
     for (i = 0; i < items.length; i++) if (items[i].kind === "dim" && items[i].cands.length) seat(i, false)
     // 2. findings: beside their point, on the first side that is free. With no free side a finding still shows,

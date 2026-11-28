@@ -7,6 +7,12 @@ import "F.js" as F
 // camera, so the sketch stays on the face when the view is turned. The solver runs on every change; what is left
 // free is counted in the tool capsule. Extrude, Cut or Revolve at the foot of the stage builds it as one feature of
 // the design's code (the same routes the sheet used: /model, /sketch, /start/sketch).
+// While a sketch is open the view is orthographic (Viewport.sketching): the far end of an extrusion and the kernel's
+// preview stand straight over the profile. The rest of the part is a ghost, the face keeps its tint, and the
+// profile's lines are drawn in the part's own depth (Viewport.inkLines): what stands in front of them hides them,
+// and the hidden part is still drawn, faintly, here. A dimension is drawn as on a drawing: witness lines, a
+// dimension line with arrows, its value in a tag that is typed over. Symbols and tags are seated so that none covers
+// another or the profile (layout()).
 //   pick(kind)      wait for a face or a plane (the dock's Sketch, Extrude, Cut, Revolve)
 //   begin(props)    props as the sheet took them: { mode: "new" | "add" | "edit", plane, outline, feature, sketch, values }
 // The old sheet (SketchEditor.qml) stays as the fallback where there is no 3D view (a software renderer).
@@ -19,6 +25,8 @@ Item {
     property real capY: 0
     property real capMax: 600
     property real midX: width / 2              // the stage's centre line, and its foot
+    property real footL: capX                  // the foot of the stage is free from here to here (no view cube down there)
+    property real footR: capX + capMax
     property real footY: height - 20
     readonly property bool usable: !!vp && GraphicsInfo.api !== GraphicsInfo.Software
     property var props: null
@@ -70,7 +78,7 @@ Item {
     function pick(k) {                         // the dock's tool: wait for a face or a plane
         if (!usable) { Store.openSheet("handsketch", { mode: "add", plane: { datum: "XY", offset: 0 }, sheet: true }); return }
         if (on) { kind = k || kind; return }
-        kind = k || "extrude"; picking = true; err = ""
+        kind = k || "extrude"; picking = true; err = ""; hover = null
         area.forceActiveFocus()
     }
     function begin(p) {                        // true when the sketch is drawn here; false: the caller opens the sheet
@@ -88,7 +96,7 @@ Item {
         if (p.mode === "new" && kind === "cut") kind = "extrude"
         depth = kind === "cut" ? "0" : "10"
         sk = s; props = p; picking = false
-        _dims = vp.showDims; vp.showDims = false
+        hover = null; vp.sketching = true
         look()
         solve()
         area.forceActiveFocus()
@@ -110,8 +118,9 @@ Item {
         var had = on
         props = null; picking = false; draft = null; sol = null; chain = []; from = null; rubber = null; snap = null; selE = []; selP = []; editing = -1; busy = false
         pv.stop()
+        hover = null; hv.stop()
         if (vp) {
-            if (had) vp.showDims = _dims
+            vp.sketching = false; vp.inkLines = []; vp.inkLit = []
             if (had && Store.viewer === vp) { Store.showHead(); vp.setView(Store.viewName, true) }
         }
         if (vp) vp.forceActiveFocus()
@@ -122,7 +131,7 @@ Item {
         if (selE.length || selP.length) { selE = []; selP = []; return }
         if (picking || !sk.entities.length) end()
     }
-    property bool _dims: true
+    Component.onDestruction: if (vp) { vp.sketching = false; vp.inkLines = []; vp.inkLit = [] }
 
     // ── the plane and the screen ──
     function at3(p) { return o.plus(xd.times(p[0])).plus(yd.times(p[1])) }
@@ -343,16 +352,210 @@ Item {
 
     // ── the camera moved: place everything again (never on a timer; a still view repaints nothing) ──
     readonly property var cam: vp ? [vp.az, vp.el, vp.dist, vp.target, vp.shift, vp.shownLeft, vp.shownRight, vp.shownTop, vp.shownBottom, vp.width, vp.height] : []
-    onCamChanged: if (on) { tick++; ink.requestPaint() }
-    onSkChanged: ink.requestPaint()
-    onSelEChanged: ink.requestPaint()
+    onCamChanged: if (on || hover) { tick++; ink.requestPaint() }
+    onSkChanged: { sync3(); ink.requestPaint() }
+    onSelEChanged: { sync3(); ink.requestPaint() }
     onSelPChanged: ink.requestPaint()
     onSnapChanged: ink.requestPaint()
-    onOnChanged: ink.requestPaint()
+    onOnChanged: { sync3(); ink.requestPaint() }
+    onHoverChanged: ink.requestPaint()
+    onLayChanged: ink.requestPaint()
+    // the profile as 3D lines in the part's own depth (construction lines stay dashed, in the ink)
+    function sync3() {
+        if (!vp) return
+        var all = [], lit = []
+        if (on) for (var i = 0; i < sk.entities.length; i++) {
+            var e = sk.entities[i]
+            if (e.construction) continue
+            var pts = sample(e), to = selE.indexOf(i) >= 0 ? lit : all
+            for (var j = 0; j + 1 < pts.length; j++) { var a = at3(pts[j]), b = at3(pts[j + 1]); to.push(a.x, a.y, a.z, b.x, b.y, b.z) }
+        }
+        vp.inkLines = all; vp.inkLit = lit
+    }
+
+    // ── the face under the pointer, before it is picked: its outline lit, from the kernel (never guessed from the mesh) ──
+    property var hover: null                   // { plane, outline, loops, f: frame, at }
+    property point _hp: Qt.point(0, 0)
+    property int _hn: 0
+    Timer { id: hv; interval: 45; onTriggered: so.probe() }
+    function loopsOf(outline) {                // the face's edges chained into closed loops (plane coordinates)
+        var left = (outline || []).filter(function (p) { return p.length > 1 }).map(function (p) { return p.slice() }), loops = []
+        function near(a, b) { return Math.abs(a[0] - b[0]) < 2e-3 && Math.abs(a[1] - b[1]) < 2e-3 }
+        while (left.length) {
+            var cur = left.shift(), grew = true
+            while (grew && !near(cur[0], cur[cur.length - 1])) {
+                grew = false
+                for (var i = 0; i < left.length; i++) {
+                    var c = left[i], end = cur[cur.length - 1]
+                    if (near(c[0], end)) { cur = cur.concat(c.slice(1)); left.splice(i, 1); grew = true; break }
+                    if (near(c[c.length - 1], end)) { cur = cur.concat(c.slice().reverse().slice(1)); left.splice(i, 1); grew = true; break }
+                }
+            }
+            loops.push(cur)
+        }
+        return loops
+    }
+    function inLoops(loops, m) {               // even-odd: inside the face, outside its holes
+        var inside = false
+        for (var l = 0; l < loops.length; l++) { var lp = loops[l]
+            for (var i = 0, j = lp.length - 1; i < lp.length; j = i++) {
+                var a = lp[i], b = lp[j]
+                if ((a[1] > m[1]) !== (b[1] > m[1]) && m[0] < (b[0] - a[0]) * (m[1] - a[1]) / (b[1] - a[1]) + a[0]) inside = !inside
+            } }
+        return inside
+    }
+    function onFace(h, x, y) {                 // is this pixel still on the face that is lit
+        if (!h || !vp) return false
+        var hit = vp.hitAt(x, y)
+        if (!hit) return false
+        var r = Qt.vector3d(hit.shown[0], hit.shown[1], hit.shown[2]).minus(h.f.o)
+        return Math.abs(r.dotProduct(h.f.n)) < 0.02 && inLoops(h.loops, [r.dotProduct(h.f.x), r.dotProduct(h.f.y)])
+    }
+    function probe() {
+        if (!picking || !vp) { hover = null; return }
+        if (onFace(hover, _hp.x, _hp.y)) return
+        var hit = vp.hitAt(_hp.x, _hp.y), n = ++_hn
+        if (!hit) { hover = null; return }
+        Store.ppost("/sketch_plane", { at: hit.at }).then(function (r) {
+            if (n !== so._hn || !so.picking) return
+            var fr = so.frameOf(r.plane)
+            so.hover = fr ? { plane: r.plane, outline: r.outline, loops: so.loopsOf(r.outline), f: fr } : null
+        }, function () { if (n === so._hn) so.hover = null })      // a curved face: nothing lights, and a click says why
+    }
+    function pxF(fr, p) { var q = vp ? vp.designPx(fr.o.plus(fr.x.times(p[0])).plus(fr.y.times(p[1]))) : null; return q || Qt.point(-1e5, -1e5) }
+
+    // ── where the dimensions and the constraints' symbols sit (screen px), so that none covers another or the profile ──
+    function _hit(r, rects) { for (var i = 0; i < rects.length; i++) { var q = rects[i]; if (r.x < q.x + q.w && q.x < r.x + r.w && r.y < q.y + q.h && q.y < r.y + r.h) return true } return false }
+    function _cuts(r, segs) {                  // does one of the segments pass through the rectangle (Liang-Barsky)
+        for (var i = 0; i < segs.length; i++) {
+            var g = segs[i], dx = g[2] - g[0], dy = g[3] - g[1], t0 = 0, t1 = 1, ok = true
+            var p = [-dx, dx, -dy, dy], q = [g[0] - r.x, r.x + r.w - g[0], g[1] - r.y, r.y + r.h - g[1]]
+            for (var k = 0; k < 4 && ok; k++) {
+                if (Math.abs(p[k]) < 1e-9) { if (q[k] < 0) ok = false }
+                else { var t = q[k] / p[k]; if (p[k] < 0) { if (t > t1) ok = false; else if (t > t0) t0 = t } else { if (t < t0) ok = false; else if (t < t1) t1 = t } }
+            }
+            if (ok) return true
+        }
+        return false
+    }
+    readonly property var lay: { tick; sk; sol; return on && vp ? layout() : ({ dims: ({}), glyphs: [], lines: [], arrows: [] }) }
+    function layout() {
+        var L = { dims: ({}), glyphs: [], lines: [], arrows: [] }
+        var mm = Math.max(1e-6, vp.mmPerPx), i, j, n = sk.points.length, cx = 0, cy = 0, segs = [], rects = []
+        for (j = 0; j < n; j++) { cx += sk.points[j][0] / n; cy += sk.points[j][1] / n }
+        for (i = 0; i < sk.entities.length; i++) {
+            var pts = sample(sk.entities[i])
+            for (j = 0; j + 1 < pts.length; j++) { var a0 = px(pts[j]), b0 = px(pts[j + 1]); segs.push([a0.x, a0.y, b0.x, b0.y]) }
+        }
+        for (j = 0; j < n; j++) { var q0 = px(sk.points[j]); rects.push({ x: q0.x - 5, y: q0.y - 5, w: 10, h: 10 }) }
+        function tagW(k) { return Math.ceil(dimText(k).length * 6.7) + 16 }
+        function free(r) { return !so._hit(r, rects) && !so._cuts(r, segs) }
+        function keep(ci, c) {
+            L.dims[ci] = { x: c.x, y: c.y }
+            rects.push(c.r)
+            for (var t = 0; t < c.lines.length; t++) { L.lines.push(c.lines[t]); segs.push(c.lines[t]) }
+            for (t = 0; t < c.arrows.length; t++) L.arrows.push(c.arrows[t])
+        }
+        // a length between two points of the plane, measured along the line through them or across (hdist, vdist):
+        // nrm is the side the dimension line stands off to; the nearest free seat on that side, then on the other
+        function linear(ci, k, P, Q, nrm) {
+            var w = tagW(k), h = 22, first = null, clear = null
+            for (var side = 0; side < 2; side++) for (var t = 0; t < 4; t++) {
+                var sg = side ? -1 : 1, nx = nrm[0] * sg, ny = nrm[1] * sg, off = (28 + 24 * t) * mm
+                var dp = P[0] * nx + P[1] * ny, dq = Q[0] * nx + Q[1] * ny, far = Math.max(dp, dq) + off
+                var A = [P[0] + nx * (far - dp), P[1] + ny * (far - dp)], B = [Q[0] + nx * (far - dq), Q[1] + ny * (far - dq)]
+                var a = px(A), b = px(B), len = Math.hypot(b.x - a.x, b.y - a.y)
+                if (len < 1e-3) continue
+                var ux = (b.x - a.x) / len, uy = (b.y - a.y) / len, ext = Math.abs(ux) * w / 2 + Math.abs(uy) * h / 2
+                var inside = len >= 2 * ext + 22, tx = inside ? (a.x + b.x) / 2 : b.x + ux * (ext + 13), ty = inside ? (a.y + b.y) / 2 : b.y + uy * (ext + 13)
+                var g = 4 * mm, o = 7 * mm
+                var w1a = px([P[0] + nx * g, P[1] + ny * g]), w1b = px([A[0] + nx * o, A[1] + ny * o]), w2a = px([Q[0] + nx * g, Q[1] + ny * g]), w2b = px([B[0] + nx * o, B[1] + ny * o])
+                var c = { x: tx, y: ty, r: { x: tx - w / 2 - 2, y: ty - h / 2 - 2, w: w + 4, h: h + 4 },
+                          lines: [[w1a.x, w1a.y, w1b.x, w1b.y], [w2a.x, w2a.y, w2b.x, w2b.y],
+                                  inside ? [a.x, a.y, b.x, b.y] : [a.x - ux * 14, a.y - uy * 14, tx, ty]],
+                          arrows: inside ? [[a.x, a.y, -ux, -uy], [b.x, b.y, ux, uy]] : [[a.x, a.y, ux, uy], [b.x, b.y, -ux, -uy]] }
+                if (!first) first = c
+                if (!clear && !so._hit(c.r, rects)) clear = c
+                if (free(c.r)) { keep(ci, c); return }
+            }
+            if (clear || first) keep(ci, clear || first)
+        }
+        // a diameter or a radius: a leader through the centre, its arrow on the curve, the value beyond it
+        function round(ci, k, C, r, dia, mid) {
+            var w = tagW(k), h = 22, first = null, turns = [0, 1, -1, 2, -2, 3]
+            for (var t = 0; t < turns.length; t++) {
+                var an = mid + turns[t] * Math.PI / 4, dx = Math.cos(an), dy = Math.sin(an)
+                var P2 = px([C[0] + r * dx, C[1] + r * dy]), P1 = px(dia ? [C[0] - r * dx, C[1] - r * dy] : C)
+                var len = Math.hypot(P2.x - P1.x, P2.y - P1.y)
+                if (len < 1e-3) continue
+                var ux = (P2.x - P1.x) / len, uy = (P2.y - P1.y) / len, ext = Math.abs(ux) * w / 2 + Math.abs(uy) * h / 2
+                var tx = P2.x + ux * (ext + 16), ty = P2.y + uy * (ext + 16)
+                var c = { x: tx, y: ty, r: { x: tx - w / 2 - 2, y: ty - h / 2 - 2, w: w + 4, h: h + 4 }, lines: [[P1.x, P1.y, tx, ty]],
+                          arrows: dia ? [[P1.x, P1.y, -ux, -uy], [P2.x, P2.y, ux, uy]] : [[P2.x, P2.y, ux, uy]] }
+                if (!first) first = c
+                if (!so._hit(c.r, rects)) { keep(ci, c); return }
+            }
+            if (first) keep(ci, first)
+        }
+        for (i = 0; i < sk.constraints.length; i++) {
+            var k = sk.constraints[i]
+            if (k.value === undefined) continue
+            var e = k.e && k.e.length === 1 && !(k.p && k.p.length) ? sk.entities[k.e[0]] : null
+            if (e && e.k === "line" && k.k === "length") {
+                var P = sk.points[e.p[0]], Q = sk.points[e.p[1]], ll = Math.max(1e-9, Math.hypot(Q[0] - P[0], Q[1] - P[1]))
+                var nn = [-(Q[1] - P[1]) / ll, (Q[0] - P[0]) / ll]
+                if (((P[0] + Q[0]) / 2 - cx) * nn[0] + ((P[1] + Q[1]) / 2 - cy) * nn[1] < 0) nn = [-nn[0], -nn[1]]
+                linear(i, k, P, Q, nn)
+            } else if (e && e.k === "circle") round(i, k, sk.points[e.p[0]], e.r, true, Math.PI / 4)
+            else if (e && e.k === "arc") { var ar = arcOf(e); round(i, k, ar.c, ar.r, false, (ar.a0 + ar.a1) / 2) }
+            else if (k.p && k.p.length === 2 && !(k.e && k.e.length) && sk.points[k.p[0]] && sk.points[k.p[1]] && (k.k === "distance" || k.k === "hdist" || k.k === "vdist")) {
+                var P3 = sk.points[k.p[0]], Q3 = sk.points[k.p[1]], l3 = Math.max(1e-9, Math.hypot(Q3[0] - P3[0], Q3[1] - P3[1]))
+                var n3 = k.k === "hdist" ? [0, 1] : k.k === "vdist" ? [1, 0] : [-(Q3[1] - P3[1]) / l3, (Q3[0] - P3[0]) / l3]
+                if (((P3[0] + Q3[0]) / 2 - cx) * n3[0] + ((P3[1] + Q3[1]) / 2 - cy) * n3[1] < 0) n3 = [-n3[0], -n3[1]]
+                linear(i, k, P3, Q3, n3)
+            } else {
+                var at = conAt(k), w0 = tagW(k)
+                if (at) { L.dims[i] = { x: at.x, y: at.y }; rects.push({ x: at.x - w0 / 2 - 2, y: at.y - 13, w: w0 + 4, h: 26 }) }
+            }
+        }
+        // the symbols: beside what they hold, on the outer side first, clear of the lines, the tags and each other
+        function seat(kind, cands, ax, ay) {
+            var pick = null
+            for (var t = 0; t < cands.length && !pick; t++) { var r = { x: cands[t][0] - 11, y: cands[t][1] - 11, w: 22, h: 22 }; if (free(r)) pick = cands[t] }
+            if (!pick) for (t = 0; t < cands.length && !pick; t++) { var r2 = { x: cands[t][0] - 11, y: cands[t][1] - 11, w: 22, h: 22 }; if (!so._hit(r2, rects)) pick = cands[t] }
+            if (!pick) pick = cands[0]
+            rects.push({ x: pick[0] - 11, y: pick[1] - 11, w: 22, h: 22 })
+            L.glyphs.push({ x: pick[0], y: pick[1], kind: kind, ax: ax, ay: ay })
+        }
+        function around(q) {
+            var out = [], dirs = [[1, -1], [-1, -1], [1, 1], [-1, 1], [1, 0], [0, -1], [-1, 0], [0, 1]]
+            for (var d = 0; d < 3; d++) for (var t = 0; t < dirs.length; t++) out.push([q.x + dirs[t][0] * (15 + 13 * d), q.y + dirs[t][1] * (15 + 13 * d)])
+            return out
+        }
+        for (i = 0; i < sk.constraints.length; i++) {
+            var c2 = sk.constraints[i]
+            if (c2.value !== undefined) continue
+            if (c2.e && c2.e.length && !(c2.p && c2.p.length)) {
+                var m = midOf(c2.e[c2.e.length > 1 ? 1 : 0])
+                if (!m) continue
+                var cs = [], tx2 = -m.ny, ty2 = m.nx, sh = [0, 1, -1, 2, -2]
+                for (var d2 = 0; d2 < 5; d2++) for (var s2 = 0; s2 < sh.length; s2++) cs.push([m.x + m.nx * (16 + 13 * d2) + tx2 * 23 * sh[s2], m.y + m.ny * (16 + 13 * d2) + ty2 * 23 * sh[s2]])
+                seat(c2.k, cs, m.x, m.y)
+            } else if (c2.p && c2.p.length === 2 && sk.points[c2.p[0]] && sk.points[c2.p[1]]) {
+                var pa = px(sk.points[c2.p[0]]), pb = px(sk.points[c2.p[1]])
+                seat(c2.k, around(Qt.point((pa.x + pb.x) / 2, (pa.y + pb.y) / 2)), (pa.x + pb.x) / 2, (pa.y + pb.y) / 2)
+            } else if (c2.p && c2.p.length && sk.points[c2.p[0]]) { var pc = px(sk.points[c2.p[0]]); seat(c2.k, around(pc), pc.x, pc.y) }
+        }
+        for (i = 0; i < sk.fixed.length; i++) if (sk.points[sk.fixed[i]]) {
+            var qf = px(sk.points[sk.fixed[i]]), cf = around(qf)
+            seat("fix", [[qf.x - 15, qf.y + 15]].concat(cf), qf.x, qf.y)
+        }
+        return L
+    }
 
     // ── the ink: the plane, the profile, its points, the constraints as small symbols ──
     Canvas {
-        id: ink; anchors.fill: parent; visible: so.on
+        id: ink; anchors.fill: parent; visible: so.on || (so.picking && !!so.hover)
         renderStrategy: Canvas.Cooperative
         function poly(c, pts, h) { for (var i = 0; i < pts.length; i++) { var q = so.px(pts[i], h); if (i) c.lineTo(q.x, q.y); else c.moveTo(q.x, q.y) } }
         function glyph(c, x, y, kind) {        // an 18 px tag with the constraint's symbol
@@ -376,15 +579,26 @@ Item {
         }
         onPaint: {
             var c = getContext("2d"); c.reset()
-            if (!so.on || !so.vp) return
+            if (!so.vp) return
             c.lineCap = "round"; c.lineJoin = "round"
+            if (!so.on) {                      // waiting for a face: the one under the pointer, lit
+                var hf = so.picking ? so.hover : null
+                if (!hf) return
+                var hp = function (pts) { for (var t = 0; t < pts.length; t++) { var z = so.pxF(hf.f, pts[t]); if (t) c.lineTo(z.x, z.y); else c.moveTo(z.x, z.y) } }
+                c.beginPath(); hf.loops.forEach(function (lp) { hp(lp); c.closePath() })
+                c.fillStyle = Theme.alpha(Theme.datum, Theme.dark ? 0.2 : 0.16); c.fill("evenodd")
+                c.beginPath(); hf.outline.forEach(function (pl) { hp(pl) })
+                c.strokeStyle = Theme.alpha(Theme.datum, 0.9); c.lineWidth = 1.5; c.stroke()
+                return
+            }
             var acc = Theme.datum, i, q, e, lit = Theme.dark ? 0.55 : 0.0
-            // the face it lies on (its outline, tinted), or the datum plane as a faint grid
+            // the face it lies on (tinted inside its own outline, holes left open), or the datum plane as a faint grid
             var out = so.props.outline || []
             if (out.length) {
+                c.beginPath(); so.faceLoops.forEach(function (lp) { ink.poly(c, lp); c.closePath() })
+                c.fillStyle = Theme.alpha(acc, Theme.dark ? 0.09 : 0.08); c.fill("evenodd")
                 c.beginPath(); out.forEach(function (pl) { ink.poly(c, pl) })
-                c.fillStyle = Theme.alpha(acc, Theme.dark ? 0.09 : 0.07); c.fill("evenodd")
-                c.strokeStyle = Theme.alpha(acc, 0.45); c.lineWidth = 1; c.stroke()
+                c.strokeStyle = Theme.alpha(acc, 0.6); c.lineWidth = 1; c.stroke()
             } else {
                 var R = so.vp.model ? Math.ceil(so.vp.radius(so.vp.bounds) / 10) * 10 : 60, st = 10
                 c.lineWidth = 1; c.strokeStyle = Theme.alpha(acc, Theme.dark ? 0.11 : 0.16); c.beginPath()
@@ -398,18 +612,48 @@ Item {
             var loops = so.sol && so.sol.ok && so.sol.closed ? so.sol.polygons || [] : []
             if (loops.length) { c.beginPath(); loops.forEach(function (lp) { ink.poly(c, lp); c.closePath() }); c.fillStyle = Theme.alpha(acc, 0.2); c.fill("evenodd") }
             if (loops.length && so.kind !== "revolve" && so.mode !== "edit" && so.depthMm > 0 && !(so.draft && so.draft.preview.ok)) {
-                var h = so.kind === "cut" ? -so.depthMm : so.depthMm
-                c.strokeStyle = Theme.alpha(acc, 0.55); c.lineWidth = 1; c.setLineDash([4, 3]); c.beginPath()
-                loops.forEach(function (lp) { ink.poly(c, lp, h); c.closePath()
-                    var stp = Math.max(1, Math.round(lp.length / 12))
-                    for (var j = 0; j < lp.length; j += stp) { var a = so.px(lp[j]), b = so.px(lp[j], h); c.moveTo(a.x, a.y); c.lineTo(b.x, b.y) } })
-                c.stroke(); c.setLineDash([])
+                // (looking straight at the plane it lies exactly under the profile: nothing more to draw)
+                var h = so.kind === "cut" ? -so.depthMm : so.depthMm, f0 = so.px(loops[0][0]), f1 = so.px(loops[0][0], h)
+                if (Math.hypot(f1.x - f0.x, f1.y - f0.y) > 1.5) {
+                    c.strokeStyle = Theme.alpha(acc, 0.55); c.lineWidth = 1; c.setLineDash([4, 3]); c.beginPath()
+                    loops.forEach(function (lp) { ink.poly(c, lp, h); c.closePath()
+                        var stp = Math.max(1, Math.round(lp.length / 12))
+                        for (var j = 0; j < lp.length; j += stp) { var a = so.px(lp[j]), b = so.px(lp[j], h); c.moveTo(a.x, a.y); c.lineTo(b.x, b.y) } })
+                    c.stroke(); c.setLineDash([])
+                }
+            }
+            // a revolve: the outline of the body the profile sweeps, dashed: its other half across the axis, and the
+            // circles its corners travel (seen as lines when looking straight at the plane)
+            if (loops.length && so.kind === "revolve" && so.mode !== "edit" && so.axis >= 0 && !(so.draft && so.draft.preview.ok)) {
+                var ax = so.sk.entities[so.axis], A0 = so.sk.points[ax.p[0]], A1 = so.sk.points[ax.p[1]], al = Math.max(1e-9, Math.hypot(A1[0] - A0[0], A1[1] - A0[1]))
+                var ux = (A1[0] - A0[0]) / al, uy = (A1[1] - A0[1]) / al
+                var foot = function (p) { var t = (p[0] - A0[0]) * ux + (p[1] - A0[1]) * uy; return [A0[0] + ux * t, A0[1] + uy * t] }
+                c.strokeStyle = Theme.alpha(acc, 0.6); c.lineWidth = 1; c.setLineDash([5, 4]); c.beginPath()
+                loops.forEach(function (lp) {
+                    ink.poly(c, lp.map(function (p) { var m = foot(p); return [2 * m[0] - p[0], 2 * m[1] - p[1]] })); c.closePath()
+                    // the circles its farthest and its nearest point travel
+                    var far = null, near = null
+                    lp.forEach(function (p) { var m = foot(p), r = Math.hypot(p[0] - m[0], p[1] - m[1]); if (!far || r > far.r) far = { m: m, r: r }; if (!near || r < near.r) near = { m: m, r: r } })
+                    ;[far, near].forEach(function (g, gi) {
+                        if (!g || g.r < 0.2 || (gi === 1 && far.r - near.r < 0.2)) return
+                        for (var t = 0; t <= 64; t++) {
+                            var an = 2 * Math.PI * t / 64, z = so.px([g.m[0] - uy * g.r * Math.cos(an), g.m[1] + ux * g.r * Math.cos(an)], g.r * Math.sin(an))
+                            if (t) c.lineTo(z.x, z.y); else c.moveTo(z.x, z.y)
+                        }
+                    })
+                })
+                c.stroke()
+                // the axis itself: a centre line, past both ends
+                c.setLineDash([9, 3, 2, 3]); c.strokeStyle = Theme.alpha(acc, 0.75); c.beginPath()
+                ink.poly(c, [[A0[0] - ux * al * 0.25, A0[1] - uy * al * 0.25], [A1[0] + ux * al * 0.25, A1[1] + uy * al * 0.25]]); c.stroke(); c.setLineDash([])
             }
             // the entities, lit
             for (i = 0; i < so.sk.entities.length; i++) {
                 e = so.sk.entities[i]
                 var sel = so.selE.indexOf(i) >= 0
-                c.lineWidth = sel ? 2.6 : 1.8; c.strokeStyle = sel ? Theme.datumHi : acc
+                // the line itself is drawn in the 3D view, in the part's depth (Viewport.inkLines). Here: the same line
+                // faintly, which is all that shows of it behind the part, and its light around it
+                c.lineWidth = e.construction ? 1.4 : sel ? 2 : 1.4; c.strokeStyle = e.construction ? Theme.alpha(acc, 0.8) : Theme.alpha(sel ? Theme.datumHi : acc, 0.34)
                 c.shadowColor = Theme.alpha(acc, lit); c.shadowBlur = lit > 0 ? 6 : 0
                 if (e.construction) c.setLineDash([6, 4])
                 c.beginPath(); ink.poly(c, so.sample(e)); c.stroke(); c.setLineDash([])
@@ -429,16 +673,21 @@ Item {
                 c.beginPath(); c.arc(q.x, q.y, ps ? 4.2 : 3.2, 0, 2 * Math.PI); c.fillStyle = ps ? acc : Theme.plate; c.fill()
                 c.lineWidth = 1.6; c.strokeStyle = acc; c.stroke()
             }
-            // the constraints, each a small symbol beside what it holds
-            var seat = {}
-            function put(x, y, kind) { var key = Math.round(x / 14) + ":" + Math.round(y / 14); while (seat[key]) { x += 21; key = Math.round(x / 14) + ":" + Math.round(y / 14) } seat[key] = 1; ink.glyph(c, x, y, kind) }
-            for (i = 0; i < so.sk.constraints.length; i++) {
-                var k = so.sk.constraints[i]
-                if (k.value !== undefined) continue
-                var at = so.conAt(k)
-                if (at) put(at.x, at.y, k.k)
+            // the dimensions, as on a drawing: witness lines, the dimension line, its arrows (the value is a tag, below)
+            var L = so.lay
+            c.strokeStyle = Theme.alpha(acc, Theme.dark ? 0.62 : 0.75); c.lineWidth = 1; c.lineCap = "butt"; c.beginPath()
+            for (i = 0; i < L.lines.length; i++) { var ln = L.lines[i]; c.moveTo(Math.round(ln[0]) + 0.5, Math.round(ln[1]) + 0.5); c.lineTo(Math.round(ln[2]) + 0.5, Math.round(ln[3]) + 0.5) }
+            c.stroke(); c.lineCap = "round"
+            c.fillStyle = Theme.dark ? "#9fe9f7" : acc
+            for (i = 0; i < L.arrows.length; i++) {
+                var ar = L.arrows[i], tx = ar[0], ty = ar[1], dx = ar[2], dy = ar[3]
+                c.beginPath(); c.moveTo(tx, ty); c.lineTo(tx - dx * 8 - dy * 2.6, ty - dy * 8 + dx * 2.6); c.lineTo(tx - dx * 8 + dy * 2.6, ty - dy * 8 - dx * 2.6); c.closePath(); c.fill()
             }
-            for (i = 0; i < so.sk.fixed.length; i++) if (so.sk.points[so.sk.fixed[i]]) { q = so.px(so.sk.points[so.sk.fixed[i]]); put(q.x - 14, q.y + 14, "fix") }
+            // the constraints, each a small symbol beside what it holds
+            c.strokeStyle = Theme.alpha(acc, 0.42); c.lineWidth = 1; c.beginPath()
+            for (i = 0; i < L.glyphs.length; i++) { var gl = L.glyphs[i]; if (Math.hypot(gl.x - gl.ax, gl.y - gl.ay) > 27) { c.moveTo(gl.ax, gl.ay); c.lineTo(gl.x, gl.y) } }
+            c.stroke()
+            for (i = 0; i < L.glyphs.length; i++) ink.glyph(c, L.glyphs[i].x, L.glyphs[i].y, L.glyphs[i].kind)
             // the snap under the pointer
             if (so.snap && so.snap.kind !== "grid" && so.tool !== "select") {
                 q = so.px(so.snap.p); c.strokeStyle = Theme.dark ? "#ffffff" : "#000000"; c.lineWidth = 1.2; c.beginPath()
@@ -467,6 +716,8 @@ Item {
         if (k.p && k.p.length && sk.points[k.p[0]]) { var q = px(sk.points[k.p[0]]); return Qt.point(q.x + 14, q.y - 14) }
         return null
     }
+    readonly property var faceLoops: props && props.outline ? loopsOf(props.outline) : []
+    function dimSeat(j) { var d = lay.dims[j]; if (d) return Qt.point(d.x, d.y); var k = sk.constraints[j]; return k ? dimAt(k) : null }
     function dimAt(k) {
         var e = k.e && k.e.length ? sk.entities[k.e[0]] : null
         if (e && k.e.length === 1 && e.k !== "line") { var c0 = sk.points[e.p[0]], r = e.k === "circle" ? e.r : arcOf(e).r, t = e.k === "circle" ? Math.PI / 4 : (arcOf(e).a0 + arcOf(e).a1) / 2
@@ -485,7 +736,7 @@ Item {
             required property int index
             readonly property bool dim: modelData.value !== undefined
             readonly property bool editing: so.editing === index
-            readonly property point at: { so.tick; so.sk; return dim ? so.dimAt(modelData) || Qt.point(-1e5, 0) : Qt.point(-1e5, 0) }
+            readonly property point at: { so.lay; return dim ? so.dimSeat(index) || Qt.point(-1e5, 0) : Qt.point(-1e5, 0) }
             objectName: "sketchDim-" + index
             visible: dim && !editing && at.x > -1e4
             x: Math.round(at.x - width / 2); y: Math.round(at.y - height / 2); width: Math.ceil(tt.implicitWidth) + 16; height: 22; radius: 11
@@ -497,7 +748,7 @@ Item {
     Rectangle {
         id: edBox; objectName: "sketchDimEdit"
         readonly property var k: so.editing >= 0 ? so.sk.constraints[so.editing] : null
-        readonly property point at: { so.tick; return k ? so.dimAt(k) || Qt.point(0, 0) : Qt.point(0, 0) }
+        readonly property point at: { so.lay; return k ? so.dimSeat(so.editing) || Qt.point(0, 0) : Qt.point(0, 0) }
         visible: !!k
         x: Math.round(at.x - width / 2); y: Math.round(at.y - height / 2); width: Math.ceil(er.implicitWidth) + 22; height: 28; radius: 14; z: 3
         color: Theme.plate; border.color: Theme.datum; border.width: 1
@@ -518,7 +769,7 @@ Item {
 
     // ── the pointer on the plane (Alt-drag, the right button and the wheel still move the view) ──
     MouseArea {
-        id: area; objectName: "sketchArea"; anchors.fill: parent; visible: so.busyHere; hoverEnabled: so.on; acceptedButtons: Qt.LeftButton
+        id: area; objectName: "sketchArea"; anchors.fill: parent; visible: so.busyHere; hoverEnabled: so.busyHere; acceptedButtons: Qt.LeftButton
         cursorShape: so.picking || so.tool !== "select" ? Qt.CrossCursor : Qt.ArrowCursor
         property bool moved: false
         onPressed: function (m) {
@@ -552,6 +803,7 @@ Item {
             if (i !== so.chain[1]) { s2.entities.push({ k: "arc", p: [so.chain[0], so.chain[1], i] }); so.chain = []; so.set(s2) }
         }
         onPositionChanged: function (m) {
+            if (so.picking) { so._hp = Qt.point(m.x, m.y); if (!hv.running) hv.start(); return }
             if (!so.on) return
             moved = true
             if (so.tool === "select" && pressed && so.dragPt >= 0) {
@@ -576,7 +828,7 @@ Item {
             }
             so.dragPt = -1
         }
-        onExited: { so.snap = null }
+        onExited: { so.snap = null; if (so.picking) { hv.stop(); so._hn++; so.hover = null } }
         Keys.onEscapePressed: so.leave()
         Keys.onDeletePressed: so.removeSel()
         Keys.onReturnPressed: so.commit()
@@ -593,6 +845,13 @@ Item {
         var hit = vp.hitAt(x, y)
         if (!hit) { err = "Nothing there. Click a flat face of the part, or choose a plane."; return }
         err = ""
+        if (onFace(hover, x, y)) {             // the lit face: no second question. Its frame moves to the clicked point, the sketch's origin
+            var f0 = hover.f, r0 = Qt.vector3d(hit.shown[0], hit.shown[1], hit.shown[2]).minus(f0.o), dx = rnd(r0.dotProduct(f0.x), 4), dy = rnd(r0.dotProduct(f0.y), 4)
+            var o2 = f0.o.plus(f0.x.times(dx)).plus(f0.y.times(dy)), pl = clone(hover.plane)
+            pl.origin = [rnd(o2.x, 4), rnd(o2.y, 4), rnd(o2.z, 4)]
+            begin({ mode: "add", plane: pl, outline: hover.outline.map(function (e) { return e.map(function (p) { return [rnd(p[0] - dx, 4), rnd(p[1] - dy, 4)] }) }), kind: kind })
+            return
+        }
         Store.ppost("/sketch_plane", { at: hit.at }).then(function (r) {
             if (so.picking) so.begin({ mode: "add", plane: r.plane, outline: r.outline, kind: so.kind })
         }, function (e) { so.err = (e.message || "A sketch goes on a flat face.") + (e.hint ? " " + e.hint : "") })
@@ -600,9 +859,34 @@ Item {
     function onDatum(d) { begin({ mode: mode === "new" && on ? "new" : "add", plane: { datum: d, offset: 0 }, kind: kind }) }
 
     // ── the tool capsule: the sketch's tools, what the selection allows, and what is left free ──
+    // It is one line at any width. When the stage is narrow the labels shorten (Rect, Dim; the free count without its
+    // word), and what the selection allows goes behind "More" as far as it does not fit.
+    FontMetrics { id: fmS; font.family: Theme.sans; font.pixelSize: 13; font.weight: Theme.wMedium }
+    FontMetrics { id: fmM; font.family: Theme.mono; font.pixelSize: 12; font.weight: Theme.wMedium }
+    readonly property var tools: [{ id: "select", text: "Select", key: "V", tip: "Select, drag a point. Shift adds to the selection" }, { id: "line", text: "Line", key: "L", tip: "Click points; a click on the first one closes the profile" },
+                                  { id: "arc", text: "Arc", key: "A", tip: "Its centre, where it starts, where it ends (counter-clockwise)" }, { id: "circle", text: "Circle", key: "C", tip: "Drag from the centre" },
+                                  { id: "rect", text: "Rectangle", short: "Rect", key: "R", tip: "Rectangle: drag from corner to corner" }, { id: "dim", text: "Dimension", short: "Dim", key: "D", tip: "Dimension: click a line, circle or arc and type its size" }]
+    readonly property string dofLong: !sol ? "…" : !sol.ok ? "does not solve" : !sk.entities.length ? "nothing drawn" : sol.fully_constrained ? "0 free · constrained" : sol.dof + " free"
+    readonly property string dofShort: !sol ? "…" : !sol.ok ? "unsolved" : !sk.entities.length ? "empty" : sol.fully_constrained ? "0 free" : sol.dof + " free"
+    function chipW(t, icon) { return Math.ceil(fmS.advanceWidth(t)) + 22 + (icon ? 20 : 0) + 4 }
+    readonly property var fit: {               // { compact, shown: how many of the offers stand in the capsule }
+        var room = cap.room, n = offers.length, i
+        function total(compact, k) {
+            var w = 0
+            for (i = 0; i < tools.length; i++) w += chipW(compact && tools[i].short ? tools[i].short : tools[i].text, false)
+            if (n) w += 13
+            for (i = 0; i < k; i++) w += chipW(offers[i].text, !!offers[i].dim)
+            if (k < n) w += chipW("More", true)
+            return w + Math.ceil(fmM.advanceWidth(compact ? dofShort : dofLong)) + 27
+        }
+        if (!on || mode === "new" && !sk.entities.length) return { compact: false, shown: n }
+        if (total(false, n) <= room) return { compact: false, shown: n }
+        for (var k = n; k > 0; k--) if (total(true, k) <= room) return { compact: true, shown: k }
+        return { compact: true, shown: 0 }
+    }
     ToolCapsule {
         id: cap; objectName: "sketchCapsule"; source: so.source; visible: so.busyHere; z: 5
-        x: so.capX; y: so.capY; maxWidth: so.capMax
+        x: so.capX; y: so.capY; maxWidth: so.capMax; wrap: false; titleMax: Math.max(72, Math.min(200, so.capMax * 0.26))
         title: so.picking ? ({ extrude: "Extrude", cut: "Cut", revolve: "Revolve" }[so.kind] || "Sketch")
              : so.mode === "edit" ? "Sketch of " + (Store.featureById(so.props.feature) || { label: so.props.feature }).label
              : "Sketch " + F.pad((Store.recipe && so.mode !== "new" ? Store.recipe.features.length : 0) + 1).slice(1)
@@ -612,22 +896,25 @@ Item {
             CapChip { required property string modelData; objectName: "sketchPlane-" + modelData; text: modelData; mono: true
                 on: so.on && so.sk.plane.datum === modelData; tip: "The " + modelData + " plane through the origin"; onClicked: so.onDatum(modelData) } }
         Item { visible: so.on && so.mode === "new" && !so.sk.entities.length; width: 9; height: 28; Rectangle { x: 4; y: 6; width: 1; height: 16; color: Theme.rule2 } }
-        Repeater { model: so.on ? [{ id: "select", text: "Select", key: "V", tip: "Select, drag a point. Shift adds to the selection" }, { id: "line", text: "Line", key: "L", tip: "Click points; a click on the first one closes the profile" },
-                                   { id: "arc", text: "Arc", key: "A", tip: "Its centre, where it starts, where it ends (counter-clockwise)" }, { id: "circle", text: "Circle", key: "C", tip: "Drag from the centre" },
-                                   { id: "rect", text: "Rectangle", key: "R", tip: "Drag from corner to corner" }, { id: "dim", text: "Dimension", key: "D", tip: "Click a line, circle or arc and type its size" }] : []
-            CapChip { required property var modelData; objectName: "sketchTool-" + modelData.id; text: modelData.text; on: so.tool === modelData.id
+        Repeater { model: so.on ? so.tools : []
+            CapChip { required property var modelData; objectName: "sketchTool-" + modelData.id; text: so.fit.compact && modelData.short ? modelData.short : modelData.text; on: so.tool === modelData.id
                 tip: modelData.tip + " · " + modelData.key; onClicked: so.setTool(modelData.id) } }
         Item { visible: so.on && so.offers.length > 0; width: 9; height: 28; Rectangle { x: 4; y: 6; width: 1; height: 16; color: Theme.rule2 } }
-        Repeater { model: so.on ? so.offers : []
+        Repeater { model: so.on ? so.offers.slice(0, so.fit.shown) : []
             CapChip { required property var modelData; objectName: "sketchOffer-" + modelData.text; text: modelData.text; tip: modelData.tip; tint: Theme.datum
                 icon: modelData.dim ? "ruler_dim" : ""; onClicked: modelData.run() } }
+        CapChip { id: more; objectName: "sketchMore"; visible: so.on && so.fit.shown < so.offers.length; text: "More"; icon: "ellipsis"; on: moreMenu.opened
+            tip: "What else the selection allows"; onClicked: moreMenu.opened ? moreMenu.close() : moreMenu.open()
+            PopMenu { id: moreMenu; objectName: "sketchMoreMenu"; y: parent.height + 10; x: Math.min(0, parent.width - width); width: 208
+                model: so.offers.slice(so.fit.shown).map(function (o) { return { name: "sketchOffer-" + o.text, text: o.text, icon: o.dim ? "ruler_dim" : "", run: o.run } })
+                onClosed: area.forceActiveFocus() } }
         // the degrees of freedom the solver still has: 0 is a profile that can only be what was said
         Item { visible: so.on; objectName: "sketchDof"; height: 28; width: Math.ceil(dofT.implicitWidth) + 25
             readonly property int dof: so.sol && so.sol.ok ? so.sol.dof : -1
             Rectangle { x: 2; y: 6; width: 1; height: 16; color: Theme.rule2 }
             Txt { id: dofT; x: 15; anchors.verticalCenter: parent.verticalCenter; mono: true; font.pixelSize: 12; font.weight: Theme.wMedium; wrapMode: Text.NoWrap
                 color: !so.sol || !so.sol.ok ? Theme.strong(Theme.amber) : so.sol.fully_constrained ? Theme.pass : Theme.ink2
-                text: !so.sol ? "…" : !so.sol.ok ? "does not solve" : !so.sk.entities.length ? "nothing drawn" : so.sol.fully_constrained ? "0 free · constrained" : so.sol.dof + " free" }
+                text: so.fit.compact ? so.dofShort : so.dofLong }
             MouseArea { id: dofM; anchors.fill: parent; hoverEnabled: true }
             Tip { show: dofM.containsMouse; below: true; text: "Degrees of freedom the solver still has (computed). At 0 the profile can only be what you said." } }
     }
@@ -636,31 +923,41 @@ Item {
     Glass {
         id: foot; objectName: "sketchFoot"; source: so.source; visible: so.on; z: 5; radius: 22
         width: Math.round(fr.implicitWidth + 16); height: 44
-        x: Math.round(Math.max(so.capX, Math.min(so.capX + so.capMax - width, so.midX - width / 2))); y: Math.round(so.footY - height)
+        x: Math.round(Math.max(so.footL, Math.min(so.footR - width, so.midX - width / 2))); y: Math.round(so.footY - height)
+        readonly property string say: so.err ? so.err
+            : so.draft && so.draft.preview.ok ? (so.draft.preview.volume_mm3.change >= 0 ? "+" : "−") + F.fmt(Math.abs(so.draft.preview.volume_mm3.change), 1) + " mm³ · computed"
+            : !so.sol || !so.sk.entities.length ? "Draw a closed profile"
+            : !so.sol.closed ? "Not closed yet"
+            : so.kind === "revolve" && so.mode !== "edit" && so.axis < 0 ? "Select the line it turns about"
+            : so.kind === "cut" && so.depthMm === 0 ? "Through everything" : so.mode === "edit" ? "Closed profile" : "Enter builds it"
+        readonly property bool sayMono: !so.err && !!so.draft && so.draft.preview.ok
+        readonly property real sayW: Math.ceil((sayMono ? fmM : fmS).advanceWidth(say)) + 6
+        readonly property real restW: 16 + (nameField.visible ? nameField.width + 8 : 0) + (kindSeg.visible ? kindSeg.width + 8 : 0) + (depthField.visible ? depthField.width + 8 : 0)
+                                      + cancelBtn.width + 8 + commitBtn.width
+        readonly property bool sayIn: restW + sayW + 8 <= so.footR - so.footL
         Row { id: fr; x: 8; anchors.verticalCenter: parent.verticalCenter; spacing: 8
             Field { id: nameField; objectName: "sketchName"; visible: so.mode === "new"; width: 150; height: 30; placeholder: "Name the design"; text: so.name; onEdited: function (t) { so.name = t }; onAccepted: area.forceActiveFocus() }
-            Seg { objectName: "sketchKind"; visible: so.mode !== "edit"; anchors.verticalCenter: parent.verticalCenter
+            Seg { id: kindSeg; objectName: "sketchKind"; visible: so.mode !== "edit"; anchors.verticalCenter: parent.verticalCenter
                 model: so.mode === "new" ? [{ value: "extrude", text: "Extrude" }, { value: "revolve", text: "Revolve" }]
                                          : [{ value: "extrude", text: "Extrude" }, { value: "cut", text: "Cut" }, { value: "revolve", text: "Revolve" }]
                 value: so.kind; onPicked: function (v) { so.kind = v; area.forceActiveFocus() } }
             Field { id: depthField; objectName: "sketchDepth"; visible: so.mode !== "edit" && so.kind !== "revolve"; width: 92; height: 30; numeric: true; unit: "mm"
                 text: so.depth; onEdited: function (t) { so.depth = t }; onAccepted: area.forceActiveFocus() }
-            Txt { objectName: "sketchSay"; anchors.verticalCenter: parent.verticalCenter; font.pixelSize: 12; wrapMode: Text.NoWrap; elide: Text.ElideRight
-                width: Math.min(implicitWidth, Math.max(120, so.capMax - 420))
-                mono: !so.err && !!so.draft && so.draft.preview.ok
-                color: so.err ? Theme.strong(Theme.amber) : Theme.ink2
-                text: so.err ? so.err
-                    : so.draft && so.draft.preview.ok ? (so.draft.preview.volume_mm3.change >= 0 ? "+" : "−") + F.fmt(Math.abs(so.draft.preview.volume_mm3.change), 1) + " mm³ · computed"
-                    : !so.sol || !so.sk.entities.length ? "Draw a closed profile"
-                    : !so.sol.closed ? "Not closed yet"
-                    : so.kind === "revolve" && so.mode !== "edit" && so.axis < 0 ? "Select the line it turns about"
-                    : so.kind === "cut" && so.depthMm === 0 ? "Through everything" : so.mode === "edit" ? "Closed profile" : "Enter builds it"
-                MouseArea { id: sayM; anchors.fill: parent; hoverEnabled: true; acceptedButtons: Qt.NoButton }
-                Tip { show: sayM.containsMouse && parent.truncated; text: parent.text } }
-            Btn { objectName: "sketchCancel"; small: true; kind: "quiet"; text: "Cancel"; tip: "Leave the sketch. Nothing is saved"; anchors.verticalCenter: parent.verticalCenter; onClicked: so.end() }
-            Btn { objectName: "sketchCommit"; small: true; kind: "primary"; anchors.verticalCenter: parent.verticalCenter
+            Txt { objectName: foot.sayIn ? "sketchSay" : ""; visible: foot.sayIn; anchors.verticalCenter: parent.verticalCenter; font.pixelSize: 12; wrapMode: Text.NoWrap
+                mono: foot.sayMono; color: so.err ? Theme.strong(Theme.amber) : Theme.ink2; text: foot.say }
+            Btn { id: cancelBtn; objectName: "sketchCancel"; small: true; kind: "quiet"; text: "Cancel"; tip: "Leave the sketch. Nothing is saved"; anchors.verticalCenter: parent.verticalCenter; onClicked: so.end() }
+            Btn { id: commitBtn; objectName: "sketchCommit"; small: true; kind: "primary"; anchors.verticalCenter: parent.verticalCenter
                 icon: so.kind === "cut" ? "scissors" : "cuboid"; busy: so.busy; busyText: "Building…"; enabled: so.ready
                 text: so.mode === "edit" ? "Save the sketch" : so.kind === "cut" ? "Cut" : so.kind === "revolve" ? "Revolve" : "Extrude"
                 tip: "Writes it into the design's code as one feature, its dimensions as parameters, and builds it"; onClicked: so.commit() } }
+    }
+    Glass {
+        objectName: "sketchSayPill"; source: so.source; visible: so.on && !foot.sayIn; z: 5; radius: 14; height: 28
+        width: Math.min(so.footR - so.footL, Math.ceil(sayT.implicitWidth) + 26)
+        x: Math.round(Math.max(so.footL, Math.min(so.footR - width, foot.x + foot.width / 2 - width / 2))); y: foot.y - height - 8
+        Txt { id: sayT; objectName: foot.sayIn ? "" : "sketchSay"; anchors.centerIn: parent; width: Math.min(implicitWidth, parent.width - 22); font.pixelSize: 12
+            wrapMode: Text.NoWrap; elide: Text.ElideRight; mono: foot.sayMono; color: so.err ? Theme.strong(Theme.amber) : Theme.ink2; text: foot.say
+            MouseArea { id: sayM; anchors.fill: parent; hoverEnabled: true; acceptedButtons: Qt.NoButton }
+            Tip { show: sayM.containsMouse && parent.truncated; text: parent.text } }
     }
 }

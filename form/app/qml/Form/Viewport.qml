@@ -34,6 +34,15 @@ Item {
     property bool showDims: true
     property bool showOrigin: true           // the faint origin cross on the floor; off where words sit over an empty floor
     property bool interactive: true
+    // a sketch open on the part (SketchOnPart.qml). The view is orthographic while it is: what stands off the plane
+    // (the far end of an extrusion, the kernel's preview of it) is then drawn straight over the profile instead of
+    // aside of it, as a perspective view draws it. The part is a ghost (clay.frag uGhost), and the profile's lines
+    // are 3D lines in the part's own depth: what stands in front of them hides them.
+    property bool sketching: false
+    property real ghostParts: sketching ? 1 : 0
+    Behavior on ghostParts { NumberAnimation { duration: Theme.reduced ? 0 : 140 } }
+    property var inkLines: []                // the profile: xyz pairs, design frame
+    property var inkLit: []                  // its selected entities
     property bool spin: false                // slow turntable (home screen)
     // by day the frame is toned with a linear curve (the floor stays paper white), so the lights are turned down to match
     readonly property real lightK: Theme.dark ? 1 : 0.48
@@ -845,7 +854,7 @@ Item {
     View3D {
         id: view
         anchors.fill: parent
-        camera: cam
+        camera: vp.sketching ? ocam : cam
         environment: SceneEnvironment {
             clearColor: Theme.plate; backgroundMode: SceneEnvironment.Color
             antialiasingMode: SceneEnvironment.MSAA; antialiasingQuality: vp.lite ? SceneEnvironment.Medium : SceneEnvironment.VeryHigh
@@ -904,6 +913,14 @@ Item {
             // doublings, so it changes a few times over the whole zoom instead of making the shadow crawl.
             readonly property real shadowFar: 1400 * Math.pow(2, Math.max(0, Math.ceil(Math.log(Math.max(1, (far * 1.3 + span) / 1400)) / Math.LN2)))
         }
+        // the same eye without perspective, for a sketch: a millimetre at the look-at point is as many pixels as in
+        // the perspective view, so the profile does not change size when the view changes over
+        // (it stands further back along its own axis, which changes nothing in an orthographic picture except that the
+        // floor no longer passes behind it at a low angle)
+        OrthographicCamera { id: ocam; readonly property real back: Math.max(2000, cam.span * 3)
+            position: cam.position.plus(cam.position.minus(vp.scene(cam.place.aim)).normalized().times(back)); rotation: cam.rotation
+            clipNear: 1; clipFar: cam.clipFar + back
+            horizontalMagnification: 1 / Math.max(1e-6, vp.mmPerPx); verticalMagnification: horizontalMagnification }
         // key from the upper left front (casts the shadow), a warm fill, a cool rim from behind that draws the
         // far silhouette, and a little light from straight above so top faces separate from walls
         DirectionalLight { eulerRotation: Qt.vector3d(-50, -34, 0); brightness: 2.0 * vp.lightK; color: "#fffaf2"
@@ -993,6 +1010,8 @@ Item {
             Node {
                 id: design
                 position: vp.shift
+                InkLine { points: vp.inkLines; color: Theme.datum; weight: 2; port: vp; visible: vp.sketching }
+                InkLine { points: vp.inkLit; color: Theme.datumHi; weight: 3; port: vp; visible: vp.sketching; bias: 2 }
                 Repeater3D {
                     id: parts
                     model: vp.model && !vp.asm ? vp._mesh : []
@@ -1018,6 +1037,12 @@ Item {
                         geometry: MeshGeometry { positions: modelData.positions; indices: modelData.indices }
                         materials: CustomMaterial {
                             shadingMode: CustomMaterial.Shaded; cullMode: pmod.k < 1 ? Material.BackFaceCulling : Material.NoCulling; fragmentShader: "shaders/clay.frag"
+                            // a sketch is open (vp.sketching): the part is a ghost, drawn after its own depth pass, so only its
+                            // nearest surface is blended and nothing inside it shows; the feature being previewed stays solid
+                            property real uGhost: vp.ghostParts * (vp.flagged.indexOf(feature) >= 0 ? 0 : 1)
+                            sourceBlend: uGhost > 0 ? CustomMaterial.SrcAlpha : CustomMaterial.NoBlend
+                            destinationBlend: uGhost > 0 ? CustomMaterial.OneMinusSrcAlpha : CustomMaterial.NoBlend
+                            depthDrawMode: uGhost > 0 ? Material.OpaquePrePassDepthDraw : Material.OpaqueOnlyDepthDraw
                             property real uDither: vp.ditherK; property real uFilmic: Theme.dark ? 1 : 0
                             property real uWipe: vp._wipePx; property real uWipeSide: 1
                             property real uMap: 0
@@ -1069,6 +1094,12 @@ Item {
                                 geometry: MeshGeometry { positions: modelData.positions; indices: modelData.indices }
                                 materials: CustomMaterial {
                                     shadingMode: CustomMaterial.Shaded; cullMode: amod.k < 1 ? Material.BackFaceCulling : Material.NoCulling; fragmentShader: "shaders/clay.frag"
+                                    // a sketch is open (vp.sketching): the part is a ghost, drawn after its own depth pass, so only its
+                                    // nearest surface is blended and nothing inside it shows; the feature being previewed stays solid
+                                    property real uGhost: vp.ghostParts * (vp.flagged.indexOf(feature) >= 0 ? 0 : 1)
+                                    sourceBlend: uGhost > 0 ? CustomMaterial.SrcAlpha : CustomMaterial.NoBlend
+                                    destinationBlend: uGhost > 0 ? CustomMaterial.OneMinusSrcAlpha : CustomMaterial.NoBlend
+                                    depthDrawMode: uGhost > 0 ? Material.OpaquePrePassDepthDraw : Material.OpaqueOnlyDepthDraw
                                     property real uDither: vp.ditherK; property real uFilmic: Theme.dark ? 1 : 0
                                     property real uWipe: vp._wipePx; property real uWipeSide: 1
                                     property real uMap: 0
@@ -1122,6 +1153,7 @@ Item {
                         geometry: MeshGeometry { positions: xmod.modelData.positions; indices: xmod.modelData.indices }
                         materials: CustomMaterial {
                             shadingMode: CustomMaterial.Shaded; cullMode: vp.wipeOn || vp._altMix >= 1 ? Material.NoCulling : Material.BackFaceCulling; fragmentShader: "shaders/clay.frag"
+                            property real uGhost: 0
                             property real uDither: vp.ditherK; property real uFilmic: Theme.dark ? 1 : 0
                             property real uWipe: vp._wipePx; property real uWipeSide: -1
                             property real uMap: 0
@@ -1226,6 +1258,7 @@ Item {
                     geometry: MeshGeometry { id: ageo; source: vp._map }
                     materials: CustomMaterial {
                         shadingMode: CustomMaterial.Shaded; cullMode: Material.NoCulling; fragmentShader: "shaders/clay.frag"
+                        property real uGhost: 0
                         property real uDither: vp.ditherK; property real uFilmic: Theme.dark ? 1 : 0
                         property real uWipe: -1; property real uWipeSide: 1
                         property real uMap: vp.mapMix
@@ -1262,7 +1295,7 @@ Item {
                     }
                 }
                 // a result of a later engine, drawn on the part: strength, manufacturability, CNC, flat pattern, motion
-                ResultLayer { id: rlayer; port: vp; live: vp.results && !vp.lite }
+                ResultLayer { id: rlayer; objectName: "resultLayer"; port: vp; live: vp.results && !vp.lite }
                 SelectionLayer { vp: vp; items: vp.focusItems; strength: 0.6; opacity: vp.asmTween ? 0 : 1
                     dot: vp.dist * 0.000034; px: Qt.vector2d(2 / Math.max(1, vp.width), 2 / Math.max(1, vp.height)) }
                 SelectionLayer { vp: vp; items: vp.selection; opacity: vp.asmTween ? 0 : 1
@@ -1300,7 +1333,7 @@ Item {
 
             // overall dimensions, drawn like a drawing: extension lines, a dimension line, the number
             // (only where the lit lines over the view are not drawn: the small views)
-            Model { visible: vp.lite && vp.showDims && !!vp.model && vp.asmMode !== "exploded" && !vp.platesOn && !vp.dimsHeld && vp._altMix < 0.5; pickable: false; castsShadows: false
+            Model { visible: vp.lite && vp.showDims && !vp.sketching && !!vp.model && vp.asmMode !== "exploded" && !vp.platesOn && !vp.dimsHeld && vp._altMix < 0.5; pickable: false; castsShadows: false
                 geometry: LineGeometry { points: {
                     var o = 7, t = 2.2, p = []
                     var x0 = vp.dimLo.x, x1 = vp.dimHi.x, y0 = vp.dimLo.y, y1 = vp.dimHi.y, z0 = vp.dimLo.z, z1 = vp.dimHi.z
@@ -1315,8 +1348,8 @@ Item {
         }
     }
     // what a result says on the part: the peak, the loads and supports, findings, bend notes (ResultLabels)
-    Loader { anchors.fill: view; active: vp.results && !vp.lite && Results.onPart; visible: !vp.asmTween
-        sourceComponent: ResultLabels { port: vp; lay3: rlayer; camera: cam } }
+    Loader { objectName: "resultLabelsLoader"; anchors.fill: view; active: vp.results && !vp.lite && Results.onPart; visible: !vp.asmTween
+        sourceComponent: ResultLabels { objectName: "resultLabels"; port: vp; lay3: rlayer; camera: cam } }
     // the brush stroke or lasso outline being drawn, on top of the part
     Canvas {
         id: strokeCanvas
@@ -1381,7 +1414,7 @@ Item {
     }
     property string _dimKey: ""
     function _seatLabels() {
-        var items = [], refs = [], i, k, it, w, h, p, c, lit = []
+        var items = [], refs = [], i, k, it, w, h, p, c, lit = [], moved = false
         for (i = 0; i < dimLabels.count; i++) {
             it = dimLabels.itemAt(i); if (!it) continue
             var ends = _dimLine(i), a = _px(ends[0]), e = _px(ends[1]), ts = [0.5, 0.3, 0.7, 0.16, 0.84]
@@ -1391,7 +1424,7 @@ Item {
                 c.push({ x: Math.round(a.x + (e.x - a.x) * ts[k] - w / 2), y: Math.round(a.y + (e.y - a.y) * ts[k] - h / 2) })
             items.push({ kind: "dim", w: w, h: h, cands: c, prev: it.cand }); refs.push(it)
         }
-        var key = JSON.stringify(lit); if (key !== _dimKey) { _dimKey = key; dimPx = lit }
+        var key = JSON.stringify(lit); if (key !== _dimKey) { _dimKey = key; dimPx = lit; moved = true }
         for (i = 0; i < pinLabels.count; i++) {
             it = pinLabels.itemAt(i); if (!it) continue
             var q = it.modelData.p
@@ -1416,17 +1449,27 @@ Item {
             c = p ? [{ x: Math.round(p.x - w / 2), y: Math.round(p.y + 6) }, { x: Math.round(p.x - w / 2), y: Math.round(p.y + 22) }] : []
             items.push({ kind: "ref", w: w, h: h, cands: c, prev: it.cand }); refs.push(it)
         }
-        if (!items.length) return
+        if (!items.length) return moved
         // labels of markers and measurements stay left of labelRight (the dock sits right of it)
         var out = Labels.place(items, { l: 4, t: 4, r: labelRight - 6, b: height - 4 })
         for (i = 0; i < refs.length; i++) {
             it = refs[i]; var r = out[i]
-            if (it.cand !== r.c) it.cand = r.c
-            if (it.shown !== r.visible) it.shown = r.visible
-            if (r.visible && (it.x !== r.x || it.y !== r.y)) { it.x = r.x; it.y = r.y }
+            if (it.cand !== r.c) { it.cand = r.c; moved = true }
+            if (it.shown !== r.visible) { it.shown = r.visible; moved = true }
+            if (r.visible && (it.x !== r.x || it.y !== r.y)) { it.x = r.x; it.y = r.y; moved = true }
         }
+        return moved
     }
-    FrameAnimation { running: vp.visible && (dimLabels.count + pinLabels.count + refLabels.count + plateLabels.count) > 0; onTriggered: vp._seatLabels() }
+    // The labels are seated again for a few frames after anything that can move them (the view, the part, the labels
+    // themselves) and for as long as a pass still moves one; never while the view is still. (It ran on every frame:
+    // a still window was not redrawn for it, but the script ran at the display's rate.)
+    property int _seatFor: 4
+    readonly property var _seatKey: [az, el, dist, target, shift, shownLeft, shownRight, shownTop, shownBottom, width, height, dimLo, dimHi, labels, labelRight,
+                                     dimLabels.count, pinLabels.count, refLabels.count, plateLabels.count, plateCount, plateK, sketching, explode, asmMode, frameTag,
+                                     camRight, camFront, fitK, visible, showDims, Theme.dark, Theme.tBody]
+    on_SeatKeyChanged: _seatFor = 4
+    FrameAnimation { running: vp.visible && vp._seatFor > 0 && (dimLabels.count + pinLabels.count + refLabels.count + plateLabels.count) > 0
+        onTriggered: { if (vp._seatLabels()) vp._seatFor = Math.max(vp._seatFor, 3); vp._seatFor-- } }
 
     // several plates: which plate is which, and a part that fits none of them
     Repeater {
@@ -1477,7 +1520,7 @@ Item {
     // dimension numbers, on the 3D dimension lines: small capsules, the number in mono
     Repeater {
         id: dimLabels
-        model: vp.showDims && rlayer.kind === "" && vp.model && !(vp.asmOn && vp.asmMode === "exploded") && !vp.platesOn && !vp.dimsHeld && vp._altMix < 0.5 ? 3 : 0
+        model: vp.showDims && !vp.sketching && rlayer.kind === "" && vp.model && !(vp.asmOn && vp.asmMode === "exploded") && !vp.platesOn && !vp.dimsHeld && vp._altMix < 0.5 ? 3 : 0
         Rectangle {
             id: dl
             objectName: "dimLabel"
