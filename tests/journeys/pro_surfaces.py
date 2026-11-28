@@ -141,6 +141,7 @@ def journey_property_card(ui):
     ui.wait_until(lambda: "mm³ of material" in str(ui.item("cardVolume").property("text")), 10, "the volume change on the card")
     ui.check(str(ui.item("cardVolume").property("text")).startswith("−"), "a bigger fillet takes material away")
     ui.eq(head(ui), h0 + 1, "nothing saved yet")
+    ui.scroll_to(ui.item("featureCard"), 0.2)
     ui.settle(500)
     crop(ui, "programPane", "property-card")
     ui.click("cardCancel")
@@ -247,6 +248,7 @@ def journey_tree_rows(ui):
     ui.wait_until(lambda: (ui.js("Store.draftValues.cut_1_depth") or 0) > 0, 5, "Blind gives the cut a depth")
     ui.wait_until(lambda: ui.find(name="cardValue-depth") is not None, 5, "and its depth field")
     ui.wait_until(lambda: ui.js("!!Store.preview"), 60, "the preview of the blind cut")
+    ui.scroll_to(ui.item("featureCard"), 0.2)
     ui.settle(400)
     crop(ui, "programPane", "property-card-cut")
     ui.click("cardCancel")
@@ -265,3 +267,45 @@ def journey_tree_rows(ui):
     ui.settle(200)
     ui.run_js("if (Store.sketchHost && Store.sketchHost.on) Store.sketchHost.end(); Store.openSheet(null)")
     ui.settle(300)
+
+
+def journey_compare_script(ui):
+    """The cut added by hand, compared with the revision before: an added feature and its code, coloured."""
+    h = head(ui)
+    ui.run_js("Store.openSheet('compare', { a: %d, b: %d, tab: 'script' })" % (h - 1, h))
+    ui.wait_until(lambda: ui.find(name="scriptRow-add") is not None, 20, "added lines in the script")
+    rows = ui.api("/projects/%s/compare?a=%d&b=%d" % (S["pid"], h - 1, h))
+    ui.check(any("def cut_1" in r["text"] for r in rows["script"]["rows"] if r["t"] == "add"), "the cut's method is an added line")
+    ui.check(ui.sees("added", within=ui.wait_until(lambda: ui.find(name="compareFeature-cut_1"), 10, "the cut's row")), "Cut 1 is added")
+    ui.settle(500)
+    crop(ui, "sheetCard", "compare-script")
+    ui.key("Escape")
+    ui.wait_until(lambda: not ui.js("!!Store.sheet"), 5, "closed")
+
+
+def journey_study_verdict(ui):
+    """The study card's verdict and load scale, on a fixture result (the FEA engine is optional; tests/journeys/results.py
+    checks the same card on a real solved study when it is installed). The numbers below are inputs, not results."""
+    ui.run_js("""(function () {
+        var o = Qt.createQmlObject('import QtQuick; import Form; Rectangle { objectName: "verdictHost"; x: 900; y: 160; width: 300; height: 240; radius: 14; color: Theme.plate2; '
+            + 'StudyVerdict { id: sv; objectName: "fixtureVerdict"; x: 14; y: 14; width: 272 } }', win.contentItem)
+        o.children[0].r = { linear: true, safety: { value: 5.4, low: 5.36, against: "yield" }, peak: { value: 51.2 }, max_displacement: { value: 0.021 } }
+    })()""")
+    v = ui.wait_until(lambda: ui.find(name="fixtureVerdict"), 3, "the verdict")
+    t = lambda: str(ui.find(name="verdictText", within=v).property("text"))
+    ui.eq(t(), "Holds the load with a safety factor of 5.4 (at least 5.3 with the stated error).", "the sentence, the bound rounded down")
+    ui.check(ui.sees("linear: exact for this model", within=v), "the slider says why it is exact")
+    crop(ui, "verdictHost", "study-verdict")
+    v.setProperty("k", 2.0)
+    ui.settle(50)
+    ui.eq(t(), "Holds 2 × the load with a safety factor of 2.7 (at least 2.6 with the stated error).", "twice the load")
+    ui.check("peak stress 102 MPa" in str(ui.find(name="loadScaleNote", within=v).property("text")), "the peak stress doubles with it")
+    v.setProperty("k", 6.0)
+    ui.settle(50)
+    ui.check(t().startswith("Too weak at 6 × the load: it holds up to 0.90 ×"), t())
+    ui.run_js("""(function () { var h = null, k = win.contentItem.children; for (var i = 0; i < k.length; i++) if (k[i].objectName === "verdictHost") h = k[i];
+        h.children[0].r = { linear: false, safety: { value: 3.1, low: 3.0 }, peak: { value: 9 }, max_displacement: { value: 0.1 } } })()""")
+    ui.settle(50)
+    ui.check(ui.find(name="loadScale", within=v) is None, "no load scale for a study that is not linear static")
+    ui.check(t().startswith("Holds the load with a safety factor of 3.1"), "the verdict stays, at 1 ×")
+    ui.run_js("""(function () { var k = win.contentItem.children; for (var i = 0; i < k.length; i++) if (k[i].objectName === "verdictHost") k[i].destroy() })()""")

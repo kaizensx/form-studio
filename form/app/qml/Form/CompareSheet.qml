@@ -210,7 +210,7 @@ Column {
                     color: Theme.alpha(Theme.plate1, 0.8); border.color: Theme.rule
                     Txt { id: lt; objectName: "compareSideLabel"; anchors.centerIn: parent; mono: true; font.pixelSize: 12; wrapMode: Text.NoWrap
                         text: F.pad(parent.modelData[0]) + (parent.modelData[0] === cs.head ? " · head" : "") } } }
-            Txt { anchors.horizontalCenter: parent.horizontalCenter; anchors.bottom: parent.bottom; anchors.bottomMargin: 10; kind: "fine"; tone: 3; wrapMode: Text.NoWrap
+            Txt { anchors.horizontalCenter: parent.horizontalCenter; anchors.bottom: parent.bottom; anchors.bottomMargin: 44; kind: "fine"; tone: 3; wrapMode: Text.NoWrap
                 text: "One camera: turn or zoom either view" } } }
 
     // ── the script: the design source as a line diff, coloured as Python ──

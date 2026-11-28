@@ -89,3 +89,10 @@ LegendStrip 1.0 LegendStrip.qml
 ResultCard 1.0 ResultCard.qml
 DrawingPane 1.0 DrawingPane.qml
 OverLine 1.0 OverLine.qml
+CompareSheet 1.0 CompareSheet.qml
+FeatureCard 1.0 FeatureCard.qml
+BenchTiles 1.0 BenchTiles.qml
+TreeExtras 1.0 TreeExtras.qml
+TreeSketch 1.0 TreeSketch.qml
+TreeEye 1.0 TreeEye.qml
+StudyVerdict 1.0 StudyVerdict.qml
