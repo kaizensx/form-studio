@@ -86,6 +86,7 @@ def read_call(st, project: str, run: str = "", wait_s: float = 0, full: bool = F
 
 def register_tools(mcp, studio, run, RO, RW, origin) -> None:
     """Add inverse_design and get_inverse_design to the MCP server."""
+    runner = run                                         # the tools below take an argument named run (a stored run's id)
     @mcp.tool(annotations=RW)
     async def inverse_design(project: str, minimize: list[str] | None = None, maximize: list[str] | None = None,
                              require: list[str] | None = None, vary: list[dict] | None = None, study: str = "",
@@ -116,12 +117,12 @@ def register_tools(mcp, studio, run, RO, RW, origin) -> None:
         st = studio()
         by = origin(ctx).replace("agent:", "") or "agent"
         if save_point is not None:
-            return await run(design.save_point, st, project, run, int(save_point), name, by)
+            return await runner(design.save_point, st, project, run, int(save_point), name, by)
         body = None
         if minimize or maximize or require or vary:
             body = {"minimize": minimize or [], "maximize": maximize or [], "require": require or [], "vary": vary or [],
                     "study": study, "modal_study": modal_study, "budget": budget or {}, "rates": rates}
-        return await run(search_call, st, project, body, run_now)
+        return await runner(search_call, st, project, body, run_now)
 
     @mcp.tool(annotations=RO)
     async def get_inverse_design(project: str, run: str = "", wait_s: float = 30, full: bool = False,
@@ -136,4 +137,4 @@ def register_tools(mcp, studio, run, RO, RW, origin) -> None:
         feasible, misses, close, failed) and the hypervolume after each round. A search made on other design source
         is stale. cancel=True stops a running search; nothing is stored for a cancelled one."""
         st = studio()
-        return await run(read_call, st, project, run, max(0.0, min(float(wait_s), 300.0)), full, cancel)
+        return await runner(read_call, st, project, run, max(0.0, min(float(wait_s), 300.0)), full, cancel)

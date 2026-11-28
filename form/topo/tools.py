@@ -87,6 +87,7 @@ def read_call(st, project: str, run: str = "", wait_s: float = 0, full: bool = F
 
 def register_tools(mcp, studio, run, RO, RW, origin) -> None:
     """Add topology_optimise, get_topology and apply_topology to the MCP server."""
+    runner = run                                         # the tools below take an argument named run (a stored run's id)
     @mcp.tool(annotations=RW)
     async def topology_optimise(project: str, volfrac: float | None = None, mass_g: float | None = None,
                                 safety_factor: float | None = None, study: str = "", mode: str = "pockets",
@@ -122,7 +123,7 @@ def register_tools(mcp, studio, run, RO, RW, origin) -> None:
         if any(v is not None for k, v in given.items() if k != "study") or mode != "pockets":
             opts = {k: v for k, v in given.items() if v is not None}
             opts["mode"] = mode
-        return await run(run_call, st, project, opts)
+        return await runner(run_call, st, project, opts)
 
     @mcp.tool(annotations=RO)
     async def get_topology(project: str, run: str = "", wait_s: float = 60, full: bool = False, frames: bool = False,
@@ -139,7 +140,7 @@ def register_tools(mcp, studio, run, RO, RW, origin) -> None:
         the newest picture while it runs; frames_file is its path. full=True adds every iteration's record and the
         edit ops. A run on an older revision is stale. cancel=True stops a running optimisation; nothing is stored."""
         st = studio()
-        return await run(read_call, st, project, run, max(0.0, min(float(wait_s), 600.0)), full, cancel, frames)
+        return await runner(read_call, st, project, run, max(0.0, min(float(wait_s), 600.0)), full, cancel, frames)
 
     @mcp.tool(annotations=RW)
     async def apply_topology(project: str, run: str = "", expect_head: int | None = None, as_new: str = "",
@@ -152,4 +153,4 @@ def register_tools(mcp, studio, run, RO, RW, origin) -> None:
         strength study is stale on the new revision until it is run there."""
         st = studio()
         by = origin(ctx) or "agent"
-        return await run(topo.apply, st, project, run, expect_head, as_new or False, mesh_body, by)
+        return await runner(topo.apply, st, project, run, expect_head, as_new or False, mesh_body, by)

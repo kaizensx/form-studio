@@ -256,6 +256,58 @@ class Requests(unittest.TestCase):
         self.assertIn("error", json.loads(out.stdout))
 
 
+class OverMCP(unittest.TestCase):
+    """The five tools called through a real MCP session over stdio (a search on kernel metrics needs no engine)."""
+
+    def test_the_tools_answer_over_stdio(self):
+        st = Studio(config.load())
+        try:
+            pid = st.create_design("MCP plate", PLATE, "", purpose="model")["id"]
+        finally:
+            st.kernel.shutdown()
+        asyncio.run(self._session(pid))
+
+    async def _session(self, pid):
+        from mcp import Client, StdioServerParameters
+
+        def data(res):
+            sc = res.structured_content
+            if isinstance(sc, dict):
+                return sc.get("result", sc)
+            return json.loads(next(x.text for x in res.content if x.type == "text"))
+        # the folder this process is using now (another test module may have pointed FORM_DATA at its own)
+        env = {**os.environ, "FORM_DATA": str(config.load()["data"]["dir"]), "PYTHONPATH": str(ROOT)}
+        params = StdioServerParameters(command=sys.executable, args=["-m", "form.mcp_server", "--no-bench"], env=env, cwd=str(ROOT))
+        async with Client(params) as c:
+            names = {t.name for t in (await c.list_tools()).tools}
+            self.assertTrue({"inverse_design", "get_inverse_design", "topology_optimise", "get_topology", "apply_topology"} <= names)
+            listing = data(await c.call_tool("inverse_design", {"project": pid}))
+            self.assertEqual((listing["runs"], [k["key"] for k in listing["knobs"]]), ([], ["height", "t"]))
+            started = data(await c.call_tool("inverse_design", {"project": pid, "minimize": ["mass_g"],
+                                                               "require": ["volume_cm3 >= 4"], "budget": {"evaluations": 8}}))
+            self.assertEqual(started["state"], "running")
+            got = {}
+            for _ in range(20):
+                got = data(await c.call_tool("get_inverse_design", {"project": pid, "wait_s": 30}))
+                if got.get("state") != "running":
+                    break
+            self.assertEqual(got["state"], "current", got)
+            self.assertEqual(len(got["result"]["front"]), 1)
+            self.assertLessEqual(got["result"]["budget"]["evaluations"], 8)
+            idx = got["result"]["front"][0]["index"]
+            kept = data(await c.call_tool("inverse_design", {"project": pid, "save_point": idx, "name": "Kept"}))
+            self.assertEqual(kept["name"], "Kept")
+            self.assertEqual(data(await c.call_tool("get_inverse_design", {"project": pid, "run": got["result"]["id"],
+                                                                         "wait_s": 0, "full": True}))["result"]["chart"]["front"], [idx])
+            topo = data(await c.call_tool("topology_optimise", {"project": pid}))
+            self.assertEqual((topo["runs"], topo["settings"]["volfrac"]["default"]), ([], 0.5))
+            self.assertEqual(data(await c.call_tool("get_topology", {"project": pid, "wait_s": 0}))["state"], "never")
+            refused = await c.call_tool("topology_optimise", {"project": pid, "volfrac": 0.5})
+            self.assertTrue(refused.is_error)                                 # no strength study: said, nothing run
+            self.assertIn("no static strength study", refused.content[0].text)
+            self.assertTrue((await c.call_tool("apply_topology", {"project": pid})).is_error)
+
+
 @NEEDS_ENGINE
 class RealSearch(unittest.TestCase):
     """Survive 60 N with a safety factor of 3, as light and as stiff as possible: every variant built and solved."""

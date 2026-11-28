@@ -200,6 +200,18 @@ def live(st, p: dict, job: dict) -> dict | None:
 
 # ---- one run -----------------------------------------------------------------------------------------------------------
 
+def _pick_study(p: dict, sid: str) -> str:
+    """The static study whose loads, supports and material the layout is optimised for."""
+    try:
+        return fea_study.pick_static(p, sid)
+    except Exception as e:
+        if "no static strength study" in str(e):
+            raise _err("The design has no static strength study, so the loads and supports to optimise for are not known.",
+                       "Define one first with strength_study: the faces that are held, the faces that are loaded, the "
+                       "material.") from None
+        raise
+
+
 def _auto_pull(bbox) -> list:
     size = [b - a for a, b in zip(bbox[0], bbox[1])]
     k = size.index(min(size))
@@ -367,7 +379,7 @@ def run(st, pid: str, opts: dict | None = None, on_progress=None, cancelled=None
     on_progress = on_progress or (lambda ev: None)
     cancelled = cancelled or (lambda: False)
     p = st.load(pid)
-    sid = fea_study.pick_static(p, o.get("study", ""))
+    sid = _pick_study(p, o.get("study", ""))
     d = fea_study.get(p, sid)
     mats = fea_study.materials_for(st, p, d)
     if len(mats) != 1:
@@ -381,7 +393,7 @@ def run(st, pid: str, opts: dict | None = None, on_progress=None, cancelled=None
     run_id = time.strftime("%Y%m%d-%H%M%S") + "-" + uuid.uuid4().hex[:4]
     base = _dir(st, p) / run_id
     t0 = time.time()
-    tries, rec = [], None
+    tries, rec, solves = [], None, 0
     volfrac = o["volfrac"]
     before = None
     try:
@@ -426,6 +438,7 @@ def run(st, pid: str, opts: dict | None = None, on_progress=None, cancelled=None
                 if e.get("kind") == "cancelled":
                     raise _err("Cancelled. No result was stored.", status=409, kind="cancelled")
                 raise _err(e.get("message", "The optimisation failed."), e.get("hint", ""), status=422, kind=e.get("kind"))
+            solves += int((res.get("mesh") or {}).get("solves") or 0)
             on_progress({"progress": "Rebuilding as features and studying the result", "fraction": 0.93})
             recon = _reconstruct(st, st.load(pid), sid, res, cancelled)
             if before is None:
@@ -476,7 +489,7 @@ def run(st, pid: str, opts: dict | None = None, on_progress=None, cancelled=None
     if rec["outcome"] != "features":
         rec["fallback"] = ({"offer": "mesh body", **rec["body"]} if rec.get("body") else None)
     rec["wall_seconds"] = round(time.time() - t0, 1)
-    rec["budget"] = {"wall_seconds": rec["wall_seconds"], "optimisation_solves": rec["mesh"]["solves"],
+    rec["budget"] = {"wall_seconds": rec["wall_seconds"], "optimisation_solves": solves,
                      "strength_studies": len(tries) + (1 if before and "error" not in before else 0),
                      "tries": len(tries), "resolution": rec.get("resolution")}
     rec["evidence"] = ("simulated (FEA) on the rebuilt CAD" if rc.get("status") == "verified" else
@@ -500,7 +513,7 @@ def start(st, pid: str, opts: dict | None = None) -> dict:
     busy = running_job(st, pid)
     if busy is not None:
         return busy
-    sid = fea_study.pick_static(p, o.get("study", ""))   # refuse now what cannot run
+    sid = _pick_study(p, o.get("study", ""))   # refuse now what cannot run
     fea_study.materials_for(st, p, fea_study.get(p, sid))
     if python(st.cfg) is None:
         raise _err("The strength solver is not installed, so nothing was optimised. No result was made up.", HOW_TO_GET,

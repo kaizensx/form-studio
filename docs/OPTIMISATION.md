@@ -249,6 +249,16 @@ The same arm, 80 × 30 × 5 mm, 60 N, PETG test values. `volfrac` 0.55, `h` 2.5 
 Rebuilt over density: safety factor 1.07, compliance 1.03, displacement 1.02, mass 1.05. Six pockets, 17 ribs.
 Wall time 124 s: 42 solves of the optimisation, two strength studies (90 s of it the rebuilt part's).
 
+With a safety factor as the target (`form optimize topology arm --safety-factor 2.5`, every other setting at its
+default: 5,963 elements of 2.1 mm, members of 4.3 mm): the first try at 50 % of the volume gives 5 pockets and a
+studied safety factor of 1.69 (at least 1.67), below the target; the second, at 58 %, gives 6 pockets, 9.36 g (39 %
+lighter) and 4.20 (at least 4.14), with the density field's own reading at 4.20. Both tries are in the record. 282 s.
+
+A finer layout is not always verified: at `h` 2 and `rmin` 3 the same arm gives 9 pockets, and the study of the
+rebuilt part stopped at its limit of 1.5 million unknowns with the peak stress still changing by 5.0 % per
+refinement against a tolerance of 5 %. The outcome is then `features, not verified`: mass, displacement and
+compliance are reported (within 7 % of the density result's), and no safety factor is claimed.
+
 ### Verification
 
 `form optimize topology --verify` (`form/topo/verify.py`, `tests/test_topology.py`), in the engine's Python.
