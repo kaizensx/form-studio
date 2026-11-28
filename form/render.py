@@ -55,7 +55,9 @@ def posed(view_data: dict, pose: str) -> dict:
         raise ValueError("This design is one part, so it has no assembled view. Use iso, front, top and the others.")
     if a.get("error"):
         raise ValueError(f"The assembly cannot be shown: {a['error']}")
-    offs = poses.explode_offsets(a["parts"], 1.0, a.get("anchor")) if pose == "exploded" else {}
+    # a computed assembly sequence (form/sequence.py) explodes along its own directions, about the same anchor
+    parts = [{**x, "explode_total": x["sequence_explode"]} if x.get("sequence_explode") else x for x in a["parts"]]
+    offs = poses.explode_offsets(parts, 1.0, a.get("anchor")) if pose == "exploded" else {}
     move = {}
     for part in a["parts"]:
         M = np.array(part["placement"]["m"], dtype=np.float64)

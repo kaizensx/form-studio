@@ -7,8 +7,9 @@ run an optional engine asks `on(id, cfg)` first, so one that is switched off is 
     recon.learned   CAD-Recode         [recon] learned          on    (used whenever it is installed, as before)
     recon.cadfit    CADFit             [recon] cadfit           off   (Settings turns it on when it installs it)
     game.coacd      CoACD              [use] coacd              on
+    robot.mujoco    MuJoCo             [use] mujoco             on
     exemplars.cadevolve  CADEvolve     [use] corpus             on
-    blender, freecad, openscad         [use] <id>               on
+    blender, freecad, openscad, kicad  [use] <id>               on
     slicer.<kind>                      [use] <kind>             on
 
 An environment variable wins for one run: FORM_USE_<ID> (dots as underscores, e.g. FORM_USE_RECON_LEARNED=0), and the
@@ -34,6 +35,10 @@ SWITCHES: dict[str, dict] = {
         "key": "use.coacd", "default": True, "name": "CoACD",
         "effect": "On: a game asset may ask for collision=\"coacd\" (several convex pieces). Off: every game asset "
                   "gets one convex hull per part."},
+    "robot.mujoco": {
+        "key": "use.mujoco", "default": True, "name": "MuJoCo",
+        "effect": "On: robot files are loaded by yourdfpy and MuJoCo (and the MJCF stepped for a second) when it is "
+                  "installed. Off: they are validated structurally only, and say so."},
     "exemplars.cadevolve": {
         "key": "use.corpus", "default": True, "name": "the CADEvolve corpus",
         "effect": "On: the agent's example search adds reference CadQuery programs from this corpus after Form "
@@ -50,6 +55,10 @@ SWITCHES: dict[str, dict] = {
         "key": "use.openscad", "default": True, "name": "OpenSCAD",
         "effect": "On: designs written in OpenSCAD build here. Off: they are refused with a message; designs in "
                   "Python are not affected."},
+    "kicad": {
+        "key": "use.kicad", "default": True, "name": "KiCad",
+        "effect": "On: board checks run KiCad's own DRC and ERC, and board fab files (Gerbers, drill, pick-and-place, "
+                  "BOM, STEP) are made with it. Off: boards are still read and enclosures checked; KiCad is never started."},
     **{f"slicer.{k}": {
         "key": f"use.{k}", "default": True, "name": "this slicer",
         "effect": "On: Form Studio may slice with it and lists its printers. Off: it is skipped, also when the "

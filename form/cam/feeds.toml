@@ -1,0 +1,135 @@
+# Cutting speeds and chip loads for carbide end mills, each read from the page it names.
+#
+# A material row is the source's own row: its surface speed range in feet per minute (sfm) and its chip load in inches
+# per tooth for each cutter diameter the source lists (chipload_in, keyed by the diameter in inches). Nothing here is
+# interpolated by hand: form/cam/feeds.py interpolates between the listed diameters and says so.
+#
+# What no source here covers is not in this file: drills, chamfer mills, wood and sheet goods, plunge feeds, depths
+# of cut and stepovers. For those the plan uses the person's numbers, or a stated rule of thumb marked "assumed",
+# and a program with an assumed speed or feed cannot be released.
+
+[sources.harvey_gmg]
+title = "General Machining Guidelines"
+publisher = "Harvey Tool"
+url = "https://www.harveytool.com/resources/general-machining-guidelines"
+published = "undated"
+read = "2026-11-28"
+formula = "RPM = (3.82 x SFM) / D; IPM = RPM x IPT x T"
+note = "Tables “Carbide End Mills, Non-Ferrous” and “Carbide End Mills, Iron, Steel, Stainless”: SFM range and chip load (IPT) by cutter diameter."
+
+[[materials]]
+id = "aluminum_wrought"
+label = "Aluminium, wrought (2024, 6061-T6, 7075-T6)"
+aliases = ["aluminum", "aluminium", "6061", "7075", "2024", "alu"]
+sfm = [800, 1500]
+chipload_in = { "0.125" = 0.001, "0.1875" = 0.002, "0.25" = 0.002, "0.375" = 0.003, "0.5" = 0.004, "0.625" = 0.005, "0.75" = 0.006, "1.0" = 0.007 }
+source = "harvey_gmg"
+quote = "Aluminum | 2024-T4/T6, 2014, 6061-T6/T651, 7075-T6 | 800-1500 | .001 | .002 | .002 | .003 | .004 | .005 | .006 | .007"
+
+[[materials]]
+id = "aluminum_cast"
+label = "Aluminium, cast (356, 380)"
+aliases = ["cast_aluminum", "cast_aluminium", "356", "380"]
+sfm = [500, 1000]
+chipload_in = { "0.125" = 0.001, "0.1875" = 0.002, "0.25" = 0.002, "0.375" = 0.003, "0.5" = 0.004, "0.625" = 0.005, "0.75" = 0.006, "1.0" = 0.007 }
+source = "harvey_gmg"
+quote = "Aluminum | 440, 356, 380, C61300 | 500-1000 | .001 | .002 | .002 | .003 | .004 | .005 | .006 | .007"
+
+[[materials]]
+id = "brass"
+label = "Brass (yellow, high lead, red)"
+aliases = ["yellow_brass", "c360"]
+sfm = [800, 1500]
+chipload_in = { "0.125" = 0.001, "0.1875" = 0.001, "0.25" = 0.002, "0.375" = 0.0025, "0.5" = 0.003, "0.625" = 0.004, "0.75" = 0.004, "1.0" = 0.005 }
+source = "harvey_gmg"
+quote = "Copper | Yellow Brass, High Lead Brass, Red Brass | 800-1500 | .001 | .001 | .002 | .0025 | .003 | .004 | .004 | .005"
+
+[[materials]]
+id = "copper_alloy"
+label = "Copper alloys (nickel silver, beryllium copper, oxygen-free copper)"
+aliases = ["copper"]
+sfm = [700, 1000]
+chipload_in = { "0.125" = 0.001, "0.1875" = 0.001, "0.25" = 0.002, "0.375" = 0.0025, "0.5" = 0.003, "0.625" = 0.004, "0.75" = 0.004, "1.0" = 0.005 }
+source = "harvey_gmg"
+quote = "Copper Alloys | Nickel Silver, Beryllium Copper, Oxygen-Free Copper | 700-1000 | .001 | .001 | .002 | .0025 | .003 | .004 | .004 | .005"
+
+[[materials]]
+id = "polycarbonate"
+label = "Polycarbonate"
+aliases = ["pc"]
+sfm = [200, 500]
+chipload_in = { "0.125" = 0.001, "0.1875" = 0.002, "0.25" = 0.003, "0.375" = 0.004, "0.5" = 0.006, "0.625" = 0.008, "0.75" = 0.010, "1.0" = 0.015 }
+source = "harvey_gmg"
+quote = "Plastics | Polycarbonate | 200-500 | .001 | .002 | .003 | .004 | .006 | .008 | .010 | .015"
+
+[[materials]]
+id = "acrylic"
+label = "Acrylics, phenolics, polysulfone"
+aliases = ["pmma", "phenolic", "plastic"]
+sfm = [200, 600]
+chipload_in = { "0.125" = 0.001, "0.1875" = 0.002, "0.25" = 0.003, "0.375" = 0.004, "0.5" = 0.006, "0.625" = 0.008, "0.75" = 0.010, "1.0" = 0.015 }
+source = "harvey_gmg"
+quote = "Plastics | Acrylics, Phenolics, Polysulfone | 200-600 | .001 | .002 | .003 | .004 | .006 | .008 | .010 | .015"
+
+[[materials]]
+id = "cast_iron_gray"
+label = "Gray cast iron"
+aliases = ["cast_iron", "gray_iron"]
+sfm = [100, 400]
+chipload_in = { "0.125" = 0.0005, "0.1875" = 0.001, "0.25" = 0.002, "0.375" = 0.003, "0.5" = 0.004, "0.625" = 0.005, "0.75" = 0.006, "1.0" = 0.008 }
+source = "harvey_gmg"
+quote = "Ductile Iron | Gray Cast Iron | 100-400 | .0005 | .001 | .002 | .003 | .004 | .005 | .006 | .008"
+
+[[materials]]
+id = "steel_low_alloy"
+label = "Carbon and low-alloy steel (10XX, 11XX, 13XX)"
+aliases = ["steel", "mild_steel", "1018", "1045"]
+sfm = [100, 300]
+chipload_in = { "0.125" = 0.0005, "0.1875" = 0.001, "0.25" = 0.0015, "0.375" = 0.002, "0.5" = 0.003, "0.625" = 0.004, "0.75" = 0.005, "1.0" = 0.006 }
+source = "harvey_gmg"
+quote = "Low Alloy | 10XX, 11XX, 13XX | 100-300 | .0005 | .001 | .0015 | .002 | .003 | .004 | .005 | .006"
+
+[[materials]]
+id = "tool_steel"
+label = "Tool steel (A-2, A-6, O1, O2)"
+aliases = ["a2", "o1"]
+sfm = [100, 250]
+chipload_in = { "0.125" = 0.0005, "0.1875" = 0.0005, "0.25" = 0.001, "0.375" = 0.001, "0.5" = 0.001, "0.625" = 0.0015, "0.75" = 0.002, "1.0" = 0.004 }
+source = "harvey_gmg"
+quote = "High Alloy | A-2/6/10, P-3/10, 01, 02, 06 | 100-250 | .0005 | .0005 | .001 | .001 | .001 | .0015 | .002 | .004"
+
+[[materials]]
+id = "steel_high_strength"
+label = "High-strength steel (4340, 6150, 52100, H-11, H-13)"
+aliases = ["4340", "4140", "h13"]
+sfm = [50, 250]
+chipload_in = { "0.125" = 0.0005, "0.1875" = 0.0005, "0.25" = 0.001, "0.375" = 0.001, "0.5" = 0.001, "0.625" = 0.0015, "0.75" = 0.002, "1.0" = 0.004 }
+source = "harvey_gmg"
+quote = "High Strength | 4340, 6150, 52100, H-11, H-13 | 50-250 | .0005 | .0005 | .001 | .001 | .001 | .0015 | .002 | .004"
+
+[[materials]]
+id = "stainless_austenitic"
+label = "Stainless steel, austenitic (304, 316, 321)"
+aliases = ["stainless", "304", "316"]
+sfm = [100, 250]
+chipload_in = { "0.125" = 0.0001, "0.1875" = 0.0002, "0.25" = 0.0005, "0.375" = 0.001, "0.5" = 0.0015, "0.625" = 0.002, "0.75" = 0.003, "1.0" = 0.004 }
+source = "harvey_gmg"
+quote = "Austenic | 304, 310, 314, 316, 321, 330, 347, 348, 21-6-9 | 100-250 | .0001 | .0002 | .0005 | .001 | .0015 | .002 | .003 | .004"
+
+[[materials]]
+id = "stainless_free_machining"
+label = "Stainless steel (200 series, 302, 303, 304L, 316L)"
+aliases = ["303", "304l", "316l"]
+sfm = [100, 350]
+chipload_in = { "0.125" = 0.0001, "0.1875" = 0.0002, "0.25" = 0.0005, "0.375" = 0.001, "0.5" = 0.0015, "0.625" = 0.002, "0.75" = 0.003, "1.0" = 0.004 }
+source = "harvey_gmg"
+quote = "Austenic | 200 Series, 302, 303, 304L, 316L | 100-350 | .0001 | .0002 | .0005 | .001 | .0015 | .002 | .003 | .004"
+
+[[materials]]
+id = "stainless_ph"
+label = "Stainless steel, precipitation hardening (17-4, 17-7)"
+aliases = ["17-4", "17_4", "17-4ph"]
+sfm = [90, 250]
+chipload_in = { "0.125" = 0.0005, "0.1875" = 0.0005, "0.25" = 0.001, "0.375" = 0.001, "0.5" = 0.002, "0.625" = 0.002, "0.75" = 0.004, "1.0" = 0.006 }
+source = "harvey_gmg"
+quote = "Precipitation | 17/4, 17/7, AF-71, Custom 450/636, 15/7 Mo, 21-6-9 | 90-250 | .0005 | .0005 | .001 | .001 | .002 | .002 | .004 | .006"

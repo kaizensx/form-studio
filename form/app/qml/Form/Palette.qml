@@ -65,6 +65,7 @@ Item {
             add("Tools", "run", "play", "Regenerate everything", "Solid, exports, checks, slice", function () { Store.run() })
             add("Tools", "alternatives", "boxes", "Compare alternatives", "Build a grid of candidates", function () { Store.openSheet("alternatives") })
             add("Tools", "lighter", "weight", "Make it lighter", "Thinner walls, pockets, less infill: every passing check kept", function () { Store.openSheet("lighter") })
+            add("Tools", "parts", "wrench", "Standard parts", "Screws, inserts, bearings, motors… placed with their hole cut and fit checked", function () { Store.openStudy({ app: "parts" }) })
             add("Tools", "variants", "layout_grid", "Variants board", "Named variants side by side", function () { Store.openSheet("variants") })
             add("Tools", "share", "share_2", "Share card", "A 1600 × 900 image of this design", function () { Store.openSheet("share") })
             add("Tools", "turntable", "film", "Turntable video", "The part turning, as MP4, PNG frames, WebP or GIF", function () { Store.openSheet("turntable") })

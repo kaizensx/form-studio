@@ -1,0 +1,74 @@
+# Resin printing (SLA, MSLA). The source is one printer generation's table; other printers and resins differ, so
+# the machine is named on every result. Read on 2026-11-28.
+
+[process]
+id = "sla"
+label = "Resin printing (SLA)"
+evidence = "computed (B-rep)"
+options = ["up", "machine"]
+needs = []
+machine_note = "Formlabs Form 4L generation, Grey V4 resin, 100 µm layers (the source's table)"
+not_judged = "Support placement, peel forces, cupping, curing shrinkage and resin choice are not judged."
+
+[[source]]
+id = "formlabs-form4"
+title = "Design specifications for 3D models (Form 4L generation)"
+publisher = "Formlabs, support article"
+url = "https://formlabs.com/eu/support/Design-specifications-for-3D-models-Form-4L-generation/"
+published = "undated"
+read = "2026-11-28"
+
+[[rule]]
+id = "sla.wall"
+title = "Thinnest wall"
+measure = "wall_min_mm"
+op = ">="
+fail = 0.2
+unit = "mm"
+source = "formlabs-form4"
+quote = "Supported and unsupported wall thickness: 0.2 mm."
+fix = "thicken"
+
+[[rule]]
+id = "sla.overhang"
+title = "Unsupported surfaces at least 10° from level"
+measure = "overhang_from_level_deg"
+op = ">="
+warn = 10.0
+unit = "° from level"
+source = "formlabs-form4"
+quote = "Overhang: minimum unsupported angle 10° from level, maximum unsupported length 5.0 mm."
+
+[[rule]]
+id = "sla.hole"
+title = "Smallest hole"
+measure = "hole_d_mm"
+op = ">="
+fail = 0.5
+unit = "mm"
+source = "formlabs-form4"
+quote = "Holes: minimum diameter 0.5 mm."
+
+[[rule]]
+id = "sla.trapped"
+title = "No closed hollow without drain holes"
+measure = "trapped_voids"
+op = "<="
+fail = 0
+unit = "voids"
+source = "computed"
+why = "A closed void holds liquid resin and air; it needs drain holes."
+fix = "escape_holes"
+hole_d = 0.75
+hole_n = 2
+hole_source = "formlabs-form4"
+hole_quote = "Drain holes: minimum diameter 0.75 mm. Two are cut so air can enter as resin leaves; the count is Form Studio's choice (unsourced)."
+
+[[rule]]
+id = "sla.size"
+title = "Fits the machine"
+measure = "fits_machine"
+op = "fits"
+unit = "mm"
+source = "computed"
+why = "The part's box against the stated machine. With no machine stated, not checked."

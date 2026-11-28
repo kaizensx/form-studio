@@ -741,6 +741,33 @@ QtObject {
             return r
         }, function (e) { instructionsBusy = false; fail(e); return null })
     }
+    // engineering drawing, STEP with PMI and the check against a person's drawing (form/drawing): the sheet scene
+    // (sheet.json) is the data the direction-I sheet pane draws; until then the paper and night PNGs preview it
+    property var drawing: null                  // { rev, key, folder, files, report, title } for the open design
+    property bool drawingBusy: false
+    property var pmi: null
+    property bool pmiBusy: false
+    function makeDrawing(sheet) {
+        if (drawingBusy) return Promise.resolve(null)
+        drawingBusy = true
+        return ppost("/drawing", sheet ? { sheet: sheet } : {}).then(function (r) {
+            drawingBusy = false; drawing = r
+            toast("Drawing ready", r.report.completeness.text + " · scale " + r.report.scale[0] + ":" + r.report.scale[1])
+            return r
+        }, function (e) { drawingBusy = false; fail(e); return null })
+    }
+    function exportPmi() {
+        if (pmiBusy) return Promise.resolve(null)
+        pmiBusy = true
+        return ppost("/drawing_pmi", {}).then(function (r) {
+            pmiBusy = false; pmi = r
+            toast("STEP with PMI ready", r.passed + " of " + r.written + " annotations read back from the file")
+            return r
+        }, function (e) { pmiBusy = false; fail(e); return null })
+    }
+    function setDimension(dim, value) {
+        return ppost("/drawing_set", { dimension: dim, value: value, expect_head: project ? project.head : null })
+    }
     function marker(c) {
         if (!viewer) return
         asmFor(c)
@@ -2546,6 +2573,7 @@ QtObject {
         if (a === "exportProject") { exportProject(pid); return }
         if (a === "review") { runStudy(e.id); return }
         if (["lighter", "share", "turntable", "render", "game"].indexOf(a) >= 0) { openSheet(a); return }
+        if (a === "parts") { openSheet("parts", { item: (selection && selection.items || []).filter(function (x) { return !!x.on })[0] || null }); return }
         if (a === "fit") { setStage("fit"); return }
         if (a === "mass") { massOn = true; return }                                  // the readout and the centre of mass
         if (a === "materials" || a === "tree") { if (stage !== "shape") setStage("shape"); return }   // Colour and material; the Program

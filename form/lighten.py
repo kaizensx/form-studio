@@ -173,9 +173,20 @@ def _interfaces(st, p) -> dict:
         return {}
 
 
-def search(st, p, builds: int = 4, ladder_max: int = 24, settings: bool = True) -> dict:
-    """Candidates that are lighter than the head revision and keep every passing check passing."""
+def search(st, p, builds: int = 4, ladder_max: int = 24, settings: bool = True, require: list | None = None,
+           study: str = "") -> dict:
+    """Candidates that are lighter than the head revision and keep every passing check passing.
+    require: strength constraints (["fea.safety_factor >= 2"]) each geometry candidate must also meet: the design's
+    static strength study (`study`, or its only one) is solved on the candidate (form/fea/constraint.py)."""
     from .studio import NODES
+    fea_cons, fea_sid = [], ""
+    if require:
+        from . import optimize as opt
+        from .fea import constraint as fea_con, study as fea_study
+        fea_cons = opt.parse_constraints(require)
+        fea_con.check_names(fea_cons)
+        fea_sid = fea_study.pick_static(p, study)
+        settings = False            # the study is of a solid part: less infill cannot be shown to meet it
     if st.read(p, "checks", st.keys(p)["checks"]) is None:          # the baseline is the head's real checks
         job = st.run_sync(p["id"])
         p = st.load(p["id"])
@@ -222,6 +233,13 @@ def search(st, p, builds: int = 4, ladder_max: int = 24, settings: bool = True) 
             if broken:
                 rejected.append({"values": r["changes"], "why": "; ".join(broken), "mass_g": c["mass_g"]})
                 continue
+            if fea_cons:
+                f = fea_con.solve(st, p, fea_sid, {**head, **r["changes"]}, fea_cons, opt.OPS)
+                entry["strength"] = f
+                if not f["ok"]:
+                    rejected.append({"values": r["changes"], "why": "; ".join(f["violations"]), "mass_g": c["mass_g"],
+                                     "strength": f})
+                    continue
             kept += 1
             cands.append(entry)
 
@@ -282,6 +300,13 @@ def search(st, p, builds: int = 4, ladder_max: int = 24, settings: bool = True) 
                                           "print settings." if not ks and not base["sliced"] else
                                           "Every lighter candidate broke a check that passes now, or was not lighter."),
             "evidence": "computed geometry and checks; slicer weights are simulated", "note": NOTE}
+    if fea_cons:
+        out["require"] = [f"{m} {op} {v:g}" for m, op, v in fea_cons]
+        out["strength_study"] = fea_sid
+        out["note"] = NOTE + (" Each geometry candidate shown was solved with the strength study and met the requirement "
+                              "(fea.safety_factor is the lower value, with the stated error applied). Print-setting "
+                              "candidates are not offered with a strength requirement: the study is of a solid part.")
+        return out | {"cached": False}          # a search with a requirement is not the cached plain search
     f = _cache_path(st, p)
     f.parent.mkdir(parents=True, exist_ok=True)
     f.write_text(json.dumps(out, indent=1), encoding="utf-8")

@@ -7,6 +7,8 @@ of its own, made with one click from Settings > Engines & software, and runs out
         recon.learned/              CAD-Recode: torch, transformers, safetensors (pinned)
         recon.cadfit/               CADFit: build123d, trimesh, scikit-learn, SciPy, manifold3d (pinned)
         game.coacd/                 CoACD: approximate convex decomposition for game collision (pinned)
+        fea/                        strength studies: Netgen, scikit-fem, SciPy, PyAMG (pinned)
+        robot.mujoco/               MuJoCo and yourdfpy: robot files loaded and stepped (pinned)
 
 An environment is built in a temporary folder next to its final place and moved there only when every step worked
 (uv venv, uv pip install, an import check, the engine's own extra step such as its weights). A failed or cancelled
@@ -67,6 +69,22 @@ SPECS: dict[str, dict] = {
         # CoACD 1.0.14 (MIT) ships abi3 wheels for macOS arm64, Linux x86_64/arm64 and Windows x86_64
         "pins": ("coacd==1.0.14", "numpy==2.5.4"),
         "check": "import coacd, numpy; import form.game.lod",
+    },
+    "fea": {
+        "label": "Strength studies (FEA)",
+        # Netgen meshes the B-rep (LGPL-2.1, unmodified wheels, with its own OCCT build netgen-occt, LGPL-2.1 with
+        # the Open CASCADE exception); scikit-fem (BSD-3-Clause) gives the quadratic shape functions; SciPy
+        # (BSD-3-Clause) and PyAMG (MIT) solve. Wheels for macOS arm64/x86_64, Linux x86_64 and Windows x86_64.
+        "pins": ("netgen-mesher==6.2.2608", "netgen-occt==7.8.1", "scikit-fem==12.0.2", "scipy==1.18.1",
+                 "pyamg==5.4.1", "numpy==2.5.5"),
+        "check": ("import netgen.occ, netgen.meshing, skfem, scipy.sparse.linalg, pyamg, numpy; "
+                  "import form.fea.core, form.fea.run, form.fea.verify"),
+    },
+    "robot.mujoco": {
+        "label": "MuJoCo",
+        # MuJoCo 4.0.1 (Apache-2.0) and yourdfpy 0.0.60 (MIT): the robot files are loaded, and the MJCF stepped, here
+        "pins": ("mujoco==4.0.1", "yourdfpy==0.0.60", "numpy==2.5.5"),
+        "check": "import mujoco, yourdfpy, numpy; import form.robot",
     },
 }
 

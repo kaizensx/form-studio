@@ -1,0 +1,132 @@
+# Sheet metal: a bent part made from one sheet. Measured by its own tool (form/sheet: the skin recognised on the
+# B-rep, unfolded with the bend table, folded back to prove it), then judged here in the same format as every other
+# process. Limits in multiples of the thickness use per = "t" (t is measured, not asked). Read on 2026-11-28.
+
+[process]
+id = "sheet_metal"
+label = "Sheet metal"
+evidence = "computed (B-rep and flat pattern), rules with sources"
+options = ["material", "k", "k_method", "forming"]
+needs = []
+measured_by = "form.sheet"
+not_judged = "Springback, the bend angle's tolerance, grain direction, cracking at tight radii, hardware (PEMs), welds and finish are not judged. The press brake (bend order, tool collisions) is its own check: bend_order."
+
+[[source]]
+id = "protolabs-sheet"
+title = "Sheet Metal Fabrication: Design Guidelines"
+publisher = "Protolabs"
+url = "https://www.protolabs.com/services/sheet-metal-fabrication/design-guidelines/"
+published = "undated"
+read = "2026-11-28"
+
+[[source]]
+id = "bystronic-tools"
+title = "The rules of press brake tool selection"
+publisher = "Bystronic Inc. (Paul LeTang)"
+url = "https://bystronic.com/usa/en-us/news/190502-rules-press-brake-tool-selection"
+published = "2019-05"
+read = "2026-11-28"
+
+[[rule]]
+id = "sheet.unfold"
+title = "One sheet of constant thickness that unfolds"
+measure = "unfolds"
+op = "fits"
+unit = ""
+source = "computed"
+why = "Flat faces and cylindrical bends of one thickness, reached from the base across tangent edges; anything else is named with the face and the reason."
+
+[[rule]]
+id = "sheet.fold_back"
+title = "The flat folds back onto the part"
+measure = "fold_back_mm"
+op = "<="
+fail = 0.01
+unit = "mm"
+source = "computed"
+why = "Every skin vertex, laid flat and folded back from the flat pattern's own numbers, lands within 0.01 mm of where it started."
+
+[[rule]]
+id = "sheet.flat_overlap"
+title = "The flat pattern does not overlap itself"
+measure = "flat_crossings"
+op = "<="
+fail = 0
+unit = "crossings"
+source = "computed"
+why = "Two flanges that land on the same place in the flat cannot be cut from one sheet."
+
+[[rule]]
+id = "sheet.flange"
+title = "Flange at least 4 × thickness"
+measure = "flange_mm"
+op = ">="
+fail = 4.0
+per = "t"
+unit = "mm"
+source = "protolabs-sheet"
+quote = "Minimum flange length on sheet metal parts must be at least 4 times the material thickness."
+
+[[rule]]
+id = "sheet.flange_die"
+title = "Flange long enough for an 8 × t V-die (77 % of the opening)"
+measure = "flange_mm"
+op = ">="
+warn = 6.16
+per = "t"
+unit = "mm"
+source = "bystronic-tools"
+quote = "the V-die opening should be 8 times the material thickness ... The minimum flange a given V die can form is approximately 77 percent of its opening."
+
+[[rule]]
+id = "sheet.hole"
+title = "Holes at least the thickness across"
+measure = "hole_d_mm"
+op = ">="
+fail = 1.0
+per = "t"
+unit = "mm"
+source = "protolabs-sheet"
+quote = "a minimum of material thickness in diameter"
+
+[[rule]]
+id = "sheet.hole_edge"
+title = "Hole to edge"
+measure = "hole_edge_mm"
+op = ">="
+by = "t_band"
+warn = { thin = 1.574, thick = 3.175 }
+unit = "mm"
+source = "protolabs-sheet"
+quote = "If a material is 0.036 in. (0.914mm) or thinner, the hole should be 0.062 in. (1.574mm) from the material edge … the hole should be at least 0.125 in. (3.175mm) from the material edge to avoid distortion"
+
+[[rule]]
+id = "sheet.hole_bend"
+title = "Hole to bend: 4 × thickness"
+measure = "hole_bend_mm"
+op = ">="
+warn = 4.0
+per = "t"
+unit = "mm"
+source = "protolabs-sheet"
+quote = "typically within 4x material thickness of the bend"
+
+[[rule]]
+id = "sheet.hem"
+title = "Hem inside diameter at least the thickness"
+measure = "hem_d_mm"
+op = ">="
+fail = 1.0
+per = "t"
+unit = "mm"
+source = "protolabs-sheet"
+quote = "minimum inside diameter equals the material thickness"
+
+[[rule]]
+id = "sheet.bend_r"
+title = "Inside bend radius"
+measure = "bend_r_mm"
+op = "info"
+unit = "mm"
+source = "computed"
+why = "Every bend's inside radius, measured; the radius a shop's tooling forms is its own (Protolabs: 0.762, 1.524, 2.286, 3.048 mm standard)."

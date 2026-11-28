@@ -17,10 +17,14 @@ Rectangle {
         return m ? [m[2], (m[1] + " " + m[3]).replace(/\s+/g, " ").replace(/^[\s·]+|[\s·]+$/g, "")] : ["", has ? e.headline : ""] }
     readonly property string action: !e || off || e.state === "running" ? "" : e.by === "agent" ? "Ask your agent" : e.by === "person" ? "Go to the release"
         : e.state === "current" ? (opens ? openWord : "Run again") : e.state === "stale" ? "Run for " + Store.revWord(e.head) : "Run"
-    readonly property bool opens: !!e && e.state === "current" && e.by === "engine" && (!!e.app || (e.files && e.files.length > 0)) && ["checks", "proof", "docs", "files", "release", "cost", "printers"].indexOf(e.app || "") < 0
+    // what a current entry opens in the window (Store.openStudy); any other with a file shows the file
+    readonly property var surfaces: ["simulate", "mass", "slicerOpen", "lighter", "share", "turntable", "render", "game", "parts", "fit", "orient", "exportProject"]
+    readonly property bool surface: !!e && ((e.app || "").indexOf("map.") === 0 || surfaces.indexOf(e.app || "") >= 0)
+    readonly property bool filed: !!e && !!e.files && e.files.length > 0
+    readonly property bool opens: !!e && e.state === "current" && e.by === "engine" && (surface || filed)
     readonly property string openWord: !e ? "" : (e.app || "").indexOf("map.") === 0 ? "Show on the part" : e.app === "simulate" ? "Play it" : e.app === "mass" ? "Show the centre of mass"
-        : e.app === "slicerOpen" ? "Open in the slicer" : e.files && e.files.length && !e.app ? "Show the file" : "Open"
-    function act() { if (!e) return; if (opens) Store.openStudy(e); else Store.runStudy(e.id, e.state === "current") }
+        : e.app === "slicerOpen" ? "Open in the slicer" : surface ? "Open" : "Show the file"
+    function act() { if (!e) return; if (opens && surface) Store.openStudy(e); else if (opens) Bridge.reveal(Bridge.fileUrl(e.files[0])); else Store.runStudy(e.id, e.state === "current") }
     width: parent ? parent.width : 0
     height: e ? col.implicitHeight + 28 : 0; visible: !!e
     radius: 14; color: Theme.alpha(Theme.lineBase, Theme.dark ? 0.045 : 0.035); border.color: Theme.rule
@@ -57,7 +61,7 @@ Rectangle {
                 icon: card.e && card.e.by === "agent" ? "sparkles" : ""; onClicked: card.act() }
             Btn { objectName: "cardAgain"; small: true; visible: card.opens; text: "Run again"; onClicked: Store.runStudy(card.e.id, true) }
             Btn { small: true; kind: "quiet"; visible: !!card.e && card.e.state === "running"; busy: true; text: "Running…"; enabled: false }
-            Btn { objectName: "cardReveal"; small: true; kind: "quiet"; visible: !!card.e && !!card.e.files && card.e.files.length > 0 && !(card.opens && card.openWord === "Show the file"); text: "Show the file"
+            Btn { objectName: "cardReveal"; small: true; kind: "quiet"; visible: card.filed && !(card.opens && !card.surface); text: "Show the file"
                 onClicked: Bridge.reveal(Bridge.fileUrl(card.e.files[0])) } }
     }
 }

@@ -82,6 +82,7 @@ class Bench(unittest.TestCase):
         es = {x["id"]: x for x in studies.listing(self.st, self.st.load(self.pid))["entries"]}
         self.assertEqual({es[i]["chapter"] for i in studies.DESIGN if i in es}, {"design"})
         self.assertEqual((es["checks"]["chapter"], es["exports"]["chapter"], es["doc.bom"]["chapter"]), ("check", "make", "document"))
+        self.assertEqual({es[i]["chapter"] for i in studies.MAKE if i in es}, {"make"})
         self.assertTrue(all(x["chapter"] in ("design", "check", "make", "document") for x in es.values()))
 
     def test_1_round_trip(self):

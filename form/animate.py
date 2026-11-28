@@ -115,6 +115,35 @@ def ffmpeg() -> str | None:
         return None
 
 
+def write_mp4(imgs: list, out: str | Path, fps: int, exe: str | None = None) -> dict:
+    """PIL frames written as H.264 MP4 (yuv420p, faststart) by ffmpeg, through a temporary PNG sequence. Raises
+    StudioError when ffmpeg is missing or fails."""
+    import shutil
+    import subprocess
+    import tempfile
+    from .studio import StudioError
+    exe = exe or ffmpeg()
+    if not exe:
+        raise StudioError("MP4 needs ffmpeg, which is not installed.", "Install ffmpeg (brew install ffmpeg).")
+    out = Path(out)
+    out.parent.mkdir(parents=True, exist_ok=True)
+    folder = Path(tempfile.mkdtemp(prefix="form-mp4-", dir=out.parent))
+    try:
+        for i, im in enumerate(imgs):
+            im = im.convert("RGB")
+            if im.width % 2 or im.height % 2:                 # H.264 in yuv420p needs even sides
+                im = im.crop((0, 0, im.width - im.width % 2, im.height - im.height % 2))
+            im.save(folder / f"frame_{i:04d}.png")
+        r = subprocess.run([exe, "-y", "-loglevel", "error", "-framerate", str(fps), "-i", str(folder / "frame_%04d.png"),
+                            "-c:v", "libx264", "-pix_fmt", "yuv420p", "-movflags", "+faststart", str(out)],
+                           capture_output=True, text=True, timeout=600)
+        if r.returncode != 0 or not out.is_file():
+            raise StudioError("ffmpeg could not write the MP4.", (r.stderr or "").strip()[-300:])
+    finally:
+        shutil.rmtree(folder, ignore_errors=True)
+    return {"file": str(out), "frames": len(imgs), "bytes": out.stat().st_size, "fps": fps}
+
+
 def export(studio, p: dict, fmt: str = "webp", frames: int = 36, elevation: float = 24, size=(960, 720), fps: int = 24) -> dict:
     """A turntable of the head revision rendered from the real mesh. gif / webp: one animated file; png: a folder of
     numbered frames and a .zip of them; mp4: H.264 through ffmpeg (refused with the reason when it is not installed).

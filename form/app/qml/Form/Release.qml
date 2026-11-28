@@ -278,6 +278,38 @@ Column {
         }
     }
 
+    // ── engineering drawing, A3 by default, and STEP with PMI (form/drawing) ─────────
+    Fold { objectName: "drawing"; title: "Drawing"; note: Store.drawing ? Store.drawing.report.completeness.text : "from the solid"
+        key: "release.drawing"
+        Column { id: dcol; width: parent.width; spacing: 8
+            readonly property var r: Store.drawing && root.p && Store.drawing.rev === root.p.head ? Store.drawing : null
+            readonly property string base: r ? "/projects/" + Store.pid + "/file/side/drawing-" + r.key + "/" : ""
+            Txt { kind: "fine"; width: parent.width
+                text: "Views by hidden-line removal, dimensions measured on the solid and tied to the parameters, fits and GD&T as the design states them, an ISO 7200 title block." }
+            Row { spacing: 6
+                Btn { objectName: "makeDrawing"; icon: "ruler_dim"; text: dcol.r ? "Draw it again" : "Drawing, A3"
+                    busy: Store.drawingBusy; busyText: "Projecting the views…"; onClicked: Store.makeDrawing("A3") }
+                Btn { kind: "quiet"; icon: "ruler_dim"; text: "A4"; onClicked: Store.makeDrawing("A4") } }
+            Rectangle { visible: !!dcol.r; width: parent.width; height: width * 297 / 420; radius: 3; color: Theme.plate1; border.color: Theme.rule; clip: true
+                Image { anchors.fill: parent; anchors.margins: 1; asynchronous: true; fillMode: Image.PreserveAspectFit; smooth: true; mipmap: true
+                    source: dcol.r ? Store.file("side/drawing-" + dcol.r.key + "/" + dcol.r.files.png_night) : "" } }
+            Txt { kind: "fine"; width: parent.width; visible: !!dcol.r
+                text: dcol.r ? "Scale " + dcol.r.report.scale[0] + ":" + dcol.r.report.scale[1] + " · " + dcol.r.report.projection + " angle · "
+                               + dcol.r.report.dimensions.length + " dimensions · " + dcol.r.report.overlaps.length + " overlaps" : "" }
+            Row { spacing: 6; visible: !!dcol.r
+                Btn { kind: "primary"; icon: "download"; text: "Save PDF…"
+                    onClicked: root.saveAs(dcol.r.files.pdf, dcol.base + dcol.r.files.pdf, "PDF (*.pdf)", true) }
+                Btn { kind: "quiet"; icon: "download"; text: "SVG…"
+                    onClicked: root.saveAs(dcol.r.files.svg, dcol.base + dcol.r.files.svg, "SVG (*.svg)", true) }
+                Btn { kind: "quiet"; icon: "download"; text: "DXF…"
+                    onClicked: root.saveAs(dcol.r.files.dxf, dcol.base + dcol.r.files.dxf, "DXF (*.dxf)", true) } }
+            Btn { objectName: "exportPmi"; icon: "file_box"; text: "STEP with PMI"; busy: Store.pmiBusy; busyText: "Writing and reading back…"
+                onClicked: Store.exportPmi() }
+            Txt { kind: "fine"; width: parent.width; visible: !!Store.pmi
+                text: Store.pmi ? Store.pmi.passed + " of " + Store.pmi.written + " annotations read back from the AP242 file on the same faces" : "" }
+        }
+    }
+
     // ── revisions ───────────────────────────────────────────
     Fold { title: "Revisions"; note: root.p ? root.revs.length + " · head " + F.pad(root.p.head) : ""; key: "release.revs"; openByDefault: true
         Column { width: parent.width

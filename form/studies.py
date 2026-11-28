@@ -40,9 +40,11 @@ STAGE = {"study": "prove", "route": "release", "document": "document"}     # the
 # it, is in Design; the rest follow their group.
 CHAPTER = {"study": "check", "route": "make", "document": "document"}
 DESIGN = ("features", "proof", "materials", "lighter")
+MAKE = ("slice", "simulation", "cam_3axis")          # studies of a way of making it: listed with the routes
 STATES = ("never", "current", "stale", "failed", "running", "unavailable", "n/a")
 BY = ("engine", "agent", "person")       # who runs it: Form Studio here, the agent (it must look), or a person
-PROVIDERS: tuple = ("form.massprops", "form.modelling")   # later waves: each module has register_studies(register)
+PROVIDERS: tuple = ("form.massprops", "form.modelling", "form.fea.bench", "form.calc.bench", "form.dfm", "form.sheet",
+                    "form.cam", "form.drawing.bench", "form.bom", "form.motion", "form.board.api")   # later waves: each has register_studies(register)
 RUNNING_TTL = 6 * 3600                   # a run marker older than this is a process that died, not a run
 
 
@@ -332,9 +334,10 @@ def _alive(pid) -> bool:
 # ---- one entry's state ----------------------------------------------------------------------------------------
 def _base(ctx, s: Study) -> dict:
     return {"id": s.id, "group": s.group, "group_label": GROUPS[s.group], "stage": STAGE[s.group],
-            "chapter": "design" if s.id in DESIGN else CHAPTER[s.group], "label": s.label,
+            "chapter": "design" if s.id in DESIGN else "make" if s.id in MAKE else CHAPTER[s.group], "label": s.label,
             "doc": s.doc, "evidence": s.evidence, "by": s.by, "app": s.app, "tool": s.tool, "heavy": s.heavy,
-            "needs": list(s.needs), "inputs": list(s.inputs), "head": ctx.p["head"], "headline": "", "rev": None}
+            "needs": list(s.needs), "inputs": list(s.inputs), "head": ctx.p["head"], "headline": "", "rev": None,
+            **({"extra": dict(s.extra)} if s.extra else {})}      # e.g. the calculators' {"chapter": "design"}
 
 
 def _from_result(e: dict, res: dict, head: int) -> dict:
@@ -993,7 +996,7 @@ def _builtin() -> None:
     reg(Study("game", "route", "Game asset", "LODs, UVs, baked maps and collision for Godot, Unity or Unreal.",
               "computed", run=_game_run, needs=("game",), app="game", tool="game_asset", heavy=True, order=20))
     reg(Study("release", "route", "Release", "The gate, then a person's approval: the files frozen with SHA-256 hashes.",
-              "computed", state_fn=_release_state, by="person", app="release", tool="request_release", order=30))
+              "computed", state_fn=_release_state, by="person", app="release", tool="request_release", order=99))   # last: after every route a wave adds
     # Documents (Make)
     for i, (name, label, doc, needs) in enumerate((
             ("BOM.csv", "Parts list", "Printed parts and bought hardware, each with its evidence.", ()),

@@ -30,7 +30,9 @@ neither is a physical result.
 
 Three passes
 - Designer: proportion, interaction, finish.
-- Engineer: interfaces, load path, assembly, tolerances (read the checks and fit model).
+- Engineer: interfaces, load path, assembly, tolerances (read the checks and fit model). For a part that carries a
+  load, a strength study answers the load path with numbers (`strength_study()`, the strength-studies skill): quote
+  its evidence class and its lower safety factor, and never the stress at a singularity it names.
 - Print technician: orientation, layer direction at loaded roots, overhangs, supports, seams (read the simulated slice).
 
 Score each 0–5 and explain the two weakest with evidence from the renders or checks:

@@ -37,7 +37,7 @@ def run(ui):
     # ── Document: what exists has a state, what is not built says so ──
     goto(ui, "document")
     ui.settle(400)
-    ui.check(ui.sees("not built yet", within=ui.item("docNotBuilt")), "what is not built yet is said, not listed as a row")
+    ui.check(ui.find(name="bench-drawing") is not None, "the drawing is a row with its state")
     ui.check(ui.find(name="bench-doc.bom") is not None, "the documents are the engine's own entries")
     ui.check(not ui.exists("docShare") and not ui.exists("docTurntable"), "no hand row repeats an entry")
     ui.shot("direction-i-document")

@@ -56,7 +56,7 @@ Parametric build123d on OpenCascade, every requirement proved on the solid, on y
 <p align="center">
   <picture>
     <source media="(prefers-color-scheme: dark)" srcset="docs/readme/numbers-1-dark.svg">
-    <img src="docs/readme/numbers-1-light.svg" width="414" alt="103 MCP tools for any agent. 18 agent apps, model APIs and local models.">
+    <img src="docs/readme/numbers-1-light.svg" width="414" alt="126 MCP tools for any agent. 18 agent apps, model APIs and local models.">
   </picture>
   <picture>
     <source media="(prefers-color-scheme: dark)" srcset="docs/readme/numbers-2-dark.svg">
@@ -86,7 +86,7 @@ Form Studio sits between your agent and the CAD kernel and keeps the record of w
 ```mermaid
 flowchart LR
   you(["You: words, a photo,<br/>a sketch, a part, a link"]) --> agent["Your agent<br/>app, model API or local model"]
-  agent -- "103 MCP tools · form CLI" --> engine["Form Studio engine<br/>parameters with provenance<br/>revisions · hashed outputs"]
+  agent -- "126 MCP tools · form CLI" --> engine["Form Studio engine<br/>parameters with provenance<br/>revisions · hashed outputs"]
   engine --> kernel["CAD kernel<br/>build123d on OpenCascade"]
   kernel --> checks["Checks<br/>solid · mesh · fits · joints"]
   checks --> release{{"You approve<br/>files frozen with SHA-256"}}
@@ -136,6 +136,8 @@ Start from words, a photo with a card or coin for scale, a sketch with real dime
 </p>
 
 Agents design with engineering parts that carry their sources: ISO 273 screw clearances, heat-set insert pockets, nut traps, bearing seats, printable threads and involute gears. Assemblies are declared as parts, joints and mates; every joint is swept through its range and checked for collisions, with Assembled and Exploded views and assembly instructions as a PDF. Constraints refuse impossible combinations with the feature, the parameters and a way forward, and an optimiser finds the best values under the requirements you state.
+
+Bring a circuit board (KiCad `.kicad_pcb` or IDF) and the agent makes an enclosure around it: standoffs on its mounting holes, openings aligned to its connectors, a lid with a lip. The board is checked against the enclosure on the solids at every revision, so a moved connector or a taller part shows up as a failed check; with KiCad installed, its own DRC and ERC and the fab files come from your copy ([docs/BOARDS.md](docs/BOARDS.md)).
 
 A library of design helpers gives the agent proven building blocks for mechanisms (hinges, snap fits, bayonets, ratchets, cams, gear trains and planetary sets), for surfaces (lofts, sweeps, shells and variable fillets), for organic forms (helmet shells, grips, handles) and for texture (knurls and embossed patterns on the solid itself, fine grain as a mesh texture), each with typed fallbacks and a clear error when a value cannot work.
 
@@ -327,8 +329,11 @@ form tool get_project '{"project": "desk-stand"}'                               
 | | |
 |---|---|
 | **Every command** | [docs/CLI.md](docs/CLI.md) |
-| **103 MCP tools** | [docs/MCP.md](docs/MCP.md) |
+| **126 MCP tools** | [docs/MCP.md](docs/MCP.md) |
 | **How the engine is built** | [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) |
+| **Strength studies and their verification** | [docs/STRENGTH.md](docs/STRENGTH.md) |
+| **Engineering calculators and their verification** | [docs/CALCULATORS.md](docs/CALCULATORS.md) |
+| **CNC toolpaths and their stock simulation** | [docs/CAM.md](docs/CAM.md) |
 
 ## Community
 
