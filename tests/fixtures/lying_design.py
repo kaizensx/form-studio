@@ -1,8 +1,10 @@
 """A design built lying down, for the views that must rest it on the ground (tests/test_assembly_views.py,
 tests/journeys/plates.py)."""
 
-# Built lying down: a post modelled along X beside a base plate, stood upright by its placement about a point under
-# the plate, and pulled down and out for the exploded view. Shown naively, the post would hang below the plate.
+# Built lying down: a post modelled along X beside a base plate, stood upright on the base by its placement (a turn
+# about Y, then a move down and over). Both exploded offsets point down (the base's 10 mm, the post's 40 mm and out):
+# shown naively, the exploded set goes through the ground. The base is the anchor (fixed to the world, the largest
+# footprint): it stays where it rests, and the post's offset relative to it (25, 0, -30) is turned upward.
 LYING = '''
 from build123d import Align, Box, Pos
 from form.recipes.base import Assembly, Feature, Param, Part, Recipe, Stage
@@ -24,7 +26,7 @@ class Design(Recipe):
 
     def assembly(self, v):
         return Assembly(parts=[
-            Part("base", "Base", 0, explode=(0, 0, 0)),
-            Part("post", "Post", 1, rotate=(0, 90, 0), move=(-50, 19, -40), explode=(0, 0, -30)),
+            Part("base", "Base", 0, explode=(0, 0, -10)),
+            Part("post", "Post", 1, rotate=(0, -90, 0), move=(31, 19, -64), explode=(25, 0, -40)),
         ])
 '''

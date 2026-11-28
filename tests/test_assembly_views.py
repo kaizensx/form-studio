@@ -35,6 +35,22 @@ class Derived(unittest.TestCase):
         self.assertGreater(stacked.parts[1].explode[2], 0)            # the upper part lifts
         self.assertEqual(a.public()["derived"], True)
 
+    def test_explode_about_the_anchor(self):
+        from form import poses
+        parts = [{"id": "lid", "parent": "box", "bbox": [[0, 0, 30], [80, 60, 34]], "explode_total": [0, 0, 20]},
+                 {"id": "box", "parent": "", "bbox": [[0, 0, 0], [80, 60, 30]], "explode_total": [0, 0, -5]},
+                 {"id": "tray", "parent": "", "bbox": [[0, 0, 2], [70, 50, 6]], "explode_total": [0, 0, -40]},
+                 {"id": "knob", "parent": "", "bbox": [[0, 0, 0], [10, 10, 10]], "explode_total": [-30, 0, 0]}]
+        self.assertEqual(poses.anchor_of(parts), "box")              # fixed to the world, the largest footprint
+        off = poses.explode_offsets(parts)
+        self.assertEqual(off["box"], [0.0, 0.0, 0.0])                # the anchor stays exactly
+        self.assertEqual(off["lid"], [0.0, 0.0, 25.0])               # relative to the anchor
+        self.assertEqual(off["tray"], [0.0, 0.0, 35.0])              # -35 would go 33 mm into the ground: turned up
+        self.assertEqual(off["knob"], [-30.0, 0.0, 5.0])             # sideways, and the anchor's -5 taken out
+        for x in parts:
+            self.assertGreaterEqual(x["bbox"][0][2] + off[x["id"]][2], 0)
+        self.assertEqual(poses.anchor_of([dict(p, parent="") for p in parts[:2]]), "box")   # equal footprints: the lowest
+
     def test_get_derives_when_undeclared_and_checks_nothing(self):
         m = model(None)
         a = asm.get(m)
@@ -74,23 +90,31 @@ class Studio_(unittest.TestCase):
         import numpy as np
 
         from form import render
+        from form import poses
         p = self.st.create_design("Lying post", LYING)
         v = self.st.view(self.st.load(p["id"]))
-        post = next(x for x in v["assembly"]["parts"] if x["id"] == "post")
-        M = np.array(post["placement"]["m"])
-        lo = np.array(post["print_bbox"][0])
-        self.assertLess((M[:, :3] @ lo + M[:, 3])[2] + post["explode_total"][2], -100)   # placed as declared: far under
-        for pose in ("assembled", "exploded"):
-            out = render.posed(v, pose)
-            P = np.concatenate([np.frombuffer(base64.b64decode(m["positions"]), np.float32).reshape(-1, 3)
-                                for m in out["mesh"]])
-            self.assertAlmostEqual(float(P[:, 2].min()), 0.0, places=3, msg=pose)     # the whole set rests on the plate
-            self.assertAlmostEqual(out["bbox"][0][2], 0.0, places=3)
-            ex = out["mesh"]                                                          # and the post stands upright
-            Q = np.concatenate([np.frombuffer(base64.b64decode(m["positions"]), np.float32).reshape(-1, 3)
-                                for m in ex if m.get("part") == "post"])
-            self.assertGreater(float(np.ptp(Q[:, 2])), 50, pose)
-        png = render.render_png(render.posed(v, "exploded"), [], "iso", None, size=(320, 240))
+        a = v["assembly"]
+        self.assertEqual(a["anchor"], "base")                     # fixed to the world, the largest footprint
+        post = next(x for x in a["parts"] if x["id"] == "post")
+        self.assertEqual(np.ptp(np.array(post["print_bbox"])[:, 2]), 12.0)   # built lying down: 12 mm tall as printed
+        self.assertAlmostEqual(post["bbox"][0][2], 6.0, places=3)             # stood on the base's top by its placement
+        self.assertLess(post["bbox"][0][2] + post["explode_total"][2], -30)    # its offset as declared: through the ground
+
+        def drawn(out, part):
+            return np.concatenate([np.frombuffer(base64.b64decode(m["positions"]), np.float32).reshape(-1, 3)
+                                   for m in out["mesh"] if m.get("part") == part])
+        shown = {pose: render.posed(v, pose) for pose in ("assembled", "exploded")}
+        for pose, out in shown.items():
+            P = np.concatenate([drawn(out, x["id"]) for x in a["parts"]])
+            self.assertGreaterEqual(float(P[:, 2].min()), -1e-3, pose)          # nothing below the plate
+            self.assertGreater(float(np.ptp(drawn(out, "post")[:, 2])), 50, pose)   # the post stands upright
+        base0, base1 = drawn(shown["assembled"], "base"), drawn(shown["exploded"], "base")
+        self.assertTrue(np.allclose(base0, base1, atol=1e-4))                   # the anchor does not move at all
+        self.assertAlmostEqual(float(base0[:, 2].min()), 0.0, places=3)          # and rests on the plate
+        d = drawn(shown["exploded"], "post").min(axis=0) - drawn(shown["assembled"], "post").min(axis=0)
+        self.assertTrue(np.allclose(d, [25, 0, 30], atol=1e-3), d)               # out, and up instead of down
+        self.assertEqual(poses.explode_offsets(a["parts"])["post"], [25.0, 0.0, 30.0])
+        png = render.render_png(shown["exploded"], [], "iso", None, size=(320, 240))
         self.assertTrue(png.startswith(b"\x89PNG"))
 
     @unittest.skipUnless(PARTS, "needs the [parts] extra")

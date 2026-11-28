@@ -194,8 +194,29 @@ Item {
                 t = r.times(t.minus(o)).plus(o); q = r.times(q)
             } else t = t.plus(ax.times(v))
         }
-        if (mode === "exploded") { var e = x.explode_total || x.explode; t = t.plus(Qt.vector3d(e[0], e[1], e[2]).times(explode)) }
+        if (mode === "exploded") t = t.plus(explodeOff(x))
         return { pos: t, rot: q }
+    }
+    // Pulled apart about an anchor (form/poses.py): the part fixed to the world with the largest footprint stays exactly
+    // where it rests; every other part moves by its exploded offset less the anchor's, and an offset that would take it
+    // below the ground has its vertical part turned upward. So the set rests on z >= 0 and the anchor never moves.
+    readonly property string anchorId: {
+        if (!asm) return ""
+        if (asm.anchor) return asm.anchor
+        var roots = asm.parts.filter(function (x) { return !x.parent }), best = null
+        if (!roots.length) roots = asm.parts
+        function area(x) { return Math.max(0, x.bbox[1][0] - x.bbox[0][0]) * Math.max(0, x.bbox[1][1] - x.bbox[0][1]) }
+        var big = Math.max.apply(null, roots.map(area))
+        roots.filter(function (x) { return area(x) >= 0.95 * big - 1e-9 }).forEach(function (x) {
+            if (!best || Math.round(x.bbox[0][2]) < Math.round(best.bbox[0][2])) best = x })
+        return best ? best.id : ""
+    }
+    readonly property real restLift: asm ? -Math.min.apply(null, asm.parts.map(function (x) { return x.bbox[0][2] })) : 0
+    function explodeOff(x) {
+        if (!x || x.id === anchorId) return Qt.vector3d(0, 0, 0)
+        var a = partById(anchorId), ae = a ? (a.explode_total || a.explode) : [0, 0, 0], e = x.explode_total || x.explode
+        var d = Qt.vector3d(e[0] - ae[0], e[1] - ae[1], e[2] - ae[2]).times(explode)
+        return x.bbox[0][2] + restLift + d.z < -1e-9 ? Qt.vector3d(d.x, d.y, -d.z) : d
     }
     // ── points on parts, from the print frame (where the engine computes) to where the part is drawn now ──
     // Measurements and selections keep their points on the part as printed, with the part's id, so they ride along
@@ -265,7 +286,7 @@ Item {
         } else if (on && asmMode === "exploded") {
             var asm = a
             for (var i = 0; i < asm.parts.length; i++) {
-                var x = asm.parts[i], xe = x.explode_total || x.explode, e = Qt.vector3d(xe[0], xe[1], xe[2]).times(explode)
+                var x = asm.parts[i], e = explodeOff(x)
                 lo = Qt.vector3d(Math.min(lo.x, x.bbox[0][0] + e.x), Math.min(lo.y, x.bbox[0][1] + e.y), Math.min(lo.z, x.bbox[0][2] + e.z))
                 hi = Qt.vector3d(Math.max(hi.x, x.bbox[1][0] + e.x), Math.max(hi.y, x.bbox[1][1] + e.y), Math.max(hi.z, x.bbox[1][2] + e.z))
             }
@@ -275,9 +296,12 @@ Item {
             lo = Qt.vector3d(Math.min(lo.x, 0), Math.min(lo.y, 0), lo.z)
             hi = Qt.vector3d(Math.max(hi.x, plateOffset(n) + plateBed[0]), Math.max(hi.y, plateBed[1]), hi.z)
         }
-        // Centred over the plate, and resting on it: the lowest point of what is drawn now (assembled, pulled apart,
-        // a joint swung, or a part built lying down and turned upright by its placement) is at z = 0, never under it.
-        var sh = Qt.vector3d(-(lo.x + hi.x) / 2, -(lo.y + hi.y) / 2, -lo.z)
+        // Resting on the plate. Assembled, pulled apart or with a joint swung, the set keeps the rest of its assembled
+        // pose (its lowest point at z = 0, a part built lying down and stood upright by its placement included), so the
+        // anchor never moves between them, and pulling apart keeps every part above the ground (explodeOff). The print
+        // layout and the plates are centred on what they show.
+        var sh = on ? Qt.vector3d(-(b[0][0] + b[1][0]) / 2, -(b[0][1] + b[1][1]) / 2, -b[0][2])
+                    : Qt.vector3d(-(lo.x + hi.x) / 2, -(lo.y + hi.y) / 2, -lo.z)
         shift = sh                           // may animate; bounds use the target, not the value mid-animation
         shiftTo = sh
         bounds = { lo: lo.plus(sh), hi: hi.plus(sh) }

@@ -16,10 +16,11 @@
   fit (another side down, a scale, a split, a larger printer). `open_in_slicer` and `form slicer-open` take
   `copies`, `pack_plate` and `form pack` say how many plates the copies take, `plate_plan(write_3mf=true)` and
   `form pack --3mf DIR` write them.
-- **Assembled and exploded views rest on the ground.** A part built lying down and stood upright by its placement,
-  an exploded offset that points down, or a joint swung open no longer puts parts under the plate or the studio
-  floor: every view (assembled, exploded, joint poses, and the rendered `render(view="exploded")`) rests its lowest
-  point at z = 0.
+- **Assembled and exploded views rest on the ground, and pull apart about the base.** The assembled set rests on
+  the plate or studio floor (its lowest point at z = 0), a part built lying down and stood upright by its placement
+  included. Pulling it apart keeps the anchor (the part fixed to the world with the largest footprint) exactly where
+  it rests: the other parts move away from it, and an offset that would go through the ground is turned upward.
+  Swinging a joint never moves the fixed part. The same in the app and in `render(view="exploded")`.
 
 ## 1.1.0
 

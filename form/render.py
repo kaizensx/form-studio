@@ -45,35 +45,39 @@ POSES = ("assembled", "exploded")       # a multi-part design put together (or p
 
 def posed(view_data: dict, pose: str) -> dict:
     """The view with every part moved from where it prints to where it sits in the assembly (plus its explode
-    offset for "exploded"), the whole set resting on the plate: its lowest point at z = 0, whether a part was built
-    lying down and turned upright by its placement or an offset points down. Raises ValueError when the design has
-    no usable assembly."""
+    offset for "exploded"). The assembled set rests on the plate (its lowest point at z = 0, a part built lying down
+    and stood upright by its placement included), and pulling it apart keeps the anchor (form/poses.py) exactly
+    there: the others move by their offsets relative to it, a downward one turned upward, so nothing goes below the
+    plate. Raises ValueError when the design has no usable assembly."""
+    from . import poses
     a = view_data.get("assembly") or {}
     if not a.get("parts"):
         raise ValueError("This design is one part, so it has no assembled view. Use iso, front, top and the others.")
     if a.get("error"):
         raise ValueError(f"The assembly cannot be shown: {a['error']}")
+    offs = poses.explode_offsets(a["parts"], 1.0, a.get("anchor")) if pose == "exploded" else {}
     move = {}
     for part in a["parts"]:
         M = np.array(part["placement"]["m"], dtype=np.float64)
-        off = np.array(part["explode_total"] if pose == "exploded" else (0.0, 0.0, 0.0), dtype=np.float64)
-        move[part["id"]] = (M[:, :3], M[:, 3] + off)
+        move[part["id"]] = (M[:, :3], M[:, 3], np.array(offs.get(part["id"], (0.0, 0.0, 0.0)), dtype=np.float64))
     moved = []
     for m in view_data["mesh"]:
         P = _arr(m["positions"], np.float32, 3).astype(np.float64)
+        off = np.zeros(3)
         if m.get("part") in move:
-            R, tr = move[m["part"]]
+            R, tr, off = move[m["part"]]
             P = P @ R.T + tr
-        moved.append((m, P))
-    lows = [P[:, 2].min() for _, P in moved if len(P)]
+        moved.append((m, P, off))
+    lows = [P[:, 2].min() for _, P, _ in moved if len(P)]        # the assembled set, resting on the plate
     lift = -min(lows) if lows else 0.0
+    moved = [(m, P + off, off) for m, P, off in moved]
     mesh = []
-    for m, P in moved:
+    for m, P, _ in moved:
         P = P + np.array([0.0, 0.0, lift])
         mesh.append({**m, "positions": base64.b64encode(np.ascontiguousarray(P.astype(np.float32)).tobytes()).decode()})
     out = {**view_data, "mesh": mesh, "edges": None}      # edges are drawn in the print frame: leave them out
     if out.get("bbox") and lows:
-        P = np.concatenate([P for _, P in moved if len(P)]) + np.array([0.0, 0.0, lift])
+        P = np.concatenate([P for _, P, _ in moved if len(P)]) + np.array([0.0, 0.0, lift])
         out["bbox"] = [P.min(axis=0).tolist(), P.max(axis=0).tolist()]
     return out
 

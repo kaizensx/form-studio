@@ -97,9 +97,9 @@ def journey_design_only_and_back(ui):
     ui.eq(data(ui)["status"]["slice"]["state"], "current", "the earlier slice is current again (same inputs, same key)")
 
 
-# Built lying down: a post modelled along X beside its base, stood upright by its placement about a point under the
-# base and pulled down for the exploded view (tests/test_assembly_views.py LYING). Shown naively it hangs under the
-# ground; every view rests the whole set on it instead.
+# Built lying down: a post modelled along X beside its base, stood upright on the base by its placement, both exploded
+# offsets pointing down (tests/fixtures/lying_design.py). The base is the anchor: it rests on the ground and stays
+# exactly there when the set is pulled apart; the post goes out and up instead of through the ground.
 def journey_lying_down_assembly_rests_on_the_ground(ui):
     import sys
     from pathlib import Path
@@ -115,13 +115,20 @@ def journey_lying_down_assembly_rests_on_the_ground(ui):
     ui.key("E")
     ui.wait_until(lambda: ui.js("Ws.tool") == "assembly", 5, "E to open Assembly")
     bar = ui.item("asmBar")
+    ui.eq(ui.js("Store.viewer.anchorId"), "base", "the base is the anchor")
+    seen = {}
     for mode, label in (("assembled", "Assembled"), ("exploded", "Exploded")):
         ui.click_text(label, within=bar)
         ui.wait_until(lambda: ui.store.get("asmMode") == mode, 3, mode)
         ui.settle(900)                       # the parts glide to their places
-        lows = [drawn_box(ui, pid)[0][2] for pid in ("base", "post")]
+        seen[mode] = {pid: drawn_box(ui, pid) for pid in ("base", "post")}
+        lows = [b[0][2] for b in seen[mode].values()]
         ui.check(min(lows) > -1e-3, f"{mode}: nothing under the ground (lowest {min(lows):.3f} mm)")
-        ui.check(abs(min(lows)) < 1e-2, f"{mode}: the set rests on the ground ({min(lows):.3f} mm)")
-        lo, hi = drawn_box(ui, "post")
+        ui.check(abs(seen[mode]["base"][0][2]) < 1e-2, f"{mode}: the base rests on the ground ({seen[mode]['base'][0][2]:.3f} mm)")
+        lo, hi = seen[mode]["post"]
         ui.check(hi[2] - lo[2] > 50, f"{mode}: the post stands upright ({hi[2] - lo[2]:.1f} mm tall)")
         ui.shot(f"lying-{mode}")
+    a, e = seen["assembled"], seen["exploded"]
+    ui.check(all(abs(a["base"][k][i] - e["base"][k][i]) < 1e-3 for k in (0, 1) for i in range(3)),
+             f"the anchor does not move when the set is pulled apart: {a['base']} vs {e['base']}")
+    ui.check(e["post"][0][2] > a["post"][0][2] + 20, "the post goes up, not through the ground")
