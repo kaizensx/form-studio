@@ -697,6 +697,40 @@ equations, the sources and the verification table are in [CALCULATORS.md](CALCUL
 - **Save files…** puts every file of a release in one .zip (STEP, STL, the sliced 3MF, G-code, report, documents and
   manifest); **Show in Finder** opens its folder. `form release-files`.
 
+## Engineering drawings, GD&T and PMI
+
+- **Views from the B-rep.** OCCT hidden-line removal draws the front, top and right views in first or third angle
+  (ISO 5456-2) and an isometric; visible edges wide, tangent edges narrow, hidden edges dashed and left out where a
+  visible edge covers them (ISO 128-2). A full section through the bores with 45° hatching and its cutting plane; a
+  detail view, circled and lettered, of a chamfer too small to read at the sheet's scale.
+- **The sheet.** A4 to A0 and ANSI A to E, the largest ISO 5455 scale at which the views and their dimensions fit,
+  an ISO 5457 border with centring marks and an ISO 7200 title block: title, number, revision, date, material and
+  computed mass when the design has a material, the general tolerance, the projection symbol and the geometry hash
+  (the release hash once released). A field Form Studio does not know stays empty.
+- **Dimensions are the parameters.** Sizes are measured on the solid (plane levels, hole and boss diameters, radii,
+  pitches) and each size parameter is bound to the size it equals; with `prove` (the default) the design is built
+  again with the parameter nudged to prove which size moves. The report states "N of N size parameters dimensioned,
+  0 twice", lists the parameters with no size of their own and what each drives, and `form drawing set` (or the
+  app) changes a dimension by committing its parameter.
+- **Placement without overlaps.** Linear dimensions are packed into tiers per view side, shortest nearest the part;
+  text never sits on an extension line; baseline dimensions nest and chain dimensions share a line (ISO 129-1,
+  `"holes": "baseline" | "chain"`); leaders, frames and symbols search for free space. Every sheet reports its
+  overlaps (none on a good sheet).
+- **Tolerances.** ISO 286 fits computed from the standard's formulas (IT5 to IT11, shaft deviations d to u and their
+  holes with the delta rule), checked against the published tables; ISO 2768 general tolerances by class.
+- **GD&T and surface texture, only where declared.** Feature control frames (ISO 1101 / ASME Y14.5), datum
+  features (ISO 5459) and surface symbols (ISO 21920-1) from the design's `drawing(v)` method or the person's
+  `drawing(spec=...)`; a declaration that breaks the standard is refused with the reason.
+- **Files.** Vector PDF by Qt with the fonts embedded, SVG, DXF (one layer per line type), paper and night PNGs, and
+  the sheet as a scene graph (`sheet.json`) for the app's sheet pane.
+- **STEP AP242 with semantic PMI.** The drawing's dimensions with their limits, datums and geometric tolerances on
+  the solid's faces through OCCT's XCAF document; the file is read back and each annotation compared with what was
+  written. `export_pmi`, `form drawing pmi`.
+- **Check against a drawing.** `check_drawing` / `form drawing check` reads a person's drawing (a PDF's text layer
+  or DXF entities exactly; an image through the agent's rows, each with its place on the sheet), and gives one row
+  per dimension: expected and measured, the tolerance used, PASS, FAIL or UNSURE, a crop of the sheet and a render
+  with the measured feature lit. Form Studio runs no OCR, so nothing it was not sure of is reported as read.
+
 ## Working with other software
 
 | Program | What Form Studio does with it |
