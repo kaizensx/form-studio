@@ -123,7 +123,7 @@ def main(argv=None) -> int:
         return 2
 
     from .. import __version__, config
-    from . import geometry  # noqa: F401  (registers the FormNative QML types)
+    from . import geometry, resultgeo  # noqa: F401  (register the FormNative QML types)
     from .bridge import Bridge
 
     cfg = config.load()

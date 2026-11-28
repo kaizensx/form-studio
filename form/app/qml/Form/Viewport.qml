@@ -95,7 +95,10 @@ Item {
     property var analysis: null
     property var _map: null                  // what is drawn (kept while fading out)
     property real mapMix: 0
-    readonly property bool mapShown: !!_map
+    readonly property bool mapShown: !!_map || rlayer.covers     // a map or a result stands in for the clay parts
+    // results drawn on the part (ResultLayer, ResultLabels): on in the workspace's view only, never in a thumbnail
+    property bool results: false
+    readonly property alias resultLayer: rlayer
     Behavior on mapMix { NumberAnimation { duration: Motion.slow; easing.type: Easing.OutCubic } }
     onAnalysisChanged: { if (analysis) { mapOff.stop(); _map = analysis; mapMix = 1 } else { mapMix = 0; mapOff.restart() } }
     Timer { id: mapOff; interval: 300; onTriggered: if (!vp.analysis) vp._map = null }
@@ -1219,7 +1222,7 @@ Item {
                     id: amodel
                     readonly property string feature: ""
                     readonly property string part: ""
-                    visible: vp.mapShown; pickable: vp.mapShown
+                    visible: !!vp._map; pickable: !!vp._map
                     geometry: MeshGeometry { id: ageo; source: vp._map }
                     materials: CustomMaterial {
                         shadingMode: CustomMaterial.Shaded; cullMode: Material.NoCulling; fragmentShader: "shaders/clay.frag"
@@ -1258,6 +1261,8 @@ Item {
                             materials: PrincipledMaterial { baseColor: modelData.kind === "thin" || modelData.severity === "fail" ? Theme.signal : Theme.amber; lighting: PrincipledMaterial.NoLighting } }
                     }
                 }
+                // a result of a later engine, drawn on the part: strength, manufacturability, CNC, flat pattern, motion
+                ResultLayer { id: rlayer; port: vp; live: vp.results && !vp.lite }
                 SelectionLayer { vp: vp; items: vp.focusItems; strength: 0.6; opacity: vp.asmTween ? 0 : 1
                     dot: vp.dist * 0.000034; px: Qt.vector2d(2 / Math.max(1, vp.width), 2 / Math.max(1, vp.height)) }
                 SelectionLayer { vp: vp; items: vp.selection; opacity: vp.asmTween ? 0 : 1
@@ -1309,6 +1314,9 @@ Item {
                     property color uColor: Theme.alpha(Theme.datum, vp.lite ? 0.72 : 0.3); property vector3d uClipN; property real uClipD; property real uClip: 0 } }
         }
     }
+    // what a result says on the part: the peak, the loads and supports, findings, bend notes (ResultLabels)
+    Loader { anchors.fill: view; active: vp.results && !vp.lite && Results.onPart; visible: !vp.asmTween
+        sourceComponent: ResultLabels { port: vp; lay3: rlayer; camera: cam } }
     // the brush stroke or lasso outline being drawn, on top of the part
     Canvas {
         id: strokeCanvas
@@ -1469,7 +1477,7 @@ Item {
     // dimension numbers, on the 3D dimension lines: small capsules, the number in mono
     Repeater {
         id: dimLabels
-        model: vp.showDims && vp.model && !(vp.asmOn && vp.asmMode === "exploded") && !vp.platesOn && !vp.dimsHeld && vp._altMix < 0.5 ? 3 : 0
+        model: vp.showDims && rlayer.kind === "" && vp.model && !(vp.asmOn && vp.asmMode === "exploded") && !vp.platesOn && !vp.dimsHeld && vp._altMix < 0.5 ? 3 : 0
         Rectangle {
             id: dl
             objectName: "dimLabel"
@@ -1540,6 +1548,7 @@ Item {
         Timer { id: valueAt; interval: 30                // the map's value under the pointer: pick, then interpolate on the mesh
             onTriggered: {
                 var r = view.pick(ma.hoverAt.x, ma.hoverAt.y)
+                if (rlayer.isField) { Results.hoverValue = r.objectHit === rlayer.fieldModel && rlayer.deformNow === 0 ? rlayer.fieldGeo.valueAt(r.position) : NaN; return }
                 if (r.objectHit === amodel) vp.hoveredValue(ageo.valueAt(r.position), ma.hoverAt.x, ma.hoverAt.y, true)
                 else vp.hoveredValue(0, 0, 0, false)
             } }
@@ -1653,7 +1662,7 @@ Item {
         }
         property bool held: false
         onPressAndHold: function (e) { if (!moved && !painting && e.button === Qt.LeftButton && !vp.measuring && !vp.selecting) { held = true; vp.contextRequested(hit(e.x, e.y), e.x, e.y) } }
-        onExited: { if (vp.hovered) vp.hovered = ""; vp.hoveredFeature("", 0, 0); valueAt.stop(); vp.hoveredValue(0, 0, 0, false) }
+        onExited: { if (vp.results) Results.hoverValue = NaN; if (vp.hovered) vp.hovered = ""; vp.hoveredFeature("", 0, 0); valueAt.stop(); vp.hoveredValue(0, 0, 0, false) }
         onWheel: function (w) {
             vp.tween = false
             var d = w.pixelDelta.y !== 0 ? w.pixelDelta.y * 0.0035 : w.angleDelta.y / 120 * 0.12

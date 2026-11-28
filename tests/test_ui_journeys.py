@@ -194,6 +194,12 @@ class Journeys(unittest.TestCase):
     def test_bench_small_light(self):      # the same in the smallest window, on paper
         self.journey("bench.py", size="1100x700", env_extra={"FORM_APPEARANCE": "light"})
 
+    def test_results(self):                # results drawn on the part: strength, manufacturability, CNC, flat pattern, motion, the sheet
+        self.journey("results.py", env_extra={"FORM_APPEARANCE": "dark"}, timeout=1200)
+
+    def test_results_small_light(self):    # the same in the smallest window, on paper
+        self.journey("results.py", size="1100x700", env_extra={"FORM_APPEARANCE": "light"}, timeout=1200)
+
     def test_maker_tools(self):
         self.journey("maker_tools.py")
 
