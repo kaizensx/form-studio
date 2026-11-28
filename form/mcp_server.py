@@ -83,6 +83,10 @@ Rules:
 - "Will it hold?": strength_study with supports and loads on picked faces and a material, then get_strength_study
   (design_guide(topic="strength")). Quote its evidence class and the lower safety factor. A study that did not converge
   has no safety factor; stress at a singularity it names is never the part's stress. Stale after any change: run again.
+- "Make it survive X, as light as possible": inverse_design (objectives and requirements over the design's own
+  parameters; every reported variant is built and solved; say the budget used and that the front is approximate).
+  "Remove what carries no load": topology_optimise, then apply_topology; report the rebuilt part's studied safety
+  factor, and call a mesh body a mesh body.
 - Complex designs (mechanisms, organic or styled forms, textures, several parts) are staged: design_brief ->
   design_guide(topic=...), design_examples -> plan_design -> create_design(plan=...) -> look at the sheet -> critique
   -> update_design. The design_guide topics and this server's skills hold each workflow.
@@ -2860,6 +2864,10 @@ def build() -> MCPServer:
     fea_tools.register_tools(mcp, studio, _run, RO, RW, _origin)
     from .calc import tools as calc_tools     # engineering calculators that write geometry: calculate (form/calc)
     calc_tools.register_tools(mcp, studio, _run, RO, RW, _origin)
+    from .inverse import tools as inverse_tools   # inverse design: inverse_design, get_inverse_design (form/inverse)
+    inverse_tools.register_tools(mcp, studio, _run, RO, RW, _origin)
+    from .topo import tools as topo_tools     # topology optimisation as features: topology_optimise, get_topology,
+    topo_tools.register_tools(mcp, studio, _run, RO, RW, _origin)      # apply_topology (form/topo)
     return mcp
 
 

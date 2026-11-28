@@ -4,6 +4,29 @@
 
 ### New
 
+- **Inverse design.** Say what the part must do ("hold 60 N with a safety factor of 3, as light and as stiff as
+  possible") and get the variants of the design that do it, on a Pareto front. The search runs over the design's own
+  parameters with Gaussian-process surrogates, NSGA-II and hypervolume infill, and the surrogate only chooses what
+  to try next: every reported variant was built by the kernel and solved by the strength study, the safety factor
+  that counts is the lower one, and candidates that failed or missed a requirement are shown with the reason. The
+  result states the solves, builds and seconds used and that the front is approximate. Any point is saved as a named
+  variant. Objectives and requirements: mass from the material's sourced density, safety factor, stress,
+  displacement, first natural frequency, support area, wall thickness, and cost when a price is given (no rate is
+  made up). Checked on ZDT1 and ZDT2 against their known fronts.
+- **Topology optimisation written back as features.** SIMP (density filter, optimality criteria) on the strength
+  study's own mesh finds where material carries the load; the faces that carry supports and loads stay solid. The
+  density field is then rebuilt as CAD: threshold, outlines, ribs measured, and one named feature per lightening
+  pocket, with three parameters (rib inset, corner radius, web thickness). The rebuilt design is built by the kernel
+  and its strength study is solved again with the refining solver; the result sets its safety factor, displacement
+  and mass beside the density field's own numbers and beside the solid part. On the test arm: 42 % lighter, safety
+  factor 2.53 (at least 2.46) against 2.37 read from the density field. A target can be a volume fraction, a mass or
+  a safety factor. When the features cannot be fitted or built, the run says why and offers the smoothed dense
+  region as a mesh body, labelled as one. SIMP reproduces the published compliance of the MBB beam (Andreassen et
+  al. 2011) to 0.002 %. [docs/OPTIMISATION.md](docs/OPTIMISATION.md).
+- **`inverse_design`, `get_inverse_design`, `topology_optimise`, `get_topology`, `apply_topology`** (MCP) and
+  **`form optimize pareto`**, **`form optimize topology`** (terminal, JSON), with the Bench entries **Inverse
+  design** and **Topology optimisation** in the Design chapter. Both run in the background with progress and cancel.
+  The stored records hold the Pareto chart data and the density field of every iteration. 111 MCP tools.
 - **Engineering calculators that write the part.** Seven calculators size a part from what it has to do, by a named
   standard's equations, and write it as a design with parameters: snap joints (cantilever and annular, Bayer's
   snap-fit guide), living hinges (elastic by strain, or moulded PP and PE from cited practice), springs

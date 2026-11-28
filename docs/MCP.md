@@ -74,6 +74,10 @@ Rules:
 - "Will it hold?": strength_study with supports and loads on picked faces and a material, then get_strength_study
   (design_guide(topic="strength")). Quote its evidence class and the lower safety factor. A study that did not converge
   has no safety factor; stress at a singularity it names is never the part's stress. Stale after any change: run again.
+- "Make it survive X, as light as possible": inverse_design (objectives and requirements over the design's own
+  parameters; every reported variant is built and solved; say the budget used and that the front is approximate).
+  "Remove what carries no load": topology_optimise, then apply_topology; report the rebuilt part's studied safety
+  factor, and call a mesh body a mesh body.
 - Complex designs (mechanisms, organic or styled forms, textures, several parts) are staged: design_brief ->
   design_guide(topic=...), design_examples -> plan_design -> create_design(plan=...) -> look at the sheet -> critique
   -> update_design. The design_guide topics and this server's skills hold each workflow.
@@ -119,7 +123,7 @@ instead.
 
 ## Tools at a glance
 
-106 tools. Read-only tools never change a project.
+111 tools. Read-only tools never change a project.
 
 | Tool | Access | What it does |
 |---|---|---|
@@ -229,6 +233,11 @@ instead.
 | [`strength_study`](#strength_study) | changes | Run a strength study on the design: will it hold? |
 | [`get_strength_study`](#get_strength_study) | read-only | Read a strength study: its state (never, running with progress, current, stale with the revision the stored result describes, failed with why), and the result. |
 | [`calculate`](#calculate) | changes | Size a part from requirements with a standard's equations, and write it as a design. |
+| [`inverse_design`](#inverse_design) | changes | Inverse design: state what the part must do and get the variants that do it, each built by the kernel and studied by the real solver. |
+| [`get_inverse_design`](#get_inverse_design) | read-only | Read an inverse design search: running with its progress, or the stored result. |
+| [`topology_optimise`](#topology_optimise) | changes | Topology optimisation written back as editable features. |
+| [`get_topology`](#get_topology) | read-only | Read a topology optimisation: running with its progress (iteration, compliance), or the stored result. |
+| [`apply_topology`](#apply_topology) | changes | Keep a topology optimisation. Default: its lightening pockets become features of the design, as one revision (each can be suppressed, deleted or reshaped; topo_inset, topo_fillet and topo_web are parameters). |
 
 ## Tools
 
@@ -2187,6 +2196,151 @@ strength study that checks a cantilever hook's deflection by finite elements (ne
 | `expect_head` | integer \| null |  |
 | `purpose` | string \| null |  |
 | `fea` | boolean |  |
+
+### `inverse_design`
+
+Inverse design: state what the part must do and get the variants that do it, each built by the kernel and
+studied by the real solver. "Survive 250 N at this face with a safety factor of 3, as light as possible" is a
+static strength_study on the design (the faces, the force, the material) plus
+minimize=["mass_g"], require=["fea.safety_factor >= 3"]. Two or three objectives (minimize=["mass_g",
+"fea.max_displacement_mm"]) give a Pareto front: variants among which one count only improves at the cost of
+another.
+vary: [{"key": "t", "min": 3, "max": 10}] (1-6 parameters; left out: the design's lengths that are not
+interfaces, at most four, named in the result).
+Metrics: mass_g (volume x the material's density, source stated), volume_cm3, width, depth, height,
+overhang_mm2 and contact_mm2 (support the best orientation needs), min_wall_mm, derived.<key>, statics.<key>;
+fea.safety_factor (the lower value: the stated error applied), fea.peak_von_mises_MPa,
+fea.max_displacement_mm from the static study (study="<id>" when the design has several);
+modal.frequency_Hz from a modal study (modal_study=); cost = mass x rates={"per_kg": x} (labelled assumed; no
+price is made up).
+budget: {"solves": 24, "seconds": 900, "evaluations": n}; the search stops at the first limit and says which.
+The search is surrogate-assisted (Gaussian processes, NSGA-II, hypervolume infill), and the surrogate only
+chooses what to evaluate: every reported point was built and, for a strength metric, solved. The front is
+approximate and the result says so. It runs in the background: read it with get_inverse_design(project,
+wait_s). Nothing in the design changes. Keep a point as a named variant with save_point=<index> (and name=,
+run= for an older search); save_variant with a point's values does the same. No arguments but project: the
+stored searches and the parameters that can be varied.
+
+| Argument | Type | Required |
+|---|---|---|
+| `project` | string | yes |
+| `minimize` | array \| null |  |
+| `maximize` | array \| null |  |
+| `require` | array \| null |  |
+| `vary` | array \| null |  |
+| `study` | string |  |
+| `modal_study` | string |  |
+| `budget` | object \| null |  |
+| `rates` | object \| null |  |
+| `run_now` | boolean |  |
+| `save_point` | integer \| null |  |
+| `name` | string |  |
+| `run` | string |  |
+
+### `get_inverse_design`
+
+*Read-only.*
+
+Read an inverse design search: running with its progress, or the stored result. Waits up to wait_s seconds
+for a running search. The result gives the front (each variant's parameter values, its objectives and
+requirements as measured, the evidence class of its study, and how to keep it), the design as it is for
+comparison, what the other candidates were (dominated, missed a requirement and which, did not build, "close":
+passing only at the central value of the safety factor), the budget used against its limits (strength solves,
+builds, seconds, why it stopped) and the statement that the front is approximate. full=True returns every
+evaluated point with all its metrics and the chart data: axes, one entry per point with its state (front,
+feasible, misses, close, failed) and the hypervolume after each round. A search made on other design source
+is stale. cancel=True stops a running search; nothing is stored for a cancelled one.
+
+| Argument | Type | Required |
+|---|---|---|
+| `project` | string | yes |
+| `run` | string |  |
+| `wait_s` | number |  |
+| `full` | boolean |  |
+| `cancel` | boolean |  |
+
+### `topology_optimise`
+
+Topology optimisation written back as editable features. The loads, supports and material are the design's
+static strength_study (study="<id>" when it has several). The layout is found by SIMP (density filter,
+optimality criteria) on the study's mesh; the faces that carry supports and loads, and a rim, stay solid.
+Then the density field is rebuilt as CAD: threshold, outlines, ribs measured, and one named feature per
+lightening pocket cut along the pull direction, with the parameters topo_inset (every rib wider by twice
+this), topo_fillet (pocket corner radius) and topo_web (a floor left under the pockets). The rebuilt design
+is built by the kernel and its strength study is solved again with the refining solver; the result sets its
+safety factor, displacement and mass beside the density field's own numbers and beside the part as it was.
+Target, one of: volfrac (the fraction of the volume that stays, 0.08-0.95, default 0.5), mass_g (grams), or
+safety_factor (the run is repeated at a higher fraction, up to `tries` times, until the rebuilt part's
+studied safety factor, lower value, meets it; volfrac is then the first try).
+mode "pockets" (default): a 2.5D layout along pull ("x", "y", "z" or a vector; left out: the part's thinnest
+direction). mode "free": a 3D layout, which is not written as features: it is offered as a mesh body.
+h: element size mm (default: the diagonal / 40, coarsened to at most 60,000 elements). rmin: smallest member
+mm (default 2 h). keep / rim: millimetres kept solid at the loaded and supported faces / along the side
+walls. max_iter (80), budget_s (240): the limits, stated in the result with the solves used.
+Stiffness is what is optimised (minimum compliance, one load case); strength is checked afterwards on the
+rebuilt part. When the features cannot be fitted, built or verified the result says why and offers the
+smoothed dense region as a mesh body, labelled as one. It runs in the background: get_topology(project,
+wait_s); nothing in the design changes until apply_topology. No arguments but project: the stored runs and
+the settings. One solid only. Needs the optional strength engine (setup_status).
+
+| Argument | Type | Required |
+|---|---|---|
+| `project` | string | yes |
+| `volfrac` | number \| null |  |
+| `mass_g` | number \| null |  |
+| `safety_factor` | number \| null |  |
+| `study` | string |  |
+| `mode` | string |  |
+| `pull` | string \| array \| null |  |
+| `h` | number \| null |  |
+| `rmin` | number \| null |  |
+| `keep` | number \| null |  |
+| `rim` | number \| null |  |
+| `max_iter` | integer \| null |  |
+| `budget_s` | number \| null |  |
+| `tries` | integer \| null |  |
+
+### `get_topology`
+
+*Read-only.*
+
+Read a topology optimisation: running with its progress (iteration, compliance), or the stored result.
+Waits up to wait_s seconds. The result gives the outcome ("features": rebuilt as pockets and verified;
+"features, not verified"; "mesh body"), the reconstruction (the features and parameters, the built solid's
+volume, the strength study of the rebuilt part with its evidence class and stated error, or why it failed),
+the comparison (rebuilt CAD against the density result and against the solid part: safety factor,
+compliance, displacement, mass, and whether the safety factors agree within the stated band), the density
+result's own numbers with how they were read, the layout (pockets, ribs with widths), the settings and mesh
+as used, the budget (seconds, solves, tries) and the resolution. frames=True adds the density field of every
+iteration (a picture across the pull direction, and the density at the vertices of the part's surface), or
+the newest picture while it runs; frames_file is its path. full=True adds every iteration's record and the
+edit ops. A run on an older revision is stale. cancel=True stops a running optimisation; nothing is stored.
+
+| Argument | Type | Required |
+|---|---|---|
+| `project` | string | yes |
+| `run` | string |  |
+| `wait_s` | number |  |
+| `full` | boolean |  |
+| `frames` | boolean |  |
+| `cancel` | boolean |  |
+
+### `apply_topology`
+
+Keep a topology optimisation. Default: its lightening pockets become features of the design, as one
+revision (each can be suppressed, deleted or reshaped; topo_inset, topo_fillet and topo_web are parameters).
+as_new="<name>": in a copy of the design instead, the original untouched. mesh_body=True: the smoothed dense
+region is added to the design's references as an STL, labelled a mesh body; the design does not change.
+run: an older run (default: the newest). A run made on another revision is refused: run it again. The
+strength study is stale on the new revision until it is run there.
+
+| Argument | Type | Required |
+|---|---|---|
+| `project` | string | yes |
+| `run` | string |  |
+| `expect_head` | integer \| null |  |
+| `as_new` | string |  |
+| `mesh_body` | boolean |  |
 
 ## Prompts
 

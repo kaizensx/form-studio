@@ -536,9 +536,9 @@ def _picks(d: dict) -> list:
     return [{"at": x["at"]} for x in out]
 
 
-def _spawn(py: Path, work: Path, on_progress, cancelled) -> int:
+def _spawn(py: Path, work: Path, on_progress, cancelled, module: str = "form.fea.run", timeout_s: float = TIMEOUT_S) -> int:
     from .. import engines
-    cmd = [str(py), "-m", "form.fea.run", str(work)]
+    cmd = [str(py), "-m", module, str(work)]
     env = engines.child_env({"OMP_NUM_THREADS": str(max(1, min(8, (os.cpu_count() or 2) // 2)))})
     if Path(py) == Path(sys.executable):              # a developer's environment: this Python, as it is
         env = {**os.environ, "PYTHONPATH": str(engines.src_root()) + os.pathsep + os.environ.get("PYTHONPATH", "")}
@@ -572,7 +572,7 @@ def _spawn(py: Path, work: Path, on_progress, cancelled) -> int:
                 proc.kill()
                 proc.wait(timeout=10)
             return -1
-        if time.time() - t0 > TIMEOUT_S:
+        if time.time() - t0 > timeout_s:
             proc.kill()
             proc.wait(timeout=10)
             return -2
@@ -702,17 +702,20 @@ def pick_static(p: dict, sid: str = "") -> str:
     return statics[0]["id"]
 
 
-def evaluate(st, p: dict, sid: str, values: dict, budget_s: float = 45.0) -> dict:
+def evaluate(st, p: dict, sid: str, values: dict, budget_s: float = 45.0, rid: str | None = None, cancelled=None,
+             mesh: dict | None = None) -> dict:
     """Solve a study on candidate parameter values (not a revision): the engine's result, stored nowhere. The picked
-    points are the study's own; a candidate on which a point no longer lands on a face raises StudioError."""
+    points are the study's own; a candidate on which a point no longer lands on a face raises StudioError.
+    rid: a design source other than the head's (an edit that is not saved yet); values are then the whole set.
+    mesh: mesh options that replace the study's own for this solve."""
     d = get(p, sid)
     mats = materials_for(st, p, d)
     py = python(st.cfg)
     if py is None:
         raise _err("The strength solver is not installed, so the constraint cannot be checked. Nothing was made up.",
                    HOW_TO_GET, status=409, kind="unavailable")
-    rid = st.rid(p)
-    vals = {**st.rev(p)["values"], **{k: float(v) for k, v in (values or {}).items()}}
+    vals = dict(values) if rid else {**st.rev(p)["values"], **{k: float(v) for k, v in (values or {}).items()}}
+    rid = rid or st.rid(p)
     work = _dir(st, p, sid) / f"candidate-{uuid.uuid4().hex[:8]}.work"
     work.mkdir(parents=True, exist_ok=True)
     try:
@@ -721,10 +724,11 @@ def evaluate(st, p: dict, sid: str, values: dict, budget_s: float = 45.0) -> dic
         if prep.get("error"):
             raise _err(prep["error"])
         spec = _engine_spec(d, prep, mats)
-        spec["mesh"] = {**spec.get("mesh", {}), "budget_s": min(float(spec.get("mesh", {}).get("budget_s", budget_s)), budget_s)}
+        spec["mesh"] = {**spec.get("mesh", {}), "budget_s": min(float(spec.get("mesh", {}).get("budget_s", budget_s)), budget_s),
+                        **(mesh or {})}
         _write(work / "job.json", {"step": prep["step"], "spec": spec})
         from .. import taskstore
-        code = _spawn(py, work, lambda ev: None, taskstore.cancelled)
+        code = _spawn(py, work, lambda ev: None, cancelled or taskstore.cancelled)
         if code == -1:
             raise _err("Cancelled.", status=409, kind="cancelled")
         out = _read(work / "result.json")
@@ -733,6 +737,7 @@ def evaluate(st, p: dict, sid: str, values: dict, budget_s: float = 45.0) -> dic
         if out.get("error"):
             raise _err(out["error"].get("message", "The study failed."), out["error"].get("hint", ""), status=422,
                        kind=out["error"].get("kind"))
+        out["volume_mm3"] = prep.get("volume_mm3")
         return out
     finally:
         shutil.rmtree(work, ignore_errors=True)

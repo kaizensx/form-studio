@@ -276,6 +276,14 @@ each one named as it arrives.
 - **Goal seek** (`optimize`): search parameter ranges for the lightest, smallest or strongest design that still passes
   its constraints, for example the lightest bracket with a safety factor of at least 3. Every candidate is a real
   kernel build.
+- **Inverse design** (`inverse_design`): state the requirement and get the variants that meet it, on a Pareto front
+  over two or three objectives (lighter against stiffer). A surrogate chooses what to try; every reported variant is
+  built by the kernel and solved by the strength study, and the budget used is stated.
+  [OPTIMISATION.md](OPTIMISATION.md).
+- **Topology optimisation as features** (`topology_optimise`): the material that carries no load is found on the
+  strength study's mesh and written back as lightening pockets, named features with parameters for rib inset,
+  corner radius and web thickness. The rebuilt part is studied again; when features cannot be fitted, a labelled
+  mesh body is offered instead.
 - **Alternatives:** a grid of real variants over one or two parameters, ranked by objectives you weight (less
   material, harder to tip, fit yield, smaller footprint).
 
@@ -705,7 +713,7 @@ equations, the sources and the verification table are in [CALCULATORS.md](CALCUL
 | OpenSCAD | Builds `.scad` designs; Customizer ranges become parameters |
 | Blender | Photoreal renders; its 3D-Print Toolbox checks when the add-on is installed |
 | Your slicer | Slices, and opens the 3MF or G-code in it |
-| Any MCP client | The full engine over 106 tools ([MCP reference](MCP.md)) |
+| Any MCP client | The full engine over 111 tools ([MCP reference](MCP.md)) |
 
 When a program's version outside the supported range is why something failed, the error names the supported versions
 and what to do.
