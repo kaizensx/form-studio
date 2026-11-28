@@ -173,7 +173,7 @@ QtObject {
     //   stagger 45 between items of an entrance cascade
     // `reduced` is read once at start (OS "reduce motion", or FORM_REDUCED_MOTION=1). When set, movement and scale are
     // dropped (Theme.move(ms) returns 0, Theme.shift(px) returns 0) and only opacity/colour still animate.
-    property bool reduceMotion: false       // the person's own switch (Settings › General › Appearance), remembered
+    property bool reduceMotion: false       // the person's own switch (Settings › Appearance), remembered
     readonly property bool reduced: Bridge.reducedMotion || reduceMotion
     readonly property int press: 110
     // direction I (docs/design/directions/i/IA.md, the motion spec). Nothing is longer than 520 ms.

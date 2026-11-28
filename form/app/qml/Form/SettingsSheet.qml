@@ -4,77 +4,60 @@ import QtQuick.Dialogs
 import FormNative
 import "F.js" as F
 
-// Settings: a navigation rail on the left, one page on the right.
+// Settings (direction I): a bare column of pages on the left under the word "Settings", one page on the right, on
+// one deep pane of glass. No title bar and no action bar: the sheet lays out its whole card (bareHead, fillsBody:
+// SheetHost.qml), the nav stays put and only the page scrolls.
 //
-//   General              appearance, what Form Studio is set up for, how designs are refined, the project folder
+//   General              what Form Studio is set up for (tiles with a switch), the engines with their licence, size
+//                        and state, how designs are refined, the project folder
 //   Agents & models      every way chat can reach a model, and the defaults for new conversations
-//   Engines & software   the installer registry: installed or not, Install, and "Use in Form Studio" for each engine
+//   Engines & software   the installer registry: installed or not, Install, and "Use in Form Studio" for each engine;
+//                        the mesh generators and their switches
 //   Printing             only with the 3D printing capability: the default printer, the slicer, the plate
 //   Costs                the cost models' rates: published (cited, dated), assumed parameters, or yours per shop
 //   Other apps           where Blender, OpenSCAD and FreeCAD are, and what "Open in…" hands files to
+//   Appearance           dark, light or the system's; Reduce motion
+//   Backups              the schedule and destinations, the last backup, verify and restore, Recently deleted
 //   Updates              update checks and the channel, the version you run
 //   Advanced             limits and fallbacks, with the key each one has in studio.toml
 //
-// Every page has the same shape: a mono overline, a title and one line on what it holds, then titled cards of rows on
-// thin glass. The rail's pages are capsule rows; one highlight glides to the page you are on. Rows that edit
-// studio.toml collect in `edits` and are written by "Save changes": only the changed keys are rewritten, comments and
-// other keys stay, and the previous file is kept as a backup next to it (form/config_edit.py). Things that apply at
-// once say so and do not wait for Save: appearance, "Set up for" (form/capabilities.py: on installs what it needs,
-// off hides it and never uninstalls), the default printer, and "Use in Form Studio".
-//   Backups              the schedule and destinations, the last backup, verify and restore, Recently deleted
-// Open with Store.openSettings("general" | "printer" | "chat" | "costs" | "apps" | "backups" | "updates" | "advanced" | "software").
-// The search in the rail finds rows on every page. The sheet lays out its own body (fillsBody, SheetHost.qml): the
-// rail stays put and only the page scrolls.
+// A page is titled groups of rows on thin glass. Rows that edit studio.toml collect in `edits`; while there are any, a
+// bar floats at the foot of the page with what is saved where, Revert and Save: only the changed keys are rewritten,
+// comments and other keys stay, and the previous file is kept as a backup next to it (form/config_edit.py). Things
+// that apply at once say so and do not wait for Save: appearance, "Set up for" (form/capabilities.py: on installs
+// what it needs, off hides it and never uninstalls), the default printer, and "Use in Form Studio".
+// Open with Store.openSettings("general" | "printer" | "chat" | "costs" | "apps" | "appearance" | "backups" | "updates" | "advanced" | "software").
+// The search under the title finds rows on every page.
 Item {
     id: st
+    objectName: "settingsSheet"
     property string title: "Settings"
-    property int sheetWidth: Theme.sheetXl
-    property int sheetHeight: 620
+    property int sheetWidth: 1200
+    property int sheetHeight: 780
     property bool fillsBody: true
+    property bool bareHead: true              // no title bar: the word "Settings" stands over the nav (SheetHost.qml)
     implicitHeight: sheetHeight
-    readonly property int railW: 224
+    readonly property int railW: 208
+    readonly property bool narrow: width < 860
+    // a quieter plate than `glass`: every other row of a list, a tile that is off
+    readonly property color glass3: Theme.dark ? Qt.rgba(1, 1, 1, 0.04) : Qt.rgba(1, 1, 1, 0.42)
     readonly property var sections: [
-        { value: "general", text: "General", icon: "sliders_horizontal", group: "Studio",
-          sub: "How Form Studio looks, what it is set up for and where your designs are kept." },
-        { value: "chat", text: "Agents & models", icon: "bot", group: "Studio",
-          sub: "Every way chat can reach a model: agent apps, provider APIs and models on this computer." },
+        { value: "general", text: "General", icon: "sliders_horizontal", group: "Studio" },
+        { value: "chat", text: "Agents & models", icon: "sparkles", group: "Studio" },
         { value: "software", text: "Engines & software", icon: "package", group: "Studio",
-          badge: Store.setupAttention && Store.setupAttention.length ? Store.setupAttention.length : 0,
-          sub: "What Form Studio uses on this computer. Install what you want, then choose whether Form Studio uses it." }]
-        .concat(Store.printOn ? [{ value: "printer", text: "Printing", icon: "printer", group: "Making",
-          sub: "The printer the checks and slices use, and how parts are laid out on its bed." }] : [])
+          badge: Store.setupAttention && Store.setupAttention.length ? Store.setupAttention.length : 0 }]
+        .concat(Store.printOn ? [{ value: "printer", text: "Printing", icon: "printer", group: "Making" }] : [])
         .concat([
-        { value: "costs", text: "Costs", icon: "coins", group: "Making",
-          sub: "The rates cost estimates use: each published with its source and date, or yours, per shop." },
-        { value: "apps", text: "Other apps", icon: "layout_grid", group: "Making",
-          sub: "Where the apps Form Studio works with are, and what “Open in…” hands a file to." },
-        { value: "backups", text: "Backups", icon: "archive", group: "System",
-          sub: "Every design and conversation, copied on a schedule to a folder you choose, and to your own Git repository if you want." },
-        { value: "updates", text: "Updates", icon: "refresh_cw", group: "System",
-          sub: "How Form Studio finds out about a newer version. Nothing is downloaded or installed by itself." },
-        { value: "advanced", text: "Advanced", icon: "wrench", group: "System",
-          sub: "Limits and fallbacks. Each row shows its key in studio.toml." }])
-    readonly property var tabNames: ({ general: "General", printer: "Printing", chat: "Agents & models", apps: "Other apps", costs: "Costs", backups: "Backups", updates: "Updates", advanced: "Advanced", software: "Engines & software" })
+        { value: "costs", text: "Costs", icon: "coins", group: "Making" },
+        { value: "apps", text: "Other apps", icon: "layout_grid", group: "Making" },
+        { value: "appearance", text: "Appearance", icon: "palette", group: "System" },
+        { value: "backups", text: "Backups", icon: "archive", group: "System" },
+        { value: "updates", text: "Updates", icon: "refresh_cw", group: "System" },
+        { value: "advanced", text: "Advanced", icon: "wrench", group: "System" }])
+    readonly property var tabNames: ({ general: "General", printer: "Printing", chat: "Agents & models", apps: "Other apps", costs: "Costs", appearance: "Appearance", backups: "Backups", updates: "Updates", advanced: "Advanced", software: "Engines & software" })
     readonly property var section: { for (var i = 0; i < sections.length; i++) if (sections[i].value === tab) return sections[i]; return sections[0] }
-    readonly property bool onSoftware: tab === "software" && !searching      // the action bar installs; elsewhere it saves
-    function accept() { if (!onSoftware && dirty > 0) save() }
-    // the action bar: what is saved where on the left, the actions on the right
-    property Component footerLeft: Txt { kind: "fine"; elide: Text.ElideMiddle; wrapMode: Text.NoWrap; verticalAlignment: Text.AlignVCenter
-        color: !st.onSoftware && st.cfg && st.cfg.env_overrides.length > 0 ? Theme.amber : Theme.ink3
-        text: st.onSoftware ? (Store.installing ? "Installing. Each command is in the log." : Store.softwareChecking ? "Looking at what is installed…" : "Nothing is installed until you press Install. “Use in Form Studio” applies at once.")
-            : !st.cfg ? ""
-            : st.cfg.env_overrides.length > 0 ? "Set outside the file for this run: " + st.cfg.env_overrides.join(", ") + ". Those win."
-            : (st.cfg.exists ? "Saved to " : "Will create ") + st.cfg.path_short + " · a backup is kept on every save" }
-    property Component footer: Row { spacing: 8
-        Btn { visible: !st.onSoftware && st.dirty > 0; kind: "quiet"; text: "Revert"; onClicked: { st.edits = ({}); st.rev++ } }
-        Btn { visible: !st.onSoftware; kind: "primary"; icon: "check"; enabled: st.dirty > 0; keys: "Return"
-            text: st.dirty ? "Save " + F.plural(st.dirty, "change") : "Saved"; onClicked: st.save() }
-        Btn { visible: st.onSoftware && Store.installing; icon: "x"; text: "Cancel"; onClicked: Store.cancelInstall() }
-        Btn { visible: st.onSoftware; icon: "refresh_cw"; text: "Check again"; busy: Store.softwareChecking; enabled: !Store.installing
-            onClicked: { Store.checkSoftware(); Store.checkSetup() } }
-        Btn { visible: st.onSoftware; kind: "primary"; icon: "download"; enabled: Store.installChosen.length > 0; busy: Store.installing
-            text: Store.installing ? "Installing…" : Store.installChosen.length ? "Install " + Store.installChosen.length + " selected" : "Install selected"
-            onClicked: Store.installSoftware() } }
+    readonly property string pageTitle: searching ? "Search" : section.text        // the page in front, by name
+    function accept() { if (dirty > 0) save() }
     readonly property var props: Store.sheet && Store.sheet.props ? Store.sheet.props : ({})
     property string tab: props.tab === "printer" && !Store.printOn ? "general" : (props.tab || "general")
     onTabChanged: pane.contentY = 0
@@ -120,10 +103,10 @@ Item {
     function saveKey(name, value) {
         return Store.post("/secrets", { name: name, value: value }).then(function (r) {
             st.keys = r.keys; Store.toast(r.key.label + " saved", "Kept in a private file on this computer and sent only to its provider.")
-            Store.checkSoftware(); Store.refreshAgents() }, Store.fail) }
+            Store.checkSoftware(); Store.refreshAgents(); st.loadGenerators() }, Store.fail) }
     function clearKey(name) {
         return Store.post("/secrets", { name: name, clear: true }).then(function (r) {
-            st.keys = r.keys; Store.toast(r.key.label + " removed", ""); Store.checkSoftware(); Store.refreshAgents() }, Store.fail) }
+            st.keys = r.keys; Store.toast(r.key.label + " removed", ""); Store.checkSoftware(); Store.refreshAgents(); st.loadGenerators() }, Store.fail) }
     readonly property var cliAgents: Store.chatAgents.filter(function (a) { return a.kind !== "api" })
     readonly property var apiAgents: Store.chatAgents.filter(function (a) { return a.kind === "api" && !a.local && !a.custom })
     readonly property var localAgents: Store.chatAgents.filter(function (a) { return a.kind === "api" && a.local && !a.custom })
@@ -132,6 +115,21 @@ Item {
     property var editingProvider: undefined      // undefined: no editor; null: adding; a provider: editing it
     function loadProviders() { Store.get("/providers").then(function (r) { st.providers = r.providers }, function () {}) }
     function agentOf(id) { return Store.agentInfo(id) }
+
+    // mesh generators (form/generate): words or a picture to a mesh, rebuilt as CAD. Each is off until its switch
+    // here is on; a hosted one also needs its key (Agents & models). Nothing is sent by turning one on.
+    property var generators: []
+    function loadGenerators() { Store.get("/generate/providers").then(function (r) { st.generators = r.providers || [] }, function () {}) }
+    function setGenerator(id, on) { Store.post("/generate/enable", { provider: id, on: on }).then(function () { st.loadGenerators() }, Store.fail) }
+
+    // the engines on General: everything Form Studio runs or hands a design to, agents apart (they have their page)
+    readonly property var engineRows: Store.software ? Store.software.software.filter(function (r) {
+        var g = st.groupOf(r.id)
+        return r.id !== "claude.signin" && r.id !== "data" && !r.absent && g !== "ai" && g !== "agents" && (g !== "slicer" || Store.printOn) }) : []
+    function groupOf(id) {
+        var gs = Store.software ? Store.software.groups : []
+        for (var i = 0; i < gs.length; i++) if (gs[i].items.indexOf(id) >= 0) return gs[i].id
+        return "" }
 
     function same(a, b) { return JSON.stringify(a) === JSON.stringify(b) }
     function current(r) { return st.edits[r.key] !== undefined ? st.edits[r.key] : r.value }
@@ -151,20 +149,22 @@ Item {
     FolderDialog { id: folderDlg; title: st.pathRow && st.pathRow.key === "backup.folder" ? "Choose the backup folder" : "Choose the project folder"; onAccepted: if (st.pathRow) st.setEdit(st.pathRow, st.localPath(selectedFolder)) }
     FileDialog { id: fileDlg; title: "Choose the program"; onAccepted: if (st.pathRow) st.setEdit(st.pathRow, st.localPath(selectedFile)) }
 
-    // ── the rail: search, then the pages in their groups ─────────────────────────────────────────────────────────
-    Item { id: rail; width: st.railW; height: parent.height
+    // ── the nav: the word, the search, then the pages. Nothing is boxed: the one plate is the page you are on ────
+    Item { id: rail; x: 17; width: st.railW; height: parent.height
         property Item cur: null                // the row of the page in front: the highlight sits behind it
-        Rectangle { x: 12; y: 2; width: parent.width - 16; height: parent.height - 6; radius: 16; color: Theme.glass }
-        Field { id: search; objectName: "settingsSearch"; x: 22; y: 14; width: parent.width - 36; placeholder: "Search settings"
+        Txt { x: 12; y: 22; height: 36; verticalAlignment: Text.AlignVCenter; text: "Settings"; lineHeight: 1.0
+            font.pixelSize: 24; font.weight: Theme.wSemi; font.letterSpacing: -0.7 }
+        Field { id: search; objectName: "settingsSearch"; x: 0; y: 68; width: parent.width; placeholder: "Search settings"
             onEdited: function (t) { st.query = t; pane.contentY = 0 } }
         // the one highlight: it glides from page to page (it jumps with Reduce Motion)
-        Rectangle { id: navHi; visible: !!rail.cur && !st.searching; radius: height / 2; color: Theme.glass2
-            x: nav.x; width: nav.width; height: 32
+        Rectangle { id: navHi; visible: !!rail.cur && !st.searching; radius: 12; color: Theme.glass2
+            x: nav.x; width: nav.width; height: 36
             y: rail.cur && rail.cur.parent ? nav.y + rail.cur.parent.y + rail.cur.y : 0
+            Rectangle { visible: Theme.dark; x: 12; width: parent.width - 24; height: 1; color: Qt.rgba(1, 1, 1, 0.08) }
             property bool settled: false
             Component.onCompleted: Qt.callLater(function () { navHi.settled = true })
             Behavior on y { enabled: navHi.settled; Glide { duration: Theme.move(Theme.base) } } }
-        Column { id: nav; objectName: "settingsNav"; x: 20; y: 58; width: parent.width - 32; spacing: 2
+        Column { id: nav; objectName: "settingsNav"; x: 0; y: 114; width: parent.width; spacing: 2
             opacity: st.searching ? 0.55 : 1
             Behavior on opacity { NumberAnimation { duration: Theme.fast } }
             Repeater {
@@ -174,11 +174,11 @@ Item {
                     required property var modelData
                     required property int index
                     readonly property bool on: modelData.value === st.tab && !st.searching
-                    readonly property bool head: index === 0 || st.sections[index - 1].group !== modelData.group
+                    readonly property bool head: index > 0 && st.sections[index - 1].group !== modelData.group
                     readonly property int pending: st.dirtyIn(modelData.value)
                     width: nav.width
-                    Txt { visible: ni.head; kind: "cap"; text: ni.modelData.group; leftPadding: 12; topPadding: (ni.index === 0 ? 2 : 14) + lead; bottomPadding: 6 - lead }
-                    Rectangle { id: navRow; objectName: "settingsNav_" + ni.modelData.value; width: parent.width; height: 32; radius: height / 2
+                    Item { visible: ni.head; width: 1; height: 10 }           // a breath between the groups, no caption
+                    Rectangle { id: navRow; objectName: "settingsNav_" + ni.modelData.value; width: parent.width; height: 36; radius: 12
                         color: !ni.on && nm.containsMouse ? Theme.washHover : "transparent"
                         readonly property bool on: ni.on
                         onOnChanged: if (on) rail.cur = navRow
@@ -188,13 +188,13 @@ Item {
                         Keys.onSpacePressed: st.go(ni.modelData.value)
                         Behavior on color { Tint {} }
                         FocusRing { on: parent.activeFocus; radius: parent.radius + 2 }
-                        Icon { x: 12; anchors.verticalCenter: parent.verticalCenter; name: ni.modelData.icon; size: 15; color: ni.on ? Theme.datum : Theme.ink3 }
-                        Txt { x: 37; anchors.verticalCenter: parent.verticalCenter; text: ni.modelData.text; wrapMode: Text.NoWrap
-                            font.weight: ni.on ? Theme.wSemi : Theme.wMedium; color: ni.on ? Theme.ink : Theme.ink2 }
+                        Icon { x: 12; anchors.verticalCenter: parent.verticalCenter; name: ni.modelData.icon; size: 16; color: ni.on ? Theme.ink : Theme.ink3 }
+                        Txt { x: 39; anchors.verticalCenter: parent.verticalCenter; text: ni.modelData.text; wrapMode: Text.NoWrap; lineHeight: 1.0
+                            font.weight: ni.on ? Theme.wSemi : Font.Normal; color: ni.on ? Theme.ink : Theme.ink2 }
                         // unsaved changes on this page, or things that want attention
                         Rectangle { visible: ni.pending > 0; anchors.right: parent.right; anchors.rightMargin: 13; anchors.verticalCenter: parent.verticalCenter
                             width: 6; height: 6; radius: 3; color: Theme.blueprint }
-                        Rectangle { visible: !!ni.modelData.badge && ni.pending === 0; anchors.right: parent.right; anchors.rightMargin: 8; anchors.verticalCenter: parent.verticalCenter
+                        Rectangle { visible: !!ni.modelData.badge && ni.pending === 0; anchors.right: parent.right; anchors.rightMargin: 10; anchors.verticalCenter: parent.verticalCenter
                             width: bt.implicitWidth + 10; height: 16; radius: 8; color: Theme.alpha(Theme.amber, 0.14)
                             Text { id: bt; anchors.centerIn: parent; text: ni.modelData.badge ? String(ni.modelData.badge) : ""; color: Theme.amber; font.family: Theme.mono; font.pixelSize: 11; renderType: Theme.textRender } }
                         MouseArea { id: nm; anchors.fill: parent; hoverEnabled: true; onClicked: st.go(ni.modelData.value) } }
@@ -202,7 +202,7 @@ Item {
             }
         }
         // what you run
-        Row { x: 32; anchors.bottom: parent.bottom; anchors.bottomMargin: 18; spacing: 6
+        Row { x: 12; anchors.bottom: parent.bottom; anchors.bottomMargin: 20; spacing: 6
             Txt { kind: "fine"; tone: 3; text: "Form Studio"; anchors.verticalCenter: parent.verticalCenter }
             Txt { kind: "fine"; tone: 3; mono: true; text: Bridge.version; anchors.verticalCenter: parent.verticalCenter } }
     }
@@ -221,20 +221,18 @@ Item {
     Flickable {
         id: pane
         objectName: "settingsScroll"
-        x: st.railW; width: parent.width - st.railW; height: parent.height
+        x: rail.x + st.railW + 12; width: parent.width - x; y: 1; height: parent.height - 2
         clip: true; boundsBehavior: Flickable.StopAtBounds
-        contentHeight: page.implicitHeight + 56
+        contentHeight: page.implicitHeight + 28 + 40 + (saveBar.shown ? 56 : 0)
         ScrollBar.vertical: ScrollBar { width: 6; policy: pane.contentHeight > pane.height + 1 ? ScrollBar.AsNeeded : ScrollBar.AlwaysOff }
         Column {
-            id: page; x: 28; y: 14; width: pane.width - 60; spacing: 22
-            // the page's title and one line on what it holds
-            Column { width: parent.width; spacing: 6
-                Txt { kind: "cap"; color: Theme.datum; text: st.searching ? "Settings" : st.section.group }
-                Txt { objectName: "settingsTitle"; kind: "h2"; text: st.searching ? "Search" : st.section.text }
-                Txt { tone: 2; width: parent.width; lineHeight: 1.35
-                    text: st.searching ? (st.found.length ? F.plural(st.found.length, "setting") + " on every page match “" + st.query.trim() + "”."
-                                                           : "No setting matches “" + st.query.trim() + "”.")
-                                       : st.section.sub } }
+            id: page; x: 18; y: 27; width: pane.width - 18 - 30; spacing: 22
+            // a search says what it found; a page needs no title of its own: the nav names it
+            Column { visible: st.searching; width: parent.width; spacing: 3
+                Txt { objectName: "settingsTitle"; text: "Search"; font.pixelSize: 15; font.weight: Theme.wSemi; font.letterSpacing: -0.15 }
+                Txt { tone: 2; width: parent.width; font.pixelSize: 12
+                    text: st.found.length ? F.plural(st.found.length, "setting") + " on every page match “" + st.query.trim() + "”."
+                                          : "No setting matches “" + st.query.trim() + "”." } }
             // a page is laid out once the settings are read, so nothing on it moves under the pointer when they arrive
             Txt { visible: !st.cfg; tone: 2; text: "Reading the settings…" }
             SettingsRows { visible: st.searching && st.found.length > 0; sheet: st; rows: st.searching ? st.found : [] }
@@ -244,42 +242,135 @@ Item {
             Loader { width: parent.width; active: !st.searching && st.tab === "printer" && !!st.cfg; visible: active; sourceComponent: printingPage }
             Loader { width: parent.width; active: !st.searching && st.tab === "apps" && !!st.cfg; visible: active; sourceComponent: appsPage }
             Loader { width: parent.width; active: !st.searching && st.tab === "costs"; visible: active; sourceComponent: costsPage }
+            Loader { width: parent.width; active: !st.searching && st.tab === "appearance"; visible: active; sourceComponent: appearancePage }
             Loader { width: parent.width; active: !st.searching && st.tab === "backups" && !!st.cfg; visible: active; sourceComponent: backupsPage }
             Loader { width: parent.width; active: !st.searching && st.tab === "updates" && !!st.cfg; visible: active; sourceComponent: updatesPage }
             Loader { width: parent.width; active: !st.searching && st.tab === "advanced" && !!st.cfg; visible: active; sourceComponent: advancedPage }
         }
     }
-    // the page slides under the title bar and the action bar
-    Fade { x: st.railW; width: pane.width; height: 16; opacity: pane.atYBeginning ? 0 : 1
+    // the page slides under the sheet's edges
+    Fade { x: pane.x; y: 1; width: pane.width - 1; height: 16; opacity: pane.atYBeginning ? 0 : 1
         Behavior on opacity { NumberAnimation { duration: Theme.fast } }
         c0: Theme.alpha(Theme.shade, Theme.dark ? 0.26 : 0.07); c1: "transparent" }
-    Fade { x: st.railW; y: parent.height - 16; width: pane.width; height: 16; opacity: pane.atYEnd || pane.contentHeight <= pane.height ? 0 : 1
+    Fade { x: pane.x; y: parent.height - 17; width: pane.width - 1; height: 16; opacity: pane.atYEnd || pane.contentHeight <= pane.height ? 0 : 1
         Behavior on opacity { NumberAnimation { duration: Theme.fast } }
         c0: "transparent"; c1: Theme.alpha(Theme.shade, Theme.dark ? 0.3 : 0.08) }
 
-    // a titled group on a page: its title, a mono note for what applies at once, one quiet line, then its card
+    // ── unsaved changes: a bar that floats at the foot of the page while there are any ──────────────────────────
+    Item { id: saveBar; objectName: "settingsSaveBar"
+        readonly property bool shown: st.dirty > 0
+        x: pane.x + 18; width: pane.width - 18 - 30; height: 48; y: parent.height - height - 18
+        opacity: shown ? 1 : 0; visible: opacity > 0.001
+        Behavior on opacity { NumberAnimation { duration: Theme.base } }
+        transform: Translate { y: saveBar.shown ? 0 : Theme.shift(8); Behavior on y { Glide { duration: Theme.base } } }
+        Shadow { radius: 16; spread: 22; drop: 10; strength: Theme.dark ? 0.8 : 0.35 }
+        Rectangle { anchors.fill: parent; radius: 16; color: Theme.glassSolid; border.width: 1; border.color: Theme.dark ? Theme.glassEdge : Theme.rule2 }
+        Txt { x: 18; anchors.verticalCenter: parent.verticalCenter; width: parent.width - 36 - saveActs.width - 12; kind: "fine"; elide: Text.ElideMiddle; wrapMode: Text.NoWrap
+            color: st.cfg && st.cfg.env_overrides.length > 0 ? Theme.amber : Theme.ink2
+            text: !st.cfg ? "" : st.cfg.env_overrides.length > 0 ? "Set outside the file for this run: " + st.cfg.env_overrides.join(", ") + ". Those win."
+                : (st.cfg.exists ? "Saved to " : "Will create ") + st.cfg.path_short + " · a backup is kept on every save" }
+        Row { id: saveActs; anchors.right: parent.right; anchors.rightMargin: 8; anchors.verticalCenter: parent.verticalCenter; spacing: 6
+            Btn { objectName: "settingsRevert"; small: true; kind: "quiet"; text: "Revert"; onClicked: { st.edits = ({}); st.rev++ } }
+            Btn { objectName: "settingsSave"; small: true; kind: "primary"; icon: "check"; keys: "Return"
+                text: "Save " + F.plural(Math.max(1, st.dirty), "change"); onClicked: st.save() } } }
+
+    // a titled group on a page: its title, a mono note for what applies at once, one quiet line, then its rows
     component Group: Column {
         id: grp
         property string title: ""
         property string sub: ""
         property string applies: ""          // "Applies at once" for things that do not wait for Save
         default property alias content: inner.data
-        width: parent ? parent.width : 0; spacing: 9
-        Column { width: parent.width; spacing: 2
+        width: parent ? parent.width : 0; spacing: 12
+        Column { width: parent.width; spacing: 3
             Row { spacing: 10
-                Txt { text: grp.title; font.weight: Theme.wSemi; font.letterSpacing: -0.1 }
+                Txt { text: grp.title; font.pixelSize: 15; font.weight: Theme.wSemi; font.letterSpacing: -0.15; lineHeight: 1.0; height: 20; verticalAlignment: Text.AlignVCenter }
                 Txt { kind: "fine"; mono: true; tone: 3; visible: text !== ""; text: grp.applies; anchors.verticalCenter: parent.verticalCenter } }
-            Txt { kind: "fine"; tone: 3; width: Math.min(parent.width, 640); visible: text !== ""; text: grp.sub } }
+            Txt { tone: 2; font.pixelSize: 12; width: Math.min(parent.width, 860); visible: text !== ""; text: grp.sub } }
         Column { id: inner; width: parent.width; spacing: 10 }
     }
 
     // ── General ──────────────────────────────────────────────────────────────────────────────────────────────────
     Component { id: generalPage
         Column { spacing: 26
+            Group { title: "Set up for"
+                sub: "What this copy of Form Studio is for. Each choice installs only what it needs, after you click. Off hides it and uninstalls nothing."
+                Txt { visible: !Store.caps; kind: "fine"; tone: 3; text: "Reading what Form Studio is set up for…" }
+                CapCards { objectName: "settingsCaps"; width: parent.width; settings: true; pick: Store.caps ? Store.caps.chosen : []
+                    onToggled: function (id, on) { Store.setCap(id, on) } }
+                InstallLog { width: parent.width } }
+            // every engine by name, with its licence and size and where it stands. A switch says whether Form Studio
+            // calls one that is installed; Install sets one up; the rest is on Engines & software.
+            Group { title: "Engines"
+                sub: "Named with their licence and size. Nothing is downloaded until you choose Install."
+                Txt { visible: !Store.software; kind: "fine"; tone: 3; text: "Looking at what is installed…" }
+                Column { id: engList; objectName: "settingsEngines"; width: parent.width; visible: st.engineRows.length > 0
+                    Repeater { model: st.engineRows
+                        Rectangle { id: er; required property var modelData; required property int index
+                            readonly property var r: modelData
+                            readonly property var step: Store.installStep(r.id)
+                            readonly property bool queued: !!step && (step.state === "running" || step.state === "waiting")
+                            readonly property bool ok: r.status === "ok"
+                            readonly property bool locked: !!r.use && r.use.locked_by !== ""
+                            readonly property real metaW: st.narrow ? 0 : Math.min(230, Math.round(width * 0.24))
+                            readonly property real nameW: Math.min(210, Math.round(width * 0.22))
+                            objectName: "engineRow"; readonly property string sid: r.id
+                            width: engList.width; height: 44; radius: 12; color: index % 2 === 0 ? st.glass3 : "transparent"
+                            Rectangle { x: 13; width: 7; height: 7; radius: 3.5; anchors.verticalCenter: parent.verticalCenter
+                                color: er.ok ? Theme.pass : "transparent"; border.width: er.ok ? 0 : 1.5; border.color: Theme.ink3 }
+                            Txt { id: en; x: 34; width: er.nameW; anchors.verticalCenter: parent.verticalCenter; text: er.r.label; font.weight: Theme.wSemi; elide: Text.ElideRight; wrapMode: Text.NoWrap; lineHeight: 1.0 }
+                            Txt { x: 34 + er.nameW + 12; width: Math.max(0, parent.width - x - er.metaW - 12 - 128); anchors.verticalCenter: parent.verticalCenter; tone: 2; font.pixelSize: 12
+                                text: er.r.why; elide: Text.ElideRight; wrapMode: Text.NoWrap; lineHeight: 1.0 }
+                            Txt { visible: er.metaW > 0; x: parent.width - 128 - er.metaW; width: er.metaW - 8; anchors.verticalCenter: parent.verticalCenter; mono: true; tone: 2; font.pixelSize: 11
+                                text: [er.r.licence || "", er.r.size || ""].filter(function (x) { return x }).join(" · "); elide: Text.ElideRight; wrapMode: Text.NoWrap; lineHeight: 1.0 }
+                            MouseArea { id: erm; anchors.fill: parent; anchors.rightMargin: 128; hoverEnabled: true; onClicked: st.go("software") }
+                            Tip { show: erm.containsMouse; text: er.r.why + (er.r.licence ? "\nLicence: " + er.r.licence : "") }
+                            // where it stands, and the one thing to do about it
+                            Row { anchors.right: parent.right; anchors.rightMargin: 12; anchors.verticalCenter: parent.verticalCenter; spacing: 8
+                                Spinner { visible: er.queued; size: 12; anchors.verticalCenter: parent.verticalCenter }
+                                Txt { visible: er.queued; kind: "fine"; tone: 2; text: er.step && er.step.state === "running" ? "Installing…" : "Waiting"; anchors.verticalCenter: parent.verticalCenter }
+                                Txt { visible: !er.queued && er.ok && !!er.r.use; kind: "fine"; tone: 3; anchors.verticalCenter: parent.verticalCenter; text: Store.useOn(er.r) ? "In use" : "Off" }
+                                Toggle { objectName: "engineUse"; readonly property string sid: er.r.id; visible: !er.queued && er.ok && !!er.r.use; anchors.verticalCenter: parent.verticalCenter
+                                    checked: Store.useOn(er.r); enabled: !er.locked && !Store.installing
+                                    onToggled: function (on) { Store.setUse(er.r, on) } }
+                                Rectangle { visible: !er.queued && er.ok && !er.r.use; width: inT.implicitWidth + 22; height: 26; radius: 13; color: "transparent"; border.width: 1; border.color: Theme.rule2
+                                    anchors.verticalCenter: parent.verticalCenter
+                                    Txt { id: inT; anchors.centerIn: parent; font.pixelSize: 12; tone: 2; text: "Installed"; lineHeight: 1.0 } }
+                                Btn { objectName: "engineInstall"; readonly property string sid: er.r.id; small: true; anchors.verticalCenter: parent.verticalCenter
+                                    visible: !er.queued && !er.ok && er.r.status !== "info" && er.r.installable; text: "Install"; enabled: !Store.installing
+                                    tip: er.r.noncommercial ? "Its licence wants a look first: Engines & software" : "Every command is shown in the log as it runs"
+                                    onClicked: { if (er.r.noncommercial) st.go("software"); else Store.installSoftware([er.r.id]) } }
+                                Btn { small: true; kind: "quiet"; anchors.verticalCenter: parent.verticalCenter
+                                    visible: !er.queued && !er.ok && !(er.r.status !== "info" && er.r.installable); text: er.r.status === "info" ? "Details" : "Not found"
+                                    tip: "Where it is looked for, and its page: Engines & software"; onClicked: st.go("software") } } } } }
+                Row { spacing: 8; height: 20
+                    Icon { name: "lock"; size: 14; color: Theme.ink3; anchors.verticalCenter: parent.verticalCenter }
+                    Txt { tone: 2; font.pixelSize: 12; anchors.verticalCenter: parent.verticalCenter; lineHeight: 1.0
+                        text: "Designs stay on this computer. Form Studio never starts a print, a machine or an upload by itself." } } }
+            Group { title: "Designing"; sub: "What happens to a design after it builds."
+                SettingsRows { sheet: st; rows: st.rowsOf("general", function (r) { return r.key.indexOf("refine.") === 0 }) }
+                // what design refinement learned on this computer (form/refine/ledger.py)
+                Rectangle { objectName: "settingsRefineLedger"; width: parent.width; height: 62; radius: 16; color: Theme.glass
+                    Column { x: 18; anchors.verticalCenter: parent.verticalCenter; width: parent.width - 36 - resetLedger.width - 12; spacing: 3
+                        Txt { text: "What refinement learned"; font.weight: Theme.wMedium }
+                        Txt { kind: "fine"; width: parent.width; elide: Text.ElideRight; wrapMode: Text.NoWrap
+                            text: "Which refinements helped which kinds of design, kept on this computer only" } }
+                    Btn { id: resetLedger; objectName: "refineLedgerReset"; anchors.right: parent.right; anchors.rightMargin: 18
+                        anchors.verticalCenter: parent.verticalCenter; small: true; icon: "rotate_ccw"; text: "Reset"
+                        onClicked: Store.resetRefineLedger() } } }
+            Group { title: "Your designs"; sub: "Designs, their history and releases are plain files in one folder."
+                SettingsRows { sheet: st; rows: st.rowsOf("general", function (r) { return r.key.indexOf("refine.") !== 0 }) }
+                Row { spacing: 8
+                    Btn { small: true; icon: "folder_open"; text: "Open the project folder"; onClicked: Bridge.openDataFolder() } } }
+        } }
+
+    // ── Appearance: how it looks, and how much it moves ──────────────────────────────────────────────────────────
+    Component { id: appearancePage
+        Column { spacing: 26
             Group { title: "Appearance"; applies: "Applies at once"
                 sub: Bridge.appearanceOverride ? "Set to " + Bridge.appearanceOverride + " for this run by FORM_APPEARANCE."
                    : Theme.appearance === "system" ? "Follows the system: " + (Theme.dark ? "dark" : "light") + " now." : "The same bench, at night or by day."
-                Row { id: looks; objectName: "appearanceSeg"; spacing: 12; enabled: !Bridge.appearanceOverride; opacity: enabled ? 1 : 0.5
+                Row { id: looks; objectName: "appearanceSeg"; spacing: 10; enabled: !Bridge.appearanceOverride; opacity: enabled ? 1 : 0.5
                     Repeater {
                         model: [{ value: "dark", text: "Dark" }, { value: "light", text: "Light" }, { value: "system", text: "Match system" }]
                         Rectangle {
@@ -287,8 +378,9 @@ Item {
                             required property var modelData
                             readonly property bool on: (Bridge.appearanceOverride || Theme.appearance) === modelData.value
                             objectName: "appearance_" + modelData.value
-                            width: Math.floor((looks.parent.width - 24) / 3); height: 104; radius: 16
-                            color: on ? Theme.glass2 : lm.containsMouse ? Theme.washHover : Theme.glass
+                            width: Math.floor((looks.parent.width - 20) / 3); height: 104; radius: 16
+                            color: on ? Theme.glass2 : lm.containsMouse ? Theme.glass : st.glass3
+                            border.width: 1; border.color: on ? Theme.alpha(Theme.datum, 0.45) : Theme.rule
                             Behavior on color { Tint {} }
                             // a small picture of the bench in that appearance
                             Item { id: pic; x: 12; y: 12; width: parent.width - 24; height: 52; clip: true
@@ -310,9 +402,10 @@ Item {
                                 anchors.bottom: parent.bottom; anchors.bottomMargin: 12 }
                             MouseArea { id: lm; anchors.fill: parent; hoverEnabled: true; cursorShape: Qt.PointingHandCursor
                                 onClicked: Theme.setAppearance(look.modelData.value) } }
-                    } }
-                // Reduce Motion: every movement becomes a short fade (Theme.move, Theme.shift). The system's own
-                // setting turns it on too, and then this switch only says so.
+                    } } }
+            // Reduce Motion: every movement becomes a short fade (Theme.move, Theme.shift). The system's own
+            // setting turns it on too, and then this switch only says so.
+            Group { title: "Motion"; applies: "Applies at once"
                 Rectangle { objectName: "settingsReduceMotion"; width: parent.width; height: 62; radius: 16; color: Theme.glass
                     Column { x: 18; anchors.verticalCenter: parent.verticalCenter; width: parent.width - 36 - rmT.width - 16; spacing: 3
                         Txt { text: "Reduce motion"; font.weight: Theme.wMedium }
@@ -321,27 +414,6 @@ Item {
                     Toggle { id: rmT; objectName: "reduceMotionToggle"; anchors.right: parent.right; anchors.rightMargin: 18; anchors.verticalCenter: parent.verticalCenter
                         checked: Theme.reduced; enabled: !Bridge.reducedMotion; opacity: enabled ? 1 : 0.5
                         onToggled: function (on) { Theme.reduceMotion = on } } } }
-            Group { title: "Set up for"; applies: "Applies at once"
-                sub: "Turning one on installs only what it needs, with every command in the log. Turning one off hides it; nothing is uninstalled."
-                Txt { visible: !Store.caps; kind: "fine"; tone: 3; text: "Reading what Form Studio is set up for…" }
-                CapCards { objectName: "settingsCaps"; width: parent.width; settings: true; pick: Store.caps ? Store.caps.chosen : []
-                    onToggled: function (id, on) { Store.setCap(id, on) } }
-                InstallLog { width: parent.width } }
-            Group { title: "Designing"; sub: "What happens to a design after it builds."
-                SettingsRows { sheet: st; rows: st.rowsOf("general", function (r) { return r.key.indexOf("refine.") === 0 }) }
-                // what design refinement learned on this computer (form/refine/ledger.py)
-                Rectangle { objectName: "settingsRefineLedger"; width: parent.width; height: 62; radius: 16; color: Theme.glass
-                    Column { x: 18; anchors.verticalCenter: parent.verticalCenter; width: parent.width - 36 - resetLedger.width - 12; spacing: 3
-                        Txt { text: "What refinement learned"; font.weight: Theme.wMedium }
-                        Txt { kind: "fine"; width: parent.width; elide: Text.ElideRight; wrapMode: Text.NoWrap
-                            text: "Which refinements helped which kinds of design, kept on this computer only" } }
-                    Btn { id: resetLedger; objectName: "refineLedgerReset"; anchors.right: parent.right; anchors.rightMargin: 18
-                        anchors.verticalCenter: parent.verticalCenter; small: true; icon: "rotate_ccw"; text: "Reset"
-                        onClicked: Store.resetRefineLedger() } } }
-            Group { title: "Your designs"; sub: "Designs, their history and releases are plain files in one folder."
-                SettingsRows { sheet: st; rows: st.rowsOf("general", function (r) { return r.key.indexOf("refine.") !== 0 }) }
-                Row { spacing: 8
-                    Btn { small: true; icon: "folder_open"; text: "Open the project folder"; onClicked: Bridge.openDataFolder() } } }
         } }
 
     // ── Agents & models: every way chat can reach a model, set up or not ─────────────────────────────────────────
@@ -362,7 +434,7 @@ Item {
                             AgentRow { width: agList.width; a: modelData; first: index === 0; objectName: "agentRow"
                                 required property var modelData
                                 required property int index
-                                onInstall: st.tab = "software" }
+                                onInstall: st.go("software") }
                         } } } }
             Group { title: "Model provider APIs"
                 sub: "Form Studio talks to the provider directly, with its own tools; no other app is needed. A key set in your environment is found by itself. Keys you add are kept in a private file on this computer and sent only to their provider."
@@ -418,7 +490,30 @@ Item {
 
     // ── Engines & software ───────────────────────────────────────────────────────────────────────────────────────
     Component { id: softwarePage
-        SoftwarePanel { actions: false; intro: false } }
+        Column { spacing: 26
+            SoftwarePanel { }
+            // Mesh generators (form/generate): the switch that lets one run. Home › Or make › More › Generate uses
+            // the ones that are on, and shows what a run sends before it sends anything.
+            Group { title: "Mesh generators"; applies: "Applies at once"
+                sub: "Words or a picture to a mesh, which Form Studio rebuilds as editable CAD. Each is off until you turn it on here. One on this computer sends nothing; a hosted one runs on your own key (Agents & models) and is billed to that account."
+                Component.onCompleted: st.loadGenerators()
+                Rectangle { objectName: "settingsGenerators"; visible: st.generators.length > 0; width: parent.width; height: genList.implicitHeight + 8; radius: 16; color: Theme.glass
+                    Column { id: genList; y: 4; width: parent.width
+                        Repeater { model: st.generators
+                            Item { id: gr; required property var modelData; required property int index
+                                width: genList.width; height: Math.max(gcol.implicitHeight, 28) + 24
+                                Column { id: gcol; x: 18; anchors.verticalCenter: parent.verticalCenter; width: parent.width - 36 - gt.width - 20; spacing: 3
+                                    Row { spacing: 8
+                                        Txt { text: gr.modelData.title; font.weight: Theme.wMedium }
+                                        Txt { kind: "fine"; tone: 3; anchors.verticalCenter: parent.verticalCenter
+                                            text: (gr.modelData.kind === "local" ? "on this computer" : "hosted, your key") + (gr.modelData.ready ? " · ready" : "") } }
+                                    Txt { kind: "fine"; width: parent.width; text: gr.modelData.why }
+                                    Txt { kind: "fine"; tone: 3; width: parent.width; text: "Licence: " + gr.modelData.licence } }
+                                Toggle { id: gt; objectName: "generatorUse"; readonly property string sid: gr.modelData.id
+                                    anchors.right: parent.right; anchors.rightMargin: 18; anchors.verticalCenter: parent.verticalCenter
+                                    checked: !!gr.modelData.enabled; enabled: !!gr.modelData.implemented
+                                    onToggled: function (on) { st.setGenerator(gr.modelData.id, on) } } } } } } }
+        } }
 
     // ── Printing: the default printer, picked from the printers set up in your slicers ───────────────────────────
     Component { id: printingPage

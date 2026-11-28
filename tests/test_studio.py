@@ -158,6 +158,14 @@ class Pipeline(unittest.TestCase):
         self.assertEqual([s["state"] for s in self.job["steps"]][:3], ["done"] * 3)
         self.expect(geometry="current", exports="current", checks="current", slice="current")
         ch = self.st.state(self.p["id"])["checks"]
+        # the list of designs carries the same checks, counted, for the head (Home's cards); a design never run has none
+        row = next(r for r in self.st.list() if r["id"] == self.p["id"])
+        self.assertEqual(row["checks"], {"pass": ch["rollup"]["PASS"], "warn": ch["rollup"]["WARN"], "fail": ch["rollup"]["FAIL"], "rev": 1})
+        idle = self.st.create("Never run", "hook")
+        self.assertIsNone(next(r for r in self.st.list() if r["id"] == idle["id"])["checks"])
+        self.assertEqual(self.st.trash_count(), 0)
+        self.st.delete_project(idle["id"])
+        self.assertEqual(self.st.trash_count(), 1)                        # Recently deleted, counted for Home's link
         byid = {c["id"]: c for c in ch["checks"]}
         self.assertEqual(byid["solid"]["status"], "PASS")
         self.assertEqual(byid["interfaces"]["status"], "PASS")

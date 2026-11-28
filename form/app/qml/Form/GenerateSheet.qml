@@ -3,8 +3,8 @@ import QtQuick.Dialogs
 
 // Generate: words or a picture to a mesh, then the mesh to an editable design (form/generate, wave Q).
 //   Store.openSheet("generate")
-// The generators the person set up are listed with what each needs; there is no default. Turning a hosted generator
-// on is a switch here (its key is stored under Settings > Agents). Before every run the sheet shows what is sent, to
+// The generators the person set up are listed with what each needs; there is no default. A generator is turned
+// on in Settings › Engines & software (a hosted one's key is stored under Settings › Agents & models). Before every run the sheet shows what is sent, to
 // which host and that it is billed to their account; Send posts the consent token of exactly that statement.
 Column {
     id: gs
@@ -21,7 +21,6 @@ Column {
     readonly property var rows: info ? info.providers : []
     Component.onCompleted: load()
     function load() { Store.get("/generate/providers").then(function (r) { gs.info = r; if (!gs.provider && r.ready.length) gs.provider = r.ready[0] }, Store.fail) }
-    function toggle(p, on) { Store.post("/generate/enable", { provider: p, on: on }).then(function () { gs.load() }, Store.fail) }
     function check() {
         gs.disclosure = null
         Store.post("/generate/disclose", { provider: gs.provider, text: words.text, image: gs.image }).then(function (d) { gs.disclosure = d }, Store.fail)
@@ -39,7 +38,7 @@ Column {
         onAccepted: { gs.image = decodeURIComponent(String(selectedFile).replace(/^file:\/\/\/([A-Za-z]:)/, "$1").replace(/^file:\/\//, "")); gs.disclosure = null } }
 
     Note { visible: !!gs.info && gs.info.ready.length === 0; width: parent.width; kind: "amber"; title: "No mesh generator is set up"
-        text: "There is no default. Turn one on below: TRELLIS.2 runs on this computer (Linux, an NVIDIA GPU with 24 GB); Meshy and Tripo run on your own API key, stored under Settings > Agents." }
+        text: "There is no default. Turn one on in Settings › Engines & software: TRELLIS.2 runs on this computer (Linux, an NVIDIA GPU with 24 GB); Meshy and Tripo run on your own API key, stored under Settings › Agents & models." }
     Repeater { model: gs.rows
         Rectangle { required property var modelData; width: gs.width; height: rc.height + 20; radius: Theme.rMd; color: gs.provider === modelData.id ? Theme.glass2 : Theme.glass; border.color: Theme.rule
             Column { id: rc; x: 12; y: 10; width: parent.width - 24; spacing: 4
@@ -49,7 +48,8 @@ Column {
                 Txt { kind: "fine"; tone: 2; width: parent.width; text: modelData.why }
                 Txt { kind: "fine"; tone: 3; width: parent.width; text: "Licence: " + modelData.licence }
                 Row { spacing: 8
-                    Btn { small: true; visible: modelData.implemented; text: modelData.enabled ? "Turn off" : "Turn on"; onClicked: gs.toggle(modelData.id, !modelData.enabled) }
+                    Btn { objectName: "generateSetUp"; small: true; visible: modelData.implemented && !modelData.ready; icon: "sliders_horizontal"; text: modelData.enabled ? "Finish setting it up…" : "Turn on in Settings…"
+                        tip: "Its switch is in Settings › Engines & software › Mesh generators"; onClicked: Store.openSettings("software") }
                     Btn { small: true; kind: "quiet"; visible: modelData.ready; text: gs.provider === modelData.id ? "Selected" : "Use this"; onClicked: { gs.provider = modelData.id; gs.disclosure = null } } } } } }
     Column { width: parent.width; spacing: 8; visible: gs.provider !== ""
         Field { id: words; width: parent.width; placeholder: "Describe it, e.g. a desk lamp with a round shade"; onTextChanged: gs.disclosure = null }

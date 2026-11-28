@@ -583,12 +583,19 @@ class Conversations:
             if thread is not None and (meta.get("thread") or meta["id"]) != thread:
                 continue
             if words:
-                hay = (meta.get("title", "") + " " + meta.get("preview", "")).lower()
+                title, preview = str(meta.get("title", "")), str(meta.get("preview", ""))
+                hay, src = (title + " " + preview).lower(), preview
                 if not all(w in hay for w in words):
-                    hay += " " + " ".join(str(e.get("text", "")) for e in self.events(d.name) if e.get("t") in ("user", "text")).lower()
+                    src = " ".join(str(e.get("text", "")) for e in self.events(d.name) if e.get("t") in ("user", "text"))
+                    hay += " " + src.lower()
                     if not all(w in hay for w in words):
                         continue
-                    meta = dict(meta, match=self._snippet(hay, words[0]))
+                # words that are not all in the title were said in the conversation: `match` is the line around the
+                # first of them, as it was written (the palette's "search everywhere" quotes it)
+                if not all(w in title.lower() for w in words):
+                    said = next((w for w in words if w in src.lower()), "")
+                    if said:
+                        meta = dict(meta, match=self._snippet(src, said))
             out.append(meta)
         out.sort(key=lambda m: (not m.get("pinned"), -m.get("updated", 0)))
         if words:                                   # one row per thread: the branches say the same things
@@ -603,7 +610,7 @@ class Conversations:
 
     @staticmethod
     def _snippet(hay: str, word: str, span: int = 60) -> str:
-        i = hay.find(word)
+        i = hay.lower().find(word)
         if i < 0:
             return ""
         a, b = max(0, i - span // 2), min(len(hay), i + len(word) + span)

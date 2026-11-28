@@ -53,6 +53,7 @@ Item {
     readonly property int grouped: everything.length - families.length          // designs tucked into a family
     function menuOpenFor(q) { return pm.opened && !!home.menuFor && home.menuFor.id === q.id }
     readonly property var latest: everything.length ? everything.slice().sort(function (a, b) { return b.updated - a.updated })[0] : null
+    readonly property int trashed: Store.studio && Store.studio.trash ? Store.studio.trash : 0      // Recently deleted
     readonly property int released: everything.filter(function (p) { return p.approved_rev === p.head }).length
     // one card per conversation thread (its newest branch): a fork is not a second conversation
     readonly property var talks: { var seen = {}; return Store.convs.filter(function (c) {
@@ -80,7 +81,7 @@ Item {
     Timer { interval: 40 + 9 * Theme.stagger + Theme.slow; running: true; onTriggered: home.entered = true }
     Connections { target: Store; function onStudioChanged() { home.loadPhotos() }
         function onSheetChanged() { if (!Store.sheet) Store.loadStart() }                 // a printer chosen in its sheet shows here
-        function onModelPickWanted() { if (Store.screen === "home" && !Store.talkOpen) Qt.callLater(function () { composer.pickModel() }) } }
+        function onModelPickWanted() { if (Store.screen === "home" && !Store.talkOpen) Qt.callLater(function () { startModel.pick() }) } }
     function recipeTitle(id) {
         if (!Store.studio) return ""
         if (String(id).indexOf("src:") === 0 || String(id).indexOf("scad:") === 0) return "Designed as code"
@@ -251,9 +252,8 @@ Item {
                         opacity: 0; transform: Translate { id: barLift }
                         Arrive { item: composer; lift: barLift; beat: 1 } }
                     Item { visible: !home.chatting; width: 1; height: Theme.s4 }
-                    // ── under the bar: what it is for and which printer, lined up with the bar's left edge. Every item
-                    // is one height on one centre line. (The agent and model are chosen in the bar itself, beside
-                    // Design it: StartComposer.qml.)
+                    // ── under the bar: what it is for and which printer at the bar's left edge, the agent and model that
+                    // design it at its right edge (StartModel.qml). Every item is one height on one centre line.
                     Item { id: opts; objectName: "startOptions"; visible: !home.chatting; width: parent.width
                         readonly property int h: 34
                         readonly property int inset: 10
@@ -273,9 +273,13 @@ Item {
                                 visible: Store.printOn && Store.newPurposeEffective === "print"
                                 text: Store.printerName ? Store.printerName : "Choose a printer"
                                 tip: "The printer the next design is checked and sliced for. Click to change it."
-                                onClicked: Store.openSheet("printer") } } }
+                                onClicked: Store.openSheet("printer") } }
+                        StartModel { id: startModel; x: opts.width - width - 4; room: opts.width - 4 - opts.inset - forRow.width - 14 } }
+                    Item { visible: makers.visible && makers.height > 0; width: 1; height: 6 }
                     // the makers' generators: a name tag, a lithophane, a jar ... made in one click, still editable
-                    MakersRow { visible: !home.chatting; width: parent.width; x: opts.inset }
+                    MakersRow { id: makers; visible: !home.chatting; x: opts.inset; width: parent.width - opts.inset - 4
+                        opacity: 0; transform: Translate { id: makersLift }
+                        Arrive { item: makers; lift: makersLift; beat: 2 } }
                     Note { visible: !!Store.fatal; width: parent.width; kind: "red"; title: Store.fatal ? Store.fatal.message : ""; text: Store.fatal ? (Store.fatal.hint || "") : "" }
                 }
                 // first day: what is turning on the bench, said honestly (kernel geometry, an example, not one of yours)
@@ -345,6 +349,10 @@ Item {
                     Btn { visible: home.everything.length > 6; kind: "quiet"; icon: "arrow_up_down"; text: home.order === "recent" ? "Last changed" : "Name"; tip: "Sort order"; anchors.verticalCenter: parent.verticalCenter
                         onClicked: home.order = home.order === "recent" ? "name" : "recent" }
                     Btn { kind: "quiet"; icon: "import"; text: "Import…"; tip: "A .formstudio project, a .formproj, or a conversation"; anchors.verticalCenter: parent.verticalCenter; onClicked: Store.openSheet("import") }
+                    // Recently deleted (Settings › Backups): shown once something is there, with how many
+                    Btn { objectName: "homeTrash"; visible: home.trashed > 0; kind: "quiet"; icon: "trash_2"; text: "Trash · " + home.trashed
+                        tip: "Recently deleted: " + F.plural(home.trashed, "design") + " you can put back"; anchors.verticalCenter: parent.verticalCenter
+                        onClicked: Store.openSettings("backups") }
                     Btn { kind: "quiet"; icon: "folder_open"; tip: "Open the projects folder: " + Bridge.dataDirShort; anchors.verticalCenter: parent.verticalCenter; onClicked: Bridge.openDataFolder() } } }
             Item { visible: home.everything.length > 0; width: 1; height: 8 }
             // rows of families; the family opened by its count sits under its own row, across the full width. Until

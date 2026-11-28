@@ -191,6 +191,7 @@ def make_handler(st: Studio):
                 return self._json(st.boot_state())
             if path == "/api/studio":
                 return self._json({"env": st.environment(), "projects": st.list(), "chat": chat_mod.status(st.cfg),
+                                   "trash": st.trash_count(),             # Recently deleted, counted (Home's link)
                                    "recipes": [r.public() for r in st.recipes.builtins().values()],
                                    # every built-in's title, legacy ones too: older designs still name them
                                    "recipe_titles": {k: r.title for k, r in st.recipes.all_builtins().items()},

@@ -48,6 +48,21 @@ def run(ui):
     more = ui.item("designsMore", timeout=20)
     ui.check(ui.sees("All 7 designs", more), "the last place on the shelf counts every design")
     ui.check(0 < len(ui.find_all(name="projectCard")) < 7, "the first row shows only what fits")
+    # nothing is in the trash yet, so the shelf has no Trash link; a card's second line says what the design is,
+    # and the one whose checks ran and pass says nothing more
+    ui.check(not ui.exists("homeTrash"), "no Trash link while the trash is empty")
+    summary = {p["name"]: p.get("checks") for p in projects(ui)}
+    ui.check(summary["Echo dock"] and summary["Echo dock"]["rev"] == 1 and summary["Zebra hook"] is None,
+             f"the list carries the head's checks, counted, only where they ran: {summary}")
+    echo = card(ui, "Echo dock")
+    want = summary["Echo dock"]
+    line = ui.item("cardSecondText", within=echo).property("text")
+    if want["fail"]:
+        ui.check(line.startswith(f"{want['fail']} check") and "fail" in line, f"a failing check leads the second line: {line}")
+    elif want["warn"]:
+        ui.check(line.startswith(f"{want['warn']} check") and "to review" in line, f"a check to review leads the second line: {line}")
+    else:
+        ui.check("check" not in line and ui.find(name="cardCheckDot", within=echo) is None, f"all passing: the line says what the design is: {line}")
     ui.settle(900)
     ui.shot("home-shelf")
     ui.click(more)
@@ -137,6 +152,19 @@ def run(ui):
     ui.eq(meta["project"], None, "the conversation no longer points at the deleted design")
     ui.eq(meta["project_was"]["name"], "Zebra hook", "and remembers what it was about")
     ui.wait_until(lambda: len(ui.find_all(name="projectCard")) == 6, 5, "six cards: seven designs, two of them one family")
+    # the shelf now has its Trash link with the count; it opens Recently deleted (Settings › Backups)
+    trash = ui.item("homeTrash", timeout=10)
+    ui.check(ui.sees("Trash · 1", trash), f"the link counts what is in the trash: {ui.texts(trash)}")
+    ui.eq(ui.api("/studio")["trash"], 1, "the engine counts the trash")
+    ui.settle(300)
+    ui.shot("home-trash-link")
+    ui.click(trash)
+    ui.wait_until(lambda: (ui.store.get("sheet") or {}).get("kind") == "settings", 5, "Settings to open")
+    ui.wait_until(lambda: ui.item("settingsSheet").property("pageTitle") == "Backups" and ui.exists("backupDeleted"), 10, "Recently deleted")
+    ui.expect("Zebra hook", within=ui.item("backupDeleted"))
+    ui.key("Escape")
+    ui.wait_until(lambda: ui.store.get("sheet") is None, 4, "the sheet to close")
+    ui.settle(300)
 
     # ── a click opens a design ──
     ui.click(card(ui, "Echo dock"), 0.5, 0.4)

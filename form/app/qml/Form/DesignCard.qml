@@ -30,6 +30,12 @@ Item {
     readonly property int foot: 64                         // the caption under it
     readonly property string via: p.lineage && p.lineage.via ? ({ duplicate: "copy", variant: "variant", concept: "concept" })[p.lineage.via] || "" : ""
     readonly property bool root: !p.lineage || !p.lineage.parent
+    // the head's checks, when they have run for it: a failing check first, then the ones to review. All passing says
+    // nothing here (the card then says what the design is); so does a design whose checks have not run.
+    readonly property var ck: p.checks || null
+    readonly property string checkState: !ck ? "" : ck.fail > 0 ? "fail" : ck.warn > 0 ? "warn" : ""
+    readonly property string checkText: checkState === "fail" ? F.plural(ck.fail, "check") + (ck.fail === 1 ? " fails" : " fail")
+                                      : checkState === "warn" ? F.plural(ck.warn, "check") + " to review" : ""
     height: plinth + foot
 
     opacity: 0
@@ -95,9 +101,17 @@ Item {
             Tag { id: rel; visible: !!card.p.approved_rev; anchors.verticalCenter: parent.verticalCenter
                 text: card.p.approved_rev === card.p.head ? "released" : card.p.approved_rev ? F.pad(card.p.approved_rev) + " released" : ""
                 kind: card.p.approved_rev === card.p.head ? "PASS" : card.p.approved_rev ? "WARN" : "" } }
-        Txt { width: parent.width - 12; x: 6; horizontalAlignment: Text.AlignHCenter; elide: Text.ElideRight; wrapMode: Text.NoWrap; font.pixelSize: 12; tone: 3; lineHeight: 1.0
-            text: (card.member ? (card.root ? "the first design" : card.via ? "a " + card.via : "design")
-                               : card.p.purpose === "print" && Store.printOn ? "For 3D printing" : card.host ? card.host.recipeTitle(card.p.recipe) : "") + " · " + F.ago(card.p.updated) } }      // a model is the normal case: no label
+        // The second line. The head's checks when one fails or wants a look (a dot and the count: the engine's
+        // rollup of the current checks, /studio projects[].checks); otherwise what the design is. Then when it changed.
+        Row { id: second; objectName: "cardSecond"; anchors.horizontalCenter: parent.horizontalCenter; spacing: 7; height: 14
+            readonly property string state: card.checkState
+            Rectangle { objectName: "cardCheckDot"; visible: card.checkState !== ""; width: 6; height: 6; radius: 3; anchors.verticalCenter: parent.verticalCenter
+                color: card.checkState === "fail" ? Theme.signal : Theme.amber }
+            Txt { objectName: "cardSecondText"; width: Math.min(implicitWidth, cap.width - 12 - (card.checkState !== "" ? 13 : 0)); elide: Text.ElideRight; wrapMode: Text.NoWrap
+                font.pixelSize: 12; tone: 3; lineHeight: 1.0; height: parent.height; verticalAlignment: Text.AlignVCenter
+                text: (card.checkState !== "" ? card.checkText
+                       : card.member ? (card.root ? "the first design" : card.via ? "a " + card.via : "design")
+                       : card.p.purpose === "print" && Store.printOn ? "For 3D printing" : card.host ? card.host.recipeTitle(card.p.recipe) : "") + " · " + F.ago(card.p.updated) } } }      // a model is the normal case: no label
     MouseArea { id: cm; anchors.fill: parent; hoverEnabled: true; acceptedButtons: Qt.LeftButton | Qt.RightButton; enabled: !card.editing && !card.asking
         cursorShape: Qt.PointingHandCursor
         onClicked: function (e) {
