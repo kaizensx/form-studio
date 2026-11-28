@@ -96,14 +96,27 @@ def _menu(ui, fid, entry):
     ui.settle(200)
     ui.click(ui.item("featureMore-" + fid))
     ui.wait_until(lambda: ui.exists(text=entry), 4, f"the menu entry {entry}")
-    ui.settle(150)
+    ui.settle(450)                                          # the popover rises into place first
+    from PySide6.QtCore import QPointF
+
+    def where():
+        it = ui.find(text=entry)
+        return None if it is None else (round(it.mapToScene(QPointF(0, 0)).y()), round(ui.item("featureMore-" + fid).mapToScene(QPointF(0, 0)).y()))
+    last = None
+    for _ in range(30):                                     # the entry and the line it belongs to have come to rest
+        now = where()
+        if now is not None and now == last:
+            break
+        last = now
+        ui.settle(120)
     ui.click_text(entry)
 
 
 def after(ui, h0, what):
     ui.wait_until(lambda: head(ui) == h0 + 1, 120, what)
     ui.wait_until(lambda: ui.js("Store.project.head") == h0 + 1, 60, "the window to read the new revision")
-    ui.settle(500)
+    ui.idle(10)
+    ui.settle(1200)                                         # the first card brings the conversation column in
 
 
 def journey_setup(ui):

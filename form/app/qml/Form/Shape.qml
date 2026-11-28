@@ -115,7 +115,14 @@ Column {
                 { text: "Pattern…", icon: "repeat", enabled: i > 0 && !sup, run: function () { root.openId = f.id; root.openWhat = "pattern" } },
                 { text: "What it depends on", icon: "git_branch", run: function () { root.openId = f.id; root.openWhat = "deps"; root.loadTree() } }].filter(function (e) { return e.visible !== false })
     }
-    PopMenu { id: rowMenu; objectName: "featureMenu"; property int at: -1; model: root.menuFor(at) }
+    PopMenu { id: rowMenu; objectName: "featureMenu"; property int at: -1
+        // the entries of this line as it is now (a binding would keep the ones of the line it was last opened on
+        // until the listing settles after a revision)
+        function show(i, item, x, y) {
+            at = i; model = root.menuFor(i); openAt(item, x, y)
+            // placed again once the listing has laid out: a line that moved as the revision landed keeps its menu
+            Qt.callLater(function () { var p = item.mapToItem(rowMenu.parent, x, y); rowMenu.x = Math.round(p.x); rowMenu.y = Math.round(p.y) })
+        } }
     Connections { target: Store; function onPidChanged() { root.tree = null; root.openId = ""; root.openWhat = "" } }
 
     Column {
@@ -214,7 +221,7 @@ Column {
                             color: fr.arriving ? Theme.datum : fr.out ? Theme.amber : Theme.ink3; opacity: fr.built ? 0.6 : fr.todo ? 0.5 : 1 }
                         MouseArea { id: fm; width: parent.width; height: fr.lineH; hoverEnabled: true; acceptedButtons: Qt.LeftButton | Qt.RightButton
                             onClicked: function (m) {
-                                if (m.button === Qt.RightButton && !root.running) { rowMenu.at = fr.index; rowMenu.openAt(fr, m.x, m.y) }
+                                if (m.button === Qt.RightButton && !root.running) rowMenu.show(fr.index, fr, m.x, m.y)
                                 else Store.select(fr.modelData.id) }
                             onEntered: Store.hover(fr.modelData.id); onExited: Store.hover("") }
                         // its tools: the line's menu (also on a right-click)
@@ -222,7 +229,7 @@ Column {
                             anchors.right: parent.right; anchors.rightMargin: 4; y: (32 - height) / 2
                             visible: (fm.containsMouse || hovered || (rowMenu.opened && rowMenu.at === fr.index)) && !root.running
                             tip: "Roll back, suppress, rename, move, pattern"
-                            onClicked: { rowMenu.at = fr.index; rowMenu.openAt(more, 0, more.height + 4) } }
+                            onClicked: rowMenu.show(fr.index, more, 0, more.height + 4) }
                         // reorder by drag: press on the number and drag it to another line
                         MouseArea { objectName: "featureDrag-" + fr.modelData.id; x: 0; width: 34; height: fr.lineH; enabled: fr.index > 0 && !root.running
                             cursorShape: enabled ? Qt.SizeVerCursor : Qt.ArrowCursor; preventStealing: true
