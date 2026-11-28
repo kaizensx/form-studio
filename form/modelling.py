@@ -406,7 +406,14 @@ def tree(st, p: dict) -> dict:
         for e in rv.get("build_log") or []:
             made.setdefault(e.get("feature"), {"rev": rv.get("n"), "origin": rv.get("origin") or "user"})
     spans = _spans(c["source"])
+    from . import feature_redefine
     for r in rows:
+        try:                                             # a hand feature's choices, for its property card
+            opts = feature_redefine.options(c["source"], r["id"], vals)
+        except Exception:                                # noqa: BLE001 - a feature the reader does not follow has none
+            opts = None
+        if opts:
+            r["options"] = opts
         if r["id"] in made:
             r["made"] = made[r["id"]]
         if r["id"] in spans:

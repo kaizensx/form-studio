@@ -124,7 +124,10 @@ Column {
                 { text: "Move down", icon: "chevron_down", enabled: i > 0 && i < fs.length - 1, run: function () { root.treeOp({ op: "move", feature: f.id, after: fs[i + 1].id }) } },
                 { sep: true },
                 { text: "Pattern…", icon: "repeat", enabled: i > 0 && !sup, run: function () { root.openId = f.id; root.openWhat = "pattern" } },
-                { text: "What it depends on", icon: "git_branch", run: function () { root.openId = f.id; root.openWhat = "deps"; root.loadTree() } }].filter(function (e) { return e.visible !== false })
+                { text: "What it depends on", icon: "git_branch", run: function () { root.openId = f.id; root.openWhat = "deps"; root.loadTree() } },
+                { text: "Compare versions…", icon: "git_compare", enabled: !!Store.project && Store.project.revisions.length > 1,
+                  run: function () { var h = Store.project.head, rs = Store.project.revisions.map(function (r) { return r.n }).filter(function (n) { return n !== h })
+                      Store.openSheet("compare", { a: rs[rs.length - 1], b: h, focus: f.id }) } }].filter(function (e) { return e.visible !== false })
     }
     PopMenu { id: rowMenu; objectName: "featureMenu"; property int at: -1
         // the entries of this line as it is now (a binding would keep the ones of the line it was last opened on
@@ -146,7 +149,7 @@ Column {
 
     Column {
         id: program; objectName: "program"
-        readonly property real listingHeight: 40 + listing.height + 6      // the pane is this tall; what follows is a scroll away
+        readonly property real listingHeight: 40 + (extrasHead.visible ? extrasHead.height : 0) + listing.height + 6     // the pane is this tall; what follows is a scroll away
         width: parent.width
         Item { width: parent.width; height: 40
             Txt { id: pt; x: 12; anchors.verticalCenter: parent.verticalCenter; text: "Tree"; font.weight: Theme.wSemi; font.pixelSize: 14; font.letterSpacing: -0.15 }
@@ -161,6 +164,8 @@ Column {
                     Rectangle { anchors.centerIn: parent; width: 6; height: 6; radius: 3; color: Theme.datum } }
                 Txt { anchors.verticalCenter: parent.verticalCenter; mono: true; font.pixelSize: 11; font.weight: Theme.wMedium; font.letterSpacing: 1.5; font.capitalization: Font.AllUppercase; color: Theme.datum; wrapMode: Text.NoWrap
                     text: root.stepOf > 1 ? root.stepAt + " of " + root.stepOf : "building" } } }
+        // the rows above the features (TreeExtras.qml): Equations, Material, Purchased parts, the origin's planes
+        TreeExtras { id: extrasHead; part: "head"; width: parent.width; visible: !root.running }
         Item {
             id: listing; width: parent.width; height: lines.implicitHeight
             // the gutter: the one drawn line of the pane, 39 px in: between the numbers and the marks, which stand
@@ -205,7 +210,8 @@ Column {
                         onArrivingChanged: if (arriving) pc.at = fr
                         onBuiltChanged: if (built && root.running) landed.restart()
                         readonly property real lineH: Math.max(32, why.visible ? why.implicitHeight + 30 : 0)
-                        width: lines.width; height: lineH + (ex.visible ? ex.implicitHeight + 10 : 0)
+                        readonly property real skH: sk.height
+                        width: lines.width; height: lineH + sk.height + (ex.visible ? ex.implicitHeight + 10 : 0)
                         readonly property bool picked: Store.feature === modelData.id && !root.running
                         readonly property var made: { var r = root.treeRow(modelData.id); return r && r.made ? r.made : null }
                         readonly property string val: root.valueOf(modelData.id)
@@ -244,7 +250,7 @@ Column {
                             font.capitalization: word ? Font.AllUppercase : Font.MixedCase; wrapMode: Text.NoWrap
                             // its value, and who made it (the role told less than the value)
                             text: fr.arriving ? "building" : fr.out ? "left out" : fr.sup ? "suppressed" : fr.val
-                            visible: !(fm.containsMouse || more.hovered) || root.running
+                            visible: !(fm.containsMouse || more.hovered || eyeX.hovered) || root.running
                             color: fr.arriving ? Theme.datum : fr.out ? Theme.amber : Theme.ink3; opacity: fr.built ? 0.6 : fr.todo ? 0.5 : 1 }
                         Icon { objectName: "featureAuthor"; visible: !!fr.made && kw.visible && !kw.word; anchors.right: kw.left; anchors.rightMargin: kw.text !== "" ? 7 : 0; y: (32 - height) / 2
                             readonly property bool you: !!fr.made && Store.who(fr.made.origin).indexOf("you") === 0
@@ -257,7 +263,7 @@ Column {
                         // its tools: the line's menu (also on a right-click)
                         Btn { id: more; objectName: "featureMore-" + fr.modelData.id; small: true; kind: "quiet"; icon: "ellipsis"
                             anchors.right: parent.right; anchors.rightMargin: 4; y: (32 - height) / 2
-                            visible: (fm.containsMouse || hovered || (rowMenu.opened && rowMenu.at === fr.index)) && !root.running
+                            visible: (fm.containsMouse || hovered || eyeX.hovered || (rowMenu.opened && rowMenu.at === fr.index)) && !root.running
                             tip: "Roll back, suppress, rename, move, pattern"
                             onClicked: rowMenu.show(fr.index, more, 0, more.height + 4) }
                         // reorder by drag: press on the number and drag it to another line
@@ -274,7 +280,11 @@ Column {
                         Tip { show: fm.containsMouse && (!!fr.modelData.doc || !!fr.made) && !fr.out
                             text: (fr.modelData.doc || "") + (fr.made ? (fr.modelData.doc ? "\n" : "") + "Made by " + Store.who(fr.made.origin) + " in " + F.pad(fr.made.rev) + "." : "") }
                         // under the line: rename it, pattern it, or what it depends on
-                        Column { id: ex; objectName: "featureTools"; x: 64; y: fr.lineH + 2; width: parent.width - 76; spacing: 6; visible: fr.tools && !root.running
+                        // the tree's extras on the line (TreeExtras.qml): its sketch nested under it, and the eye
+                        TreeSketch { id: sk; fid: fr.modelData.id; y: fr.lineH; width: parent.width; shown: !root.running && !fr.sup }
+                        TreeEye { id: eyeX; fid: fr.modelData.id; anchors.right: more.visible ? more.left : kw.left; anchors.rightMargin: more.visible ? 2 : 26; y: (32 - height) / 2
+                            hot: fm.containsMouse || more.hovered; visible: !root.running && (hot || hovered || Store.hidden.indexOf(fr.modelData.id) >= 0) }
+                        Column { id: ex; objectName: "featureTools"; x: 64; y: fr.lineH + sk.height + 2; width: parent.width - 76; spacing: 6; visible: fr.tools && !root.running
                             Field { id: rn; objectName: "renameField"; width: parent.width; visible: root.openWhat === "rename"; text: fr.modelData.label
                                 placeholder: "Name of this feature"
                                 onVisibleChanged: if (visible) Qt.callLater(function () { rn.input.forceActiveFocus(); rn.input.selectAll() })
@@ -299,7 +309,7 @@ Column {
                 readonly property Item row: rep.count ? rep.itemAt(at) : null
                 visible: rep.count > 1 && !root.running && !Store.hasDraft
                 x: 4; width: parent.width - 8; height: 12
-                y: row ? row.y + row.lineH - 6 : listing.height - 6
+                y: row ? row.y + row.lineH + row.skH - 6 : listing.height - 6
                 Behavior on y { enabled: root.rollDrag < 0; NumberAnimation { duration: Theme.move(160); easing.type: Easing.OutCubic } }
                 Rectangle { x: 28; anchors.verticalCenter: parent.verticalCenter; width: parent.width - 28; height: 1.5
                     color: root.rollAt >= 0 || root.rollDrag >= 0 ? Theme.datum : Theme.alpha(Theme.datum, 0.35); opacity: grip.containsMouse || grip.pressed || root.rollAt >= 0 ? 1 : 0.55 }
@@ -318,6 +328,8 @@ Column {
                                                                                        : "Drag up to see the part as it stood after any feature" }
             }
         }
+        // the PMI the drawing declares: datums, toleranced dimensions, notes (TreeExtras.qml)
+        TreeExtras { id: extrasFoot; part: "pmi"; width: parent.width; visible: !root.running && hasAny }
         Item { width: 1; height: 6 }
         // the design's source, under the tree: the same thing the values and the handles change. Read from the head.
         Rectangle { id: src; objectName: "treeSource"; visible: Store.treeLower === "source" && !!root.tree && !!root.tree.source && !root.running
@@ -363,9 +375,15 @@ Column {
             Txt { kind: "h2"; text: root.f ? root.f.label : "" }
             Tag { text: root.f ? root.f.role : ""; anchors.verticalCenter: parent.verticalCenter } }
         Txt { tone: 2; width: parent.width; topPadding: 4 + lead; visible: text !== ""; text: root.f ? (root.f.doc || "") : "" }
+        // a feature made by hand: its property card per kind (FeatureCard.qml), in place of the plain parameter list
+        Item { width: 1; height: card.visible ? 8 : 0 }
+        FeatureCard { id: card; width: parent.width; fid: root.f ? root.f.id : ""; params: root.f ? root.paramsOf(root.f.id) : []
+            options: { var r = root.treeRow(fid); return r && r.options ? r.options : null }
+            code: { var r = root.treeRow(fid), src = root.tree && root.tree.source ? String(root.tree.source).split("\n") : []
+                    return r && r.lines ? src.slice(r.lines[0] - 1, r.lines[1]).join("\n") : "" } }
         // its own parameters; a feature without any says what shapes it instead: values that follow from standards
         // (below), the design's general parameters and the features built before it (each one click away)
-        Sec { id: drives; objectName: "featureDrives"
+        Sec { id: drives; objectName: "featureDrives"; visible: !card.visible
             readonly property int n: root.f ? root.paramsOf(root.f.id).length : 0
             readonly property var before: {
                 var fs = Store.recipe ? Store.recipe.features : [], out = []

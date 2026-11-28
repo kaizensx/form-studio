@@ -399,9 +399,10 @@ def end_args(st, p, c, kind, fid, label, o) -> tuple[str, list, str]:
         if end not in ("angle", "face"):
             raise _err(f"Unknown revolve end “{end}”.", "angle or face.")
         if end == "face":
-            if not o.get("to_at"):
+            if not o.get("to_at") and not isinstance(o.get("to"), dict):
                 raise _err("Up to face needs to_at: a point on the face.")
-            kw.append(f"end=\"face\", to={_lit(_face_q(st, p, c, o['to_at']))}")
+            q = _face_q(st, p, c, o["to_at"]) if o.get("to_at") else o["to"]     # a face already found (a redefine)
+            kw.append(f"end=\"face\", to={_lit(q)}")
             said.append("up to a face")
         if o.get("angle2"):
             a2 = _num(o, "angle2", 0.1, 359.9, "The second angle", None)
@@ -435,7 +436,8 @@ def end_args(st, p, c, kind, fid, label, o) -> tuple[str, list, str]:
             at = o.get(to_k + "_at") or o.get(to_k)
             if not at:
                 raise _err(f"Up to face needs {to_k}_at: a point on the face.")
-            kw.append(f"{to_k}={_lit(_face_q(st, p, c, at))}")
+            q = at if isinstance(at, dict) and not o.get(to_k + "_at") else _face_q(st, p, c, at)  # found: a redefine
+            kw.append(f"{to_k}={_lit(q)}")
         if e == "vertex":
             if not o.get(to_k):
                 raise _err(f"Up to vertex needs {to_k}: the vertex [x, y, z].")

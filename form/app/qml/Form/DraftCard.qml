@@ -32,7 +32,8 @@ Rectangle {
             Repeater { model: d.im ? d.im.params : []
                 Delta { required property var modelData; label: modelData.label; from: F.trim(modelData.from); to: F.trim(modelData.to); unit: modelData.unit; tint: Theme.blueprint } } }
         Field { width: parent.width; placeholder: "Why this change? (optional, kept in history)"; text: Store.draftNote; onEdited: function (t) { Store.draftNote = t } }
-        Row { spacing: 8
+        // a feature's property card holds the one OK / Cancel while it is open (FeatureCard.qml)
+        Row { spacing: 8; visible: !Store.cardFor; objectName: "draftActions"
             Btn { kind: "primary"; text: "Commit as " + d.next; icon: "git_commit_horizontal"
                 enabled: !Store.draftError && (!!Store.preview || F.keys(Store.draftProv).length > 0); onClicked: Store.commit() }
             Btn { kind: "quiet"; text: "Discard"; onClicked: Store.discard() } }

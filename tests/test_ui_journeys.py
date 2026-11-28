@@ -194,6 +194,15 @@ class Journeys(unittest.TestCase):
     def test_bench_small_light(self):      # the same in the smallest window, on paper
         self.journey("bench.py", size="1100x700", env_extra={"FORM_APPEARANCE": "light"})
 
+    def test_pro_surfaces(self):           # the compare sheet, the feature property card, the Bench tiles, the tree's rows, the study verdict
+        self.journey("pro_surfaces.py", env_extra={"FORM_APPEARANCE": "dark"})
+
+    def test_pro_surfaces_light(self):     # the same at 1280 x 800, on paper
+        self.journey("pro_surfaces.py", size="1280x800", env_extra={"FORM_APPEARANCE": "light"})
+
+    def test_pro_surfaces_small(self):     # the smallest window, at night: the cards scroll in the pane, one OK each
+        self.journey("pro_surfaces.py", size="1100x700", env_extra={"FORM_APPEARANCE": "dark"})
+
     def test_results(self):                # results drawn on the part: strength, manufacturability, CNC, flat pattern, motion, the sheet
         self.journey("results.py", env_extra={"FORM_APPEARANCE": "dark"}, timeout=1200)
 

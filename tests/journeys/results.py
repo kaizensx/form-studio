@@ -111,6 +111,17 @@ def journey_strength(ui):
     ui.check(ui.sees("Largest displacement", within=card), "the displacement line")
     ui.check(ui.find(name="convergence", within=card) is not None and len(res(ui, "Results.r.convergence.points")) == len(want["convergence"]["levels"]),
              "the convergence plot has one point per mesh")
+    # the verdict in one sentence, with the stated-error bound, and the load scale of a linear static study
+    sf = want["safety_factor"]
+    ui.check(ui.sees("safety factor of", within=card) and ui.sees("with the stated error", within=card), "the verdict sentence")
+    ui.check(ui.find(name="loadScale", within=card) is not None and ui.sees("linear: exact for this model", within=card), "a linear static study has the load scale")
+    if sf.get("value"):
+        v = ui.item("studyVerdict")
+        v.setProperty("k", 2.0)
+        ui.settle(100)
+        ui.check(("%.1f" % (sf["value"] / 2) if sf["value"] / 2 >= 2 else "%.2f" % (sf["value"] / 2)) in str(ui.item("verdictText").property("text")),
+                 "twice the load halves the factor")
+        v.setProperty("k", 1.0)
     crop(ui, "strength-static")
     # the many-colour scale, and back
     ui.click_text("Many colours", within=strip)

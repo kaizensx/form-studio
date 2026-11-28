@@ -19,7 +19,7 @@ from pathlib import Path
 
 import numpy as np
 
-VERSION = 3                    # part of the cache key: change the computation or the picture, change this
+VERSION = 4                    # part of the cache key: change the computation or the picture, change this
 ADDED = (46, 160, 90)
 REMOVED = (214, 64, 52)
 SAME = (190, 186, 178)
@@ -68,7 +68,13 @@ def op_geomdiff(key, recipe_id, values, key_b, recipe_b, values_b, tol=0.08):
     B = own_copy(_get(key_b, recipe_b, values_b, 0.05)["shape"])
     added, removed = B - A, A - B
     P, T = _tessellate(B, tol)
+
+    def box(s):
+        bb = s.bounding_box()
+        return [[round(bb.min.X, 3), round(bb.min.Y, 3), round(bb.min.Z, 3)], [round(bb.max.X, 3), round(bb.max.Y, 3), round(bb.max.Z, 3)]]
     return {"volume_a_mm3": round(float(A.volume), 3), "volume_b_mm3": round(float(B.volume), 3),
+            "bbox_a": box(A), "bbox_b": box(B),
+            "solids_a": len([s for s in A.solids() if s.volume > EPS_MM3]), "solids_b": len([s for s in B.solids() if s.volume > EPS_MM3]),
             "added": _region(added, tol), "removed": _region(removed, tol),
             "base": {"positions": _b64(P.astype(np.float32)), "indices": _b64(T.astype(np.uint32))}}
 
@@ -103,6 +109,8 @@ def compute(st, p: dict, a: int, b: int | None = None) -> dict:
     res = {"a": a, "b": b, "evidence": "computed",
            "volume_a_mm3": raw["volume_a_mm3"], "volume_b_mm3": raw["volume_b_mm3"],
            "net_mm3": round(raw["volume_b_mm3"] - raw["volume_a_mm3"], 3),
+           # the whole solids of both revisions: their boxes and how many bodies each is (for the compare sheet)
+           "bbox_a": raw["bbox_a"], "bbox_b": raw["bbox_b"], "solids_a": raw["solids_a"], "solids_b": raw["solids_b"],
            "added": {k: raw["added"][k] for k in ("volume_mm3", "regions", "bbox")},
            "removed": {k: raw["removed"][k] for k in ("volume_mm3", "regions", "bbox")},
            "same": raw["added"]["regions"] == 0 and raw["removed"]["regions"] == 0,
