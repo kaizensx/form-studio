@@ -30,6 +30,8 @@
                                      a strength study with a stated error (also modal, buckling, list, show, verify;
                                      `form study strength ...` is the same); JSON
   form study list|run|show <project> [id] [--force]   the Bench: every study, route and document, with its state
+  form calc <calculator> key=value ... [--build]   size a snap fit, hinge, spring, bolted joint, gear pair, cam or fit
+                                     from a standard's equations; every number with its source (form calc list); JSON
   form verify <project> <release>    re-hash a release against its manifest
   form chat "message" [--project ID] [--conversation ID] [--agent claude|codex] [--model X] [--attach FILE] [--json]
                                      one message to an agent with FORM's tools; streams the reply, saves the conversation
@@ -256,6 +258,9 @@ def main(argv=None):
     if argv[:1] == ["strength"] or (argv[:1] == ["study"] and argv[1:2] and argv[1] in ("strength", "static", "modal", "buckling", "thermal", "thermal_stress", "verify")):
         from .fea.cli import main as strength_main  # strength studies with a stated error (form/fea)
         return strength_main(argv[1:] if argv[0] == "strength" else argv[2:] if argv[1] == "strength" else argv[1:])
+    if argv[:1] == ["calc"]:                       # engineering calculators that write geometry (form/calc)
+        from .calc.cli import main as calc_main
+        return calc_main(argv[1:])
     if argv[:1] == ["study"]:                      # the Bench: every study, route and document with its state (form/studies.py)
         from .studies import main_cli as study_main
         return study_main(argv[1:])

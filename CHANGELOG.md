@@ -2,6 +2,22 @@
 
 ## Unreleased
 
+- **Engineering calculators that write the part.** Seven calculators size a part from what it has to do, by a named
+  standard's equations, and write it as a design with parameters: snap joints (cantilever and annular, Bayer's
+  snap-fit guide), living hinges (elastic by strain, or moulded PP and PE from cited practice), springs
+  (compression, extension and torsion to EN 13906, with a printed-spring mode), bolted joints (VDI 2230 Part 1,
+  simplified: size from the load, preload, tightening torque, thread stripping; bosses with heat-set inserts),
+  involute gears (spur and helical with profile shift, internal pairs, rack and pinion; contact ratio, backlash, Lewis
+  bending), plate cams from a motion law, and ISO 286 fits over a temperature span. Every number is labelled
+  computed, specified or assumed, with its equation and its source; a material value with no source leaves its
+  result out instead of being guessed. The calculation stays in the design and runs again on every revision. Checked
+  against 72 published quantities; a snap hook is also checked by finite elements where the strength engine is
+  installed. [docs/CALCULATORS.md](docs/CALCULATORS.md).
+- **`calculate`** (MCP) and **`form calc <calculator> key=value ... [--build]`** (terminal, JSON), and the Bench
+  entry **Engineering calculation**. 104 MCP tools.
+- ISO 286 tables and published fastener dimensions moved to modules with no CAD kernel behind them
+  (`form/iso286.py`, `form/hardware_tables.py`); `form.craft.fits` and `form.parts` read the same copy.
+
 - **The Bench.** Every study, route and document of a design in one listing: at the top of the Review pane the
   studies (checks, assembly and joints, requirements, analysis maps, fit, critique, slice, print simulation,
   orientation, every printer, cost, make it lighter), at the top of the Make pane the routes (exports, 3MF with

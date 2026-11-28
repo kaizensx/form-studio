@@ -119,7 +119,7 @@ instead.
 
 ## Tools at a glance
 
-103 tools. Read-only tools never change a project.
+104 tools. Read-only tools never change a project.
 
 | Tool | Access | What it does |
 |---|---|---|
@@ -226,6 +226,7 @@ instead.
 | [`get_study`](#get_study) | read-only | Read one Bench entry: its state, the revision it describes, its headline with evidence, its files and stored numbers, and the log of its runs. |
 | [`strength_study`](#strength_study) | changes | Run a strength study on the design: will it hold? |
 | [`get_strength_study`](#get_strength_study) | read-only | Read a strength study: its state (never, running with progress, current, stale with the revision the stored result describes, failed with why), and the result. |
+| [`calculate`](#calculate) | changes | Size a part from requirements with a standard's equations, and write it as a design. |
 
 ## Tools
 
@@ -2058,6 +2059,40 @@ cancel=True stops a running study; nothing is stored for a cancelled run.
 | `full` | boolean |  |
 | `field` | boolean |  |
 | `cancel` | boolean |  |
+
+### `calculate`
+
+Size a part from requirements with a standard's equations, and write it as a design. calculator: "snapfit"
+(cantilever or annular snap joints by permissible strain; Bayer's snap-fit guide), "hinge" (living hinge:
+elastic by strain, or moulded PP/PE from cited practice), "spring" (compression, extension, torsion; EN
+13906-1/-2/-3, with a printed-spring mode), "fastener" (screw size from the load, preload, tightening torque,
+thread stripping, or a boss with a heat-set insert; VDI 2230 Part 1 simplified), "gear" (involute spur and
+helical pairs with profile shift, internal pairs, rack and pinion; contact ratio, backlash, Lewis bending),
+"cam" (plate cam from a motion law; pressure angle, undercut), "fit" (an ISO 286 fit over a temperature span
+from the materials' sourced expansion). No calculator: the list, with every input and its unit.
+inputs: plain numbers and words in mm, N, N·mm, degrees, MPa, °C; materials are keys of the materials library
+(mass_properties library=True lists them). The result is a sheet: values (each with unit, evidence = computed,
+specified or assumed, its equation and its source), checks (PASS, WARN, FAIL with why), equations (text and
+source), sources (title, url), caveats, and not_computed (what was left out because an input has no source,
+and what to give). Nothing is assumed silently: a missing material value leaves its result out.
+build=True writes the geometry as a new design with a parameter per sized dimension (name= names it); every
+later revision runs the calculation again on its values. project= with at=[x, y, z] and normal=[x, y, z] puts
+a snap hook or an insert boss on that face of an existing design instead. project= alone (no calculator):
+the sheet of a design a calculator wrote, for its head revision. fea=True with build=True also defines a
+strength study that checks a cantilever hook's deflection by finite elements (needs the strength engine).
+
+| Argument | Type | Required |
+|---|---|---|
+| `calculator` | string |  |
+| `inputs` | object \| null |  |
+| `build` | boolean |  |
+| `name` | string |  |
+| `project` | string |  |
+| `at` | array \| null |  |
+| `normal` | array \| null |  |
+| `expect_head` | integer \| null |  |
+| `purpose` | string \| null |  |
+| `fea` | boolean |  |
 
 ## Prompts
 

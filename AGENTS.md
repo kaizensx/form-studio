@@ -33,6 +33,7 @@ Prefer the MCP server (`form-mcp`). Without MCP, the `form` CLI does the same an
 | Mass, centre of mass, inertia (per part, assembled at a pose) and the sourced materials library | `mass_properties` | `form mass <p> --pose '{"lid_hinge": 90}'`, `form materials AL-6061` |
 | Put text on a flat face (a feature in the source) | `add_text`, `remove_text` | `form engrave <p> TEXT --at x,y,z --normal x,y,z` |
 | Will it hold: stress, displacement and a safety factor with a stated error; frequencies; buckling | `strength_study` → `get_strength_study` | `form strength static <p> --fix x,y,z --force x,y,z:Fx,Fy,Fz --material AL-6061` |
+| Size a snap fit, living hinge, spring, bolted joint, gear pair, cam or fit from a standard's equations, and write it as a design | `calculate` (`build=True` writes the design; every number is computed, specified or assumed, with its equation and source) | `form calc spring wire_d=1.6 mean_d=14 active=6 force=40 wire=music --build`, `form calc list` |
 | See what changed in the solid between revisions | `geometry_diff` | `form diff <p> 1 3 --png diff.png` |
 | Assess anything the person brings (mesh, STEP, photo, PDF, link, words) and get the route | `triage` | `form triage scan.stl` |
 | Turn an STL, OBJ or 3MF into a design by the route its triage chooses (parametric CAD, a surface body, a mesh body, parts) | `reconstruct` | `form reconstruct part.stl --tolerance 0.02` |
