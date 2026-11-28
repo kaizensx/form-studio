@@ -88,7 +88,8 @@ def build(recipe, summary: dict, analysis: dict, ctx: dict, fit: dict | None) ->
                 ("These parts are" if len(big) > 1 else "This part is") + " larger than the plate however "
                 + ("they lie" if len(big) > 1 else "it lies") + " flat: " + "; ".join(
                     f"{b['label']} {' × '.join(f'{v:.1f}' for v in b['size'])} mm" for b in big)
-                + f". {allows} Split the part, scale it, or choose a larger printer.", "computed")
+                + f". {allows} " + (" ".join(big[0].get("suggestions") or [])
+                                    or "Split the part, scale it, or choose a larger printer."), "computed")
         else:
             n = plan["count"]
             mats = sorted({pl["material"] for pl in plan["plates"] if pl["material"]})

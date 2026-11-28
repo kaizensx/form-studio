@@ -19,6 +19,8 @@ from test_assembly import model  # noqa: E402
 PARTS = importlib.util.find_spec("py_gearworks") is not None and importlib.util.find_spec("bd_warehouse") is not None
 NO_ASSEMBLY = EXAMPLE.split("    def assembly(self, v):")[0]          # the example box, without its declaration
 
+from fixtures.lying_design import LYING  # noqa: E402  (a part built lying down)
+
 
 class Derived(unittest.TestCase):
     def test_from_solids_pulls_parts_away_from_the_middle_never_down(self):
@@ -65,6 +67,31 @@ class Studio_(unittest.TestCase):
         self.assertEqual(self.st.state(p["id"])["documents"], ["BOM.csv", "PRINT_REPORT.md", "MEASUREMENT_PLAN.md"])
         self.assertEqual(self.st.run_sync(p["id"], ["geometry", "exports", "checks"])["state"], "done")
         self.assertFalse(any(k.startswith("asm_") for k in self.checks(self.st.load(p["id"]))))
+
+    def test_a_part_built_lying_down_never_hangs_under_the_plate(self):
+        import base64
+
+        import numpy as np
+
+        from form import render
+        p = self.st.create_design("Lying post", LYING)
+        v = self.st.view(self.st.load(p["id"]))
+        post = next(x for x in v["assembly"]["parts"] if x["id"] == "post")
+        M = np.array(post["placement"]["m"])
+        lo = np.array(post["print_bbox"][0])
+        self.assertLess((M[:, :3] @ lo + M[:, 3])[2] + post["explode_total"][2], -100)   # placed as declared: far under
+        for pose in ("assembled", "exploded"):
+            out = render.posed(v, pose)
+            P = np.concatenate([np.frombuffer(base64.b64decode(m["positions"]), np.float32).reshape(-1, 3)
+                                for m in out["mesh"]])
+            self.assertAlmostEqual(float(P[:, 2].min()), 0.0, places=3, msg=pose)     # the whole set rests on the plate
+            self.assertAlmostEqual(out["bbox"][0][2], 0.0, places=3)
+            ex = out["mesh"]                                                          # and the post stands upright
+            Q = np.concatenate([np.frombuffer(base64.b64decode(m["positions"]), np.float32).reshape(-1, 3)
+                                for m in ex if m.get("part") == "post"])
+            self.assertGreater(float(np.ptp(Q[:, 2])), 50, pose)
+        png = render.render_png(render.posed(v, "exploded"), [], "iso", None, size=(320, 240))
+        self.assertTrue(png.startswith(b"\x89PNG"))
 
     @unittest.skipUnless(PARTS, "needs the [parts] extra")
     def test_enclosure_lid_seats_on_the_box(self):

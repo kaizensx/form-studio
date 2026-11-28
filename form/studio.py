@@ -345,7 +345,26 @@ class Studio:
             s = self.slicer_info(p=p)
             if s.get("available") and s.get("envelope_mm"):
                 out.update(envelope=[round(float(x), 3) for x in s["envelope_mm"]], name=choice["machine"], source=source)
+                zones = plates_mod.bed_zones(((s.get("presets") or {}).get("machine") or {}).get("data") or {})
+                if zones:                              # excluded corners, or the square inside a round bed (form/plates.py)
+                    out["exclude"] = zones
         return out
+
+    def plate_room(self, p: dict | None = None) -> dict:
+        """What the plate plan keeps clear besides the gap: {"clearance": mm for a brim, "why", "exclude": zones}."""
+        s = self.slicer_info(p=p)
+        c, why = plates_mod.clearance(s) if s.get("available") else (0.0, "")
+        return {"clearance": c, "why": why, "exclude": self.printer_env(p).get("exclude") or []}
+
+    def plate_plan(self, p: dict, parts: list, bed: list, margin: float, copies: int = 1) -> dict:
+        """The plate plan for these parts on this design's printer: the gap, a brim's room and the bed's excluded zones
+        (form/plates.py). copies > 1 lays out that many of every part."""
+        room = self.plate_room(p)
+        pl = plates_mod.plan(plates_mod.copies_of(parts, copies), bed, plates_mod.spacing(self.cfg), margin,
+                             room["clearance"], room["exclude"])
+        if room["why"]:
+            pl["clearance_source"] = room["why"]
+        return pl
 
     def printer_state(self, p: dict) -> dict:
         """The printer this design uses and where that choice comes from (project, default, slicer)."""
@@ -431,6 +450,9 @@ class Studio:
                 out["spacing"] = plates_mod.spacing(self.cfg)
             if float(self.cfg["printer"].get("plate_margin_mm", 2.0)) != float(config_mod.DEFAULTS["printer"]["plate_margin_mm"]):
                 out["margin"] = float(self.cfg["printer"]["plate_margin_mm"])
+            if not purpose_mod.is_model(p):            # the plan's method, a brim's room and the bed's excluded zones
+                room = self.plate_room(p)
+                out["room"] = {"v": plates_mod.PLATES_VERSION, "clearance": room["clearance"], "exclude": room["exclude"]}
         if out.get("material") or any("material" in v for v in own.values()):
             out["brief"] = H(p["brief"].get("text", ""))           # the material notes read the brief
         return out
@@ -1788,7 +1810,7 @@ class Studio:
                       color=mats["parts"].get(x["id"], {}).get("color") or "") for x in a.get("parts") or []]
         if parts:                                      # several printed parts: how they go onto plates (form/plates.py)
             ctx["parts"] = parts
-            ctx["plates"] = plates_mod.plan(parts, pe["envelope"], plates_mod.spacing(self.cfg), pe["margin"])
+            ctx["plates"] = self.plate_plan(p, parts, pe["envelope"], pe["margin"])
             ctx["plates"]["needed"] = plates_mod.needed(parts, ex.get("print_bbox") or [0, 0, 0], pe["envelope"], pe["margin"])
         design_mat = materials_mod.stated(p) if not parts else None
         if not design_mat and not parts and materials_mod.normalise(p.get("material")):
@@ -1839,10 +1861,10 @@ class Studio:
         (out / "meta.json").write_text(json.dumps(info, indent=1), encoding="utf-8")
 
     # ---- several plates (form/plates.py) ---------------------------------
-    def _plate_parts(self, p, rev, keys, name, s) -> list:
+    def _plate_parts(self, p, rev, keys, name, s, out_dir: Path | None = None) -> list:
         """Each printed part as its own STL in its print orientation, with its material. [] for one solid."""
         pe = self.printer_env(p)
-        tmp = self.dir(p["id"]) / "artifacts" / "slice" / f"{keys['slice']}.parts"
+        tmp = Path(out_dir) if out_dir else self.dir(p["id"]) / "artifacts" / "slice" / f"{keys['slice']}.parts"
         shutil.rmtree(tmp, ignore_errors=True)
         r = self._k("plate_parts", key=keys["geometry"], recipe_id=self.rid(p), values=rev["values"], out_dir=str(tmp), name=name,
                     orientation=p["orientation"], orient=plates_mod.part_orientations(p),
@@ -1853,12 +1875,12 @@ class Studio:
 
     def _slice_plates(self, p, rev, keys, out, parts, bed, margin, s, ex):
         """Pack the parts onto plates, slice each plate on its own, and add up the slicer's estimates."""
-        pl = plates_mod.plan(parts, bed, plates_mod.spacing(self.cfg), margin)
+        pl = self.plate_plan(p, parts, bed, margin)
         if pl["too_big"]:
             b = pl["too_big"][0]
             raise StudioError(f"{b['label']} is {' × '.join(f'{v:g}' for v in b['size'])} mm: larger than the plate "
-                              f"({bed[0]:g} × {bed[1]:g} mm, {margin:g} mm margin) however it lies.",
-                              "Split or scale the part, or choose a printer with a larger bed.")
+                              f"({bed[0]:g} × {bed[1]:g} mm, {margin:g} mm margin) as it lies.",
+                              " ".join(b.get("suggestions") or ["Split or scale the part, or choose a printer with a larger bed."]))
         stl_of = {x["id"]: x["stl"] for x in parts}
         shutil.rmtree(out, ignore_errors=True)
         out.mkdir(parents=True)
@@ -2184,6 +2206,16 @@ class Studio:
                     out[f] = sha_file(rel / f)
             except Exception:
                 pass
+        else:                                          # several plates: every plate in one 3MF the slicer reads as plates
+            ch = self.read(p, "checks", keys["checks"]) or {}
+            pl = (ch.get("context") or {}).get("plates") or {}
+            if pl.get("needed") and pl.get("count", 0) > 1:
+                try:
+                    w = plates_mod.write_3mf(self, p, rel)
+                    for f in w["files"]:
+                        out[Path(f).name] = sha_file(Path(f))
+                except Exception:                     # the per-plate G-code and the STL are the record
+                    pass
         return out
 
     def _report(self, p, m) -> str:

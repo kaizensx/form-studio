@@ -2,8 +2,8 @@
 
 Rectangles only (each part's bounding box as printed), with a gap between parts and a margin to the
 bed edge, each part free to turn 90°. It answers "does it fit" and gives a layout to look at. It is
-a computed arrangement, not the slicer's: the slicer arranges again when it slices the plate, and
-FORM's export stays one plate.
+a computed arrangement, not the slicer's. What does not fit one plate goes onto more plates (form/plates.py), and
+Form Studio's 3MF carries every plate (form/plate3mf.py).
 """
 from __future__ import annotations
 
@@ -40,9 +40,12 @@ def _split(free: list, used: tuple) -> list:
     return keep
 
 
-def _maxrects(sizes: list, bw: float, bh: float, rotate: bool, rule: str) -> list:
-    """Place rectangles (already inflated by the gap) in a bw × bh area. Returns [(x, y, w, h, rotated) | None]."""
+def _maxrects(sizes: list, bw: float, bh: float, rotate: bool, rule: str, blocked: tuple = ()) -> list:
+    """Place rectangles (already inflated by the gap) in a bw × bh area. Returns [(x, y, w, h, rotated) | None].
+    blocked: rectangles (x, y, w, h) nothing may cover (a bed's excluded zones, inflated by the gap)."""
     free = [(0.0, 0.0, bw, bh)]
+    for b in blocked:
+        free = _split(free, b)
     placed = [None] * len(sizes)
     order = sorted(range(len(sizes)), key=lambda i: (-max(sizes[i]), -sizes[i][0] * sizes[i][1]))
     for i in order:
@@ -90,20 +93,38 @@ def _extent(cells) -> float:
     return max(max(x + w for x, _, w, _, _ in done), max(y + h for _, y, _, h, _ in done)) if done else 0.0
 
 
-def pack(parts: list, bed: tuple, spacing: float = DEFAULT_SPACING_MM, margin: float = 0.0, rotate: bool = True) -> dict:
+def _blocked(exclude, margin: float, spacing: float) -> tuple:
+    """Excluded zones of the bed ([[x0, y0, x1, y1]], bed coordinates) in the packer's inflated, margin-relative units:
+    a part keeps the gap to a zone as it does to another part."""
+    out = []
+    for z in exclude or ():
+        x0, y0, x1, y1 = (float(v) for v in z)
+        # a placed rectangle carries its gap on its far side, so the zone carries one on its far side too
+        x0, x1 = min(x0, x1) - margin, max(x0, x1) - margin
+        y0, y1 = min(y0, y1) - margin, max(y0, y1) - margin
+        out.append((x0, y0, x1 - x0 + spacing, y1 - y0 + spacing))
+    return tuple(out)
+
+
+def pack(parts: list, bed: tuple, spacing: float = DEFAULT_SPACING_MM, margin: float = 0.0, rotate: bool = True,
+         exclude=()) -> dict:
     """Arrange `parts` ([{"id", "w", "h"}], millimetres) on a bed (width, depth).
 
+    exclude: zones of the bed nothing may cover ([[x0, y0, x1, y1]], bed coordinates: a Bambu X1's cutter corner).
     Returns {"fits", "placed": [{"id", "x", "y", "w", "h", "rotated"}], "unplaced": [ids], ...}; x, y are the
-    lower-left corner of the part itself (not its gap) in bed coordinates, the layout centred on the bed."""
+    lower-left corner of the part itself (not its gap) in bed coordinates, the layout centred on the bed (left where
+    it was packed when the bed has excluded zones, so nothing is moved onto one). Deterministic: the same parts in the
+    same order give the same layout."""
     bed_w, bed_h = float(bed[0]), float(bed[1])
     spacing, margin = max(0.0, float(spacing)), max(0.0, float(margin))
     aw, ah = bed_w - 2 * margin + spacing, bed_h - 2 * margin + spacing       # usable area, in inflated units
     sizes = [(float(p["w"]) + spacing, float(p["h"]) + spacing) for p in parts]
+    blocked = _blocked(exclude, margin, spacing)
     candidates = []
     if aw > 0 and ah > 0 and parts:
         for rule in ("short-side", "bottom-left"):
-            candidates.append(_maxrects(sizes, aw, ah, rotate, rule))
-        if len({(round(w, 4), round(h, 4)) for w, h in sizes}) == 1:
+            candidates.append(_maxrects(sizes, aw, ah, rotate, rule, blocked))
+        if not blocked and len({(round(w, 4), round(h, 4)) for w, h in sizes}) == 1:
             g = _grid(sizes[0][0], sizes[0][1], len(sizes), aw, ah, rotate)
             if g:
                 candidates.append(list(g))
@@ -113,7 +134,7 @@ def pack(parts: list, bed: tuple, spacing: float = DEFAULT_SPACING_MM, margin: f
     if done:
         x1 = max(x + w for x, _, w, _, _ in done) - spacing
         y1 = max(y + h for _, y, _, h, _ in done) - spacing
-        ox, oy = (bed_w - x1) / 2, (bed_h - y1) / 2
+        ox, oy = ((bed_w - x1) / 2, (bed_h - y1) / 2) if not blocked else (margin, margin)
     else:
         x1 = y1 = ox = oy = 0.0
     placed, unplaced = [], []
@@ -127,8 +148,8 @@ def pack(parts: list, bed: tuple, spacing: float = DEFAULT_SPACING_MM, margin: f
             "bed_mm": [bed_w, bed_h], "spacing_mm": spacing, "margin_mm": margin,
             "used_mm": [round(x1, 2), round(y1, 2)], "rotation": "90° turns allowed" if rotate else "no rotation",
             "evidence": "computed",
-            "note": "Bounding boxes on one plate, computed by Form Studio. The slicer arranges again when it slices; "
-                    "Form Studio's export stays one part per plate."}
+            "note": "Bounding boxes on one plate, computed by Form Studio. What does not fit goes onto more plates "
+                    "(plates)."}
 
 
 def copies(w: float, h: float, n: int, bed: tuple, spacing: float = DEFAULT_SPACING_MM, margin: float = 0.0,
@@ -220,10 +241,25 @@ def project(st, p: dict, n: int = 1, spacing: float | None = None, rotate: bool 
         every = [{"id": f"{x['id']} · {i + 1}" if n > 1 else x["id"], "w": x["w"], "h": x["h"]} for i in range(n) for x in parts]
         out = pack(every, bed, spacing, margin, rotate)
         out["copies"] = n
+    # what does not fit one plate goes onto more: the same footprints packed plate after plate (form/plates.py)
+    from . import plates as plates_mod
+    room = st.plate_room(p)
+    every = [{"id": f"{x['id']} · {i + 1}" if n > 1 else x["id"], "label": f"{x['id']} · {i + 1}" if n > 1 else x["id"],
+              "size": [x["w"], x["h"], 0.0]} for i in range(n) for x in parts]
+    pl = plates_mod.plan(every, list(bed)[:2] + [1e6], spacing, margin, room["clearance"], room["exclude"])   # footprints only
+    out["plates"] = {"count": pl["count"], "plates": [{"n": x["n"], "parts": [q["id"] for q in x["parts"]]} for x in pl["plates"]],
+                     "too_big": [{"id": b["id"], "label": b["label"], "footprint_mm": b["size"][:2], "usable_mm": b["usable_mm"][:2],
+                                 "suggestions": [t for t in b["suggestions"] if not t.startswith("Lay it")]} for b in pl["too_big"]],
+                     "clearance_mm": pl["clearance_mm"], "evidence": "computed",
+                     "note": "Form Studio's 3MF and Open in slicer carry every plate (form pack --3mf DIR, open_in_slicer copies=N)."}
     out |= {"project": p["id"], "rev": p["head"], "parts_per_copy": len(parts), "footprint_source": source,
             "bed_source": bed_source,
             "summary": (f"{n} {'copy fits' if n == 1 else 'copies fit'}" if out["fits"] else
                         f"{n} {'copy does' if n == 1 else 'copies do'} not fit: {len(out['placed'])} of {len(out['placed']) + len(out['unplaced'])} "
                         f"{'parts' if len(parts) > 1 else 'copies'} placed")
-                       + f" on the {bed[0]:g} × {bed[1]:g} mm plate with {spacing:g} mm between parts."}
+                       + f" on the {bed[0]:g} × {bed[1]:g} mm plate with {spacing:g} mm between parts."
+                       + ("" if out["fits"] or not pl["count"] else
+                          f" On {pl['count']} plates they all fit" + ("" if not pl["too_big"] else
+                                                                    f", except {len(pl['too_big'])} too big for any plate")
+                          + ".")}
     return out

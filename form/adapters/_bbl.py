@@ -395,6 +395,47 @@ def refusal(fam: Family, returncode: int, said: str, errors: list, result: dict)
 
 
 def slice_stl(fam: Family, resolved: dict, stl: Path, out_dir: Path, timeout: float = 600) -> dict:
+    return _slice(fam, resolved, stl, out_dir, timeout, plates=False)
+
+
+def slice_plates(fam: Family, resolved: dict, threemf: Path, out_dir: Path, timeout: float = 600) -> dict:
+    """Slice a 3MF that already holds several plates (form/plate3mf.py: Metadata/model_settings.config plate entries)
+    as the program's own project: every plate sliced, nothing re-arranged (--arrange 0: without it the CLI arranges
+    a 3MF it did not write itself, plates and all), one project 3MF out with
+    each plate's G-code in it. Adds "plates": [{"n", "time_s", "filament_g", "support_used", "outside", "gcode"}]
+    read from that project's Metadata/slice_info.config, one row per plate the program sliced."""
+    info = _slice(fam, resolved, threemf, out_dir, timeout, plates=True)
+    out_dir = Path(out_dir).resolve()
+    info["plates"] = read_plates(out_dir / "plate.3mf") if (out_dir / "plate.3mf").exists() else []
+    for row in info["plates"]:
+        g = out_dir / f"plate_{row['n']}.gcode"
+        row["gcode"] = g.name if g.exists() else None
+    return info
+
+
+def read_plates(path: Path) -> list:
+    """Per plate of a sliced project 3MF (Metadata/slice_info.config): index, time, grams, support, outside."""
+    rows = []
+    try:
+        with zipfile.ZipFile(path) as z:
+            root = ElementTree.fromstring(z.read("Metadata/slice_info.config"))
+    except (KeyError, zipfile.BadZipFile, ElementTree.ParseError, OSError):
+        return rows
+    for plate in root.iter("plate"):
+        meta = {m.get("key"): m.get("value") for m in plate.iter("metadata")}
+        try:
+            n = int(meta.get("index") or 0)
+        except ValueError:
+            continue
+        row = {"n": n, "time_s": float(meta["prediction"]) if meta.get("prediction") else None,
+               "filament_g": float(meta["weight"]) if meta.get("weight") else None,
+               "support_used": meta.get("support_used") == "true", "outside": meta.get("outside") == "true",
+               "objects": [o.get("name") for o in plate.iter("object")]}
+        rows.append(row)
+    return sorted(rows, key=lambda r: r["n"])
+
+
+def _slice(fam: Family, resolved: dict, model: Path, out_dir: Path, timeout: float, plates: bool) -> dict:
     if not resolved.get("available"):
         raise SlicerBlocked(resolved.get("reason") or "Slicer unavailable.")
     out_dir = Path(out_dir).resolve()
@@ -405,12 +446,12 @@ def slice_stl(fam: Family, resolved: dict, stl: Path, out_dir: Path, timeout: fl
     for kind, p in resolved["presets"].items():
         files[kind] = out_dir / f"preset_{kind}.json"
         files[kind].write_text(json.dumps(p["data"], indent=1), encoding="utf-8")
-    local = out_dir / "model.stl"
-    shutil.copyfile(stl, local)
+    local = out_dir / ("plates.3mf" if plates else "model.stl")
+    shutil.copyfile(model, local)
     cmd = [resolved["app"], "--debug", "3",
            "--load-settings", f"{files['machine']};{files['process']}",
            "--load-filaments", str(files["filament"]),
-           "--arrange", "1", "--slice", "0",
+           "--arrange", "0" if plates else "1", "--slice", "0",
            "--export-3mf", "plate.3mf", "--outputdir", str(out_dir), str(local)]
     t0 = time.time()
     try:

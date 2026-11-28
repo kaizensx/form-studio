@@ -39,6 +39,34 @@ def journey_two_plates(ui):
     ui.shot("prove-plate-2")
 
 
+def drawn_box(ui, pid):
+    """Where a part is drawn now, on the plate: its print box's corners through the part's transform and the shift."""
+    return ui.js("(function(){ var v = Store.viewer, x = v.partById(%r), xf = v.partXf(x), b = x.print_bbox, lo = [1e9, 1e9, 1e9], hi = [-1e9, -1e9, -1e9];"
+                 " for (var m = 0; m < 8; m++) { var p = xf.rot.times(Qt.vector3d(b[m & 1][0], b[(m >> 1) & 1][1], b[(m >> 2) & 1][2])).plus(xf.pos).plus(v.shift);"
+                 " lo = [Math.min(lo[0], p.x), Math.min(lo[1], p.y), Math.min(lo[2], p.z)]; hi = [Math.max(hi[0], p.x), Math.max(hi[1], p.y), Math.max(hi[2], p.z)] }"
+                 " return [lo, hi] })()" % pid)
+
+
+def journey_every_plate_in_the_view(ui):
+    """The 3D view shows both plates, each part lying on its own as it prints, never off a plate or under it."""
+    ui.wait_until(lambda: ui.js("Store.viewer.platesOn") is True, 10, "the parts laid out on their plates")
+    ui.eq(ui.js("Store.viewer.plateCount"), 2, "two plates drawn")
+    ui.check(ui.js("Store.viewer.plateBed[0]") == data(ui)["checks"]["context"]["plates"]["bed_mm"][0], "each the bed's own size")
+    ui.wait_until(lambda: ui.sees("Plate 1 of 2") and ui.sees("Plate 2 of 2"), 5, "each plate says which it is")
+    plan = data(ui)["checks"]["context"]["plates"]
+    bed, gap = plan["bed_mm"], ui.js("Store.viewer.plateGapMm")
+    sx, sy = ui.js("[Store.viewer.shift.x, Store.viewer.shift.y]")
+    for plate in plan["plates"]:
+        x0 = sx + (plate["n"] - 1) * (bed[0] + gap)
+        for q in plate["parts"]:
+            lo, hi = drawn_box(ui, q["id"])
+            ui.check(lo[2] > -1e-3, f"{q['id']} rests on the plate (lowest z {lo[2]:.3f})")
+            ui.check(x0 - 1e-3 <= lo[0] and hi[0] <= x0 + bed[0] + 1e-3 and sy - 1e-3 <= lo[1] and hi[1] <= sy + bed[1] + 1e-3,
+                     f"{q['id']} lies on plate {plate['n']}: {lo} {hi}")
+    ui.settle(600)
+    ui.shot("plates-in-the-view")
+
+
 def journey_simulate_a_plate(ui):
     ui.click_text("Inspect layers")
     ui.wait_until(lambda: ui.find(name="printSim") is not None, 10, "the print simulation")
@@ -67,3 +95,33 @@ def journey_design_only_and_back(ui):
     ui.wait_until(lambda: not data(ui)["project"].get("design_only"), 10, "slicing on for this design")
     wait_job(ui, S["pid"])
     ui.eq(data(ui)["status"]["slice"]["state"], "current", "the earlier slice is current again (same inputs, same key)")
+
+
+# Built lying down: a post modelled along X beside its base, stood upright by its placement about a point under the
+# base and pulled down for the exploded view (tests/test_assembly_views.py LYING). Shown naively it hangs under the
+# ground; every view rests the whole set on it instead.
+def journey_lying_down_assembly_rests_on_the_ground(ui):
+    import sys
+    from pathlib import Path
+    sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
+    from fixtures.lying_design import LYING
+    from _lib import click_stage, open_project
+    d = ui.studio.create_design("Lying post", LYING)
+    ui.api("/projects/" + d["id"] + "/run", {"nodes": [], "force": False})
+    wait_job(ui, d["id"])
+    open_project(ui, d["id"])
+    ui.wait_until(lambda: ui.store.get("assembly") is not None, 20, "the post and its base as an assembly")
+    click_stage(ui)
+    ui.key("E")
+    ui.wait_until(lambda: ui.js("Ws.tool") == "assembly", 5, "E to open Assembly")
+    bar = ui.item("asmBar")
+    for mode, label in (("assembled", "Assembled"), ("exploded", "Exploded")):
+        ui.click_text(label, within=bar)
+        ui.wait_until(lambda: ui.store.get("asmMode") == mode, 3, mode)
+        ui.settle(900)                       # the parts glide to their places
+        lows = [drawn_box(ui, pid)[0][2] for pid in ("base", "post")]
+        ui.check(min(lows) > -1e-3, f"{mode}: nothing under the ground (lowest {min(lows):.3f} mm)")
+        ui.check(abs(min(lows)) < 1e-2, f"{mode}: the set rests on the ground ({min(lows):.3f} mm)")
+        lo, hi = drawn_box(ui, "post")
+        ui.check(hi[2] - lo[2] > 50, f"{mode}: the post stands upright ({hi[2] - lo[2]:.1f} mm tall)")
+        ui.shot(f"lying-{mode}")

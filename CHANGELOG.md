@@ -2,6 +2,25 @@
 
 ## Unreleased
 
+### Fixed
+
+- **Parts that do not fit one plate go onto more plates, never off the plate.** A design whose parts (or copies of
+  it) do not fit the printer's bed is packed onto as many plates as it takes: largest first, turned about Z where
+  that helps, with the gap between parts, room for the brim the slicer will add and the bed's excluded zones (an
+  X1's cutter corner, the square inside a round bed). The 3D view shows every plate side by side, "Plate 1 of N"
+  under each, each part lying as it prints. The exported 3MF carries every plate in the form the slicer reads as
+  plates: Bambu Studio and OrcaSlicer (and ElegooSlicer, Snapmaker Orca) get their plate entries, PrusaSlicer 2.9 its
+  bed grid. Open in slicer now opens one project with every plate, each sliced by the slicer itself (time and grams
+  per plate and in all); PrusaSlicer, which keeps one plate per project, opens one window per plate. A part larger
+  than the plate however it lies is never placed: it is named with its size against the bed and what would make it
+  fit (another side down, a scale, a split, a larger printer). `open_in_slicer` and `form slicer-open` take
+  `copies`, `pack_plate` and `form pack` say how many plates the copies take, `plate_plan(write_3mf=true)` and
+  `form pack --3mf DIR` write them.
+- **Assembled and exploded views rest on the ground.** A part built lying down and stood upright by its placement,
+  an exploded offset that points down, or a joint swung open no longer puts parts under the plate or the studio
+  floor: every view (assembled, exploded, joint poses, and the rendered `render(view="exploded")`) rests its lowest
+  point at z = 0.
+
 ## 1.1.0
 
 Form Studio 1.1 is the largest release since 1.0. The app has a new look and layout, Lightdesk: the 3D view fills

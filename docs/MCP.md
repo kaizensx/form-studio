@@ -189,7 +189,7 @@ instead.
 | [`suggest_orientation`](#suggest_orientation) | read-only | Rank the ways the part can lie on the plate: the six axis orientations plus every flat face on its convex hull. |
 | [`print_simulation`](#print_simulation) | read-only | Simulate the print layer by layer. |
 | [`estimate_cost`](#estimate_cost) | read-only | Estimate the print cost. Filament, electricity and machine-time cost of the current slice, per plate and for `copies`, plus the same volume in the other materials the slicer has presets for. |
-| [`plate_plan`](#plate_plan) | read-only | Plan the plates. How the design's printed parts go onto plates: each part as it lies on its own (orientation, size, material), the plates they are packed onto when the design does not fit one plate (or its parts differ in material), parts too big for the plate, and per plate the slicer's time and filament when it has been sliced. |
+| [`plate_plan`](#plate_plan) | read-only | Plan the plates. How the design's printed parts go onto plates: each part as it lies on its own (orientation, size, material), the plates they are packed onto when the design does not fit one plate (or its parts differ in material), parts too big for the plate (with their size against the bed and what would make them fit), and per plate the slicer's time and filament when it has been sliced. |
 | [`set_part_print`](#set_part_print) | changes | Set one part's print settings. |
 | [`pack_plate`](#pack_plate) | read-only | Pack copies on a plate. Do `copies` of this design fit on one plate? |
 | [`render_photo`](#render_photo) | changes | Render a photo-real image. A realistic-looking render of the current revision's exported STL, made by Blender headless (if installed). |
@@ -1110,12 +1110,18 @@ It starts from the slicer's own preset and overrides only those keys, slices for
 slicer's simulation), writes a project 3MF with the plate, the oriented part, the settings and the filament,
 checks the settings are in that file, and opens it in the slicer's app. printer: an id from list_printers
 (default: the design's printer). open_app=false writes the file without opening it. Nothing is printed or sent.
+Parts that do not fit one plate (several parts, or `copies` of the design) go onto as many plates as it takes on
+that printer's bed, never off it: Bambu Studio, OrcaSlicer and the Orca forks get one project with every plate,
+each sliced by the program (plates[]: time and grams per plate, read from its own slice_info); PrusaSlicer and
+its forks get one project per plate, each opened in its own window, plus one 3MF of all plates for PrusaSlicer
+2.9+. A part larger than the plate however it lies is left out and listed in too_big with what would fit it.
 
 | Argument | Type | Required |
 |---|---|---|
 | `project` | string | yes |
 | `printer` | string |  |
 | `open_app` | boolean |  |
+| `copies` | integer |  |
 
 ### `open_bench`
 
@@ -1476,12 +1482,18 @@ says which number to ask the user for. No currency is assumed.
 
 Plan the plates. How the design's printed parts go onto plates: each part as it lies on its own (orientation, size, material),
 the plates they are packed onto when the design does not fit one plate (or its parts differ in material), parts
-too big for the plate, and per plate the slicer's time and filament when it has been sliced. Computed by FORM from
-bounding boxes; each plate is sliced on its own. Needs current checks (run_pipeline).
+too big for the plate (with their size against the bed and what would make them fit), and per plate the
+slicer's time and filament when it has been sliced. Computed by FORM from bounding boxes, with the gap, the
+brim's room and the bed's excluded zones; each plate is sliced on its own. Needs current checks (run_pipeline).
+write_3mf=true also writes the plates (of `copies` of the design) as a 3MF in the form the design's slicer reads
+as several plates (Bambu/Orca: one file; PrusaSlicer 2.9+: one file per 9 plates) under the project's folder:
+export.files.
 
 | Argument | Type | Required |
 |---|---|---|
 | `project` | string | yes |
+| `write_3mf` | boolean |  |
+| `copies` | integer |  |
 
 ### `set_part_print`
 
@@ -1503,8 +1515,9 @@ parts in different materials go on different plates, each sliced with its own fi
 *Read-only.*
 
 Pack copies on a plate. Do `copies` of this design fit on one plate? Bounding-box packing with a gap (default 6 mm) and 90° turns,
-on the selected printer's bed. Returns the layout and the most copies this packer can place. Computed by FORM;
-the slicer arranges again when it slices, and FORM's export stays one plate.
+on the selected printer's bed. Returns the layout, the most copies this packer can place, and `plates`: the
+copies on as many plates as they take (never off a plate). Computed by FORM; plate_plan(write_3mf=true,
+copies=N) writes them as a 3MF and open_in_slicer(copies=N) slices every plate.
 
 | Argument | Type | Required |
 |---|---|---|

@@ -1709,7 +1709,8 @@ def build() -> MCPServer:
         return await _run(open_output, st, project, what, app)
 
     @mcp.tool(annotations=OPEN)
-    async def open_in_slicer(project: str, printer: str = "", open_app: bool = True, ctx: Context = None) -> dict:
+    async def open_in_slicer(project: str, printer: str = "", open_app: bool = True, copies: int = 1,
+                             ctx: Context = None) -> dict:
         """Open the design in the user's slicer, sliced with settings chosen for this part on this printer: orientation
         (the orientation finder's first choice), layer height, walls, top/bottom layers, infill and pattern, supports
         (only where overhangs need them), brim, seam, filament for the design's material and the speed profile (one of
@@ -1717,13 +1718,18 @@ def build() -> MCPServer:
         It starts from the slicer's own preset and overrides only those keys, slices for real (time and grams are the
         slicer's simulation), writes a project 3MF with the plate, the oriented part, the settings and the filament,
         checks the settings are in that file, and opens it in the slicer's app. printer: an id from list_printers
-        (default: the design's printer). open_app=false writes the file without opening it. Nothing is printed or sent."""
+        (default: the design's printer). open_app=false writes the file without opening it. Nothing is printed or sent.
+        Parts that do not fit one plate (several parts, or `copies` of the design) go onto as many plates as it takes on
+        that printer's bed, never off it: Bambu Studio, OrcaSlicer and the Orca forks get one project with every plate,
+        each sliced by the program (plates[]: time and grams per plate, read from its own slice_info); PrusaSlicer and
+        its forks get one project per plate, each opened in its own window, plus one 3MF of all plates for PrusaSlicer
+        2.9+. A part larger than the plate however it lies is left out and listed in too_big with what would fit it."""
         _need_printing()
         st = studio()
         act(project, "look", "Choosing print settings and opening the design in the slicer", ctx)
         def go():
             from . import slicer_open
-            return slicer_open.run(st, st.load(project), printer or None, open_app=open_app)
+            return slicer_open.run(st, st.load(project), printer or None, open_app=open_app, copies=copies)
         return await _run(go)
 
     @mcp.tool(annotations=OPEN)
@@ -2201,16 +2207,24 @@ def build() -> MCPServer:
         return await _run(go)
 
     @mcp.tool(annotations=RO)
-    async def plate_plan(project: str) -> dict:
+    async def plate_plan(project: str, write_3mf: bool = False, copies: int = 1) -> dict:
         """Plan the plates. How the design's printed parts go onto plates: each part as it lies on its own (orientation, size, material),
         the plates they are packed onto when the design does not fit one plate (or its parts differ in material), parts
-        too big for the plate, and per plate the slicer's time and filament when it has been sliced. Computed by FORM from
-        bounding boxes; each plate is sliced on its own. Needs current checks (run_pipeline)."""
+        too big for the plate (with their size against the bed and what would make them fit), and per plate the
+        slicer's time and filament when it has been sliced. Computed by FORM from bounding boxes, with the gap, the
+        brim's room and the bed's excluded zones; each plate is sliced on its own. Needs current checks (run_pipeline).
+        write_3mf=true also writes the plates (of `copies` of the design) as a 3MF in the form the design's slicer reads
+        as several plates (Bambu/Orca: one file; PrusaSlicer 2.9+: one file per 9 plates) under the project's folder:
+        export.files."""
         _need_printing()
         st = studio()
         def go():
             from . import plates
-            return plates.for_project(st, st.load(project))
+            p = st.load(project)
+            out = plates.for_project(st, p)
+            if write_3mf:
+                out["export"] = plates.write_3mf(st, p, st.dir(project) / "artifacts" / "side" / "plates-3mf", max(1, copies))
+            return out
         return await _run(go)
 
     @mcp.tool()
@@ -2232,8 +2246,9 @@ def build() -> MCPServer:
     @mcp.tool(annotations=RO)
     async def pack_plate(project: str, copies: int = 1, spacing_mm: float | None = None) -> dict:
         """Pack copies on a plate. Do `copies` of this design fit on one plate? Bounding-box packing with a gap (default 6 mm) and 90° turns,
-        on the selected printer's bed. Returns the layout and the most copies this packer can place. Computed by FORM;
-        the slicer arranges again when it slices, and FORM's export stays one plate."""
+        on the selected printer's bed. Returns the layout, the most copies this packer can place, and `plates`: the
+        copies on as many plates as they take (never off a plate). Computed by FORM; plate_plan(write_3mf=true,
+        copies=N) writes them as a 3MF and open_in_slicer(copies=N) slices every plate."""
         _need_printing()
         st = studio()
         def go():

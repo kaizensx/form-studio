@@ -23,6 +23,7 @@ computed mass (volume x typical density); it never picks a filament, and the fil
 from __future__ import annotations
 
 import re
+from pathlib import Path
 
 MATERIALS = {
     "PLA": {"label": "PLA", "process": "fdm", "density_g_cm3": 1.24, "heat_c": 55, "nozzle_c": [190, 220], "bed_c": [50, 60],
@@ -343,12 +344,36 @@ def op_parts_mesh(key, recipe_id, values, orientation="as_modelled", tol=0.01, a
 KERNEL_OPS = {"parts_mesh": op_parts_mesh}
 
 
-def threemf(st, p: dict) -> bytes:
+def threemf(st, p: dict, copies: int = 1) -> bytes:
     """A 3MF of the head revision as printed, one object per body, each with its colour and material name
-    (3MF core basematerials). Slicers that read 3MF colours show them; the geometry is the exported STL's."""
+    (3MF core basematerials). Slicers that read 3MF colours show them; the geometry is the exported STL's.
+
+    A design made for printing is laid out on its printer's plates (form/plates.py), every part on a plate and as many
+    plates as it takes, written the way the design's slicer reads several plates (form/plate3mf.py). A design whose
+    slicer needs several files for that (PrusaSlicer, more than 9 plates) raises StudioError: `form pack <p> --3mf
+    DIR` writes them all. A 3D model (purpose "model") is written as modelled, one plate-less scene."""
     import io
     import zipfile
     from xml.sax.saxutils import escape
+    from . import purpose as purpose_mod
+    if not purpose_mod.is_model(p) or copies > 1:
+        import shutil
+        import tempfile
+        from . import plates
+        from .studio import StudioError
+        tmp = Path(tempfile.mkdtemp(prefix="form-3mf-", dir=str(st.dir(p["id"]))))
+        try:
+            out = plates.write_3mf(st, p, tmp, copies)
+            if len(out["files"]) != 1:
+                if not out["files"]:
+                    b = out["too_big"][0] if out["too_big"] else None
+                    raise StudioError((f"{b['label']} is larger than the plate however it lies." if b else
+                                       "Nothing fits the plate."), " ".join(b["suggestions"]) if b else "", status=409)
+                raise StudioError(f"These {out['plates']} plates take {len(out['files'])} files for {out['slicer']}.",
+                                  f"Write them all with: form pack {p['id']} --3mf <folder>", status=409)
+            return Path(out["files"][0]).read_bytes()
+        finally:
+            shutil.rmtree(tmp, ignore_errors=True)
     r = st.rev(p)
     res = st._k("parts_mesh", timeout=300, key=st.keys(p, r["n"])["geometry"], recipe_id=st.rid(p, r["n"]), values=r["values"],
                 orientation=p["orientation"], p=p)

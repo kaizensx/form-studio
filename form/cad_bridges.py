@@ -404,18 +404,19 @@ except Exception:
 
 # ---- opening a file in the user's own program -----------------------------------------------------------------------
 
-def open_file(target: str, app: str = "") -> dict:
+def open_file(target: str, app: str = "", new_instance: bool = False) -> dict:
     """Hand a file to another program with the system's open command. Raises RuntimeError on failure.
+    new_instance (macOS): open -n, a new copy of the program, for one that keeps one project per window.
 
     FORM_FAKE_LAUNCH=<file> (tests): append {"opened", "with"} to that file as one JSON line instead of opening."""
     fake = os.environ.get("FORM_FAKE_LAUNCH")
     if fake:
         import json
         with open(fake, "a", encoding="utf-8") as f:
-            f.write(json.dumps({"opened": target, "with": app}) + "\n")
+            f.write(json.dumps({"opened": target, "with": app, **({"new_instance": True} if new_instance else {})}) + "\n")
         return {"opened": target, "with": app or "system default", "fake": True}
     if sys.platform == "darwin":
-        cmd = ["open"] + (["-a", app] if app else []) + [target]
+        cmd = ["open"] + (["-n"] if new_instance and app else []) + (["-a", app] if app else []) + [target]
     elif sys.platform.startswith("win") and not app:
         os.startfile(target)                      # type: ignore[attr-defined]
         return {"opened": target, "with": "system default"}

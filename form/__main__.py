@@ -359,6 +359,7 @@ def main(argv=None):
     so.add_argument("--printer", metavar="ID", help="a printer id from `form printers` (default: the design's printer)")
     so.add_argument("--explain", action="store_true", help="lead the JSON with each decision as one plain line")
     so.add_argument("--no-open", action="store_true", help="slice and write the project 3MF, but do not open the slicer")
+    so.add_argument("--copies", type=int, default=1, help="this many of the design, on as many plates as it takes")
     cp = sub.add_parser("compare-printers", help="slice the design on every printer in your slicers: time, filament, cost")
     cp.add_argument("project")
     cp.add_argument("--limit", type=int, default=8, help="how many printers (the selected ones first)")
@@ -420,11 +421,12 @@ def main(argv=None):
     co.add_argument("--machine-rate", type=float, help="per hour")
     co.add_argument("--copies", type=int, default=1)
     co.add_argument("--save", action="store_true", help="remember the given prices in <data dir>/cost.json")
-    pk = sub.add_parser("pack", help="do N copies fit on one plate?")
+    pk = sub.add_parser("pack", help="do N copies fit on one plate? (and how many plates they take)")
     pk.add_argument("project")
     pk.add_argument("--copies", type=int, default=1)
     pk.add_argument("--spacing", type=float, help="gap between parts in mm (default 6)")
     pk.add_argument("--no-rotate", action="store_true")
+    pk.add_argument("--3mf", dest="threemf", metavar="DIR", help="write the copies on their plates as a 3MF (or several) into DIR")
     # ---- design tools: variants, share card, history, label text ----
     va = sub.add_parser("variants", help="named variants: list, save, promote, delete")
     va.add_argument("action", choices=["list", "save", "promote", "delete"])
@@ -668,7 +670,7 @@ def main(argv=None):
                 _print(lighten.search(st, p, builds=a.builds))
         elif a.cmd == "slicer-open":
             from . import slicer_open
-            r = slicer_open.run(st, st.load(a.project), a.printer, open_app=not a.no_open)
+            r = slicer_open.run(st, st.load(a.project), a.printer, open_app=not a.no_open, copies=a.copies)
             if a.explain:
                 r = {"explain": slicer_open.explain(r).splitlines(), **r}
             _print(r)
@@ -855,6 +857,9 @@ def main(argv=None):
         elif a.cmd == "pack":
             from . import packing
             res = packing.project(st, st.load(a.project), a.copies, a.spacing, not a.no_rotate)
+            if a.threemf:
+                from . import plates as plates_mod
+                res["export"] = plates_mod.write_3mf(st, st.load(a.project), Path(a.threemf).expanduser(), a.copies)
             _print(res)
             return 0 if res["fits"] else 1
         elif a.cmd == "variants":

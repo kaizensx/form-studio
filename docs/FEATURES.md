@@ -728,11 +728,15 @@ Measurements from a printed coupon calibrate the printer profile and are reused 
   choice, at once: Settings, the top bar, the plate and the open design's checks update without a restart.
   `form printers`; MCP `list_printers`, `choose_printer`.
 - **Several plates.** A design whose parts do not fit one plate is laid out part by part on as many plates as needed,
-  each in its own orientation and sliced, with time, filament and cost added up. Review and the print simulation switch
-  between plates. `form plates`; MCP `plate_plan`, `set_part_print`.
+  each in its own orientation and sliced, with time, filament and cost added up, never off a plate: the packer turns
+  parts about Z and keeps the gap, the brim's room and the bed's excluded zones clear. The 3D view shows every plate.
+  The 3MF carries every plate the way the slicer reads plates (Bambu Studio and OrcaSlicer plate entries, PrusaSlicer
+  2.9's bed grid), and Open in slicer opens them all. A part too big for any plate is named, with what would fit it.
+  Review and the print simulation switch between plates. `form plates`, `form pack --3mf DIR`; MCP `plate_plan`,
+  `set_part_print`, `open_in_slicer(copies=N)`.
 - **Watch it print.** The G-code is read back and played in 3D with a nozzle marker, line-type filters, a per-layer time
   chart and the slicer's own time and filament estimate. Jump to the next bridge or overhang wall.
-- **Copies on a plate:** does N fit, and how they pack.
+- **Copies on a plate:** does N fit, how they pack, and how many plates they take.
 - **Cost:** filament, electricity and machine time from the slice and your prices. Form Studio never guesses a price.
 
 ![Several plates in Review, each sliced on its own](images/plates.webp)

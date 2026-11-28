@@ -232,6 +232,7 @@ Item {
             anchors.fill: parent
             visible: !Store.layers
             asmMode: Store.asmMode; explode: Store.explode; pose: Store.pose
+            platePlan: ws.d && ws.d.checks && ws.d.checks.context ? ws.d.checks.context.plates || null : null   // several plates (form/plates.py)
             stageMode: Store.stageMode                                            // the studio floor; the build plate only where the printer matters
             plateSize: ws.d && ws.d.printer ? Math.max(60, Math.max(ws.d.printer.env.envelope[0], ws.d.printer.env.envelope[1])) : 180
             hiddenFeatures: Store.hidden                                           // design tools: quick actions

@@ -23,7 +23,7 @@ Item {
                       else Store.toast("Could not write that file", "Choose another place.", true) } }
     // colours and materials (form/materials.py): the head as printed, one object per part, each in its colour
     FileDialog { id: tmf; property string pid: ""; title: "Save a 3MF with colours"; fileMode: FileDialog.SaveFile; nameFilters: ["3MF (*.3mf)"]
-        onAccepted: { if (Bridge.save("/projects/" + pid + "/colour.3mf", selectedFile)) Store.toast("3MF saved", "One object per part, each in its colour and named with its material.")
+        onAccepted: { if (Bridge.save("/projects/" + pid + "/colour.3mf", selectedFile)) Store.toast("3MF saved", "One object per part, each in its colour and named with its material. A design for printing is on every plate it takes.")
                       else Store.toast("Could not write that file", "Choose another place.", true) } }
     FileDialog { id: imp; title: "Import into Form Studio"; nameFilters: ["Form Studio files (*.formstudio *.formproj *.json)"]; onAccepted: Store.importFile(selectedFile) }
 }

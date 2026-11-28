@@ -114,7 +114,7 @@ Column {
             title: !root.c || !root.c.per_plate_of_copies ? "" : root.copies + " copies: "
                 + (root.has(root.c.per_plate_of_copies.cost) ? root.money(root.c.per_plate_of_copies.cost) + " · " : "")
                 + F.fmt(root.c.per_plate_of_copies.filament_g, 0) + " g · " + F.dur(root.c.per_plate_of_copies.time_s)
-            text: root.c && root.c.per_plate_of_copies ? "Estimated as " + root.copies + " × this plate. Copies share start-up and travel, so slice the full plate to confirm. Form Studio exports one part per plate." : "" }
+            text: root.c && root.c.per_plate_of_copies ? "Estimated as " + root.copies + " × this plate. Copies share start-up and travel, so slice the full plate to confirm." : "" }
 
         // ── other materials ──────────────────────────────────
         Column { width: parent.width; visible: !!root.c && !!root.c.materials && root.c.materials.rows.length > 0; topPadding: 6

@@ -309,7 +309,7 @@ class PackingTest(unittest.TestCase):
         self.assertEqual({a["id"] for a in r["placed"]}, {"box", "lid", "pin", "tray"})
         self.check(r)
         self.assertEqual(r["evidence"], "computed")
-        self.assertIn("one part per plate", r["note"])
+        self.assertIn("more plates", r["note"])
         self.assertFalse(packing.pack(parts + [{"id": "slab", "w": 170, "h": 170}], (180, 180), 6, 2)["fits"])
 
 
