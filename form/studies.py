@@ -330,7 +330,8 @@ def _alive(pid) -> bool:
 def _base(ctx, s: Study) -> dict:
     return {"id": s.id, "group": s.group, "group_label": GROUPS[s.group], "stage": STAGE[s.group], "label": s.label,
             "doc": s.doc, "evidence": s.evidence, "by": s.by, "app": s.app, "tool": s.tool, "heavy": s.heavy,
-            "needs": list(s.needs), "inputs": list(s.inputs), "head": ctx.p["head"], "headline": "", "rev": None}
+            "needs": list(s.needs), "inputs": list(s.inputs), "head": ctx.p["head"], "headline": "", "rev": None,
+            **({"extra": dict(s.extra)} if s.extra else {})}      # e.g. the calculators' {"chapter": "design"}
 
 
 def _from_result(e: dict, res: dict, head: int) -> dict:

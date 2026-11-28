@@ -223,5 +223,90 @@ class PackagedData(unittest.TestCase):
             self.assertIn(ext, offered)
 
 
+def _run_spec(collect_submodules=lambda pkg: []):
+    """Execute packaging/form.spec with PyInstaller's build steps stubbed; return Analysis's keyword arguments."""
+    import sys
+    import types
+    spec_file = ROOT / "packaging" / "form.spec"
+    hooks = types.ModuleType("PyInstaller.utils.hooks")
+    hooks.collect_all = lambda pkg: ([], [], [])
+    hooks.collect_data_files = lambda pkg, include_py_files=False: []
+    hooks.collect_submodules = collect_submodules
+    hooks.copy_metadata = lambda pkg, recursive=False: []
+    stub = {"PyInstaller": types.ModuleType("PyInstaller"), "PyInstaller.utils": types.ModuleType("PyInstaller.utils"),
+            "PyInstaller.utils.hooks": hooks}
+    got = {}
+
+    def Analysis(*a, **k):
+        got.update(k)
+        return types.SimpleNamespace(pure=[], scripts=[], binaries=[], datas=[])
+    ns = {"SPECPATH": str(spec_file.parent), "Analysis": Analysis, "PYZ": lambda *a, **k: None,
+          "EXE": lambda *a, **k: None, "COLLECT": lambda *a, **k: None, "BUNDLE": lambda *a, **k: None,
+          "__file__": str(spec_file)}
+    saved = {k: sys.modules.get(k) for k in stub}
+    sys.modules.update(stub)
+    try:
+        exec(compile(spec_file.read_text(encoding="utf-8"), str(spec_file), "exec"), ns)
+    finally:
+        for k, v in saved.items():
+            if v is None:
+                sys.modules.pop(k, None)
+            else:
+                sys.modules[k] = v
+    return got
+
+
+class WavesShip(unittest.TestCase):
+    """What the integrated waves read or run at run time is in the packaged app (integrate-2)."""
+
+    def test_every_table_read_at_run_time_ships_from_an_explicit_folder(self):
+        # rule, bend, service tables (TOML) and any CSV or JSON table in the package: each one's folder is listed as
+        # data by name, not only left to collect_data_files
+        import subprocess
+        got = _run_spec()
+        dests = {Path(src).resolve(): dest for src, dest in got["datas"]}
+        try:
+            tracked = subprocess.run(["git", "ls-files", "form"], cwd=ROOT, capture_output=True, text=True,
+                                     check=True).stdout.split()
+        except (OSError, subprocess.CalledProcessError):
+            tracked = [p.relative_to(ROOT).as_posix() for p in (ROOT / "form").rglob("*")]
+        tables = [t for t in tracked if t.endswith((".toml", ".csv")) or
+                  (t.endswith(".json") and not t.startswith(("form/app/", "form/web/")))]
+        self.assertTrue(any(t.startswith("form/dfm/rules/") for t in tables) and "form/cam/feeds.toml" in tables)
+        for t in tables:
+            f = (ROOT / t).resolve()
+            covered = any(f == src or src in f.parents for src in dests)
+            self.assertTrue(covered, f"{t} is read at run time but no datas entry ships its folder")
+
+    def test_the_new_data_modules_are_importable_in_the_app(self):
+        # standard parts, calculators, materials, ISO 286 and hardware tables are Python modules: hidden imports
+        mods = ["form.catalog", "form.calc.fit", "form.material_data", "form.material_library", "form.iso286",
+                "form.hardware_tables", "form.drawing.qtpaint", "form.motion", "form.robot", "form.sequence", "form.bom",
+                "form.dfm.rules", "form.sheet.tables", "form.cam", "form.cam.feeds"]
+        got = _run_spec(lambda pkg: list(mods) if pkg == "form" else [])
+        for m in mods:
+            self.assertIn(m, got["hiddenimports"])
+        from form import catalog, hardware_tables, iso286, material_data  # noqa: F401  (they import without the kernel)
+        self.assertIs(catalog.INSERTS, hardware_tables.INSERTS)
+
+    def test_drawings_paint_and_read_pdfs_in_the_packaged_app(self):
+        # form.drawing runs `<executable> -m form.drawing.qtpaint job`: the packaged executable must dispatch it, and
+        # the drawing check reads PDFs with QtPdf, which must not be excluded
+        entry = (ROOT / "packaging" / "entry.py").read_text(encoding="utf-8")
+        self.assertIn('["-m", "form.drawing.qtpaint"]', entry)
+        got = _run_spec()
+        self.assertNotIn("PySide6.QtPdf", got["excludes"])
+        src = (ROOT / "form" / "drawing" / "qtpaint.py").read_text(encoding="utf-8")
+        self.assertIn("from PySide6.QtPdf import", src)
+
+    def test_engine_children_find_their_code(self):
+        # the strength engine runs `python -m form.fea.run`, the MuJoCo check `python -m form.robot validate`
+        got = _run_spec()
+        shipped = {(Path(src).name, dest) for src, dest in got["datas"]}
+        self.assertIn(("robot.py", "engine_src/form"), shipped)
+        for f in sorted(p.name for p in (ROOT / "form" / "fea").glob("*.py")):
+            self.assertIn((f, "engine_src/form/fea"), shipped)
+
+
 if __name__ == "__main__":
     unittest.main()
