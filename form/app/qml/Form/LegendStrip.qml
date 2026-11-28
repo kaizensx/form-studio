@@ -51,7 +51,7 @@ Glass {
     readonly property string errorText: {
         if (!d) return ""
         if (dk === "field") {
-            if (d.converged !== true) return "Did not converge: " + (d.why || "no reason given") + "."
+            if (d.converged !== true) return "Did not converge: " + String(d.why || "no reason given").replace(/\.+$/, "") + "."
             var c = d.convergence || {}, n = c.points ? c.points.length : 0
             return "Discretisation error " + (d.stated && d.stated.text ? d.stated.text : "not stated") + (n ? " after " + n + " meshes" : "") + (d.singular && d.singular.length ? "; " + d.singular.length + " singular zone" + (d.singular.length > 1 ? "s" : "") + " left out (hatched)" : "") + "."
         }
@@ -153,7 +153,7 @@ Glass {
                         if (pen) g.lineTo(x, y); else g.moveTo(x, y); pen = true }
                     g.stroke()
                     if (c.first_contact_t !== null && c.first_contact_t !== undefined) { var fx = c.first_contact_t / tl.dur * W; g.strokeStyle = Theme.signal; g.lineWidth = 1.5; g.beginPath(); g.moveTo(fx, 0); g.lineTo(fx, H); g.stroke() } } }
-            Txt { visible: ls.dk === "motion" && !!plot.c; x: tl.x0 + 4; y: -2; mono: true; font.pixelSize: 11; tone: 3; wrapMode: Text.NoWrap
+            Txt { visible: ls.dk === "motion" && !!plot.c; anchors.right: parent.right; y: parent.height - 14; lineHeight: 1; topPadding: 0; bottomPadding: 0; mono: true; font.pixelSize: 11; tone: 3; wrapMode: Text.NoWrap
                 text: plot.c ? "smallest gap, 0 to " + Results.fmt(plot.span, "mm") + (plot.c.first_contact_t !== null && plot.c.first_contact_t !== undefined ? " · first contact " + Results.fmt(plot.c.first_contact_t, "s") : " · no contact") : "" }
             // the moment shown
             Rectangle { objectName: "scrubHandle"; x: Math.round(tl.x0 + Results.t / tl.dur * tl.w - 1); y: ls.dk === "motion" ? 0 : -4; width: 2; height: ls.dk === "motion" ? 40 : 18; radius: 1; color: Theme.ink }

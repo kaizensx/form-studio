@@ -8,5 +8,7 @@ void MAIN()
     cpT = UV0;
     vec4 v = VIEW_MATRIX * (MODEL_MATRIX * vec4(VERTEX, 1.0));
     v.xyz *= 0.9985;                       // a hair closer to the eye, so a path wins over the stock it cut
-    POSITION = PROJECTION_MATRIX * v;
+    vec4 p = PROJECTION_MATRIX * v;
+    p.xy += uOff.xy * p.w;                    // a fraction of a pixel aside: four passes read as a line two pixels wide
+    POSITION = p;
 }

@@ -42,7 +42,7 @@ Column {
         model: rc.mine && rc.r.studies ? rc.r.studies.map(function (s) { return { value: s.id, text: s.name } }) : []
         value: rc.mine ? rc.r.study || "" : ""; onPicked: function (v) { Results.setStudy(v) } }
     Txt { objectName: "notConverged"; visible: rc.kind === "field" && rc.r.converged !== true; width: parent.width; color: Theme.signal
-        text: rc.kind === "field" ? "Did not converge. " + (rc.r.why || "") : "" }
+        text: rc.kind === "field" ? "Did not converge: " + (rc.r.why || "no reason given") : "" }
     Column { width: parent.width; spacing: 2; visible: rc.kind === "field"
         Repeater { model: rc.kind === "field" ? rc.r.lines.slice(rc.lead ? 1 : 0) : []
             Line { required property var modelData; objectName: "resultLine"; k: modelData.k; v: modelData.v; ev: modelData.ev; note: modelData.note || "" } } }
@@ -132,7 +132,7 @@ Column {
     Column { width: parent.width; spacing: 2; visible: rc.kind === "flat"
         Repeater { model: rc.kind === "flat" ? rc.r.bends : []
             Line { required property var modelData; required property int index; objectName: "bendLine"
-                k: "Bend " + (index + 1) + ", " + modelData.direction; v: F.fmt(modelData.angle, 1) + "°  R " + F.fmt(modelData.r, 2) + "  K " + F.fmt(modelData.K, 2); ev: "specified"
+                k: "Bend " + (index + 1); v: Math.round(modelData.angle * 10) / 10 + "° " + modelData.direction + " · R " + Math.round(modelData.r * 100) / 100 + " · K " + Math.round(modelData.K * 100) / 100; ev: "specified"
                 note: index === 0 ? modelData.k_source : "" } }
         Line { k: "Flat size"; v: rc.kind === "flat" && rc.r.size_mm ? F.fmt(rc.r.size_mm[0], 1) + " × " + F.fmt(rc.r.size_mm[1], 1) + " mm" : ""; ev: "computed" }
     }

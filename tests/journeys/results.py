@@ -79,6 +79,8 @@ def journey_strength(ui):
     want = study.result(ui.studio, p, S["static"])["result"]
     show(ui, S["bracket"], "Ctrl+2", "strength", "field")
     ui.eq(res(ui, "Results.r.study"), S["static"], "the static study is the one drawn")
+    ui.eq(res(ui, "Results.developed"), 1, "the result developed on the part, once")
+    ui.check(res(ui, "Results.develop") == 1 and res(ui, "Results.settle") == 1, "and the moment has ended")
     ui.check(res(ui, "Results.r.converged") is True, "it converged")
     ui.check(abs(res(ui, "Results.r.peak.value") - want["peak_von_mises_MPa"]) < 1e-9, "the peak is the engine's")
     lay = "Store.viewer.resultLayer"
@@ -133,6 +135,19 @@ def journey_strength(ui):
     crop(ui, "strength-mode")
     ui.click("modePlay")
     ui.check(not res(ui, "Results.playing"), "and stops")
+    ui.click_text("Shelf load", within=card)
+    ui.wait_until(lambda: res(ui, "Results.r.study") == S["static"], 15, "the static study again")
+    ui.settle(700)
+    ui.eq(res(ui, "Results.developed"), 2, "each study developed once; coming back to one does not play it again")
+    # a study that did not converge never plays the moment: it shows its reason
+    ui.click_text("Rough", within=card)
+    ui.wait_until(lambda: res(ui, "Results.r.study") == S["rough"] and not res(ui, "Results.busy"), 15, "the study that did not converge")
+    ui.check(res(ui, "Results.r.converged") is False, "the engine says it did not converge")
+    ui.check(not res(ui, "Results.developing") and res(ui, "Results.developed") == 2, "the moment is not played for it")
+    ui.check("Did not converge" in str(ui.item("legendLimits").property("text")), "the strip says so, in place of an error it cannot state")
+    ui.check(ui.find(name="notConverged", within=card) is not None, "and the card gives the reason")
+    ui.settle(300)
+    crop(ui, "strength-not-converged")
     ui.click_text("Shelf load", within=card)
     ui.wait_until(lambda: res(ui, "Results.r.study") == S["static"], 15, "the static study again")
 
@@ -286,8 +301,10 @@ def journey_drawing(ui):
     ui.settle(300)
     crop(ui, "drawing-night", what=("drawingPane",))
     ui.click(pane, 0.02, 0.02)
+    night = not pane.property("paper")
+    ui.eq(night, os.environ.get("FORM_APPEARANCE", "dark") != "light", "a night sheet in the dark room, paper in the light one")
     ui.key("P")
-    ui.check(res(ui, "Results.paper") is True and pane.property("paper") is True, "P switches to white paper")
+    ui.check(res(ui, "Results.paper") is True and pane.property("paper") is night, "P switches between night and paper")
     ui.settle(300)
     crop(ui, "drawing-paper", what=("drawingPane",))
     ui.key("P")
@@ -322,6 +339,65 @@ def journey_drawing(ui):
         ui.check(ui.sees("Stale", within=ui.item("resultNone")) or ui.sees("Not run", within=ui.item("resultNone")), "the card says so")
 
 
+class Frames:
+    """Counts the frames the window swaps (QQuickWindow.frameSwapped) and the time between them."""
+
+    def __init__(self, ui):
+        import time
+        self.ui, self.t, self.clock = ui, [], time.perf_counter
+        ui.win.frameSwapped.connect(self._tick)
+
+    def _tick(self):
+        self.t.append(self.clock())
+
+    def idle(self, ms=1200):
+        self.ui.settle(400)
+        self.t.clear()
+        self.ui.wait(ms)
+        return len(self.t)
+
+    def orbit(self, steps=90):
+        """Turn the view two degrees a frame; the mean and the worst milliseconds between frames."""
+        self.ui.settle(300)
+        self.t.clear()
+        for _ in range(steps):
+            n = len(self.t)
+            self.ui.run_js("Store.viewer.tween = false; Store.viewer.az += 2")
+            self.ui.wait_until(lambda: len(self.t) > n, 2, "a frame")
+        d = [1000 * (b - a) for a, b in zip(self.t, self.t[1:])]
+        d.sort()
+        return sum(d) / len(d), d[int(len(d) * 0.95)]
+
+    def close(self):
+        self.ui.win.frameSwapped.disconnect(self._tick)
+
+
+def journey_perf(ui):
+    """A still result is not redrawn, and turning the view with a result on the part costs what the part costs."""
+    fr = Frames(ui)
+    out = {}
+    open_project(ui, S["bracket"])
+    ui.key("Ctrl+1")
+    ui.settle(600)
+    out["part"] = (fr.idle(), *fr.orbit())
+    rows = [("dfm", S["bracket"], "Ctrl+2", "dfm_injection", "dfm"), ("cam", S["pocket"], "Ctrl+3", "cam_3axis", "cam"),
+            ("flat", S["tray"], "Ctrl+3", "sheet_flat", "flat")]
+    if S["fea"] and ui.studio.load(S["bracket"])["head"] == 1:
+        rows.insert(0, ("strength", S["bracket"], "Ctrl+2", "strength", "field"))
+    for name, pid, key, row, kind in rows:
+        show(ui, pid, key, row, kind)
+        out[name] = (fr.idle(), *fr.orbit())
+    fr.close()
+    for k, (idle, mean, p95) in out.items():
+        print(f"PERF {k:9s} idle frames in 1.2 s: {idle:3d}   orbit: {mean:5.1f} ms mean, {p95:5.1f} ms 95th")
+    base = out["part"]
+    for k, (idle, mean, p95) in out.items():
+        if k == "part":
+            continue
+        ui.check(idle <= base[0] + 2, f"{k}: a still result is not redrawn ({idle} frames, the part alone {base[0]})")
+        ui.check(mean <= max(base[1] * 1.5, base[1] + 6), f"{k}: turning the view is not slowed ({mean:.1f} ms a frame, the part alone {base[1]:.1f})")
+
+
 def run(ui):
     journey_setup(ui)
     journey_strength(ui)
@@ -330,4 +406,5 @@ def run(ui):
     journey_cam(ui)
     journey_flat(ui)
     journey_motion(ui)
+    journey_perf(ui)
     journey_drawing(ui)

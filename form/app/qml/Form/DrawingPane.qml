@@ -77,7 +77,7 @@ Item {
 
     // the room shows around the sheet; the sheet is a plate with a soft edge
     Rectangle { objectName: "sheetPlate"; x: Math.round(pane.sx(0)); y: Math.round(pane.sy(pane.sh)); width: Math.round(pane.sw * pane.zoom); height: Math.round(pane.sh * pane.zoom)
-        color: pane.colors.paper || "transparent"; radius: 3; border.color: pane.paper ? Theme.alpha("#000000", 0.25) : Theme.alpha("#ffffff", 0.1)
+        color: pane.colors.paper || "transparent"; radius: 3; border.color: pane.paper ? Qt.rgba(0, 0, 0, 0.25) : Qt.rgba(1, 1, 1, 0.1)
         opacity: Theme.reduced ? pane.k : pane.ramp(0, 140)
         scale: Theme.reduced ? 1 : 0.94 + 0.06 * pane.ramp(0, 200) }
     Canvas {
@@ -141,7 +141,7 @@ Item {
     }
     // the selected dimension: its box, and what it is bound to
     Rectangle { objectName: "dimSelected"; visible: !!pane.sel && !!pane.sel.bbox && pane.k >= 1; color: "transparent"; radius: 4
-        border.color: Theme.alpha(pane.paper ? "#0a7fa0" : "#3ee6ff", 0.7); border.width: 1
+        border.color: (pane.paper ? Qt.rgba(0.04, 0.5, 0.63, 0.7) : Qt.rgba(0.24, 0.9, 1, 0.7)); border.width: 1
         x: pane.sel && pane.sel.bbox ? Math.round(pane.sx(pane.sel.bbox[0]) - 5) : 0; y: pane.sel && pane.sel.bbox ? Math.round(pane.sy(pane.sel.bbox[3]) - 5) : 0
         width: pane.sel && pane.sel.bbox ? Math.round((pane.sel.bbox[2] - pane.sel.bbox[0]) * pane.zoom + 10) : 0; height: pane.sel && pane.sel.bbox ? Math.round((pane.sel.bbox[3] - pane.sel.bbox[1]) * pane.zoom + 10) : 0 }
 
@@ -191,7 +191,7 @@ Item {
 
     // the sheet's own line: what it is, how it is known, the style, the selection
     Rectangle { objectName: "sheetFoot"; anchors.horizontalCenter: parent.horizontalCenter; anchors.bottom: parent.bottom; anchors.bottomMargin: 10
-        width: Math.min(parent.width - 24, foot.implicitWidth + 28); height: 30; radius: 15; color: Theme.alpha(Theme.dark ? "#0b0b0c" : "#ffffff", 0.86); border.color: Theme.rule2
+        width: Math.min(parent.width - 24, foot.implicitWidth + 28); height: 30; radius: 15; color: Theme.dark ? Qt.rgba(0.043, 0.043, 0.047, 0.86) : Qt.rgba(1, 1, 1, 0.9); border.color: Theme.rule2
         opacity: pane.k >= 1 ? 1 : 0; Behavior on opacity { NumberAnimation { duration: Theme.fast } }
         Row { id: foot; anchors.centerIn: parent; spacing: 10
             Txt { anchors.verticalCenter: parent.verticalCenter; font.pixelSize: 12; font.weight: Theme.wSemi; wrapMode: Text.NoWrap

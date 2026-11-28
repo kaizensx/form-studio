@@ -44,6 +44,7 @@ QtObject {
     property real develop: 1             // 0..1 the map's front, from the peak outward
     property real settle: 1              // 0..1 the legend and the error line, after it
     property var _played: ({})
+    property int developed: 0            // how many times the moment has played (the journeys read it)
     readonly property bool developing: _dev.running
     property var _dev: SequentialAnimation {
         NumberAnimation { target: rs; property: "develop"; from: 0; to: 1; duration: 320; easing.type: Easing.BezierSpline; easing.bezierCurve: Theme.easeMode }
@@ -58,7 +59,8 @@ QtObject {
         if (_played[key]) return
         _played[key] = true
         if (r.converged !== true) return                 // a study that did not converge shows its reason instead
-        if (Theme.reduced) { settle = 0; _fade.restart(); return }
+        if (Theme.reduced) { developed++; settle = 0; _fade.restart(); return }
+        developed++
         develop = 0; settle = 0; _dev.restart()
     }
 

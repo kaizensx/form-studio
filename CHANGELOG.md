@@ -2,6 +2,38 @@
 
 ## Unreleased
 
+### Added
+
+- **Results are drawn on the part** (direction I, decision 7). Select a current row of the Bench and what it found
+  is on the design itself, from the file its engine stored, with a legend strip under the part that says the scale
+  and its unit, how the result is known and what it does not tell.
+  - **Strength.** The stress field in one hue (clay, cyan, white at the peak) or, as an option in the strip, a
+    conventional many-colour scale; the peak marked with its number, each held face with a lock, each load as an
+    arrow with its size; singular zones hatched and named as left out; the deformed shape at a round factor; a
+    modal or buckling study's shapes, swinging. The opened row shows the lines of the result, each with how it is
+    known, and the convergence plot. The first time a converged result is shown it develops from the peak outward
+    (520 ms, cut by any input, a cross-fade under Reduce Motion). A study that did not converge never plays it: the
+    strip and the row give the engine's reason in place of an error it cannot state.
+  - **Manufacturability.** Pass, warn and fail per face as the engine coloured them, a marker at each finding, the
+    proposed parting line and the pull; the pointer on a rule in the opened row lights that rule's faces. A rule
+    with a fix previews it: built and checked without saving, drawn as a ghost over the part with Before and
+    After, and applied only when the preview passes.
+  - **CNC.** The toolpaths of a setup coloured by operation, a timeline to scrub and play (a whole program in 8 s
+    at most), the tool's tip where the program is, and at the end of the setup the simulated stock with what the
+    simulation marked. The stock the engine stores is the end of the setup, and the strip says so.
+  - **Sheet metal.** Bend lines up and down with their angle and radius on the part, and Folded or Flat: the flat
+    pattern lies on its base face and folds to the part and back.
+  - **Motion.** The cycle scrubbed and played on the assembled design, traced paths, the smallest gap of the frame
+    shown, and in the strip the gap over the cycle with the tolerance and the first contact.
+  - **The drawing sheet** takes the stage in Document: the engine's own scene graph, as a night sheet in the dark
+    room and white paper in the light one (P switches), with zoom and pan. A dimension is an object: one bound to
+    a parameter is typed over (double-click or Enter), which commits the parameter and makes the sheet again. The
+    sheet unfolds once per visit (480 ms, cut by any input).
+  - A stale, failed or never-run entry draws nothing: the row says *not run* or what it describes.
+  - `GET /api/projects/<id>/result?id=<entry>` is the description the window draws (`form/resultview.py`); the
+    arrays stay in the engines' files and are read by the view's own geometry. The manufacturability overlay
+    (`form-dfm-overlay/1`) gains `face`, the B-rep face of each triangle.
+
 ### Changed
 
 - **The right pane is the Bench's chapter for the mode, in one row grammar** (direction I, second part). Check lists

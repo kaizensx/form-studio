@@ -46,7 +46,7 @@ uv tool install --python 3.12 "form-studio[all] @ git+https://github.com/kaizens
 | **Tool dock** (left) | Select, Measure, Annotate, Section, Analyze, Assembly, History, Simulate the print and Photo render; the active tool's options sit beside it |
 | **Size** (bottom left) | Width × depth × height and volume of what is on screen |
 | **View cube and shading chip** (top right of the stage) | A face of the cube is a view: top, front, side; its rim is Iso and a double click looks from under. The chip under it switches the build plate of a design made for printing, the floor's 10 mm grid and the overall dimensions |
-| **Legend strip** (under the part) | While a map is shown on the part: its scale, how the result is known, and what it does not tell |
+| **Legend strip** (under the part) | While a map or a result is shown on the part: its scale with the unit, how the result is known (for a simulation, the stated error) and what it does not tell. For a CNC setup or a motion study it is a timeline: drag to scrub, the round button plays |
 | **Pane** (right) | The panel of the mode you are in. In Design it is the features in build order as a numbered listing; click a line for its parameters. While a design builds, the line being built is lit and the built ones are ticked |
 | **Pipeline** (the foot of the pane) | One line: a dot for each step (Parameters, Solid, Exports, Checks, Slice, Release), the revision and what its checks found, and Auto. A step is current only when it describes the revision on screen. A 3D model, or a design that is not sliced, has no Slice step |
 | **Conversation** (left) | Once something is said, a glass column on the left: the conversation picker, New and Fold at its head, the messages, the agent's steps, the views it looked at and attachments, and the prompt at its foot. Drag its edge to resize it (300 to 480 px, remembered). Ctrl/⌘ J or Fold turns it into one bar under the part: what the agent is doing, numbered suggestions (keys 1 to 4) and the prompt. A click into the 3D view, or Esc, folds it too, and taking up the prompt brings it back; it folds while a build plays. Paste a link to attach the file it points at |
@@ -114,6 +114,23 @@ before (Describe, Review, Brief, Shape, Prove, Release) still find them in the c
 | Ctrl/⌘ I | The Overview of the design |
 | Ctrl/⌘ Return | Commit the draft |
 | ? | All keys |
+
+## Results on the part
+
+Select a current row in Check, Make or Document and its result is drawn on the design. Nothing is drawn for a row
+that never ran, failed or describes an older revision: the opened row says so.
+
+| Row | On the part | In the strip and the opened row |
+|---|---|---|
+| Strength | The stress field, the peak with its number, a lock on each held face, an arrow for each load, singular zones hatched and marked *left out* | The scale to the peak; One hue or Many colours; As built or Deformed × N; a modal study's shapes with Swing. The row: every result line with how it is known, the convergence plot, a switch between the design's studies |
+| A manufacturability check | Pass, warn and fail per face, a marker at each finding, the parting line and the pull | The row lists the rules: the pointer on one lights its faces. *Preview the fix* builds the fix without saving and draws it as a ghost, with Before, After, Apply fix and Cancel |
+| CNC, 3-axis | Toolpaths by operation up to the second shown, the tool's tip, and at the end of the setup the simulated stock with gouge and leftover marks | The timeline, one span per operation; the row lists the operations (click one to go to its end) |
+| Flat pattern, DXF | Bend lines (cyan up, amber down) with angle and radius; Folded or Flat | The bends with their K-factor and its source |
+| Motion | The mechanism at the moment shown, traced paths, the smallest gap | The gap over the cycle with the tolerance and the first contact; the joints' values at that moment |
+| Drawing | The sheet takes the stage | Night or paper (P), zoom with the wheel, pan by dragging, 0 fits. Click a dimension to select it; Enter or a double-click types over one that is bound to a parameter |
+
+A result that develops on the part the first time it is shown is a converged study; one that did not converge is
+drawn with its reason and no stated error.
 
 In the viewport:
 

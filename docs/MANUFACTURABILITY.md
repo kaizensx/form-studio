@@ -133,7 +133,8 @@ A plain Recipe is lifted into features first (`edit_design`'s canonical form), s
 ## The overlay
 
 `artifacts/dfm/overlay-<key>.json`, format `form-dfm-overlay/1`: the same fields as an analysis map (`positions`,
-`indices`, `values`, `colors` in base64) plus `status` per vertex (0 pass, 1 warn, 2 fail, 3 not checked), `faces`
+`indices`, `values`, `colors` in base64) plus `status` per vertex (0 pass, 1 warn, 2 fail, 3 not checked), `face`
+(uint32 per triangle: the B-rep face it samples, so a rule's faces can be lit), `faces`
 (per B-rep face: status and rules), `markers` (one per finding, at its place) and `lines` (the parting line). `map`
 says what `values` holds: draft in degrees, tool reach in tool diameters or overhang in degrees from level.
 

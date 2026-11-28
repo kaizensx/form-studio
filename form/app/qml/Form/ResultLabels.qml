@@ -23,7 +23,7 @@ Item {
         var t = tick, s = port.shift
         return port._px(Qt.vector3d(p[0] + s.x, p[1] + s.y, p[2] + s.z))
     }
-    readonly property color plate: Theme.alpha(Theme.dark ? "#0b0b0c" : "#ffffff", 0.88)
+    readonly property color plate: Theme.dark ? Qt.rgba(0.043, 0.043, 0.047, 0.88) : Qt.rgba(1, 1, 1, 0.92)
     readonly property real show: Results.settle
 
     component Pill: Rectangle {
@@ -87,8 +87,10 @@ Item {
                 Rectangle { objectName: "dfmMarker"; visible: !!mk.p; width: mk.lit ? 12 : 9; height: width; radius: width / 2; color: mk.c; border.width: 1.5; border.color: root.plate
                     x: mk.p ? Math.round(mk.p.x - width / 2) : 0; y: mk.p ? Math.round(mk.p.y - height / 2) : 0
                     HoverHandler { id: mh } }
-                Pill { visible: !!mk.p && (mh.hovered || mk.lit || (mk.index < 3 && Results.litRule === "")); p: mk.p; dx: 12; dy: -14; tint: mk.c
-                    text: String(mk.modelData.label).split(":")[0].split(" (")[0] } } }
+                readonly property bool first: { var ms = root.r.markers; for (var i = 0; i < index; i++) if (ms[i].rule === modelData.rule) return false; return true }
+                readonly property string word: { var t = String(modelData.label).split(":")[0].split(" (")[0]; return t.length > 34 ? t.slice(0, 32) + "…" : t }
+                Pill { visible: !!mk.p && (mh.hovered || (mk.first && (mk.lit || Results.litRule === ""))); p: mk.p; dx: 12; dy: -14; tint: mk.c; z: mh.hovered ? 2 : 0
+                    text: mk.word } } }
         Pill { objectName: "pullLabel"; p: root.kind === "dfm" && root.lay3 && root.lay3.pullAt ? (root.tick, root.at([root.lay3.pullAt.tip.x, root.lay3.pullAt.tip.y, root.lay3.pullAt.tip.z])) : null
             dx: 10; dy: 0; text: root.kind === "dfm" && root.r.pull ? "pull " + root.r.pull.name : "" }
     }
@@ -96,12 +98,14 @@ Item {
     // ── CNC: what the simulation marked ──
     Item { anchors.fill: parent; visible: root.kind === "cam" && !!root.lay3 && root.lay3.stockOn
         Repeater { model: root.kind === "cam" && root.lay3 && root.lay3.setup ? root.lay3.setup.marks.slice(0, 12) : []
-            Item { id: cm; required property var modelData
+            Item { id: cm; required property var modelData; required property int index
                 readonly property var p: root.at(modelData.at)
                 readonly property color c: modelData.kind === "gouge" || modelData.kind === "collision" ? Theme.signal : Theme.amber
                 Rectangle { objectName: "camMark"; visible: !!cm.p; width: 9; height: 9; radius: 4.5; color: cm.c; border.width: 1.5; border.color: root.plate
-                    x: cm.p ? Math.round(cm.p.x - 4.5) : 0; y: cm.p ? Math.round(cm.p.y - 4.5) : 0 }
-                Pill { p: cm.p; dx: 10; dy: -14; tint: cm.c; text: cm.modelData.label } } }
+                    x: cm.p ? Math.round(cm.p.x - 4.5) : 0; y: cm.p ? Math.round(cm.p.y - 4.5) : 0
+                    HoverHandler { id: cmh } }
+                readonly property bool first: { var ms = root.lay3.setup.marks; for (var i = 0; i < index; i++) if (ms[i].kind === modelData.kind) return false; return true }
+                Pill { visible: !!cm.p && (cm.first || cmh.hovered); p: cm.p; dx: 10; dy: -14; tint: cm.c; text: cm.modelData.label } } }
     }
 
     // ── sheet metal: each bend's angle and side ──

@@ -20,7 +20,7 @@ Node {
     readonly property var r: live && Results.onPart ? Results.r : null
     readonly property string kind: r ? r.kind : ""
     // whether the result stands in for the clay part (the part is then not drawn under it)
-    readonly property bool covers: kind === "field" || kind === "dfm" || (kind === "cam" && stockOn) || (kind === "flat" && foldK < 0.5)
+    readonly property bool covers: kind === "field" || kind === "dfm" || kind === "cam" || (kind === "flat" && foldK < 0.5)
     readonly property real px: port ? port.dist * 0.00044 : 1        // about one pixel at the part, in millimetres
     property alias fieldGeo: fgeo
     property alias fieldModel: fmodel
@@ -28,7 +28,7 @@ Node {
     // ── strength ──
     readonly property bool isField: kind === "field"
     readonly property bool modal: isField && !!r.modes
-    readonly property real deform: !isField ? 0 : modal ? Results.deformShown * (Results.playing ? Math.sin(Results.phase * 2 * Math.PI) : (Results.deformed ? 1 : 0))
+    readonly property real deform: !isField ? 0 : modal ? Results.deformShown * (Results.playing ? Math.sin(Results.phase * 2 * Math.PI) : 1)
                                                         : (Results.deformed ? Results.deformShown : 0)
     property real deformNow: deform
     Behavior on deformNow { enabled: !Results.playing; NumberAnimation { duration: Motion.move(Theme.cross); easing.type: Easing.BezierSpline; easing.bezierCurve: Theme.easeMode } }
@@ -93,7 +93,7 @@ Node {
         geometry: ResultGeometry { source: lay.isDfm && lay.litFaces.length ? ({ file: lay.r.mesh.file, kind: "dfm", faces: lay.litFaces }) : ({}) }
         materials: CustomMaterial { shadingMode: CustomMaterial.Unshaded; fragmentShader: "shaders/lit.frag"; cullMode: Material.NoCulling
             sourceBlend: CustomMaterial.One; destinationBlend: CustomMaterial.OneMinusSrcAlpha; depthDrawMode: Material.NeverDepthDraw
-            property color uColor: Theme.alpha("#3ee6ff", 0.5) } }
+            property color uColor: Qt.rgba(0.24, 0.9, 1, 0.5) } }
     // the parting line the engine proposes, and the pull: an arrow from above the part along the direction the tool opens
     Model { visible: lay.isDfm && !!lay.r.parting; pickable: false; castsShadows: false
         geometry: LineGeometry { segments: lay.isDfm && lay.r.parting ? lay.r.parting.lines : "" }
@@ -110,8 +110,8 @@ Node {
         var lo = r.box.lo, hi = r.box.hi, d = Qt.vector3d(r.pull.dir[0], r.pull.dir[1], r.pull.dir[2])
         var c = Qt.vector3d((lo[0] + hi[0]) / 2, (lo[1] + hi[1]) / 2, (lo[2] + hi[2]) / 2)
         var half = (Math.abs(d.x) * (hi[0] - lo[0]) + Math.abs(d.y) * (hi[1] - lo[1]) + Math.abs(d.z) * (hi[2] - lo[2])) / 2
-        var L = Math.max(10, 0.3 * Math.hypot(hi[0] - lo[0], hi[1] - lo[1], hi[2] - lo[2]))
-        return { tail: c.plus(d.times(half + L * 0.25)), dir: d, len: L, tip: c.plus(d.times(half + L * 1.25)) }
+        var L = Math.max(8, 0.16 * Math.hypot(hi[0] - lo[0], hi[1] - lo[1], hi[2] - lo[2]))
+        return { tail: c.plus(d.times(half + L * 0.2)), dir: d, len: L, tip: c.plus(d.times(half + L * 1.2)) }
     }
     OverLine { visible: lay.isDfm && (!!lay.pullAt || lay.r.side_actions.length > 0); port: lay.port; depth: 0
         points: {
@@ -141,13 +141,15 @@ Node {
             property color uColor: Theme.clay; property color uGlow: "#000000"; property color uRim: "#000000"
             property vector3d uClipN: lay.port ? lay.port.clipN : Qt.vector3d(0, 1, 0); property real uClipD: lay.port ? lay.port.clipD : 0
             property real uClip: lay.port && lay.port.clipOn ? 1 : 0 } }
-    Model { visible: lay.isCam; pickable: false; castsShadows: false
-        geometry: PathGeometry { id: pgeo; source: lay.isCam ? ({ file: lay.r.mesh.file, setup: Results.setup }) : ({}) }
-        materials: CustomMaterial { shadingMode: CustomMaterial.Unshaded; fragmentShader: "shaders/campath.frag"; vertexShader: "shaders/campath.vert"
-            sourceBlend: CustomMaterial.One; destinationBlend: CustomMaterial.OneMinusSrcAlpha
-            property real uNow: Results.t
-            property real uTail: Math.max(0.5, Results.duration * 0.04)
-            property real uPast: lay.stockOn ? 0.5 : 0.62 } }
+    PathGeometry { id: pgeo; source: lay.isCam ? ({ file: lay.r.mesh.file, setup: Results.setup }) : ({}) }
+    Repeater3D { model: lay.isCam ? [[-0.5, -0.5], [0.5, -0.5], [-0.5, 0.5], [0.5, 0.5]] : []
+        Model { required property var modelData; pickable: false; castsShadows: false; geometry: pgeo
+            materials: CustomMaterial { shadingMode: CustomMaterial.Unshaded; fragmentShader: "shaders/campath.frag"; vertexShader: "shaders/campath.vert"
+                sourceBlend: CustomMaterial.One; destinationBlend: CustomMaterial.OneMinusSrcAlpha
+                property vector3d uOff: Qt.vector3d(modelData[0] * 1.3 / Math.max(1, lay.port ? lay.port.width : 1000), modelData[1] * 1.3 / Math.max(1, lay.port ? lay.port.height : 1000), 0)
+                property real uNow: Results.t
+                property real uTail: Math.max(0.5, Results.duration * 0.04)
+                property real uPast: lay.stockOn ? 0.42 : 0.5 } } }
     // the tool: its tip where the program is, and its axis
     readonly property vector3d toolAt: isCam && pgeo.segments > 0 ? (Results.t, pgeo.at(Results.t)) : Qt.vector3d(0, 0, 0)
     readonly property vector3d toolAxis: setup && setup.axis ? Qt.vector3d(setup.axis[0], setup.axis[1], setup.axis[2]) : Qt.vector3d(0, 0, 1)
@@ -208,7 +210,7 @@ Node {
     }
     OverLine { visible: lay.isFlat && lay.foldK < 0.999; port: lay.port; depth: 0.0002
         points: lay.isFlat && lay.foldK < 0.999 ? lay._flatPoints(lay.foldK, false, "") : []
-        color: Theme.alpha(Theme.dark ? "#f4f3f1" : "#161616", 1 - lay.foldK * 0.6) }
+        color: Theme.dark ? Qt.rgba(0.96, 0.95, 0.94, 1 - lay.foldK * 0.6) : Qt.rgba(0.09, 0.09, 0.09, 1 - lay.foldK * 0.6) }
     Repeater3D { model: ["up", "down"]
         OverLine { required property string modelData; visible: lay.isFlat; port: lay.port; depth: 0
             points: lay.isFlat ? lay._flatPoints(lay.foldK, true, modelData) : []

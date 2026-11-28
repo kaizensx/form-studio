@@ -158,6 +158,8 @@ STATIC = {"kind": "static", "name": "Shelf load", "material": ALU,
           "mesh": {"budget_s": 40}}
 MODAL = {"kind": "modal", "name": "Modes", "material": ALU, "modes": 3,
          "fixtures": [{"type": "fixed", "faces": [[33, 20, 3], [65, 20, 3]]}], "mesh": {"budget_s": 30}}
+# a study that cannot converge: a tolerance of 0.1 % on the stress, three meshes and few unknowns allowed
+ROUGH = {**STATIC, "name": "Rough", "mesh": {"budget_s": 20, "levels_max": 3, "dof_max": 2e4, "tol_stress": 0.001}}
 FLAT_TOOL = {"kind": "flat", "d": 6, "flutes": 3, "flute_l": 18, "length": 30, "holder_d": 28, "holder_l": 30}
 CAM_OPTS = {"tools": [FLAT_TOOL], "material": "aluminum"}
 
@@ -198,6 +200,7 @@ def seed(st, fea=None) -> dict:
     if fea if fea is not None else fea_ready(st):
         ids["static"] = strength(st, ids["bracket"], STATIC)
         ids["modal"] = strength(st, ids["bracket"], MODAL)
+        ids["rough"] = strength(st, ids["bracket"], ROUGH)
     bench(st, ids["bracket"], "dfm_injection")
     bench(st, ids["bracket"], "dfm_cnc", options={"tool_d": 6, "material": "metal"})
     bench(st, ids["bracket"], "drawing")
