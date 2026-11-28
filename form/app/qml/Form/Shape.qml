@@ -378,6 +378,7 @@ Column {
         // a feature made by hand: its property card per kind (FeatureCard.qml), in place of the plain parameter list
         Item { width: 1; height: card.visible ? 8 : 0 }
         FeatureCard { id: card; width: parent.width; fid: root.f ? root.f.id : ""; params: root.f ? root.paramsOf(root.f.id) : []
+            options: { var r = root.treeRow(fid); return r && r.options ? r.options : null }
             code: { var r = root.treeRow(fid), src = root.tree && root.tree.source ? String(root.tree.source).split("\n") : []
                     return r && r.lines ? src.slice(r.lines[0] - 1, r.lines[1]).join("\n") : "" } }
         // its own parameters; a feature without any says what shapes it instead: values that follow from standards

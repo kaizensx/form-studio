@@ -65,10 +65,22 @@
   the tree shows its sections (edges and size; standard, size and depth; direction and instances; faces and wall;
   section, end condition and depth). Every field writes the feature's parameter as a draft the kernel previews at
   once, with the change in volume; OK saves one revision, Cancel goes back to the head. What a field cannot change is
-  said from the feature's code (the picked edges, the standard a hole's size came from, a pattern's direction). A
-  cut's end condition is Blind or Through all, as the engine builds them today; reverse, a second direction, draft
-  and a thin wall appear by themselves once the engine writes their parameters (`FeatureKinds.js`). The picked-feature
-  panel previews as you type and ends in OK / Cancel too.
+  said from the feature's code (the picked edges, the standard a hole's size came from, a pattern's direction). The
+  picked-feature panel previews as you type and ends in OK / Cancel too.
+- **The property card changes what a feature was made with.** An extrude or cut has its Direction 1 end condition
+  (blind, through all, up to next, up to a face, up to a vertex, offset from a face, mid-plane), the face or vertex
+  picked on the stage, the offset, reverse, a draft, a Direction 2 with its own end condition and depth, and a thin
+  wall (one side, mid, two sides). A revolve goes by its angle or up to a face, mid-plane, the other way and
+  reversed. The new kinds have cards too: sweep (twist, Frenet), loft (ruled), rib (thickness, which way it grows,
+  flip), mirror (its plane), draft (angle, the pull flipped), move face (distance), thicken (thickness, both sides),
+  boolean (combine, subtract, intersect), split (its plane, the side kept), variable fillet (both radii) and datum
+  planes (offset, angle). A choice is written in the feature's call (`POST /redefine`, `form/feature_redefine.py`:
+  the parameters it newly reads are added, the ones it no longer reads removed), built in the kernel with the change
+  in volume before anything is saved, and refused with the reason when it cannot be made; a number is a value draft
+  as before. OK saves one revision, Cancel leaves the head. `GET /tree` gives each hand feature's `options`.
+- **One OK and one Cancel.** While a feature's card is open, the draft panel at the foot of the pane keeps the
+  consequences and leaves out its own Commit and Discard. The card's body has its own scrim, so its labels stay
+  legible where a light part shows through the pane.
 - **The Bench as tiles.** The ⌘B sheet switches between its four columns and a tile grid: each chapter tiled
   Analysis, Manufacturing and Documents, every tile an icon, a short name, one plain sentence of what you get, our
   state dot with its number and evidence word, and Run.

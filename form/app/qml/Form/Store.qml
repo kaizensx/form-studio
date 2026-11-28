@@ -24,6 +24,7 @@ QtObject {
     property string draftAgent: ""
     property var preview: null         // engine preview of the draft (geometry + impact)
     property var draftError: null
+    property string cardFor: ""        // a feature's property card is open (FeatureCard.qml): it holds the draft's OK / Cancel
     property string job: ""
     property var running: ({})         // pipeline node → state while a job runs
     property var ack: []               // acknowledged warning ids (release gate)
@@ -2094,11 +2095,23 @@ QtObject {
     function selNote(t) { selSay = t; _selSayOff.restart() }
     function setSelecting(on) {
         if (on && measuring) setMeasuring(false)
+        if (!on) facePick = null
         selecting = !!on; selSay = ""
         if (on && viewer) viewer.setMarker(null)
     }
+    // A property card asks for one face (or point) on the stage, for an end condition (FeatureCard.qml): the next
+    // pick goes to it instead of the selection. Esc, or turning Annotate off, ends it with nothing picked.
+    property var facePick: null
+    function pickOnStage(mode, cb) {
+        selClear(); annFocus = null
+        setSelecting(true); selMode = mode
+        facePick = cb
+        selNote(mode === "point" ? "Click the vertex it goes up to." : "Click the face it goes up to.")
+    }
+    function endPick() { if (!facePick) return; facePick = null; setSelecting(false) }
     function selAdd(items, add) {              // add: keep what is selected (Shift); else start again
         if (!items || !items.length) return
+        if (facePick) { var cb = facePick, it = items[0]; endPick(); if (it && it.at) cb(it.at); return }
         selItems = (add ? selItems : []).concat(items).slice(-24)
         annFocus = null
         _selRun()

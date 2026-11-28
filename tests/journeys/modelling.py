@@ -10,6 +10,8 @@ from pathlib import Path
 
 from _lib import open_project, toasts_gone, wait_job
 
+from form.app.uitest import UIError
+
 DATA = "fresh"
 S = {}
 
@@ -86,15 +88,26 @@ def menu(ui, fid, entry):
     return _menu(ui, fid, entry)
 
 
+def hover_row(ui, fid):
+    """The pointer on a line until its tools show (its menu button visible), the state, not a time: a line rebuilt as
+    a revision lands, or a pane that glides, takes the pointer off it; then it moves off and on again."""
+    def shown():
+        b = ui.find(name="featureMore-" + fid)
+        return b if b is not None and b.property("visible") and b.width() > 0 else None
+    for _ in range(6):
+        ui.hover(ui.item("programPane"), 0.5, 0.01)       # off the line first: a rebuilt line needs the pointer to enter it
+        ui._pump(60)
+        ui.hover(ui.item("feature-" + fid), 0.5, 0.3)
+        try:
+            return ui.wait_until(shown, 1.5, f"the tools of the {fid} line")
+        except UIError:
+            ui.settle(250)
+    return ui.wait_until(shown, 2, f"the tools of the {fid} line")
+
+
 def _menu(ui, fid, entry):
     ui.idle(10)
-    row = ui.item("feature-" + fid)
-    ui.scroll_to(row)
-    ui.hover(ui.item("programPane"), 0.5, 0.01)            # off the line first: a rebuilt line needs the pointer to enter it
-    ui.settle(100)
-    ui.hover(row, 0.5, 0.3)
-    ui.settle(200)
-    ui.click(ui.item("featureMore-" + fid))
+    ui.click(hover_row(ui, fid))
     ui.wait_until(lambda: ui.exists(text=entry), 4, f"the menu entry {entry}")
     ui.settle(450)                                          # the popover rises into place first
     from PySide6.QtCore import QPointF

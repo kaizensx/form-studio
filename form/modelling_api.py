@@ -65,7 +65,7 @@ def _ran(st, pid: str, p_after: dict) -> str | None:
 
 def route_post(st, p: dict, action: str, body):
     from . import modelling
-    if action not in ("tree", "model", "sketch", "sketch_plane"):
+    if action not in ("tree", "model", "sketch", "sketch_plane", "redefine"):
         return None
     body = body if isinstance(body, dict) else {}
     pid = p["id"]
@@ -84,6 +84,19 @@ def route_post(st, p: dict, action: str, body):
         _said(st, body, pid, h0, r)
         q = r.pop("project")
         return {"head": r["head"], "said": r["said"], "preview": r["preview"], "job": _ran(st, pid, q)}
+    if action == "redefine":                       # a hand feature's choices changed in its property card
+        from . import feature_redefine
+        fid = str(body.get("feature") or "")
+        ops, note = feature_redefine.ops(st, p, fid, body.get("change") or {}, body.get("values") or {})
+        if body.get("preview"):
+            pv = modelling.preview(st, p, ops, view=True)
+            pv.pop("rid", None)
+            return {"feature": fid, "summary": note, "preview": pv}
+        h0 = p["head"]
+        r = modelling.commit(st, p, ops, eh, "you", note=note)
+        _said(st, body, pid, h0, r)
+        q = r.pop("project")
+        return {"head": r["head"], "feature": fid, "said": r["said"], "preview": r["preview"], "job": _ran(st, pid, q)}
     if action == "tree":
         ops = body.get("ops") or []
         bad = [o for o in ops if not isinstance(o, dict) or o.get("op") not in modelling.TREE_OPS]

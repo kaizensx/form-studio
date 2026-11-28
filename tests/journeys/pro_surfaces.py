@@ -45,8 +45,9 @@ class Design(FeatureDesign):
 '''
 
 
-def crop(ui, item, name):
-    """A 200 % crop of one item, for looking at closely (FORM_CRAFT_OUT)."""
+def crop(ui, item, name, clip=None):
+    """A 200 % crop of one item, for looking at closely (FORM_CRAFT_OUT); clip: only the part inside that item (the
+    pane's scrolling area)."""
     out = os.environ.get("FORM_CRAFT_OUT")
     if not out:
         return
@@ -58,8 +59,14 @@ def crop(ui, item, name):
     dpr = img.devicePixelRatio() or 1.0
     p = it.mapToScene(QPointF(0, 0))
     x0, y0 = max(0, p.x() - 8), max(0, p.y() - 8)
-    w = min(it.width() + 16, ui.win.width() - x0)
-    h = min(it.height() + 16, ui.win.height() - y0)
+    x1, y1 = p.x() + it.width() + 8, p.y() + it.height() + 8
+    if clip is not None:
+        c = ui.item(clip) if isinstance(clip, str) else clip
+        q = c.mapToScene(QPointF(0, 0))
+        x0, y0 = max(x0, q.x()), max(y0, q.y())
+        x1, y1 = min(x1, q.x() + c.width()), min(y1, q.y() + c.height())
+    w = min(x1 - x0, ui.win.width() - x0)
+    h = min(y1 - y0, ui.win.height() - y0)
     r = QRect(int(x0 * dpr), int(y0 * dpr), int(w * dpr), int(h * dpr))
     c = img.copy(r).scaled(int(w * 2), int(h * 2), Qt.KeepAspectRatio, Qt.SmoothTransformation)
     d = Path(out)
@@ -243,23 +250,20 @@ def journey_tree_rows(ui):
     ui.check(ui.find(name="featureEye-rib") is not None, "a hidden line keeps its eye")
     crop(ui, "programPane", "tree-rows")
     ui.run_js("Store.toggleHidden('rib')")
-    # the cut's card: its end condition, Through all (a depth of 0) and Blind, as the engine builds them today
+    # the cut's card: a cut of depth 0 reads Through all; Blind is a choice the kernel builds before anything is saved
     ui.click("feature-cut_1", 0.4, 0.4)
-    ui.wait_until(lambda: ui.find(name="featureCard"), 5, "the cut's card")
-    end = ui.item("cardEnd")
-    ui.eq(end.property("value"), 1, "a cut through everything reads Through all")
+    card = ui.wait_until(lambda: ui.find(name="featureCard"), 5, "the cut's card")
+    ui.wait_until(lambda: str(ui.item("cardEnd").property("value")) == "through", 10, "a cut through everything reads Through all")
     ui.check(ui.find(name="cardValue-depth") is None, "with no depth to type")
-    ui.check(ui.find(name="cardField-draft") is None and ui.find(name="cardSection-Direction 2") is None,
-             "draft and a second direction are not offered before the engine builds them")
-    ui.click_text("Blind", within=end)
-    ui.wait_until(lambda: (ui.js("Store.draftValues.cut_1_depth") or 0) > 0, 5, "Blind gives the cut a depth")
-    ui.wait_until(lambda: ui.find(name="cardValue-depth") is not None, 5, "and its depth field")
-    ui.wait_until(lambda: ui.js("!!Store.preview"), 60, "the preview of the blind cut")
+    ui.check(ui.find(name="cardSection-Direction 2", within=card) is not None, "a second direction is offered")
+    end_pick(ui, "cardEnd", "blind")
+    ui.wait_until(lambda: ui.js("Store.cardFor") == "cut_1" and ui.find(name="cardValue-depth") is not None, 5, "Blind gives the cut a depth")
+    ui.wait_until(lambda: "mm³ of material" in str(ui.item("cardVolume").property("text")), 60, "the preview of the blind cut")
     ui.scroll_to(ui.item("featureCard"), 0.2)
     ui.settle(400)
     crop(ui, "programPane", "property-card-cut")
     ui.click("cardCancel")
-    ui.wait_until(lambda: not ui.js("Object.keys(Store.draftValues).length"), 5, "Cancel")
+    ui.wait_until(lambda: str(ui.item("cardEnd").property("value")) == "through", 5, "Cancel: Through all again")
     ui.run_js("Store.select('')")
     ui.settle(300)
     # Equations opens the Values view; an origin plane starts a sketch on it
@@ -291,6 +295,165 @@ def journey_compare_script(ui):
     crop(ui, "sheetCard", "compare-script")
     ui.key("Escape")
     ui.wait_until(lambda: not ui.js("!!Store.sheet"), 5, "closed")
+
+
+def end_pick(ui, button, value):
+    """Open an end-condition menu of the card and pick one entry, once the popover is in place."""
+    ui.click(button)
+    entry = ui.wait_until(lambda: ui.find(name="cardEndPick-" + value), 4, f"the {value} entry")
+    ui.wait_until(lambda: entry.property("visible") and entry.width() > 0, 3, "the menu in place")
+    ui.settle(250)
+    ui.click(ui.find(name="cardEndPick-" + value))
+    ui.wait_until(lambda: ui.find(name="cardEndPick-" + value) is None or not ui.find(name="cardEndPick-" + value).property("visible"), 3, "the menu closed")
+
+
+def card_done(ui, what):
+    """The card's preview from the kernel: its volume line, or the reason it was refused."""
+    def done():
+        c, v = ui.find(name="featureCard"), ui.find(name="cardVolume")
+        return c is not None and not c.property("pending") and (
+            (v is not None and "mm³ of material" in str(v.property("text"))) or refused(ui) is not None)
+    return ui.wait_until(done, 90, what)
+
+
+def refused(ui):
+    """Why the kernel refused the card's draft, when it did (the line is hidden otherwise)."""
+    r = ui.find(name="cardRefused")
+    return str(r.property("text")) if r is not None and r.property("visible") else None
+
+
+def crop_card(ui, name):
+    """The card at 200 %, its head and its foot (the pane scrolls: a long card never stands whole in it)."""
+    if not os.environ.get("FORM_CRAFT_OUT"):
+        return
+    card = ui.item("featureCard")
+    ui.scroll_to(card, 0.0)
+    ui.settle(400)
+    crop(ui, "featureCard", name + "-head", clip="inspector")
+    ui.scroll_to(ui.item("cardOk"), 0.5)
+    ui.settle(400)
+    crop(ui, "featureCard", name + "-foot", clip="inspector")
+
+
+def card_vol(ui):
+    v = ui.item("featureCard").property("vol")
+    return None if v is None else float(v)
+
+
+def journey_end_conditions(ui):
+    """The cut's card wired to the engine: up to a face picked on the stage, a draft, a second direction and a thin
+    wall, each previewed by the kernel with its change in volume; OK writes one revision, Cancel leaves the head. One
+    OK and one Cancel only: the draft panel at the pane's foot shows none of its own while the card is open."""
+    from math import pi
+    h0 = head(ui)
+    ui.scroll_to(ui.item("feature-cut_1"), 0.5)
+    ui.click("feature-cut_1", 0.4, 0.4)
+    card = ui.wait_until(lambda: ui.find(name="featureCard"), 5, "the cut's card")
+    ui.wait_until(lambda: str(ui.item("cardEnd").property("value")) == "through", 10, "Through all")
+    # up to a face: pick the plate's underside (z = -5) on the stage. The pick goes in as the viewport hands one over
+    # (Viewport.selPicked: the surface point under the pointer)
+    end_pick(ui, "cardEnd", "face")
+    pick = ui.wait_until(lambda: ui.find(name="cardPick-to_at"), 5, "the face pick")
+    ui.check(ui.sees("Pick a face", within=pick), "it asks for the face")
+    ui.click(pick)
+    ui.wait_until(lambda: ui.js("!!Store.facePick && Store.selecting"), 3, "the stage waits for the face")
+    ui.run_js("Store.selAdd([{ kind: 'face', at: [5, -10, -5], part: '' }], false)")
+    ui.wait_until(lambda: not ui.js("!!Store.facePick") and not ui.js("Store.selecting"), 3, "the pick handed to the card")
+    card_done(ui, "the preview up to the face")
+    ui.check(refused(ui) is None, str(refused(ui)))
+    # the cut went through the 10 mm plate both ways from z = 0; up to the underside it goes 5 mm: half the material back
+    want, got = pi * 9 * 5, card_vol(ui)
+    ui.check(got is not None and abs(got - want) < 0.5, f"+{want:.1f} mm³ back, computed by the kernel: {got}")
+    ui.check(ui.sees("+%.1f mm³ of material" % got, within=card), "the card says it")
+    ui.eq(head(ui), h0, "nothing saved yet")
+    ui.check(not ui.js("Store.hasDraft"), "a choice is the card's draft, not a value draft")
+    # a draft angle beside it (a parameter the choice adds)
+    f = ui.wait_until(lambda: ui.find(name="cardValue-draft"), 5, "the draft field")
+    ui.click(f, 0.5, 0.5)
+    ui.key("Ctrl+A")
+    ui.type("4")
+    ui.key("Return")
+    ui.wait_until(lambda: not ui.item("featureCard").property("pending") and (refused(ui) or (card_vol(ui) or 0) > want + 1),
+                  90, "the draft previewed: a tapered cut takes less, so more material stays")
+    ui.check(refused(ui) is None, str(refused(ui)))
+    ui.check(ui.sees("Changed Cut 1: up to a face", within=card), "the card says what the kernel built")
+    crop_card(ui, "card-up-to-face")
+    # one OK, one Cancel
+    ui.check(ui.find(name="draftActions") is None, "the draft panel shows no Commit of its own")
+    ui.wait_until(lambda: ui.item("cardOk").property("enabled"), 20, "OK ready")
+    ui.click("cardOk")
+    ui.wait_until(lambda: head(ui) == h0 + 1, 120, "OK saved one revision")
+    src = ui.api("/projects/%s/compare?a=%d&b=%d" % (S["pid"], h0, h0 + 1))
+    added = "\n".join(r["text"] for r in src["script"]["rows"] if r["t"] == "add")
+    ui.check('end="face"' in added and "cut_1_draft" in added, "the cut's call now goes up to the face, with its draft")
+    ui.eq(ui.api("/projects/" + S["pid"])["project"]["revisions"][-1]["values"]["cut_1_draft"], 4, "the draft is a parameter")
+    wait_job(ui, S["pid"])
+    ui.run_js("Store.refresh(true)")
+    ui.wait_until(lambda: str(ui.item("cardEnd").property("value")) == "face", 20, "the card reads the new head")
+    # a thin wall: a ring 1 mm wide cut down to the underside, the core still joined to the plate above it
+    ui.click("cardToggle-thin")
+    ui.wait_until(lambda: ui.find(name="cardSeg-thin_mode") is not None, 5, "the wall's side")
+    card_done(ui, "the thin preview")
+    ui.check(refused(ui) is None, str(refused(ui)))
+    v_ring = card_vol(ui)
+    ui.check(v_ring is not None and v_ring > 0, f"a ring takes less than the full circle: {v_ring}")
+    crop_card(ui, "card-thin")
+    # and a second direction up through the top: the core would come loose, so the kernel refuses it with the reason
+    end_pick(ui, "cardEnd2", "blind")
+    ui.wait_until(lambda: ui.find(name="cardValue-depth2") is not None, 5, "the second depth")
+    card_done(ui, "the second direction's preview")
+    ui.check("2 solids" in (refused(ui) or ""), f"refused, with the reason: {refused(ui)}")
+    ui.check(not ui.item("cardOk").property("enabled"), "no OK for a draft the kernel refused")
+    crop_card(ui, "card-direction2-refused")
+    ui.click("cardCancel")
+    ui.wait_until(lambda: str(ui.item("cardEnd2").property("value")) == "" and ui.find(name="cardSeg-thin_mode") is None, 5, "Cancel")
+    ui.eq(head(ui), h0 + 1, "Cancel saves nothing")
+    ui.run_js("Store.select('')")
+    ui.settle(300)
+
+
+def journey_new_kinds(ui):
+    """A datum plane and a mirror made by hand open their own cards: a number is a value draft (one OK, the draft
+    panel without its own Commit), a choice (the mirror plane) is rewritten in the call and previewed."""
+    h0 = head(ui)
+    r = ui.api("/projects/%s/model" % S["pid"], {"kind": "datum_plane", "base": "XY", "offset": 20, "expect_head": h0})
+    ui.check(r.get("feature") == "datum_plane_1", f"a datum plane: {r}")
+    wait_job(ui, S["pid"])
+    r = ui.api("/projects/%s/model" % S["pid"], {"kind": "mirror", "plane": "YZ", "expect_head": h0 + 1})
+    ui.check(r.get("feature") == "mirror_1", f"a mirror: {r}")
+    wait_job(ui, S["pid"])
+    ui.run_js("Store.refresh(true)")
+    ui.wait_until(lambda: ui.exists("feature-mirror_1"), 30, "the mirror's line")
+    ui.settle(400)
+    ui.scroll_to(ui.item("feature-datum_plane_1"), 0.5)
+    ui.click("feature-datum_plane_1", 0.4, 0.4)
+    card = ui.wait_until(lambda: ui.find(name="featureCard"), 5, "the datum plane's card")
+    ui.wait_until(lambda: ui.sees("Datum plane · property card", within=card), 5, "its name")
+    f = ui.item("cardValue-offset")
+    ui.eq(str(f.property("text")), "20", "the offset from the head")
+    ui.click(f, 0.5, 0.5)
+    ui.key("Ctrl+A")
+    ui.type("25")
+    ui.wait_until(lambda: ui.js("Store.draftValues.datum_plane_1_offset") == 25, 5, "a value draft")
+    ui.wait_until(lambda: ui.js("Store.cardFor") == "datum_plane_1", 3, "the card holds the draft's OK")
+    ui.wait_until(lambda: ui.find(name="draftCard") is not None and ui.item("draftCard").property("visible"), 10, "the draft panel")
+    ui.check(ui.find(name="draftActions") is None, "with no Commit or Discard of its own")
+    ui.click("cardCancel")
+    ui.wait_until(lambda: not ui.js("Store.hasDraft"), 5, "Cancel")
+    ui.scroll_to(ui.item("feature-mirror_1"), 0.5)
+    ui.click("feature-mirror_1", 0.4, 0.4)
+    ui.wait_until(lambda: ui.sees("Mirror · property card", within=ui.item("featureCard")), 5, "the mirror's card")
+    seg = ui.wait_until(lambda: ui.find(name="cardSeg-plane"), 5, "the mirror plane")
+    ui.eq(seg.property("value"), "YZ", "mirrored about YZ")
+    ui.click_text("XZ", within=seg)
+    card_done(ui, "the mirror about XZ, previewed")
+    ui.check(refused(ui) is None, str(refused(ui)))
+    crop_card(ui, "card-mirror")
+    ui.click("cardCancel")
+    ui.wait_until(lambda: ui.item("cardSeg-plane").property("value") == "YZ", 5, "Cancel: YZ again")
+    ui.eq(head(ui), h0 + 2, "nothing saved by the cards")
+    ui.run_js("Store.select('')")
+    ui.settle(300)
 
 
 def journey_study_verdict(ui):
