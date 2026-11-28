@@ -1,0 +1,318 @@
+{
+ "runs": [
+  {
+   "benchmark": "Parametric CAD Bench v3",
+   "dataset": "gnucleus-ai/cad-bench@v3",
+   "digest": "sha256:8a786725d3648a76282fc5868df06da3d5e00d603f283573a53430803465d78a",
+   "sources": {
+    "paper": "https://arxiv.org/abs/2611.02659",
+    "tasks": "https://hub.harborframework.com/datasets/gnucleus-ai/cad-bench/v3",
+    "submission": "https://github.com/gNucleus-AI/cad-bench-submission",
+    "validator": "https://github.com/gNucleus-AI/freecad-validator",
+    "site": "https://cadbench.ai/"
+   },
+   "agent": "standin",
+   "model": "default",
+   "effort": "default",
+   "standin": true,
+   "freecad_on_host": "FreeCAD 1.1.4 Revision: 20260928 (Git shallow)",
+   "harness": "Prompt: instruction.md as published, '/app' replaced by the trial folder, after a preamble naming that folder, Form Studio's MCP tools and FreeCAD's command line. Tools: Form Studio's MCP tools; Read, Write and Edit in the trial folder; Bash limited to FreeCAD's command line. Agent on the host, not in the task's container; FreeCAD as installed on the host. Scoring: the task's own verifier image and scripts, unchanged, no network. One attempt per task, no retries.",
+   "form_version": "1.2.0-dev",
+   "commit": "b44f4d692c7e9cb6ec50ddf5e4435786def0cf91",
+   "dirty": false,
+   "machine": "arm64, Darwin 27.3.0, 18 cores",
+   "python": "3.12.15",
+   "date": "2026-11-28",
+   "summary": {
+    "tasks": 6,
+    "complete": false,
+    "mean_reward": 0.0,
+    "scored": 6,
+    "errors": 0,
+    "perfect": 0,
+    "modes": {
+     "create": {
+      "tasks": 2,
+      "mean_reward": 0.0
+     },
+     "create_edit": {
+      "tasks": 2,
+      "mean_reward": 0.0
+     },
+     "image_to_cad": {
+      "tasks": 2,
+      "mean_reward": 0.0
+     }
+    }
+   },
+   "trials": [
+    {
+     "task": "gnucleus-ai/freecad-0280cda4fc",
+     "id": "freecad-0280cda4fc",
+     "mode": "create_edit",
+     "reward": 0.0,
+     "agent": {
+      "exit": 0,
+      "timed_out": false,
+      "seconds": 5.8,
+      "cost_usd": 0.0,
+      "turns": 4,
+      "model_reported": "standin",
+      "tool_calls": 4,
+      "form_tool_calls": 2,
+      "form_tools": [
+       "create_design",
+       "form_overview"
+      ],
+      "error": null
+     },
+     "answers": [
+      "answer.py",
+      "answer_base.FCStd",
+      "answer_edit.FCStd"
+     ],
+     "details": {
+      "score": 0.0,
+      "combined": 0.0,
+      "base": {
+       "geometry_similarity": 0.0,
+       "cad_spec_consistency": 0.0,
+       "combined": 0.0,
+       "geometry_similarity_reason": "face count differs by 83% (candidate=6, reference=36; threshold 50%) \u2014 candidate likely represents a structurally different part; gated geometry to 0.0",
+       "cad_spec_consistency_reason": "spec_base.json vs answer_base.FCStd: spec_score=0.000 (5/24 consistent, 16 inconsistent, 3 not_found; failure_budget=10)"
+      },
+      "target": {
+       "geometry_similarity": 0.0,
+       "cad_spec_consistency": 0.0,
+       "combined": 0.0,
+       "geometry_similarity_reason": "face count differs by 90% (candidate=6, reference=61; threshold 50%) \u2014 candidate likely represents a structurally different part; gated geometry to 0.0",
+       "cad_spec_consistency_reason": "spec_target.json vs answer_edit.FCStd: spec_score=0.000 (5/48 consistent, 37 inconsistent, 6 not_found; failure_budget=10)"
+      }
+     }
+    },
+    {
+     "task": "gnucleus-ai/freecad-03561c2ec4",
+     "id": "freecad-03561c2ec4",
+     "mode": "create",
+     "reward": 0.0,
+     "agent": {
+      "exit": 0,
+      "timed_out": false,
+      "seconds": 6.1,
+      "cost_usd": 0.0,
+      "turns": 4,
+      "model_reported": "standin",
+      "tool_calls": 4,
+      "form_tool_calls": 2,
+      "form_tools": [
+       "create_design",
+       "form_overview"
+      ],
+      "error": null
+     },
+     "answers": [
+      "answer.py",
+      "answer.FCStd"
+     ],
+     "details": {
+      "score": 0.0,
+      "geometry_similarity": 0.0,
+      "cad_spec_consistency": 0.0,
+      "combined": 0.0,
+      "geometry_similarity_reason": "face count differs by 93% (candidate=6, reference=83; threshold 50%) \u2014 candidate likely represents a structurally different part; gated geometry to 0.0",
+      "cad_spec_consistency_reason": "spec.json vs answer.FCStd: spec_score=0.000 (3/67 consistent, 53 inconsistent, 11 not_found; failure_budget=10)"
+     }
+    },
+    {
+     "task": "gnucleus-ai/freecad-066c381c7c",
+     "id": "freecad-066c381c7c",
+     "mode": "image_to_cad",
+     "reward": 0.0,
+     "agent": {
+      "exit": 0,
+      "timed_out": false,
+      "seconds": 6.0,
+      "cost_usd": 0.0,
+      "turns": 4,
+      "model_reported": "standin",
+      "tool_calls": 4,
+      "form_tool_calls": 2,
+      "form_tools": [
+       "create_design",
+       "form_overview"
+      ],
+      "error": null
+     },
+     "answers": [
+      "answer.py",
+      "answer.FCStd"
+     ],
+     "details": {
+      "reward": 0.0,
+      "geometry_similarity": 0.0,
+      "cad_spec_consistency": 0.0,
+      "combined": 0.0,
+      "geometry_similarity_reason": "face count differs by 74% (candidate=6, reference=23; threshold 50%) \u2014 candidate likely represents a structurally different part; gated geometry to 0.0",
+      "cad_spec_consistency_reason": "spec.json vs answer.FCStd: spec_score=0.000 (1/27 consistent, 22 inconsistent, 4 not_found; failure_budget=10)"
+     }
+    },
+    {
+     "task": "gnucleus-ai/freecad-06a5c206229",
+     "id": "freecad-06a5c206229",
+     "mode": "create",
+     "reward": 0.0,
+     "agent": {
+      "exit": 0,
+      "timed_out": false,
+      "seconds": 5.7,
+      "cost_usd": 0.0,
+      "turns": 4,
+      "model_reported": "standin",
+      "tool_calls": 4,
+      "form_tool_calls": 2,
+      "form_tools": [
+       "create_design",
+       "form_overview"
+      ],
+      "error": null
+     },
+     "answers": [
+      "answer.py",
+      "answer.FCStd"
+     ],
+     "details": {
+      "score": 0.0,
+      "geometry_similarity": 0.0,
+      "cad_spec_consistency": 0.0,
+      "combined": 0.0,
+      "geometry_similarity_reason": "vertex count differs by 62% (candidate=8, reference=21; threshold 50%) \u2014 gated geometry to 0.0",
+      "cad_spec_consistency_reason": "spec.json vs answer.FCStd: spec_score=0.000 (6/29 consistent, 18 inconsistent, 5 not_found; failure_budget=10)"
+     }
+    },
+    {
+     "task": "gnucleus-ai/freecad-06d3f63e25",
+     "id": "freecad-06d3f63e25",
+     "mode": "create_edit",
+     "reward": 0.0,
+     "agent": {
+      "exit": 0,
+      "timed_out": false,
+      "seconds": 5.6,
+      "cost_usd": 0.0,
+      "turns": 4,
+      "model_reported": "standin",
+      "tool_calls": 4,
+      "form_tool_calls": 2,
+      "form_tools": [
+       "create_design",
+       "form_overview"
+      ],
+      "error": null
+     },
+     "answers": [
+      "answer.py",
+      "answer_base.FCStd",
+      "answer_edit.FCStd"
+     ],
+     "details": {
+      "score": 0.0,
+      "combined": 0.0,
+      "base": {
+       "geometry_similarity": 0.0,
+       "cad_spec_consistency": 0.0,
+       "combined": 0.0,
+       "geometry_similarity_reason": "face count differs by 73% (candidate=6, reference=22; threshold 50%) \u2014 candidate likely represents a structurally different part; gated geometry to 0.0",
+       "cad_spec_consistency_reason": "spec_base.json vs answer_base.FCStd: spec_score=0.000 (8/22 consistent, 11 inconsistent, 3 not_found; failure_budget=10)"
+      },
+      "target": {
+       "geometry_similarity": 0.0,
+       "cad_spec_consistency": 0.0,
+       "combined": 0.0,
+       "geometry_similarity_reason": "face count differs by 86% (candidate=6, reference=42; threshold 50%) \u2014 candidate likely represents a structurally different part; gated geometry to 0.0",
+       "cad_spec_consistency_reason": "spec_target.json vs answer_edit.FCStd: spec_score=0.000 (8/28 consistent, 16 inconsistent, 4 not_found; failure_budget=10)"
+      }
+     }
+    },
+    {
+     "task": "gnucleus-ai/freecad-1338adbf8b",
+     "id": "freecad-1338adbf8b",
+     "mode": "image_to_cad",
+     "reward": 0.0,
+     "agent": {
+      "exit": 0,
+      "timed_out": false,
+      "seconds": 5.3,
+      "cost_usd": 0.0,
+      "turns": 4,
+      "model_reported": "standin",
+      "tool_calls": 4,
+      "form_tool_calls": 2,
+      "form_tools": [
+       "create_design",
+       "form_overview"
+      ],
+      "error": null
+     },
+     "answers": [
+      "answer.py",
+      "answer.FCStd"
+     ],
+     "details": {
+      "reward": 0.0,
+      "geometry_similarity": 0.0,
+      "cad_spec_consistency": 0.0,
+      "combined": 0.0,
+      "geometry_similarity_reason": "face count differs by 98% (candidate=6, reference=261; threshold 50%) \u2014 candidate likely represents a structurally different part; gated geometry to 0.0",
+      "cad_spec_consistency_reason": "spec.json vs answer.FCStd: spec_score=0.000 (0/17 consistent, 10 inconsistent, 7 not_found; failure_budget=10)"
+     }
+    }
+   ],
+   "leaderboard_comparable": false
+  }
+ ],
+ "parity": {
+  "what": "each task's held-back reference scored as the answer, through the harness's scoring (the task's own verifier image and test.sh)",
+  "rows": [
+   {
+    "task": "freecad-0280cda4fc",
+    "mode": "create_edit",
+    "reward": 1.0,
+    "error": null
+   },
+   {
+    "task": "freecad-03561c2ec4",
+    "mode": "create",
+    "reward": 1.0,
+    "error": null
+   },
+   {
+    "task": "freecad-066c381c7c",
+    "mode": "image_to_cad",
+    "reward": 1.0,
+    "error": null
+   },
+   {
+    "task": "freecad-06a5c206229",
+    "mode": "create",
+    "reward": 1.0,
+    "error": null
+   },
+   {
+    "task": "freecad-06d3f63e25",
+    "mode": "create_edit",
+    "reward": 1.0,
+    "error": null
+   },
+   {
+    "task": "freecad-1338adbf8b",
+    "mode": "image_to_cad",
+    "reward": 1.0,
+    "error": null
+   }
+  ],
+  "all_one": true,
+  "date": "2026-11-28",
+  "machine": "arm64, Darwin 27.3.0, 18 cores",
+  "commit": "b44f4d692c7e9cb6ec50ddf5e4435786def0cf91"
+ }
+}
