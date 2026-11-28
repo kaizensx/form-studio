@@ -666,7 +666,7 @@ process parameter labelled assumed; money is never assumed, and a line nobody pr
 set. Cost per part against quantity, the cheapest process at each quantity and where one process overtakes another
 ("Injection moulding costs less per part than FDM printing from about 628 parts"), each with its arithmetic. Your
 shop's rates and currency in Settings › Costs. `form cost`; MCP `estimate_cost`, `cost_compare`, `cost_rates`; the
-Bench's Cost. See [COST.md](COST.md).
+Bench's Cost per process. See [COST.md](COST.md).
 
 ## Tolerance stack-up
 
@@ -873,7 +873,7 @@ far the gap moves. The method, the rules and the verification table are in [TOLE
 | OpenSCAD | Builds `.scad` designs; Customizer ranges become parameters |
 | Blender | Photoreal renders; its 3D-Print Toolbox checks when the add-on is installed |
 | Your slicer | Slices, and opens the 3MF or G-code in it |
-| Any MCP client | The full engine over 127 tools ([MCP reference](MCP.md)) |
+| Any MCP client | The full engine over 142 tools ([MCP reference](MCP.md)) |
 
 When a program's version outside the supported range is why something failed, the error names the supported versions
 and what to do.

@@ -1244,13 +1244,14 @@ def register_studies(register) -> None:
     register(Study("testplan", "document", "Test plan", "What to measure on the made part: each requirement, fit, "
                    "critical dimension and load, with its instrument, limits, readings and when it passes; a checklist "
                    "to fill in.", "a plan: no result", run=plan_run, probe=plan_probe,
-                   key=lambda ctx: plan_key(ctx.st, ctx.p), inputs=("geometry", "values", "provenance", "contract", "strength studies"),
-                   tool="test_plan", order=30))
+                   key=lambda ctx: plan_key(ctx.st, ctx.p), inputs=("geometry", "values", "provenance", "contract", "drawing spec",
+                                                                   "strength studies"),
+                   tool="test_plan", order=32))     # after the files made from the design
     register(Study("report", "document", "Results report", "The design and its hashes, every check and study with its "
                    "evidence, the measured results against the test plan, what is open, and a verdict that is never a "
                    "pass with anything unchecked.", "measured and computed, each labelled", run=rep_run, probe=rep_probe,
                    key=lambda ctx: report_key(ctx.st, ctx.p), inputs=("every key of the revision", "physical results", "studies"),
-                   tool="results_report", order=32))
+                   tool="results_report", order=34))     # last: it reads every other entry
 
 
 # ---- command line ----------------------------------------------------------------------------------------------------

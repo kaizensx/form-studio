@@ -506,9 +506,9 @@ def _bench_run(ctx) -> dict:
 def register_studies(register) -> None:
     """The Bench's "Cost" entry in Make: every process's cost per part against quantity, with the crossovers."""
     from ..studies import Study
-    register(Study("cost.process", "route", "Cost",
+    register(Study("cost.process", "route", "Cost per process",
                    "Cost per part against quantity for printing, CNC, moulding and sheet metal, each rate sourced and "
                    "dated, yours, or labelled assumed; where one process overtakes another.",
                    "sourced × specified × assumed", run=_bench_run, key=_bench_key,
                    inputs=("geometry", "materials", "rates table", "your shop's rates", "slice", "CAM simulation"),
-                   tool="estimate_cost", heavy=True, order=24))
+                   tool="estimate_cost", heavy=True, order=90))     # after every process's route, before Release

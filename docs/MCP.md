@@ -39,10 +39,10 @@ more revision (refine_design shows, undoes or turns it off). Long work answers w
 
 Rules:
 - Units are mm, degrees, grams. Only change parameters that describe_recipe lists.
-- preview_change before commit_change; pass expect_head so a newer revision is never overwritten.
+- Commit with expect_head so a newer revision is never overwritten.
 - Provenance is evidence. Mark a value "measured" only when the user measured it and told you the number. Never invent
   physical results: record_physical_result is only for what the user reports.
-- A slice is a simulation, not a print; fit yield is a model. Say so.
+- A slice is a simulation; fit yield is a model. Say so.
 - You cannot approve a release: request_release returns a link the user opens in Form Studio. Nothing here starts a
   print or sends files anywhere.
 - Every design has a purpose, "print" or "model" (just a 3D model; get_project says). For a model never ask about a
@@ -69,7 +69,7 @@ Rules:
   create_design relation="part_of"). A second create_design in a conversation says its relation: replaces, part_of,
   alternative or new.
 - "Will it hold?": strength_study, then get_strength_study (design_guide(topic="strength")). Quote its evidence and
-  lower safety factor; not converged means none.
+  lower safety factor; not converged means none. Lighter, still holding: inverse_design or topology_optimise.
 - Complex designs (mechanisms, organic or styled forms, textures, several parts) are staged: design_brief ->
   design_guide(topic=...), design_examples -> plan_design -> create_design(plan=...) -> look at the sheet -> critique
   -> update_design. The design_guide topics and the skills hold each workflow.
@@ -115,7 +115,7 @@ instead.
 
 ## Tools at a glance
 
-127 tools. Read-only tools never change a project.
+142 tools. Read-only tools never change a project.
 
 | Tool | Access | What it does |
 |---|---|---|
@@ -183,7 +183,7 @@ instead.
 | [`explore_alternatives`](#explore_alternatives) | read-only | Build a small grid of real variants (1-2 parameters, up to 5 values each) and rank them. |
 | [`optimize`](#optimize) | read-only | Optimize a design. Goal seek: search parameter ranges for the best design that meets constraints. |
 | [`slice_test_piece`](#slice_test_piece) | changes | Cut a thin ring through the fit interface of this revision and slice it, so a cheap test print can check the fit before the whole part. |
-| [`record_physical_result`](#record_physical_result) | changes | Record what the USER observed after a real print or a real machining run. |
+| [`record_physical_result`](#record_physical_result) | changes | Record what the USER observed or measured on the real part, after a real print or a real machining run. |
 | [`request_release`](#request_release) | read-only | Check whether the head revision can be released and hand the decision to the user. |
 | [`verify_release`](#verify_release) | read-only | Re-hash every file of a release against its manifest and say whether it still matches the head revision. |
 | [`open_in`](#open_in) | changes | Open a current output in the user's own software: what = step \| stl \| 3mf \| gcode \| folder. |
@@ -251,6 +251,16 @@ instead.
 | [`print_orient`](#print_orient) | changes | Find the print orientation over several objectives at once. |
 | [`print_strength`](#print_strength) | changes | Strength of the part as printed, layer by layer. |
 | [`print_warp`](#print_warp) | read-only | Warp risk of the part as printed: an indicator, never a predicted lift in millimetres. |
+| [`inverse_design`](#inverse_design) | changes | Inverse design: state what the part must do and get the variants that do it, each built by the kernel and studied by the real solver. |
+| [`get_inverse_design`](#get_inverse_design) | read-only | Read an inverse design search: running with its progress, or the stored result. |
+| [`topology_optimise`](#topology_optimise) | changes | Topology optimisation written back as editable features. |
+| [`get_topology`](#get_topology) | read-only | Read a topology optimisation: running with its progress (iteration, compliance), or the stored result. |
+| [`apply_topology`](#apply_topology) | changes | Keep a topology optimisation. Default: its lightening pockets become features of the design, as one revision (each can be suppressed, deleted or reshaped; topo_inset, topo_fillet and topo_web are parameters). |
+| [`tolerance_stack`](#tolerance_stack) | changes | Tolerance stack-up of a gap between two faces of an assembly. |
+| [`get_tolerance_stack`](#get_tolerance_stack) | read-only | Read the tolerance stacks kept with a design. |
+| [`test_plan`](#test_plan) | changes | The physical test plan of a design's head revision, from what it claims: one test per brief requirement, per fit (ISO 286 holes and pairs, the fit window, assembly mates), per critical dimension (brief and interface parameters, measured or specified values, the overall size) and per strength-study load. |
+| [`results_report`](#results_report) | changes | The results report of a design's head revision: the design with its revision and hashes, every check and study with its evidence class and stated error, the physical results recorded against the test plan, open items and a verdict. |
+| [`backup`](#backup) | changes | Backups of every design and conversation, and Recently deleted. |
 
 ## Tools
 
@@ -1542,14 +1552,17 @@ before the whole part. Returns its STL path and simulated time and material.
 
 ### `record_physical_result`
 
-Record what the USER observed after a real print or a real machining run. Never call this with values
-the user did not report.
+Record what the USER observed or measured on the real part, after a real print or a real machining run.
+Never call this with values the user did not report: every value here is kept with provenance "measured".
 kind="fit": result is too_tight | good | too_loose for this revision.
 kind="widths": measured pairs [{"nominal": mm, "measured": mm}] from a coupon (source="coupon") or this part
 (source="part"); they calibrate this printer profile for every future design.
 kind="machined": the posted CNC program was run on a machine; result is good | gouged | collision |
 left_material | scrapped. It belongs to that program (its file hashes); until one is recorded the program
 is labelled "simulated, not proven on a machine".
+kind="test": a result against the test plan (test_plan lists the ids): test=<id> with the readings
+values=[...] in the test's unit, or result="pass" | "fail" for a pass/fail test; instrument= what was used,
+by= who measured. It is judged against the plan's limits, and the results report shows it.
 
 | Argument | Type | Required |
 |---|---|---|
@@ -2856,6 +2869,254 @@ drafts, and the model is not calibrated to any print.
 | `tg_C` | number \| null |  |
 | `layer_height_mm` | number \| null |  |
 | `source` | string |  |
+
+### `inverse_design`
+
+Inverse design: state what the part must do and get the variants that do it, each built by the kernel and
+studied by the real solver. "Survive 250 N at this face with a safety factor of 3, as light as possible" is a
+static strength_study on the design (the faces, the force, the material) plus
+minimize=["mass_g"], require=["fea.safety_factor >= 3"]. Two or three objectives (minimize=["mass_g",
+"fea.max_displacement_mm"]) give a Pareto front: variants among which one count only improves at the cost of
+another.
+vary: [{"key": "t", "min": 3, "max": 10}] (1-6 parameters; left out: the design's lengths that are not
+interfaces, at most four, named in the result).
+Metrics: mass_g (volume x the material's density, source stated), volume_cm3, width, depth, height,
+overhang_mm2 and contact_mm2 (support the best orientation needs), min_wall_mm, derived.<key>, statics.<key>;
+fea.safety_factor (the lower value: the stated error applied), fea.peak_von_mises_MPa,
+fea.max_displacement_mm from the static study (study="<id>" when the design has several);
+modal.frequency_Hz from a modal study (modal_study=); cost = mass x rates={"per_kg": x} (labelled assumed; no
+price is made up); cost.per_part = the cost per part to make it, from the sourced rates (estimate_cost's
+models on each candidate's volume and bounding box), costing={"process": "auto"|"fdm"|"sla"|"sls"|"mjf"|
+"lpbf"|"cnc", "quantity": 1000, "shop": ""}, labelled as its rates are (sourced, specified, assumed).
+budget: {"solves": 24, "seconds": 900, "evaluations": n}; the search stops at the first limit and says which.
+The search is surrogate-assisted (Gaussian processes, NSGA-II, hypervolume infill), and the surrogate only
+chooses what to evaluate: every reported point was built and, for a strength metric, solved. The front is
+approximate and the result says so. It runs in the background: read it with get_inverse_design(project,
+wait_s). Nothing in the design changes. Keep a point as a named variant with save_point=<index> (and name=,
+run= for an older search); save_variant with a point's values does the same. No arguments but project: the
+stored searches and the parameters that can be varied.
+
+| Argument | Type | Required |
+|---|---|---|
+| `project` | string | yes |
+| `minimize` | array \| null |  |
+| `maximize` | array \| null |  |
+| `require` | array \| null |  |
+| `vary` | array \| null |  |
+| `study` | string |  |
+| `modal_study` | string |  |
+| `budget` | object \| null |  |
+| `rates` | object \| null |  |
+| `costing` | object \| null |  |
+| `run_now` | boolean |  |
+| `save_point` | integer \| null |  |
+| `name` | string |  |
+| `run` | string |  |
+
+### `get_inverse_design`
+
+*Read-only.*
+
+Read an inverse design search: running with its progress, or the stored result. Waits up to wait_s seconds
+for a running search. The result gives the front (each variant's parameter values, its objectives and
+requirements as measured, the evidence class of its study, and how to keep it), the design as it is for
+comparison, what the other candidates were (dominated, missed a requirement and which, did not build, "close":
+passing only at the central value of the safety factor), the budget used against its limits (strength solves,
+builds, seconds, why it stopped) and the statement that the front is approximate. full=True returns every
+evaluated point with all its metrics and the chart data: axes, one entry per point with its state (front,
+feasible, misses, close, failed) and the hypervolume after each round. A search made on other design source
+is stale. cancel=True stops a running search; nothing is stored for a cancelled one.
+
+| Argument | Type | Required |
+|---|---|---|
+| `project` | string | yes |
+| `run` | string |  |
+| `wait_s` | number |  |
+| `full` | boolean |  |
+| `cancel` | boolean |  |
+
+### `topology_optimise`
+
+Topology optimisation written back as editable features. The loads, supports and material are the design's
+static strength_study (study="<id>" when it has several). The layout is found by SIMP (density filter,
+optimality criteria) on the study's mesh; the faces that carry supports and loads, and a rim, stay solid.
+Then the density field is rebuilt as CAD: threshold, outlines, ribs measured, and one named feature per
+lightening pocket cut along the pull direction, with the parameters topo_inset (every rib wider by twice
+this), topo_fillet (pocket corner radius) and topo_web (a floor left under the pockets). The rebuilt design
+is built by the kernel and its strength study is solved again with the refining solver; the result sets its
+safety factor, displacement and mass beside the density field's own numbers and beside the part as it was.
+Target, one of: volfrac (the fraction of the volume that stays, 0.08-0.95, default 0.5), mass_g (grams), or
+safety_factor (the run is repeated at a higher fraction, up to `tries` times, until the rebuilt part's
+studied safety factor, lower value, meets it; volfrac is then the first try).
+mode "pockets" (default): a 2.5D layout along pull ("x", "y", "z" or a vector; left out: the part's thinnest
+direction). mode "free": a 3D layout, which is not written as features: it is offered as a mesh body.
+h: element size mm (default: the diagonal / 40, coarsened to at most 60,000 elements). rmin: smallest member
+mm (default 2 h). keep / rim: millimetres kept solid at the loaded and supported faces / along the side
+walls. max_iter (80), budget_s (240): the limits, stated in the result with the solves used.
+Stiffness is what is optimised (minimum compliance, one load case); strength is checked afterwards on the
+rebuilt part. When the features cannot be fitted, built or verified the result says why and offers the
+smoothed dense region as a mesh body, labelled as one. It runs in the background: get_topology(project,
+wait_s); nothing in the design changes until apply_topology. No arguments but project: the stored runs and
+the settings. One solid only. Needs the optional strength engine (setup_status).
+
+| Argument | Type | Required |
+|---|---|---|
+| `project` | string | yes |
+| `volfrac` | number \| null |  |
+| `mass_g` | number \| null |  |
+| `safety_factor` | number \| null |  |
+| `study` | string |  |
+| `mode` | string |  |
+| `pull` | string \| array \| null |  |
+| `h` | number \| null |  |
+| `rmin` | number \| null |  |
+| `keep` | number \| null |  |
+| `rim` | number \| null |  |
+| `max_iter` | integer \| null |  |
+| `budget_s` | number \| null |  |
+| `tries` | integer \| null |  |
+
+### `get_topology`
+
+*Read-only.*
+
+Read a topology optimisation: running with its progress (iteration, compliance), or the stored result.
+Waits up to wait_s seconds. The result gives the outcome ("features": rebuilt as pockets and verified;
+"features, not verified"; "mesh body"), the reconstruction (the features and parameters, the built solid's
+volume, the strength study of the rebuilt part with its evidence class and stated error, or why it failed),
+the comparison (rebuilt CAD against the density result and against the solid part: safety factor,
+compliance, displacement, mass, and whether the safety factors agree within the stated band), the density
+result's own numbers with how they were read, the layout (pockets, ribs with widths), the settings and mesh
+as used, the budget (seconds, solves, tries) and the resolution. frames=True adds the density field of every
+iteration (a picture across the pull direction, and the density at the vertices of the part's surface), or
+the newest picture while it runs; frames_file is its path. full=True adds every iteration's record and the
+edit ops. A run on an older revision is stale. cancel=True stops a running optimisation; nothing is stored.
+
+| Argument | Type | Required |
+|---|---|---|
+| `project` | string | yes |
+| `run` | string |  |
+| `wait_s` | number |  |
+| `full` | boolean |  |
+| `frames` | boolean |  |
+| `cancel` | boolean |  |
+
+### `apply_topology`
+
+Keep a topology optimisation. Default: its lightening pockets become features of the design, as one
+revision (each can be suppressed, deleted or reshaped; topo_inset, topo_fillet and topo_web are parameters).
+as_new="<name>": in a copy of the design instead, the original untouched. mesh_body=True: the smoothed dense
+region is added to the design's references as an STL, labelled a mesh body; the design does not change.
+run: an older run (default: the newest). A run made on another revision is refused: run it again. The
+strength study is stale on the new revision until it is run there.
+
+| Argument | Type | Required |
+|---|---|---|
+| `project` | string | yes |
+| `run` | string |  |
+| `expect_head` | integer \| null |  |
+| `as_new` | string |  |
+| `mesh_body` | boolean |  |
+
+### `tolerance_stack`
+
+Tolerance stack-up of a gap between two faces of an assembly. a, b: the faces, each {"at": [x, y, z]} (a
+point on the face as built, the frame analyze_selection uses; add "part", or "frame": "assembled") or
+{"face": model face index}. direction: the gap's direction (default: face A's outward normal). Form Studio
+finds the loop itself: the chain of parts from A's part to B's through the declared mates that hold them
+along the direction (seats: opposite faces; radial fits: a pin square to it, whose clearance is a float), each
+part's link between the faces it is entered and left by, and d(link)/d(parameter) per part by finite
+differences on the rebuilt CAD (so angles count). Tolerances, first that applies: tolerances= ({param: ±t |
+[lower, upper]}, or "part:param"), the drawing's ISO 286 fits, the parameter's provenance sigma, the drawing's
+ISO 2768 class, the process (printed: printer calibration, else FDM ±0.2 mm assumed), else ISO 2768-m assumed;
+declared position and profile tolerances on faces of the loop are converted (±zone/2 along the gap). dist:
+{id: normal | uniform} (default normal at ±3 sigma = tolerance; assumed ones uniform). spec: [LSL, USL] of
+the gap (default LSL 0, assumed). t_min, t_max (°C): the gap over a temperature span from each part's sourced
+expansion (alpha={part: 1/K} for a part without one; never assumed). Returns the gap and its loop (closure),
+contributors with evidence and rule, worst case, RSS, Monte Carlo (seeded) with histogram, Cpk and share out
+of spec, the contribution chart (percent of variance), suggestions (what to tighten, cost hints labelled
+assumed), thermal, and draw (the loop's faces and segments for the viewport). save=True keeps it with the
+design (the Bench entry 'stack'); stack= alone runs a kept one for the head.
+
+| Argument | Type | Required |
+|---|---|---|
+| `project` | string | yes |
+| `a` | object \| null |  |
+| `b` | object \| null |  |
+| `direction` | array \| null |  |
+| `tolerances` | object \| null |  |
+| `dist` | object \| null |  |
+| `spec` | array \| null |  |
+| `t_min` | number \| null |  |
+| `t_max` | number \| null |  |
+| `alpha` | object \| null |  |
+| `samples` | integer |  |
+| `seed` | integer |  |
+| `params` | array \| null |  |
+| `exclude` | array \| null |  |
+| `name` | string |  |
+| `save` | boolean |  |
+| `stack` | string |  |
+
+### `get_tolerance_stack`
+
+*Read-only.*
+
+Read the tolerance stacks kept with a design. No stack: each with its state (current for the head,
+stale with the revision it describes, never). stack=: its stored result (as tolerance_stack returns it).
+Reads only.
+
+| Argument | Type | Required |
+|---|---|---|
+| `project` | string | yes |
+| `stack` | string |  |
+
+### `test_plan`
+
+The physical test plan of a design's head revision, from what it claims: one test per brief requirement,
+per fit (ISO 286 holes and pairs, the fit window, assembly mates), per critical dimension (brief and
+interface parameters, measured or specified values, the overall size) and per strength-study load. Each test:
+id, what to measure, instrument (10:1 rule), limits and their source (the drawing's ISO 286 fit or ISO 2768
+class where it states one, else ISO 2768-1 m), readings, and when it passes; a load test quotes the strength
+study's converged displacement. Writes TEST_PLAN.pdf, TEST_PLAN.md and TEST_CHECKLIST.csv (copied to out_dir if given).
+Results go in with record_physical_result(kind="test", test=<id>, values=[...] or result="pass"|"fail",
+instrument=...), only for what the person measured.
+
+| Argument | Type | Required |
+|---|---|---|
+| `project` | string | yes |
+| `out_dir` | string \| null |  |
+
+### `results_report`
+
+The results report of a design's head revision: the design with its revision and hashes, every check and
+study with its evidence class and stated error, the physical results recorded against the test plan, open
+items and a verdict. PASS only when every required test is measured within limits and nothing is open;
+anything unchecked is NOT A PASS; a measured failure is FAIL. Writes RESULTS_REPORT.pdf and .md (copied to
+out_dir if given). Report the verdict as it is.
+
+| Argument | Type | Required |
+|---|---|---|
+| `project` | string | yes |
+| `out_dir` | string \| null |  |
+
+### `backup`
+
+Backups of every design and conversation, and Recently deleted. action:
+status (settings, last run, backups in the folder, the bin); run (back up now to the folder and, if set, push
+to the person's own Git repository; then verify and prune); list; verify (file: a backup name, default the
+newest; every file against its SHA-256); restore (file, optional projects=[ids]; an existing design is skipped
+unless replace=True, which moves it to Recently deleted first); deleted (the bin, 30 days, with which backup
+holds each); undelete (entry from deleted). Restore and undelete only when the person asks. Destinations are
+set by the person in Settings › Backups; this tool never creates a repository or changes where backups go.
+
+| Argument | Type | Required |
+|---|---|---|
+| `action` | string |  |
+| `file` | string \| null |  |
+| `projects` | array \| null |  |
+| `replace` | boolean |  |
+| `entry` | string \| null |  |
 
 ## Prompts
 

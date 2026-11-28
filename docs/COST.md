@@ -13,7 +13,7 @@ form cost rates                                              # the table, with s
 form cost rates --shop garage --rate labour=32 --use         # your own rate, in your own shop
 ```
 
-MCP: `estimate_cost` (with `process` and `quantities`), `cost_compare`, `cost_rates`. The Bench lists **Cost** in
+MCP: `estimate_cost` (with `process` and `quantities`), `cost_compare`, `cost_rates`. The Bench lists **Cost per process** in
 Make. Settings › Costs shows every rate with its source and takes your shop's own numbers.
 
 ## What a number is made of
