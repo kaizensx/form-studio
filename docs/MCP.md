@@ -1559,6 +1559,10 @@ is labelled "simulated, not proven on a machine".
 | `widths` | array \| null |  |
 | `source` | string |  |
 | `note` | string |  |
+| `test` | string \| null |  |
+| `values` | array \| null |  |
+| `instrument` | string |  |
+| `by` | string |  |
 
 ### `request_release`
 

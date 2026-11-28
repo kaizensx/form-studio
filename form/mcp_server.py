@@ -2227,16 +2227,30 @@ def build() -> MCPServer:
 
     @mcp.tool(annotations=RW)
     async def record_physical_result(project: str, kind: str, result: str | None = None,
-                                     widths: list[dict] | None = None, source: str = "part", note: str = "") -> dict:
-        """Record what the USER observed after a real print or a real machining run. Never call this with values
-        the user did not report.
+                                     widths: list[dict] | None = None, source: str = "part", note: str = "",
+                                     test: str | None = None, values: list[float] | None = None,
+                                     instrument: str = "", by: str = "") -> dict:
+        """Record what the USER observed or measured on the real part, after a real print or a real machining run.
+        Never call this with values the user did not report: every value here is kept with provenance "measured".
         kind="fit": result is too_tight | good | too_loose for this revision.
         kind="widths": measured pairs [{"nominal": mm, "measured": mm}] from a coupon (source="coupon") or this part
         (source="part"); they calibrate this printer profile for every future design.
         kind="machined": the posted CNC program was run on a machine; result is good | gouged | collision |
         left_material | scrapped. It belongs to that program (its file hashes); until one is recorded the program
-        is labelled "simulated, not proven on a machine"."""
+        is labelled "simulated, not proven on a machine".
+        kind="test": a result against the test plan (test_plan lists the ids): test=<id> with the readings
+        values=[...] in the test's unit, or result="pass" | "fail" for a pass/fail test; instrument= what was used,
+        by= who measured. It is judged against the plan's limits, and the results report shows it."""
         st = studio()
+        if kind == "test":
+            from . import reports
+
+            def rec_test():
+                return reports.record(st, project, test or "", values=values, result=result, instrument=instrument,
+                                      by=by, note=note)
+            rec = await _run(rec_test)
+            return {"recorded": rec, "verdict": rec["test_record"]["verdict"],
+                    "next": "results_report shows every result against the plan, with what is still open."}
         body = {"kind": kind, "note": note}
         if kind in ("fit", "machined"):
             body["result"] = result
@@ -3476,6 +3490,9 @@ def build() -> MCPServer:
     topo_tools.register_tools(mcp, studio, _run, RO, RW, _origin)      # apply_topology (form/topo)
     from .stack import tools as stack_tools   # tolerance stack-up from the assembly: tolerance_stack, get_tolerance_stack
     stack_tools.register_tools(mcp, studio, _run, RO, RW, _origin)
+    from . import backup, reports
+    reports.register_mcp(mcp, studio, _run)
+    backup.register_mcp(mcp, studio, _run)
     return mcp
 
 

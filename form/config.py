@@ -87,6 +87,12 @@ DEFAULTS = {
     # Standard parts (form/catalog.py, form/bom.py). catalogue: an optional supplier catalogue service, off by
     # default; before each search it says what is sent and to whom. catalogue_provider: its id (none ships yet).
     "parts": {"catalogue": False, "catalogue_provider": ""},
+    # Backups of every design and conversation (form/backup.py): to a folder you choose (outside the project folder),
+    # and optionally pushed to a Git repository you created, with your own Git credentials. every: hourly | daily |
+    # weekly; keep: how many backup files stay in the folder; built: include STEP, STL, renders and slices (they are
+    # made again from the revisions; the Git copy never has them). Off until a destination is chosen and enabled.
+    "backup": {"enabled": False, "every": "daily", "folder": "", "keep": 10, "conversations": True, "built": True,
+               "git_remote": "", "git_branch": "main"},
     # Open the bench in your browser when an agent starts working (MCP server).
     "bench": {"auto_open": True},
     # Look for a newer FORM release on GitHub at most once a day (public release metadata only; nothing is

@@ -400,6 +400,9 @@ class Journeys(unittest.TestCase):
     def test_settings_tour_light(self):     # the same in the light appearance
         self.journey("settings_tour.py", env_extra={"FORM_APPEARANCE": "light"})
 
+    def test_backups(self):                 # Settings › Backups: back up now, listed and verified, Recently deleted, put back
+        self.journey("backups.py", env_extra={"FORM_APPEARANCE": "light"})
+
     def test_ui_tree(self):                 # the item tree as data, never a password field's text
         self.journey("ui_tree.py", env_extra={"FORM_UITEST_API_AGENTS": "1"})
 

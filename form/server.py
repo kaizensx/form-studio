@@ -171,6 +171,11 @@ def make_handler(st: Studio):
             owned = setup_app.route_get(st, path, q)
             if owned is not None:
                 return self._json(owned)
+            if path.startswith("/api/backup"):               # backups and Recently deleted (form/backup.py)
+                from . import backup
+                got = backup.route_get(st, path, q)
+                if got is not None:
+                    return self._json(got)
             # -- Home and new design: starters, recipe library, archives, What's New (home workstream; form/home_api.py) --
             from . import home_api
             got = home_api.route_get(st, path, q)
@@ -639,6 +644,11 @@ def make_handler(st: Studio):
             owned = setup_app.route_post(st, path, body)
             if owned is not None:
                 return self._json(owned)
+            if path.startswith("/api/backup/"):              # back up now, verify, restore, undelete (form/backup.py)
+                from . import backup
+                got = backup.route_post(st, path, body)
+                if got is not None:
+                    return self._json(got)
             # -- Home and new design (home workstream; form/home_api.py) --
             from . import home_api
             got = home_api.route_post(st, path, body, {k: v[0] for k, v in parse_qs(urlparse(self.path).query).items()})
@@ -1120,6 +1130,8 @@ def serve(cfg=None):
     httpd.daemon_threads = True
     # warm the kernel only once this process owns a port; an early "already running" exit must not leave it mid-call
     threading.Thread(target=lambda: _quiet(st.kernel_id), daemon=True).start()
+    from . import backup
+    backup.start_scheduler(st)                         # [backup] enabled: on its schedule while this runs
     print(f"Form Studio → http://{host}:{port}   (data: {cfg['data']['dir']})", flush=True)
     _open(f"http://{host}:{port}", cfg)
     try:

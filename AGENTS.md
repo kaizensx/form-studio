@@ -62,6 +62,10 @@ Prefer the MCP server (`form-mcp`). Without MCP, the `form` CLI does the same an
 | Play a mechanism: loops, couplings, traces, clearance along the cycle, holding torque, an MP4 | `motion_study` | `form motion <p> --drivers '[{"joint": "crank", "from": 0, "to": 360}]'` |
 | URDF, SRDF and MJCF with inertia from the B-rep, checked and parsed back | `robot_files` | `form urdf <p>`, `form mjcf <p>` |
 | A feasible assembly order and insertion directions (the explode and instructions follow it) | `assembly_sequence` | `form sequence <p>` |
+| What to measure on the made part (each requirement, fit, critical dimension and load), with a checklist | `test_plan` | `form testplan <p>` |
+| Record what the person measured against a test | `record_physical_result(kind="test", test=, values=)` | `form testplan record <p> TEST 8.01 8.02` |
+| The results report: measured results, every check and study with its evidence, open items, verdict | `results_report` | `form report <p>` |
+| Backups of designs and conversations; Recently deleted | `backup` (restore only when the person asks) | `form backup status\|run\|verify\|restore` |
 
 Every design has a **purpose**: `print` (for 3D printing) or `model` (just a 3D model: rendering, CAD exchange, CNC,
 laser, moulding). `get_project` reports it and `form_overview` says whether the person prints at all (`has_printer`).
@@ -73,7 +77,9 @@ Rules that keep the record honest:
 1. **Units:** mm, degrees, grams. For a design started from a building block, only use parameter keys that `describe_recipe` lists.
 2. **Preview, then commit.** Pass `expect_head` so you never overwrite someone else's newer revision.
 3. **Provenance is evidence.** Mark a value `measured` only when the user measured it and gave you the number. Ask how they measured it, for example with calipers. Otherwise it stays `assumed`.
-4. **Never invent physical results.** `record_physical_result` is only for what the user reports after a real print or a real machining run.
+4. **Never invent physical results.** `record_physical_result` is only for what the user reports after a real print,
+   a real machining run or a measurement of the part. A results report is a pass only when every required test was
+   measured; say its verdict as it is.
 5. **Name evidence classes correctly.** A slice is a simulation. A CNC program is "simulated, not proven on a machine" until the person records what it did on one. Fit yield is a statistical model. Checks are labelled computed, heuristic or model. Say which one you are reporting.
 6. **You cannot approve a release.** The user approves in the app's Release stage, after reviewing the checks and acknowledging the warnings.
 7. **No printing, no uploads.** Form Studio never sends files to a printer or a service, and you must not either unless the user explicitly asks.

@@ -170,7 +170,7 @@ Whatever you bring is assessed first. **Triage** reads a mesh, a STEP, a photo, 
   </picture>
 </p>
 
-Every revision is checked on the B-rep and its mesh: a valid solid, a closed export mesh, the STL against the CAD volume, the STEP re-imported in FreeCAD, fits, joints and loads. Each result says whether it was computed, a stated rule of thumb or a model. Compare any two revisions on the solids themselves, branch, keep variants, and go back at any point. Only a person approves a release, and its files are frozen with their hashes and a report of every check.
+Every revision is checked on the B-rep and its mesh: a valid solid, a closed export mesh, the STL against the CAD volume, the STEP re-imported in FreeCAD, fits, joints and loads. Each result says whether it was computed, a stated rule of thumb or a model. Compare any two revisions on the solids themselves, branch, keep variants, and go back at any point. Only a person approves a release, and its files are frozen with their hashes and a report of every check. For the part you made, a test plan says what to measure, with which instrument and limits, and the results report holds only what was measured: it is never a pass while anything is unchecked. Designs and conversations are backed up on a schedule to a folder you choose, or a Git repository you own.
 
 ## Make it
 

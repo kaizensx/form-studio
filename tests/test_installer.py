@@ -432,7 +432,7 @@ class ConfigWriteBack(unittest.TestCase):
                      "chat.budget_usd_per_message", "updates.check", "bench.auto_open", "blender.app", "cad.openscad", "cad.freecad"):
             self.assertIn(want, keys)
         for r in d["settings"]:
-            self.assertIn(r["tab"], ("general", "printer", "chat", "apps", "updates", "advanced", "software"))
+            self.assertIn(r["tab"], ("general", "printer", "chat", "apps", "backups", "updates", "advanced", "software"))
 
 
 class NoSeeding(unittest.TestCase):

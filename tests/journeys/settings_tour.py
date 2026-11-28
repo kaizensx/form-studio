@@ -6,7 +6,7 @@ Environment (tests/test_ui_journeys.py test_settings_tour): FORM_APPEARANCE pick
 from _lib import open_sheet_wait
 
 PAGES = (("general", "General"), ("chat", "Agents & models"), ("software", "Engines & software"), ("apps", "Other apps"),
-         ("updates", "Updates"), ("advanced", "Advanced"))
+         ("backups", "Backups"), ("updates", "Updates"), ("advanced", "Advanced"))
 
 
 def _row(ui, name, sid):
