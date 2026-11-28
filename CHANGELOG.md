@@ -20,7 +20,10 @@
   the plate or studio floor (its lowest point at z = 0), a part built lying down and stood upright by its placement
   included. Pulling it apart keeps the anchor (the part fixed to the world with the largest footprint) exactly where
   it rests: the other parts move away from it, and an offset that would go through the ground is turned upward.
-  Swinging a joint never moves the fixed part. The same in the app and in `render(view="exploded")`.
+  Swinging a joint keeps the fixed part where it is, unless the swing would take a part below the ground: then the
+  whole set is lifted just enough for the lowest point the joint reaches over its whole range, so the lift stays
+  the same through the motion and nothing is ever drawn under the plate. The same in the app and in
+  `render(view="exploded")`.
 
 ## 1.1.0
 

@@ -132,3 +132,44 @@ def journey_lying_down_assembly_rests_on_the_ground(ui):
     ui.check(all(abs(a["base"][k][i] - e["base"][k][i]) < 1e-3 for k in (0, 1) for i in range(3)),
              f"the anchor does not move when the set is pulled apart: {a['base']} vs {e['base']}")
     ui.check(e["post"][0][2] > a["post"][0][2] + 20, "the post goes up, not through the ground")
+
+
+# A front flap hinged on the box's bottom front edge, swung through 180° forward and down past the plate's side
+# (tests/fixtures/lying_design.py FLAP). At rest the box sits on the ground; once the lid moves, the whole set is lifted
+# by what the flap reaches over the hinge's whole range, so nothing is ever under the ground and the lift does not
+# change while the flap swings.
+def journey_a_swung_lid_never_goes_under_the_ground(ui):
+    import sys
+    from pathlib import Path
+    sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
+    from fixtures.lying_design import FLAP
+    from _lib import click_stage, open_project
+    d = ui.studio.create_design("Box with a flap", FLAP)
+    ui.api("/projects/" + d["id"] + "/run", {"nodes": [], "force": False})
+    wait_job(ui, d["id"])
+    open_project(ui, d["id"])
+    ui.wait_until(lambda: ui.store.get("assembly") is not None, 20, "the box and its lid as an assembly")
+    click_stage(ui)
+    ui.key("E")
+    ui.wait_until(lambda: ui.js("Ws.tool") == "assembly", 5, "E to open Assembly")
+    ui.click_text("Assembled", within=ui.item("asmBar"))
+    ui.wait_until(lambda: ui.store.get("asmMode") == "assembled", 3, "assembled")
+    ui.settle(900)
+    rest = drawn_box(ui, "box")
+    ui.check(abs(rest[0][2]) < 1e-2, f"at rest the box stands on the ground ({rest[0][2]:.3f} mm)")
+    lifts, lows = [], []
+    for deg in (1, 30, 60, 90, 120, 150, 180):
+        ui.run_js(f"Store.setPose('flap', {deg})")
+        ui.settle(500)                       # the lift glides in on the first move; the shift then stays
+        box, lid = drawn_box(ui, "box"), drawn_box(ui, "lid")
+        lows.append(min(box[0][2], lid[0][2]))
+        lifts.append(box[0][2] - rest[0][2])
+        ui.check(lows[-1] > -1e-3, f"lid at {deg}°: nothing under the ground (lowest {lows[-1]:.3f} mm)")
+        if deg in (90, 180):
+            ui.shot(f"flap-{deg}")
+    ui.check(max(lifts) - min(lifts) < 1e-3, f"the lift is the same through the swing: {[round(x, 3) for x in lifts]}")
+    ui.check(lifts[0] > 15, f"the set is lifted for the lid's swing ({lifts[0]:.2f} mm)")
+    ui.check(min(lows) < 1, f"and only as much as it needs: the lid's lowest point touches the ground ({min(lows):.3f} mm)")
+    ui.run_js("Store.setPose('flap', 0)")
+    ui.settle(700)
+    ui.check(abs(drawn_box(ui, "box")[0][2]) < 1e-2, "closed again, the box is back on the ground")

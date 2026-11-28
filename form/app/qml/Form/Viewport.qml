@@ -177,7 +177,7 @@ Item {
         else { s = Math.sqrt(1 + m[2][2] - m[0][0] - m[1][1]) * 2; w = (m[1][0] - m[0][1]) / s; x = (m[0][2] + m[2][0]) / s; y = (m[1][2] + m[2][1]) / s; z = s / 4 }
         return Qt.quaternion(w, x, y, z).normalized()
     }
-    function _xf(x, mode) {                  // part as printed → where it is drawn in this mode: { pos, rot }
+    function _xf(x, mode, at) {              // part as printed → where it is drawn in this mode (at: a pose, default the shown one)
         if (mode === "print") {
             var at = platesOn ? _planAt[x.id] : null
             if (!at) return { pos: Qt.vector3d(0, 0, 0), rot: Qt.quaternion(1, 0, 0, 0) }
@@ -186,7 +186,7 @@ Item {
         var pl = x.placement, t = Qt.vector3d(pl.t[0], pl.t[1], pl.t[2]), q = Qt.quaternion(pl.q[0], pl.q[1], pl.q[2], pl.q[3])
         var ch = chainOf(x)
         for (var i = ch.length - 1; i >= 0; i--) {
-            var j = jointById(ch[i]), v = j ? (pose[j.id] || 0) : 0
+            var j = jointById(ch[i]), v = j ? ((at || pose)[j.id] || 0) : 0
             if (!j || !v || j.kind === "fixed") continue
             var ax = Qt.vector3d(j.axis[0], j.axis[1], j.axis[2]).normalized()
             if (j.kind === "hinge") {
@@ -262,6 +262,35 @@ Item {
         return out
     }
     readonly property var shownFrom: measureFrom ? { at: shownPoint(measureFrom.part, measureFrom.at) } : null
+    property real _lift: 0
+    // How far the set is lifted for the shown pose: 0 while every part stays above the plate; otherwise what the lowest
+    // point reaches over the whole range of each joint that is swung (the others as shown), so a sweep has one lift.
+    // rest: the assembled rest (mm added to z). Part boxes as printed, carried through each sampled pose.
+    function poseLift(mode, rest) {
+        if (!asm) return 0
+        var low = 1e9, moved = false, js = asm.joints || []
+        function lowest(at) {
+            for (var k = 0; k < asm.parts.length; k++) {
+                var y = asm.parts[k], pb = y.print_bbox, xf = _xf(y, mode, at)
+                if (!pb || !y.placement) continue
+                for (var m = 0; m < 8; m++)
+                    low = Math.min(low, xf.rot.times(Qt.vector3d(pb[m & 1][0], pb[(m >> 1) & 1][1], pb[(m >> 2) & 1][2])).plus(xf.pos).z)
+            }
+        }
+        for (var i = 0; i < js.length; i++) {
+            var j = js[i]
+            if (j.kind === "fixed" || !(pose[j.id] || 0)) continue
+            moved = true
+            var n = Math.max(2, Math.min(48, j.samples || 24))
+            for (var s = 0; s <= n; s++) {
+                var at = Object.assign({}, pose); at[j.id] = j.range[0] + (j.range[1] - j.range[0]) * s / n
+                lowest(at)
+            }
+        }
+        if (!moved) return 0
+        lowest(pose)
+        return Math.max(0, -(low + rest))
+    }
     function _frame() {                      // rest what is shown on the plate and centre it; bounds follow the mode
         if (!model) return
         // read the mode directly: this runs from onAsmModeChanged, possibly before the asmOn binding has updated
@@ -300,13 +329,20 @@ Item {
         // pose (its lowest point at z = 0, a part built lying down and stood upright by its placement included), so the
         // anchor never moves between them, and pulling apart keeps every part above the ground (explodeOff). The print
         // layout and the plates are centred on what they show.
-        var sh = on ? Qt.vector3d(-(b[0][0] + b[1][0]) / 2, -(b[0][1] + b[1][1]) / 2, -b[0][2])
+        // Nothing is ever drawn under the plate: a pose that would take a part below it lifts the whole set, by what
+        // the lowest point reaches over each swung joint's whole range (poseLift), so the lift stays the same through
+        // a sweep, and glides in when a joint first moves.
+        var lift = on ? poseLift(asmMode, -b[0][2]) : 0
+        var sh = on ? Qt.vector3d(-(b[0][0] + b[1][0]) / 2, -(b[0][1] + b[1][1]) / 2, -b[0][2] + lift)
                     : Qt.vector3d(-(lo.x + hi.x) / 2, -(lo.y + hi.y) / 2, -lo.z)
+        if (Math.abs(lift - _lift) > 1e-6) { _lift = lift; liftTween = true; liftTweenOff.restart() }
         shift = sh                           // may animate; bounds use the target, not the value mid-animation
         shiftTo = sh
         bounds = { lo: lo.plus(sh), hi: hi.plus(sh) }
     }
-    Behavior on shift { enabled: vp.asmTween; Vector3dAnimation { duration: Motion.part; easing.type: Easing.BezierSpline; easing.bezierCurve: Motion.out } }
+    property bool liftTween: false           // the shift glides when a pose first lifts the set (the parts keep following the slider)
+    Timer { id: liftTweenOff; interval: Motion.part + 60; onTriggered: vp.liftTween = false }
+    Behavior on shift { enabled: vp.asmTween || vp.liftTween; Vector3dAnimation { duration: Motion.part; easing.type: Easing.BezierSpline; easing.bezierCurve: Motion.out } }
 
     // ── what the part holds (companions): a reference outline, not part of the print ──
     // A device can be several times taller than the part that holds it. The camera frames the part, so a tall
