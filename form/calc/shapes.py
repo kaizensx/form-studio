@@ -238,33 +238,56 @@ def _gw():
     return parts._bd("gear")
 
 
+SLIVER_MM2 = 1e-3      # a face this small is not geometry: OCCT's mesher leaves its edges open in the STL
+
+
+def undercuts(z: int, x: float, alpha_deg: float, helix_deg: float = 0.0) -> bool:
+    """Whether the standard rack (straight flank to 1.0 m below the pitch line, ISO 53) undercuts this gear: at the
+    virtual tooth count z / cos³β, undercut when 1 - x > z_v sin²α / 2 (Shigley, 10th ed., eq. 13-11 for the rack, with
+    the profile shift x)."""
+    zv = z / math.cos(math.radians(helix_deg)) ** 3
+    return 1.0 - x > zv * math.sin(math.radians(alpha_deg)) ** 2 / 2 + 1e-9
+
+
+def _slivers(part) -> int:
+    return sum(1 for f in part.faces() if f.area < SLIVER_MM2)
+
+
 def _gear_obj(v, which: str, addendum: float = 1.0, dedendum: float = 1.25):
     g = _gw()
     z = int(round(v["z" + which]))
     x = v.get("x" + which, 0.0)
     helix = v.get("helix", 0.0)
+    # py_gearworks' undercut trochoid on a gear the rack does not undercut is a near-zero curve: with a root fillet it
+    # leaves two sliver faces per tooth (5e-5 mm² on a 31-tooth m2 wheel), whose edges OCCT's mesher leaves open, so
+    # the STL needed the export ladder's last repair rung, which a busy machine does not reach in its time budget.
+    # Without undercut the flanks are the same involute; it is left out only where the rack cuts none.
+    no_undercut_ok = not undercuts(z, x, v["pressure_angle"], helix)
 
-    def make(fillet):
+    def make(fillet, undercut=True):
         kw = dict(number_of_teeth=z, module=v["module"], height=v["face"], profile_shift=x,
                   addendum_coefficient=round(addendum, 6), dedendum_coefficient=round(dedendum, 6), tip_truncation=0.0,
                   pressure_angle=math.radians(v["pressure_angle"]), backlash=v.get("backlash", 0.0) / 2 / v["module"],
-                  root_fillet=fillet, enable_undercut=True)
+                  root_fillet=fillet, enable_undercut=undercut)
         if helix > 1e-9:
             return g.HelicalGear(helix_angle=math.radians(helix) * (1 if which == "1" else -1), **kw)
         return g.SpurGear(**kw)
 
     # the root fillet is the largest of these the tooth space takes: the flanks (the involute) do not change with it
     for fillet in (0.25, 0.15, 0.08, 0.0):
-        obj = make(fillet)
-        try:
-            part = obj.build_part()
-            ok = part.is_valid and len(part.solids()) == 1
-        except Exception:                                   # noqa: BLE001 - try the next fillet
-            continue
-        if ok:
-            if fillet < 0.25:
-                note(f"gear: root fillet {fillet:g} m_n on the {z}-tooth gear (0.25 m_n did not fit the tooth space)")
-            return obj
+        for undercut in ((True, False) if no_undercut_ok else (True,)):
+            obj = make(fillet, undercut)
+            try:
+                part = obj.build_part()
+                ok = part.is_valid and len(part.solids()) == 1
+                if ok and _slivers(part) and undercut and no_undercut_ok:
+                    continue                                # the same flanks without the sliver faces, next
+            except Exception:                               # noqa: BLE001 - try the next fillet
+                continue
+            if ok:
+                if fillet < 0.25:
+                    note(f"gear: root fillet {fillet:g} m_n on the {z}-tooth gear (0.25 m_n did not fit the tooth space)")
+                return obj
     raise _fail(f"The {z}-tooth gear could not be built as a valid solid", "gear", "Change the tooth count, the profile shift or the module.",
                 ["z" + which, "x" + which, "module"])
 

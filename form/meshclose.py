@@ -571,7 +571,8 @@ def _sewn(solid, tol: float):
     ex = TopExp_Explorer(sw.SewedShape(), TopAbs_SHELL)
     if not ex.More():
         return None
-    mk = BRepBuilderAPI_MakeSolid(TopoDS.Shell_s(ex.Current()))
+    shell = TopoDS.Shell_s if hasattr(TopoDS, "Shell_s") else TopoDS.Shell   # OCP 7.x has the _s form, OCP 8 not
+    mk = BRepBuilderAPI_MakeSolid(shell(ex.Current()))
     fix = ShapeFix_Solid(mk.Solid())
     fix.Perform()
     return Solid(fix.Solid())
