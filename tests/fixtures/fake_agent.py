@@ -137,7 +137,7 @@ def main():
     if cited:
         for tid, name, inp, res, ok in CITE_LOG:
             tool(tid, name, inp, res, ok)
-    planned = re.search(r"\bplan\b", first)
+    planned = re.search(r"\bplan card\b", first)
     if planned:
         tool("p1", "plan_design", {"brief": "b1", "features": ["base", "upright", "gussets"]},
              {"plan": {"route": "prismatic"}, "route": "prismatic", "steps": PLAN_STEPS})

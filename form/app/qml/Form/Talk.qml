@@ -576,10 +576,10 @@ Rectangle {
                     Md { id: lt; source: Store.chatLive && Store.chatLive.text ? Store.chatLive.text : ""; width: parent.width } }
                 Item { objectName: "liveStatus"; width: parent.width; height: 20
                     Item { id: ldot; width: 14; height: 14; anchors.verticalCenter: parent.verticalCenter
-                        Rectangle { anchors.centerIn: parent; width: 14; height: 14; radius: 7; color: Theme.alpha(Theme.datum, 0.22) }
-                        Rectangle { anchors.centerIn: parent; width: 6; height: 6; radius: 3; color: Theme.datum; Glow { blur: 7; strength: 0.7 }
-                            SequentialAnimation on opacity { running: Store.chatBusy && talk.onScreen && !Theme.reduced; loops: Animation.Infinite; alwaysRunToEnd: true
-                                NumberAnimation { to: 0.45; duration: 700; easing.type: Easing.InOutSine } NumberAnimation { to: 1; duration: 700; easing.type: Easing.InOutSine } } } }
+                        Rectangle { anchors.centerIn: parent; width: 14; height: 14; radius: 7; color: Theme.alpha(Theme.datum, 0.22)
+                            SequentialAnimation on scale { running: Store.chatBusy && talk.onScreen && !Theme.reduced; loops: Animation.Infinite; alwaysRunToEnd: true
+                                NumberAnimation { to: 1.35; duration: 700; easing.type: Easing.InOutSine } NumberAnimation { to: 1; duration: 700; easing.type: Easing.InOutSine } } }
+                        Rectangle { anchors.centerIn: parent; width: 6; height: 6; radius: 3; color: Theme.datum } }
                     Txt { id: lsay; objectName: "liveSay"; x: 24; anchors.verticalCenter: parent.verticalCenter; font.pixelSize: 13; text: talk.liveText()
                         width: Math.min(implicitWidth, parent.width - 24 - ldet.width - 10); elide: Text.ElideRight; wrapMode: Text.NoWrap }
                     Txt { id: ldet; objectName: "liveDetail"; anchors.right: parent.right; anchors.verticalCenter: parent.verticalCenter; mono: true; tone: 3; font.pixelSize: Theme.tCap; wrapMode: Text.NoWrap

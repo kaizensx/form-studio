@@ -42,7 +42,7 @@ def run(ui):
     ui.shot("sources")
 
     # ---- the plan card: the steps of plan_design; the approval the agent asks for is answered on it ----
-    send(ui, "plan the mount")
+    send(ui, "plan card for the mount")
     plan = ui.item("planCard", timeout=15)
     ui.wait_until(lambda: plan.property("waiting"), 15, "the plan to wait for an answer")
     ui.eq(len(ui.find_all("planStep", within=plan)), 4, "the four steps of the plan")
@@ -56,8 +56,8 @@ def run(ui):
     ui.check(not ui.exists("planApprove"), "an answered plan has no buttons")
 
     # a plan nobody was asked about is the plan and nothing more
-    send(ui, "plan quiet mount")
-    reply(ui, "You said: plan quiet mount")
+    send(ui, "plan card quiet mount")
+    reply(ui, "You said: plan card quiet mount")
     plan = ui.find_all("planCard")[-1]
     ui.check(ui.sees("4 steps", within=plan) and not ui.sees("approved by you", within=plan), f"no claim of approval: {ui.texts(within=plan)}")
 

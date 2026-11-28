@@ -228,7 +228,7 @@ Item {
         MouseArea { anchors.fill: parent }
         // the prompt: the well the command is typed into, as in the bar under the part
         Rectangle { id: well; x: 8; y: 8; width: parent.width - 16; height: 44; radius: Theme.rPane - 8; color: Theme.glassWell; border.width: 1; border.color: Theme.alpha(Theme.datum, 0.55)
-            Glow { color: Theme.datum; blur: 14; strength: Theme.dark ? 0.22 : 0.12; radius: well.radius } }
+            Rectangle { anchors.fill: parent; anchors.margins: -3; radius: parent.radius + 3; color: "transparent"; border.width: 3; border.color: Theme.alpha(Theme.datum, 0.13) } }
         // where the search looks first: the open design
         Rectangle { id: ctx; objectName: "paletteScope"; visible: !!Store.project && Store.screen === "work"; anchors.right: well.right; anchors.rightMargin: 10; anchors.verticalCenter: well.verticalCenter
             width: ctxT.width + 16; height: 22; radius: 6; color: Theme.alpha(Theme.lineBase, Theme.dark ? 0.10 : 0.07)
