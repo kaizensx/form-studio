@@ -135,6 +135,14 @@ Column {
             Qt.callLater(function () { var p = item.mapToItem(rowMenu.parent, x, y); rowMenu.x = Math.round(p.x); rowMenu.y = Math.round(p.y) })
         } }
     Connections { target: Store; function onPidChanged() { root.tree = null; root.openId = ""; root.openWhat = "" } }
+    // the dock's Pattern: the selected feature's pattern panel opens under its line
+    function wantPattern() {
+        if (Ws.want !== "pattern" || !Store.feature || !Store.recipe) return
+        var ids = Store.recipe.features.map(function (f) { return f.id })
+        if (ids.indexOf(Store.feature) > 0) { root.openId = Store.feature; root.openWhat = "pattern" }
+    }
+    Connections { target: Ws; function onWantChanged() { root.wantPattern() } }
+    Connections { target: Store; function onFeatureChanged() { root.wantPattern() } }
 
     Column {
         id: program; objectName: "program"

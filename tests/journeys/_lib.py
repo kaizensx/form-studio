@@ -132,3 +132,24 @@ def plate_toggle(ui):
     ui.settle(200)
     ui.click("showPlate")
     ui.wait_until(lambda: not ui.exists("showPlate"), 3, "the menu to close")
+
+
+# the dock holds four tools everywhere and, under them, the tools of the mode (docs/design/directions/i/IA.md)
+DOCK_MODE = {"Analyze": "prove", "History": "prove", "Assembly": "prove", "Simulate the print": "release",
+             "Photo render": "release", "Hide overall dimensions": "document", "Show overall dimensions": "document"}
+
+
+def dock(ui, label):
+    """Click a tool of the dock by its label, as a person does: in the mode whose group holds it, then back to the
+    mode the journey was in (a tool stays active, a toggle stays set, whatever the mode; a sheet stays open)."""
+    was, mode = ui.store.get("stage"), DOCK_MODE.get(label)
+    there = mode and ui.js("Store.mode") != mode
+    if there:
+        ui.click("stage-" + mode)
+        ui.wait_until(lambda: ui.js("Store.mode") == mode, 3, mode)
+        ui.settle(260)
+    ui.click_text(label)
+    if there and not ui.store.get("sheet") and not ui.js("!!Store.layers"):      # a sheet or the print simulation is where it leads
+        ui.settle(120)
+        ui.click("stage-" + ("shape" if was == "brief" else "prove" if was == "fit" else was))
+        ui.settle(260)

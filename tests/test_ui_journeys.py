@@ -206,7 +206,16 @@ class Journeys(unittest.TestCase):
     def test_modelling_small(self):         # the smallest window: Preview and Add stay in view, pinned at the pane's foot
         self.journey("modelling.py", size="1120x700", env_extra={"FORM_APPEARANCE": "dark"})
 
-    def test_bracket_by_hand(self):         # Wave B acceptance: the bracket from Start blank, by hand, timed (< 120 s)
+    def test_dock_modes(self):              # the dock by mode, the capsule in one place, the modes' keys, idle redraws
+        self.journey("dock_modes.py", env_extra={"FORM_APPEARANCE": "dark"})
+
+    def test_dock_modes_light(self):        # the same on paper, at 1280 x 800
+        self.journey("dock_modes.py", size="1280x800", env_extra={"FORM_APPEARANCE": "light"})
+
+    def test_dock_modes_small(self):        # 1100 x 700: the Design group still ends above the window's foot
+        self.journey("dock_modes.py", size="1100x700", env_extra={"FORM_APPEARANCE": "dark"})
+
+    def test_bracket_by_hand(self):         # Wave B acceptance: the bracket from Start blank, sketched on the part (L profile, a pocket on a face), timed (< 120 s)
         self.journey("bracket_by_hand.py", env_extra={"FORM_APPEARANCE": "dark"})
 
     def test_bracket_by_hand_light(self):

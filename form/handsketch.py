@@ -185,6 +185,8 @@ def solve(data: dict, values: dict | None = None, prefix: str = "") -> dict:
            "closed": closed, "loops": len(loops), "solve_ms": rep["solve_ms"]}
     if why:
         out["open"] = why
+    if closed:                                      # the closed loops as points (arcs sampled), for whoever draws the profile
+        out["polygons"] = [[[round(x, 5), round(y, 5)] for x, y in lp] for lp in sk.polygons(vals)]
     return out
 
 

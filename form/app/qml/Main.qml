@@ -227,6 +227,7 @@ Window {
         else if (Store.paletteOpen) Store.paletteOpen = false
         else if (Store.ctxMenu) Store.ctxMenu = null
         else if (Store.sheet) Store.openSheet(null)
+        else if (Store.sketchHost && Store.sketchHost.busyHere) Store.sketchHost.leave()     // a sketch on the part: the line being drawn, the selection, then an empty sketch
         else if (Store.benchOpen) { if (Store.benchFind) Store.benchFind = ""; else Store.benchOpen = false }
         else if (Store.compare) Store.endCompare()
         else if (Store.measuring) Store.setMeasuring(false)

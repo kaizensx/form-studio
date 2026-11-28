@@ -2,7 +2,7 @@
 print simulation, photo render."""
 import os
 
-from _lib import has_slicer, make, open_project, open_sheet_wait, close_sheet_esc, printing_on
+from _lib import has_slicer, make, open_project, open_sheet_wait, close_sheet_esc, printing_on, dock
 
 DATA = "fresh"
 S = {}
@@ -56,9 +56,9 @@ def journey_select_and_views(ui):
     ui.key("1")
     ui.settle(500)
     # the two view switches on the rail
-    ui.click_text("Hide overall dimensions")
+    dock(ui, "Hide overall dimensions")
     ui.wait_until(lambda: ui.store.get("dims") is False, 2, "dimensions to hide")
-    ui.click_text("Show overall dimensions")
+    dock(ui, "Show overall dimensions")
     ui.wait_until(lambda: ui.store.get("dims") is True, 2, "dimensions to show")
 
 
@@ -165,7 +165,7 @@ def journey_analyze(ui):
 
 
 def journey_history(ui):
-    ui.click_text("History")
+    dock(ui, "History")
     ui.wait_until(lambda: ui.store.get("timelineOpen") is True and tool(ui) == "history", 3, "the timeline")
     ui.settle(300)
     track = ui.item("timelineTrack")
@@ -202,7 +202,7 @@ def journey_simulate(ui):
         print("  (no slicer on this machine: print simulation not exercised)")
         return
     ui.wait_until(lambda: ui.js("!!Store.data.slice"), 300, "a current slice")
-    ui.click_text("Simulate the print")
+    dock(ui, "Simulate the print")
     ui.wait_until(lambda: ui.store.get("layers") is not None, 60, "the simulation to open")
     sim = ui.item("printSim")
     ui.wait_until(lambda: sim.property("count") > 0, 120, "the toolpaths to load")
@@ -270,7 +270,7 @@ def _hidden(sim):
 
 
 def journey_photo_render_sheet(ui):
-    ui.click_text("Photo render")
+    dock(ui, "Photo render")
     open_sheet_wait(ui, "render")
     rs = ui.item("renderSheet")
     ui.wait_until(lambda: rs.property("st") is not None, 30, "the render sheet to load what Blender it has")

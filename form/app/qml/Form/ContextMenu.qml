@@ -61,7 +61,7 @@ Item {
 
     // ── viewport keys. Off while a sheet, the palette or a text box has the keyboard. ──
     readonly property var focusItem: Window.activeFocusItem
-    readonly property bool keys: Store.screen === "work" && !Store.sheet && !Store.paletteOpen && !Store.layers
+    readonly property bool keys: Store.screen === "work" && !Store.sheet && !Store.paletteOpen && !Store.layers && !(Store.sketchHost && Store.sketchHost.on)
         && !(focusItem && focusItem.cursorPosition !== undefined)
     Shortcut { sequence: "F"; enabled: cm.keys; onActivated: Store.frameSelection() }
     Shortcut { sequence: "1"; enabled: cm.keys; onActivated: Store.setView("iso") }
