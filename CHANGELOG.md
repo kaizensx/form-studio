@@ -103,6 +103,22 @@
   materials`. New engineering materials: alloy steel 4140, white oak, nylon PA6 (moulded).
 - **Concept cards show mass and material.** `propose_concepts` takes a material per concept; a print concept without
   one is shown in PLA, marked assumed.
+- **Standard parts, generated from the standards' tables.** ISO 4762 (and DIN 912) socket head, ISO 7380-1 button
+  head and ISO 10642 countersunk screws, ISO 4032 nuts, ISO 7089 washers, CNC Kitchen heat-set inserts, ISO 15
+  deep-groove bearings (60x, 62x, 6xx, 608), ISO 8734 dowels, DIN 705 A collars, ground shafts and THK LM6-12UU
+  bushings, GT2 pulleys and belts, NEMA 17/23 motors, V-Slot 2020/2040 with T-nuts, NdFeB magnets by grade and
+  ISO 3601-1 O-rings with their gland. Every dimension names its table or datasheet; sizes outside a table are
+  refused; threads are cosmetic and say so. Designations as they are ordered ("ISO 4762 M5×12 A2-70").
+- **Place a part by picking a hole or a face.** It snaps to the hole's axis or the face, measures the host's
+  thickness, picks a screw's stock length, cuts the matching hole, counterbore, pocket, seat or motor mount into the
+  design's source as a feature, enters the assembly as purchased, and is checked for fit on the B-rep (interference
+  of the fitted part with the cut host, and the clearance per side from the tables). In the app: **Part here…** on a
+  selection, the Bench's **Standard parts**, or the palette.
+- **A buyable parts list.** Purchased items grouped by designation, with quantity, material and mass (catalogue value,
+  else the B-rep volume times the sourced density, else none), and the made parts with their mass; CSV and a PDF
+  page. Supplier numbers come only from you or a page at a link you give. An optional catalogue service is in
+  Settings, off by default, and says before each search what is sent and to whom; no provider ships yet.
+- **`standard_part`, `bom`** (MCP) and **`form parts …`, `form bom …`** (terminal). 103 MCP tools.
 
 ### Changed
 

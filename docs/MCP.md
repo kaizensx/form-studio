@@ -1075,6 +1075,67 @@ is saved then. preview=True builds and reports. The checks run again on the save
 | `expect_head` | integer \| null |  |
 | `preview` | boolean |  |
 
+### `standard_part`
+
+Standard parts to buy (screws, nuts, washers, inserts, bearings, dowels, collars, shafts, LM bushings, GT2
+pulleys and belts, NEMA motors, V-Slot extrusion and T-nuts, magnets, O-rings), generated from published
+tables: every dimension names its standard and table, or the maker's datasheet. Threads are cosmetic.
+action="search": query such as "m5 socket 12", "608", "lm8uu", "nema 17", "o-ring 010" -> candidates with
+spec and designation (local tables; nothing is sent anywhere). "families": every family, its sizes and
+options. "describe": spec={family, size, ...} -> designation, dimensions with sources, the mating cut, the
+material; step=True also builds it (real CAD, measured on the B-rep), gives its mass with the evidence and
+writes a STEP. "din": query "DIN 912" -> what it is ordered as today.
+On a Python design (project): "snap" (at) -> what is there: a hole (snapped to its axis and opening) or a flat
+face, and the host's thickness. "place" (spec, at, optional normal, depth, qty, cut) -> one action: snaps to
+the hole or face, cuts the matching clearance hole and counterbore, insert pocket, bearing seat, nut trap or
+motor mount into the host as a feature of the source (a new revision), records the part as purchased with
+its designation (in assembly() when the design has one), picks a screw's stock length from the host's
+thickness when none is given, and checks the fit: interference on the B-rep and the clearance per side from
+the tables (computed). "list", "fit", "remove" (part_id like "std_1").
+
+| Argument | Type | Required |
+|---|---|---|
+| `action` | string |  |
+| `query` | string |  |
+| `spec` | object \| null |  |
+| `project` | string |  |
+| `at` | array \| null |  |
+| `normal` | array \| null |  |
+| `depth` | number \| null |  |
+| `qty` | integer |  |
+| `cut` | boolean |  |
+| `snap` | boolean |  |
+| `part_id` | string |  |
+| `step` | boolean |  |
+| `expect_head` | integer \| null |  |
+
+### `bom`
+
+The parts list a buyer orders from: purchased items grouped by standard designation (e.g. "ISO 4762
+M5×12 A2-70") with quantity, material and mass (the maker's catalogue value, else the modelled volume on the
+B-rep times the sourced density, else none), the made parts with their mass (mass_properties), and supplier
+numbers. action="list": format json (default), csv or pdf (a page for the drawing set; returns the path).
+Supplier numbers are taken only from the person or from a page at a link the person gave:
+action="add_supplier" (designation, supplier, part_number, and url: the page the person linked, read with
+fetch_link; or from_person=True when the person typed the number to you) or "remove_supplier"; never make
+one up or look one up unasked. action="catalogue": the optional catalogue
+service (Settings, off by default) - its state, and with query what would be sent and to whom; it searches
+only with confirm=True after the person agreed. No provider ships, so the state says "no provider configured".
+
+| Argument | Type | Required |
+|---|---|---|
+| `project` | string | yes |
+| `action` | string |  |
+| `format` | string |  |
+| `designation` | string |  |
+| `supplier` | string |  |
+| `part_number` | string |  |
+| `url` | string |  |
+| `note` | string |  |
+| `query` | string |  |
+| `confirm` | boolean |  |
+| `from_person` | boolean |  |
+
 ### `remove_feature`
 
 Remove a feature as a new revision: a standard feature added with add_feature ("boss_1", "hook_1"), or any

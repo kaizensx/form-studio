@@ -83,6 +83,9 @@ DEFAULTS = {
     # `refine = False` on a design class. game: game assets (Beta) are refined only when this is true or when it is
     # asked for one design (refine_design action="on"); CAD designs follow enabled.
     "refine": {"enabled": True, "game": False},
+    # Standard parts (form/catalog.py, form/bom.py). catalogue: an optional supplier catalogue service, off by
+    # default; before each search it says what is sent and to whom. catalogue_provider: its id (none ships yet).
+    "parts": {"catalogue": False, "catalogue_provider": ""},
     # Open the bench in your browser when an agent starts working (MCP server).
     "bench": {"auto_open": True},
     # Look for a newer FORM release on GitHub at most once a day (public release metadata only; nothing is
