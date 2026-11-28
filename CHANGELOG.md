@@ -14,7 +14,22 @@
   made. States come from keys of the head revision's inputs, never set by hand. The command palette finds every
   entry.
 - **`list_studies`, `run_study`, `get_study`** (MCP) and **`form study list|run|show <project> [id]`** (terminal):
-  the same Bench, headless. 100 MCP tools.
+  the same Bench, headless. 101 MCP tools.
+- **Mass properties from the B-rep.** Mass, centre of mass, inertia tensor and principal axes of every part and of
+  the whole, computed by OCCT on the solid; an assembly at any pose of its joints. The grams on the size line show
+  the centre of mass and the principal axes on the part with a glass readout (also in Analyze). MCP
+  `mass_properties`, `form mass`. Checked against closed-form solids to 1e-6 relative.
+- **A materials library with sources.** Density, stiffness, Poisson's ratio, strength, thermal values for 10 printing
+  filaments (manufacturers' printed-specimen values in X-Y and Z) and 18 engineering metals, plastics and woods; every
+  value names its document, URL and the line it was read from. A value no source gave says "unsourced". `form
+  materials`. New engineering materials: alloy steel 4140, white oak, nylon PA6 (moulded).
+- **Concept cards show mass and material.** `propose_concepts` takes a material per concept; a print concept without
+  one is shown in PLA, marked assumed.
+
+### Changed
+
+- Filament and engineering densities are now the cited datasheet values (for example PETG 1.28, PA-CF 1.09, stainless
+  304 8.00 g/cm³); woods keep the bd_materials catalogue density, labelled typical. "Oak" is red oak.
 
 ### Fixed
 

@@ -11,7 +11,7 @@ import time
 import traceback
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
-from urllib.parse import parse_qs, quote, urlparse
+from urllib.parse import parse_qs, quote, unquote, urlparse
 
 from . import advisor, config
 from .cad_bridges import open_output
@@ -204,6 +204,12 @@ def make_handler(st: Studio):
             if path == "/api/materials":                   # colours and materials (form/materials.py)
                 from . import materials
                 return self._json(materials.catalogue())
+            if path.startswith("/api/materials/"):         # one material's sourced record (form/material_library.py)
+                from . import material_library as ml
+                try:
+                    return self._json(ml.record(unquote(path[len("/api/materials/"):])))
+                except KeyError as e:
+                    raise StudioError(str(e).strip("'\""), status=404)
             if path == "/api/refine/host":                 # which process runs refinement jobs (form/refine/jobs.py)
                 return self._json({"data_dir": str(st.root), "pid": os.getpid()})
             if path == "/api/photos":                      # Blender renders: newest current one per project
@@ -229,6 +235,12 @@ def make_handler(st: Studio):
             if rest == "/colour.3mf":
                 from . import materials
                 return self._send(200, materials.threemf(st, p), "model/3mf")
+            if rest == "/mass":                            # mass properties (form/massprops.py); pose is JSON
+                from . import massprops
+                pose = json.loads(q["pose"]) if q.get("pose") else None
+                r = massprops.compute(st, p, part=q.get("part") or "", pose=pose, frame=q.get("frame") or None,
+                                      material=q.get("material") or None)
+                return self._json({**r, "headline": massprops.headline(r)})
             # -- analysis on the model (form/analysis.py): maps, orientations --
             if rest == "/analysis":
                 from . import analysis

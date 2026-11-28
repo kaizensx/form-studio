@@ -53,6 +53,13 @@ class MCPEndToEnd(unittest.TestCase):
                 self.assertIn("(assumed)", p["parameters"]["device_width"])
                 pid, head = p["project"], p["head"]
 
+                ms = data(await c.call_tool("mass_properties", {"project": pid, "material": "PETG", "library": True}))
+                self.assertEqual(ms["evidence"], "computed (B-rep)")                    # form/massprops.py on the B-rep
+                self.assertGreater(ms["total"]["mass_g"], 0)
+                self.assertIn("PETG", ms["library"])
+                self.assertTrue(ms["library"]["PETG"]["properties"]["uts_z"]["url"].startswith("https://"))
+                bare = data(await c.call_tool("mass_properties", {"project": pid}))
+                self.assertIsNone(bare["total"])                                         # no material: no mass, said so
                 pv = data(await c.call_tool("preview_change", {"project": pid, "values": {"clearance": 0.35}}))
                 self.assertTrue(pv["buildable"])
                 self.assertIn("Pocket", " ".join(pv["features"]))
