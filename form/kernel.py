@@ -1391,3 +1391,5 @@ from .appearance import KERNEL_OPS as _APPEARANCE_OPS  # noqa: E402  (material z
 OPS.update(_APPEARANCE_OPS)
 from .candidates import KERNEL_OPS as _CANDIDATE_OPS  # noqa: E402  (several candidates built and scored)
 OPS.update(_CANDIDATE_OPS)
+from .drawing.kernel_ops import KERNEL_OPS as _DRAWING_OPS  # noqa: E402  (drawing views, sections, PMI)
+OPS.update(_DRAWING_OPS)
