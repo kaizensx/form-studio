@@ -1,0 +1,11 @@
+# Sheet metal is its own tool (wave H: recognising the sheet, unfolding with a sourced bend table, the flat pattern
+# DXF). Until it lands, manufacturability says so instead of passing anything.
+
+[process]
+id = "sheet_metal"
+label = "Sheet metal"
+evidence = "not checked"
+routed = "Sheet metal is checked by its own tool (flat pattern and bends, wave H), which is not in this version."
+options = []
+needs = []
+not_judged = "Everything: no sheet-metal rule runs here."

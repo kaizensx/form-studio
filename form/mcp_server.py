@@ -1358,6 +1358,53 @@ def build() -> MCPServer:
         return await _run(go)
 
     @mcp.tool(annotations=RW)
+    async def manufacturability(project: str, process: str = "", options: dict | None = None, rev: int | None = None,
+                                view: str = "") -> dict:
+        """Check a design for a manufacturing process. Every rule of the process measured on the exact solid, each
+        limit with the published guide it comes from (title, publisher, the date it was read) or "computed" when it
+        is geometry: process cnc (3/4/5-axis access for a flat end mill, internal corners against the tool and the
+        cavity depth, tool reach, thin walls, holes, setups), injection (a proposed pull direction and parting line,
+        undercuts with the side action or lifter each needs, draft per face, wall range per resin, projected area,
+        clamp tonnage), fdm, sla, sls, mjf, lpbf (walls, overhangs, holes, enclosed voids, build volume), sheet_metal
+        (routed to its own tool; not checked here). Default process: the design's own (purpose print: fdm).
+        options: cnc {tool_d (mm, needed), material: metal|plastic, axes: 3|4|5, flute_l, holder_d, rotary_axis};
+        injection {resin: abs|pc|pp|nylon|..., pull: [x,y,z] or "auto", cavities, textured}; printing {up: [x,y,z],
+        machine: [x,y,z] mm, alloy for lpbf}; any process {overrides: {rule_id: {fail, warn}}} for a shop's limits
+        (recorded as specified). A rule whose input is missing is not checked, and the verdict is then "not proven",
+        never a pass. Returns rows (one per rule), findings (where, value, limit), the proposed fixes (apply_fix),
+        the overlay file the viewport draws (form-dfm-overlay/1) and, with view (iso, top, ...), a picture."""
+        st = studio()
+        def go():
+            from . import dfm
+            p = st.load(project)
+            res = dfm.check(st, p, process or None, options or {}, rev)
+            out = dfm.summary(res)
+            out["fixes"] = [{k: v for k, v in f.items() if k != "attempts"} for f in res.get("fixes", [])]
+            if view and res.get("overlay_file"):
+                out["png"] = dfm.render(st, p, res, view)
+            return out
+        return await _run(go)
+
+    @mcp.tool(annotations=RW)
+    async def apply_fix(project: str, process: str = "", fix: str = "", options: dict | None = None, apply: bool = True,
+                        accept_trades: bool = False, expect_head: int | None = None) -> dict:
+        """Fix a manufacturability finding and prove it. Takes a fix id or rule id from manufacturability (default the
+        first fix proposed): draft on the faces along the pull, internal corners raised to the tool radius, escape
+        holes from enclosed voids, a wall or hole set by a parameter. The edit is written into the design's source
+        as edit_design ops (a parameter and a feature, or set_param), built and checked without saving (the preview),
+        then saved as a new revision and checked again on the new head from a fresh measurement. Returns fixed (true
+        only when that second check passes the rule), the ops, the rows before and after, any other rule the change
+        made worse (a trade: not applied unless accept_trades), and before and after pictures. apply=false stops
+        after the preview. Pass the same options as manufacturability and expect_head."""
+        st = studio()
+        def go():
+            from . import dfm
+            p = st.load(project)
+            return dfm.apply_fix(st, p, process or None, fix or None, options or {}, apply=apply,
+                                 accept_trades=accept_trades, expect_head=expect_head)
+        return await _run(go)
+
+    @mcp.tool(annotations=RW)
     async def add_text(project: str, text: str, at: list[float], normal: list[float], height: float = 6.0,
                        depth: float = 0.6, sunk: bool = False, up: list[float] | None = None,
                        expect_head: int | None = None) -> dict:

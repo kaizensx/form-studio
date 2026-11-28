@@ -468,6 +468,22 @@ def main(argv=None):
     eg.add_argument("--list", action="store_true")
     eg.add_argument("--remove", metavar="ID")
     eg.add_argument("--expect-head", type=int)
+    dm = sub.add_parser("dfm", help="manufacturability, every rule with its source, measured on the solid: dfm <project> "
+                                    "[--process cnc|injection|fdm|sla|sls|mjf|lpbf] [--set k=v ...] [--fix ID [--preview]] "
+                                    "[--png FILE]; dfm rules [PROCESS] lists the rule tables")
+    dm.add_argument("project", help="a project, or `rules` for the rule tables")
+    dm.add_argument("extra", nargs="?", default="", help="with `rules`: one process")
+    dm.add_argument("--process", default="")
+    dm.add_argument("--set", action="append", default=[], metavar="KEY=VALUE",
+                    help="an option: tool_d=6 material=metal axes=5 resin=abs pull=0,0,1 up=0,0,1 machine=200,200,200")
+    dm.add_argument("--override", action="append", default=[], metavar="RULE:fail=X,warn=Y",
+                    help="your shop's limit for one rule (recorded as specified)")
+    dm.add_argument("--fix", metavar="ID", help="apply a proposed fix (its id or rule id) and prove it by checking again")
+    dm.add_argument("--preview", action="store_true", help="with --fix: build and check the fix, save nothing")
+    dm.add_argument("--accept-trades", action="store_true")
+    dm.add_argument("--expect-head", type=int)
+    dm.add_argument("--png", help="write a picture of the result on the part here")
+    dm.add_argument("--full", action="store_true", help="every finding, not the first 30")
     gd = sub.add_parser("diff", help="what changed between two revisions, computed on the solids: diff <project> A [B] [--png FILE]")
     gd.add_argument("project")
     gd.add_argument("a", type=int)
@@ -730,6 +746,36 @@ def main(argv=None):
                 out = engrave.add(st, p, a.text, xyz(a.at), xyz(a.normal), a.height, a.depth, a.sunk, xyz(a.up) if a.up else None,
                                   a.expect_head, origin="cli")
                 out["printability"] = engrave.printability(a.text, a.height, a.depth, a.sunk, nz)
+                _print(out)
+        elif a.cmd == "dfm":
+            from . import dfm
+            from .dfm import rules as dfm_rules
+            if a.project == "rules":
+                procs = [dfm.process_id(a.extra)] if a.extra else dfm_rules.processes()
+                _print({pid: dfm_rules.table(pid) for pid in procs})
+            else:
+                opts: dict = {}
+                for kv in a.set:
+                    k, _, v = kv.partition("=")
+                    opts[k.strip()] = v.strip()
+                ovr: dict = {}
+                for o in a.override:
+                    rid, _, rest = o.partition(":")
+                    ovr[rid] = {k: float(v) for k, v in (x.split("=") for x in rest.split(",") if "=" in x)}
+                if ovr:
+                    opts["overrides"] = ovr
+                p = st.load(a.project)
+                if a.fix:
+                    out = dfm.apply_fix(st, p, a.process or None, a.fix, opts, apply=not a.preview,
+                                        accept_trades=a.accept_trades, expect_head=a.expect_head)
+                else:
+                    res = dfm.check(st, p, a.process or None, opts)
+                    out = dfm.summary(res, findings=10 ** 6 if a.full else 30)
+                    out["fixes"] = [{k: v for k, v in f.items() if k != "attempts"} for f in res.get("fixes", [])]
+                    if a.png and res.get("overlay_file"):
+                        import shutil as _sh
+                        _sh.copyfile(dfm.render(st, p, res), a.png)
+                        out["png"] = str(Path(a.png).resolve())
                 _print(out)
         elif a.cmd == "diff":
             from . import geomdiff
