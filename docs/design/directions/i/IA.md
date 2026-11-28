@@ -266,3 +266,10 @@ blender -b --python docs/design/directions/i/tools/render.py -- OUT RENDERS    #
 `assets/geo.js` holds the cameras' projections, the hidden-line paths and the computed numbers the pages read.
 The plate renders were made in a second run after a spacing change; `assets.py` expects all renders and one `proj.json` in RENDERS.
 The screens are saved as WebP at quality 95 (about 300 kB each) rather than PNG (about 1.5 MB each).
+
+## Approved (2026-11-28)
+
+The owner approved direction I with the recommended choices: four modes (Describe becomes the Overview, Fit a
+study in Check); the drawing sheet in the dark theme is a night sheet with cyan dimensions, and a key switches it
+to white paper; the dock stays vertical at the stage's left edge; stress maps use one hue (clay to cyan to white),
+with a many-colour scale as a legend option; feature rows show their value and who made the feature.
