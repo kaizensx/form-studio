@@ -28,8 +28,12 @@ contact_mm2 (the support the best orientation needs: a proxy for print support),
 statics.<key>. From the strength study: fea.safety_factor, fea.peak_von_mises_MPa, fea.max_displacement_mm. From a
 modal study (modal_study=): modal.frequency_Hz, the first natural frequency. cost: mass x a price per kg, only when
 a price is known (rates={"per_kg": x} with the search, labelled assumed; or the person's own price for the
-material, labelled specified); no price is made up. Print time and sliced support come from a slice, which a
-search does not run per candidate: slice the variant you keep.
+material, labelled specified); no price is made up. cost.per_part: the cost per part to make it at a quantity
+(costing={"process": "auto" or one of fdm, sla, sls, mjf, lpbf, cnc, "quantity": N, "shop": ...}), from form/costing's
+models on each candidate's computed volume and bounding box, labelled as its rates are (sourced, specified, assumed,
+with the assumed share per point); a candidate that cannot be costed in full has no value, never a guess. Moulding
+and sheet metal need a check of each candidate's solid, which a search does not run. Print time and sliced support
+come from a slice, which a search does not run per candidate: slice the variant you keep.
 """
 from __future__ import annotations
 
@@ -50,7 +54,7 @@ DENSITY_ASSUMED = 1.24      # g/cm3, as form/optimize.py solid_mass_g
 LABELS = {"mass_g": ("Mass", "g"), "volume_cm3": ("Volume", "cm³"), "solid_mass_g": ("Mass at 1.24 g/cm³", "g"),
           "fea.safety_factor": ("Safety factor (lower value)", ""), "fea.peak_von_mises_MPa": ("Peak von Mises stress", "MPa"),
           "fea.max_displacement_mm": ("Largest displacement", "mm"), "modal.frequency_Hz": ("First natural frequency", "Hz"),
-          "cost": ("Material cost", ""), "overhang_mm2": ("Overhang needing support", "mm²"),
+          "cost": ("Material cost", ""), "cost.per_part": ("Cost per part", ""), "overhang_mm2": ("Overhang needing support", "mm²"),
           "contact_mm2": ("Bed contact", "mm²"), "min_wall_mm": ("Thinnest wall", "mm"),
           "width": ("Width", "mm"), "depth": ("Depth", "mm"), "height": ("Height", "mm")}
 
@@ -81,7 +85,8 @@ def clean(st, p: dict, body: dict | None) -> dict:
     from ..fea import constraint as fea_con
     from ..fea import study as fea_study
     body = dict(body or {})
-    known = ("vary", "minimize", "maximize", "require", "study", "modal_study", "budget", "rates", "seed", "batch")
+    known = ("vary", "minimize", "maximize", "require", "study", "modal_study", "budget", "rates", "costing", "seed",
+             "batch")
     bad = [k for k in body if k not in known]
     if bad:
         raise _err(f"Unknown field {', '.join(sorted(bad))}.", "Fields: " + ", ".join(known) + ".")
@@ -126,6 +131,12 @@ def clean(st, p: dict, body: dict | None) -> dict:
         out["modal_study"] = sid
     if "cost" in used:
         out["rates"] = _rates(st, p, body.get("rates"), out.get("study"))
+    if any(m.startswith("cost.") for m in used):
+        if any(m != "cost.per_part" for m in used if m.startswith("cost.")):
+            raise _err("The cost metric is cost.per_part (cost per part at costing.quantity).")
+        out["costing"] = _costing(st, body.get("costing"))
+    elif body.get("costing"):
+        raise _err("costing is for the metric cost.per_part, which no objective or requirement names.")
     vary = body.get("vary") or []
     auto = not vary
     if auto:
@@ -177,6 +188,42 @@ def _rates(st, p, rates, sid) -> dict:
     raise _err("No price per kg is known, so cost cannot be an objective. No rate is made up.",
                'Give rates={"per_kg": 25} with the search (it is then labelled assumed). With one material, cost '
                "orders the designs exactly as mass does.")
+
+
+def _costing(st, c) -> dict:
+    """cost.per_part's settings, checked: a process a candidate can be costed for, a quantity, the shop."""
+    from .. import costing
+    from ..costing import rates as rates_mod
+    c = dict(c or {})
+    bad = [k for k in c if k not in ("process", "quantity", "shop", "currency", "options")]
+    if bad:
+        raise _err(f"Unknown costing field {', '.join(sorted(bad))}.", "costing: process, quantity, shop, currency, options.")
+    proc = str(c.get("process") or "auto")
+    if proc != "auto":
+        proc = costing.process_id(proc)
+        if proc not in costing.CANDIDATE_PROCESSES:
+            raise _err(f"{costing.LABELS[proc]} cannot be costed per candidate: it needs a check of each candidate's "
+                       "solid, which a search does not run.", "process: auto or " + ", ".join(costing.CANDIDATE_PROCESSES)
+                       + ". Cost the variant you keep with estimate_cost.")
+    q = costing.clean_quantities([c.get("quantity", 1)])[0]
+    R = rates_mod.Rates(st.cfg, c.get("shop") or None, c.get("currency") or None)
+    return {"process": proc, "quantity": q, "shop": R.shop_id, "currency": R.currency,
+            "options": dict(c.get("options") or {}),
+            "processes": [proc] if proc != "auto" else list(costing.CANDIDATE_PROCESSES),
+            "rates_digest": rates_mod.digest()}
+
+
+def _cost_evidence(points: list, c: dict) -> str:
+    """The label of cost.per_part: the evidence classes of the counted lines' inputs over every costed point, and the
+    largest share of a point's cost in lines with an assumed input."""
+    ev = sorted({e for pt in points for e in ((pt.get("cost") or {}).get("evidence") or [])})
+    shares = [s for pt in points for s in [(pt.get("cost") or {}).get("assumed_share")] if isinstance(s, (int, float))]
+    proc = "the cheapest of " + ", ".join(c["processes"]) if c["process"] == "auto" else c["process"]
+    txt = (f"{' × '.join(ev) or 'no line counted'} (form/costing rates {c['rates_digest'][:8]}, shop {c['shop']}, "
+           f"{c['currency']}; {proc} at {c['quantity']} parts; on each candidate's computed volume and bounding box)")
+    if shares:
+        txt += f"; assumed share up to {max(shares) * 100:.0f} % of a point's cost"
+    return txt
 
 
 def _source_text(m: dict, fallback: str) -> str:
@@ -297,6 +344,8 @@ def run(st, pid: str, body: dict | None = None, on_progress=None, cancelled=None
         raise _err("The strength solver is not installed, so no candidate can be studied. Nothing was made up.", HOW_TO_GET,
                    status=409, kind="unavailable")
     t0 = time.time()
+    cst = o.get("costing")
+    dfm_cache: dict = {}                 # the head's manufacturability (CNC setups), measured once per search
     limit = o["budget"]
     used_b = {"solves": 0, "builds": 0, "failed_builds": 0}
     points: list = []
@@ -332,6 +381,20 @@ def run(st, pid: str, body: dict | None = None, on_progress=None, cancelled=None
         met["mass_g"] = met["volume_cm3"] * dens
         if o.get("rates"):
             met["cost"] = met["mass_g"] / 1000.0 * o["rates"]["per_kg"]
+        if cst:
+            from .. import costing
+            from ..studio import StudioError
+            cand = {"volume_mm3": met["volume_cm3"] * 1000.0, "size": [met["width"], met["depth"], met["height"]]}
+            try:
+                cp = costing.point(st, p, cst["process"], cst["quantity"], cst["options"], cst["shop"], cst["currency"],
+                                   candidate=cand, dfm_cache=dfm_cache)
+                met["cost.per_part"] = cp["value"]
+                pt["cost"] = {k: cp[k] for k in ("process", "evidence", "assumed_share", "not_counted")}
+                if cp["value"] is None:
+                    pt["cost"]["why"] = "not every line could be costed: " + (", ".join(cp["not_counted"]) or "no process")
+            except StudioError as e:
+                met["cost.per_part"] = None
+                pt["cost"] = {"why": str(e)}
         if need_fea:
             fea_cons = [(c["metric"], c["op"], c["value"]) for c in cons if c["metric"].startswith("fea.")]
             used_b["solves"] += 1
@@ -359,14 +422,18 @@ def run(st, pid: str, body: dict | None = None, on_progress=None, cancelled=None
                     raise
                 met["modal.frequency_Hz"] = None
                 pt["modal"] = {"why": str(e)}
-        missing = sorted({m for m in used if met.get(m) is None and not m.startswith(("fea.", "modal."))})
+        missing = sorted({m for m in used if met.get(m) is None and not m.startswith(("fea.", "modal.", "cost."))})
         if missing:
             raise _err(f"Unknown metric {', '.join(missing)}.", "Metrics: " + ", ".join(sorted(k for k in met if met[k] is not None))
-                       + ", fea.safety_factor, fea.peak_von_mises_MPa, fea.max_displacement_mm, modal.frequency_Hz, cost.")
+                       + ", fea.safety_factor, fea.peak_von_mises_MPa, fea.max_displacement_mm, modal.frequency_Hz, cost, "
+                       "cost.per_part.")
         for c in cons:
             x = met.get(c["metric"])
             if x is None:
-                if not (c["metric"].startswith("fea.") and pt["violations"]):         # the reason is already there
+                if c["metric"] == "cost.per_part":
+                    pt["violations"].append("cost.per_part is not available for this candidate: "
+                                            + ((pt.get("cost") or {}).get("why") or "it could not be costed"))
+                elif not (c["metric"].startswith("fea.") and pt["violations"]):         # the reason is already there
                     pt["violations"].append(f"{c['metric']} is not available for this candidate")
             elif not opt.OPS[c["op"]](x, c["value"]):
                 pt["violations"].append(f"{c['metric']} {c['op']} {c['value']:g} (is {x:.4g})")
@@ -426,10 +493,13 @@ def run(st, pid: str, body: dict | None = None, on_progress=None, cancelled=None
     fr = sorted((pt for pt in points if pt["on_front"]), key=lambda q: q["metrics"][objs[0]["metric"]])
 
     def label(m):
+        if m == "cost.per_part":
+            return ("Cost per part", f"{cst['currency']}/part")
         return LABELS.get(m, (m, ""))
     ev_of = {m: ("simulated (FEA, each point's own study; evidence per point)" if m.startswith(("fea.", "modal."))
                  else f"computed (B-rep volume x density; density: {dens_src})" if m == "mass_g"
-                 else o["rates"]["evidence"] + ", on computed mass" if m == "cost" else "computed (B-rep)")
+                 else o["rates"]["evidence"] + ", on computed mass" if m == "cost"
+                 else _cost_evidence(points, cst) if m == "cost.per_part" else "computed (B-rep)")
              for m in used}
     axes_out = [{"metric": x["metric"], "sense": x["sense"], "label": label(x["metric"])[0], "unit": label(x["metric"])[1],
                  "evidence": ev_of[x["metric"]]} for x in objs]
@@ -441,6 +511,7 @@ def run(st, pid: str, body: dict | None = None, on_progress=None, cancelled=None
         "vary": [{k: ax[k] for k in ("key", "label", "lo", "hi", "step", "unit")} for ax in axes],
         "vary_chosen_by": o["vary_chosen_by"], "study": sid, "modal_study": msid,
         "density": {"g_cm3": round(dens, 5), "source": dens_src}, "rates": o.get("rates"),
+        "costing": cst,
         "points": points, "front": [pt["index"] for pt in fr], "current": current["index"] if current else None,
         "history": res["history"],
         "budget": {"strength_solves": used_b["solves"], "strength_solves_limit": limit["solves"] if (need_fea or need_modal) else None,

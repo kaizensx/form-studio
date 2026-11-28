@@ -168,8 +168,16 @@ FDM's assumed share is high. Set your own times to firm it up.
 ```python
 from form import costing
 costing.cost(st, p, "injection", quantity=5000)      # per part, or None when a line is not counted
-f = costing.objective("auto", 1000)                  # (st, p) -> the cheapest complete process's cost per part
+f = costing.objective("auto", 1000)                  # (st, p, candidate=None) -> the cheapest complete process's cost per part
+f.point(st, p, {"volume_mm3": 5000, "size": [40, 30, 5]})   # the same, with its evidence, for an unsaved candidate
 ```
+
+Inverse design uses it as the metric `cost.per_part` (`inverse_design(..., minimize=["mass_g", "cost.per_part"],
+costing={"process": "auto", "quantity": 1000})`, or `form optimize pareto --cost-quantity 1000`). A candidate of a
+search is built but never saved, so it has no slice, CAM simulation, manufacturability check or unfold: FDM, SLA, SLS,
+MJF, LPBF and CNC are costed from its own volume and bounding box (CNC setups are the head revision's, said so), and
+moulding and sheet metal are refused for a candidate rather than costed from the head's geometry. The axis is
+labelled with the evidence classes of the counted lines and the largest assumed share.
 
 `cost()` never returns a partial number unless asked (`complete_only=False`). An objective therefore never prefers a
 design only because one of its costs is missing.

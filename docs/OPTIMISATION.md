@@ -29,6 +29,8 @@ get_inverse_design(project, wait_s=60)
 
 form optimize pareto arm --minimize mass_g --minimize fea.max_displacement_mm \
      --require "fea.safety_factor>=3" --vary height:12:40 --vary t:2:10 --solves 20
+
+form optimize pareto arm --minimize mass_g --minimize cost.per_part --cost-process auto --cost-quantity 1000
 ```
 
 One to three objectives, any number of requirements, one to six parameters. With `vary` left out the search takes
@@ -44,6 +46,7 @@ the design's lengths that are not interfaces (at most four) and names them in th
 | `fea.safety_factor`, `fea.peak_von_mises_MPa`, `fea.max_displacement_mm` | the static study, solved on each candidate | simulated (FEA), each point with its own stated error |
 | `modal.frequency_Hz` | a modal study (`modal_study=`), solved on each candidate | simulated (FEA) |
 | `cost` | `mass_g` × a price per kg | only when a price is known: `rates={"per_kg": x}` (labelled assumed), or your own price for the material (specified). No rate is made up. With one material it orders designs exactly as mass does |
+| `cost.per_part` | [COST.md](COST.md)'s models at `costing={"process": "auto", "quantity": 1000, "shop": ""}`, on each candidate's B-rep volume and bounding box | labelled as its rates are: the evidence classes of the counted lines (sourced, specified, assumed, estimated) and the largest assumed share, per point and on the axis. FDM, SLA, SLS, MJF, LPBF and CNC (`auto`: the cheapest of them); moulding and sheet metal need a check of each candidate's solid and are refused. A candidate not costed in full has no value |
 
 Print time and sliced support come from a slice, which a search does not run per candidate: slice the variant you
 keep. Manufacturability rules (wave E) join as metrics when that wave lands.

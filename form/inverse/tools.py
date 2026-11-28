@@ -91,7 +91,7 @@ def register_tools(mcp, studio, run, RO, RW, origin) -> None:
     async def inverse_design(project: str, minimize: list[str] | None = None, maximize: list[str] | None = None,
                              require: list[str] | None = None, vary: list[dict] | None = None, study: str = "",
                              modal_study: str = "", budget: dict | None = None, rates: dict | None = None,
-                             run_now: bool = True, save_point: int | None = None, name: str = "", run: str = "",
+                             costing: dict | None = None, run_now: bool = True, save_point: int | None = None, name: str = "", run: str = "",
                              ctx: Context = None) -> dict:
         """Inverse design: state what the part must do and get the variants that do it, each built by the kernel and
         studied by the real solver. "Survive 250 N at this face with a safety factor of 3, as light as possible" is a
@@ -106,7 +106,9 @@ def register_tools(mcp, studio, run, RO, RW, origin) -> None:
         fea.safety_factor (the lower value: the stated error applied), fea.peak_von_mises_MPa,
         fea.max_displacement_mm from the static study (study="<id>" when the design has several);
         modal.frequency_Hz from a modal study (modal_study=); cost = mass x rates={"per_kg": x} (labelled assumed; no
-        price is made up).
+        price is made up); cost.per_part = the cost per part to make it, from the sourced rates (estimate_cost's
+        models on each candidate's volume and bounding box), costing={"process": "auto"|"fdm"|"sla"|"sls"|"mjf"|
+        "lpbf"|"cnc", "quantity": 1000, "shop": ""}, labelled as its rates are (sourced, specified, assumed).
         budget: {"solves": 24, "seconds": 900, "evaluations": n}; the search stops at the first limit and says which.
         The search is surrogate-assisted (Gaussian processes, NSGA-II, hypervolume infill), and the surrogate only
         chooses what to evaluate: every reported point was built and, for a strength metric, solved. The front is
@@ -122,6 +124,8 @@ def register_tools(mcp, studio, run, RO, RW, origin) -> None:
         if minimize or maximize or require or vary:
             body = {"minimize": minimize or [], "maximize": maximize or [], "require": require or [], "vary": vary or [],
                     "study": study, "modal_study": modal_study, "budget": budget or {}, "rates": rates}
+            if costing:
+                body["costing"] = costing
         return await runner(search_call, st, project, body, run_now)
 
     @mcp.tool(annotations=RO)

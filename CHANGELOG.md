@@ -158,6 +158,10 @@
   per part than FDM printing from about 628 parts". Your own rates, currency and exchange rates go in a shop, in
   Settings › Costs or with `form cost rates`. They are recorded as yours and replace the published ones.
   `costing.cost()` and `costing.objective()` give optimise and inverse design a cost per part.
+  Inverse design takes it as the metric `cost.per_part` (`costing={"process", "quantity", "shop"}`; terminal
+  `form optimize pareto --cost-process --cost-quantity`): each candidate is costed from its own volume and bounding
+  box by FDM, SLA, SLS, MJF, LPBF or CNC, and the axis is labelled with the rates' evidence classes and the largest
+  assumed share. Moulding and sheet metal need a check of each candidate's solid and are refused, not guessed.
 
   Available as `estimate_cost` (now with `process` and `quantities`; without them it is unchanged), `cost_compare`
   and `cost_rates` over MCP (116 tools), as `form cost <project> --process ...`, `form cost compare` and

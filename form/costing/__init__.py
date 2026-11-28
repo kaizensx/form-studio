@@ -65,24 +65,41 @@ def clean_quantities(q) -> list:
 
 # ---- drivers from the design ----------------------------------------------------------------------------------
 
-class Design:
-    """What the cost models read from one revision, measured once and shared by every process."""
+# A candidate of a search (inverse design) is built by the kernel but never saved, so it has no slice, no CAM
+# simulation, no manufacturability check and no unfold of its own. These processes are costed from its volume and
+# bounding box alone; moulding and sheet metal need a check of each candidate's solid, which a search does not run.
+CANDIDATE_PROCESSES = ("fdm", "sla", "sls", "mjf", "lpbf", "cnc")
 
-    def __init__(self, st, p: dict, options: dict | None = None):
+
+class Design:
+    """What the cost models read from one revision, measured once and shared by every process.
+
+    candidate: {"volume_mm3", "size": [x, y, z]} of a built, unsaved candidate (inverse design): the B-rep drivers
+    are the candidate's; nothing is read from a slice or a CAM simulation of the head revision. dfm_cache: a dict
+    kept across candidates, so the head's manufacturability (CNC setups) is measured once per search."""
+
+    def __init__(self, st, p: dict, options: dict | None = None, candidate: dict | None = None,
+                 dfm_cache: dict | None = None):
         from .. import materials
         self.st, self.p, self.o = st, p, dict(options or {})
-        self.s = st.head_summary(p)
+        self.candidate = dict(candidate) if candidate else None
+        if self.candidate:
+            size = [float(x) for x in self.candidate["size"]]
+            self.s = {"volume_mm3": float(self.candidate["volume_mm3"]), "bbox": [[0.0, 0.0, 0.0], size], "faces": None}
+        else:
+            self.s = st.head_summary(p)
         lo, hi = self.s["bbox"]
         self.size = [float(b - a) for a, b in zip(lo, hi)]
         self.mat = materials.resolved(p)["material"]
         self.mat_info = materials.info(self.mat) if self.mat else None
         self.rev = st.rev(p)["n"]
         self.notes: list = []
-        self._dfm: dict = {}
+        self._dfm: dict = dfm_cache if dfm_cache is not None else {}
 
     # B-rep
     def volume(self):
-        return drv("volume_mm3", self.s["volume_mm3"], "mm³", "computed (B-rep)", "the design's solid", "Volume")
+        return drv("volume_mm3", self.s["volume_mm3"], "mm³", "computed (B-rep)",
+                   "the candidate's solid" if self.candidate else "the design's solid", "Volume")
 
     def faces(self):
         return drv("faces", self.s.get("faces"), "faces", "computed (B-rep)", "faces of the design's solid", "Faces")
@@ -118,6 +135,11 @@ def _measure(measures: dict, key: str, agg=max):
 
 def drivers(D: Design, process: str, R) -> dict:
     """The drivers of one process, each with its evidence (see models.py)."""
+    if D.candidate and process not in CANDIDATE_PROCESSES:
+        raise _err(f"{LABELS[process]} is not costed for a search candidate: it needs a check of each candidate's solid "
+                   "(manufacturability or the unfold), which a search does not run. Nothing was made up.",
+                   "Cost processes for a search: " + ", ".join(CANDIDATE_PROCESSES) + ". Cost the variant you keep with "
+                   "estimate_cost.")
     o = D.o.get(process) or {}
     vol = D.volume()
     d: dict = {"volume_mm3": vol}
@@ -125,7 +147,7 @@ def drivers(D: Design, process: str, R) -> dict:
         kind = (D.mat_info or {}).get("kind")
         key = D.mat if kind == "filament" else None
         sliced = None
-        if D.p.get("purpose") == "print":
+        if D.p.get("purpose") == "print" and not D.candidate:
             try:
                 from .. import cost as legacy
                 sliced = legacy.project(D.st, D.p, with_materials=False)
@@ -149,7 +171,9 @@ def drivers(D: Design, process: str, R) -> dict:
             g = vol["value"] / 1000 * dens["value"] * sf["value"]
             d["grams"] = drv("grams", g, "g", "estimated", f"volume × {dens['value']:.3g} g/cm³ × {sf['value']:g} (assumed; no slice)", "Filament")
             d["hours"] = drv("hours", g / rate["value"], "h", "estimated", f"grams / {rate['value']:g} g/h (assumed; no slice)", "Print time")
-            D.notes.append("FDM: no current slice, so grams and hours are estimated from the volume; slice the design for the slicer's numbers.")
+            D.notes.append("FDM: grams and hours are estimated from the candidate's volume (a search slices nothing)."
+                           if D.candidate else
+                           "FDM: no current slice, so grams and hours are estimated from the volume; slice the design for the slicer's numbers.")
         d["material_key"] = key or "PLA"
         try:
             from .. import cost as legacy
@@ -180,6 +204,8 @@ def drivers(D: Design, process: str, R) -> dict:
         cyc = None
         try:
             from .. import cam
+            if D.candidate:
+                raise LookupError("a candidate has no CAM simulation")
             stt = cam.status(D.st, D.p)
             if stt.get("state") == "current" and stt.get("simulation", {}).get("cycle_time_s") is not None:
                 cyc = drv("cycle_s", stt["simulation"]["cycle_time_s"], "s", "simulated",
@@ -202,7 +228,9 @@ def drivers(D: Design, process: str, R) -> dict:
             n, state = _measure(meas, "setups")
             if n is not None:
                 d["setups"] = drv("setups", n, "setups", "computed (manufacturability, B-rep)",
-                                  f"the fewest setups for a {opts['tool_d']:g} mm cutter", "Setups")
+                                  f"the fewest setups for a {opts['tool_d']:g} mm cutter"
+                                  + (f", measured on r{D.rev} (a candidate's sizes are taken not to change it)"
+                                     if D.candidate else ""), "Setups")
         except Exception as e:                   # noqa: BLE001
             D.notes.append(f"CNC: setups not measured ({getattr(e, 'msg', e)}); one is assumed.")
         if n is None:
@@ -292,12 +320,13 @@ def _finish(res: dict, quantities: list) -> dict:
 
 
 def estimate(st, p: dict, process: str, quantities=None, options: dict | None = None, shop: str | None = None,
-             currency: str | None = None, overrides: dict | None = None) -> dict:
+             currency: str | None = None, overrides: dict | None = None, candidate: dict | None = None,
+             dfm_cache: dict | None = None) -> dict:
     """One process: its lines (fixed and per part), totals, and cost per part at each quantity."""
     pid = process_id(process)
     qs = clean_quantities(quantities)
     R = rates_mod.Rates(st.cfg, shop, currency, overrides)
-    D = Design(st, p, options)
+    D = Design(st, p, options, candidate, dfm_cache)
     res = _finish(_run(D, pid, R), qs)
     return {"project": p["id"], "rev": D.rev, "shop": R.shop_id, "currency": R.currency, "quantities": qs,
             **res, "notes": res["notes"] + D.notes, "note": NOTE, "rates_digest": rates_mod.digest(),
@@ -315,14 +344,17 @@ def default_processes(st, p: dict) -> list:
 
 
 def compare(st, p: dict, processes=None, quantities=None, options: dict | None = None, shop: str | None = None,
-            currency: str | None = None, overrides: dict | None = None) -> dict:
+            currency: str | None = None, overrides: dict | None = None, candidate: dict | None = None,
+            dfm_cache: dict | None = None) -> dict:
     """Cost per part against quantity for several processes, the cheapest at each quantity, and the crossovers
     ("moulding beats FDM above ~N parts"), every number with its evidence. Purchased parts are added to every route."""
     qs = clean_quantities(quantities)
     procs = [process_id(x) for x in (processes or default_processes(st, p))]
     procs = [x for x in procs if x != "purchased"]
+    if candidate and processes is None:
+        procs = [x for x in procs if x in CANDIDATE_PROCESSES]
     R = rates_mod.Rates(st.cfg, shop, currency, overrides)
-    D = Design(st, p, options)
+    D = Design(st, p, options, candidate, dfm_cache)
     rows = {}
     for pr in procs:
         try:
@@ -375,27 +407,53 @@ def _crossing(rows, lo, hi, q, cur) -> dict:
 
 # ---- for optimise and inverse design (wave AB) ----------------------------------------------------------------
 
-def cost(st, p: dict, process: str = "auto", quantity: int = 1, options: dict | None = None, shop: str | None = None,
-         currency: str | None = None, complete_only: bool = True) -> float | None:
-    """Cost per part at `quantity` in the shop's currency, for an objective: one process, or "auto" for the cheapest
-    process whose lines are all counted. None when nothing can be costed in full (never a guess)."""
+def point(st, p: dict, process: str = "auto", quantity: int = 1, options: dict | None = None, shop: str | None = None,
+          currency: str | None = None, candidate: dict | None = None, dfm_cache: dict | None = None,
+          complete_only: bool = True) -> dict:
+    """Cost per part at `quantity` with how it is known: {value (None when it cannot be costed in full: never a
+    guess), process, currency, shop, evidence (the classes of the counted lines' inputs: sourced, specified, assumed,
+    computed, simulated, estimated), assumed_share, not_counted, rates_digest}. process "auto" is the cheapest
+    process whose lines are all counted (for a candidate: of CANDIDATE_PROCESSES)."""
     q = int(quantity)
     if process in ("auto", "", None):
-        r = compare(st, p, None, [q], options, shop, currency)
+        r = compare(st, p, None, [q], options, shop, currency, candidate=candidate, dfm_cache=dfm_cache)
         c = r["cheapest"][0]
-        return c["per_part"]
-    r = estimate(st, p, process, [q], options, shop, currency)
-    if complete_only and not r["totals"]["complete"]:
-        return None
-    return r["totals"]["curve"][0]["per_part"]
+        row = r["processes"].get(c["process"]) if c["process"] else None
+        val, pid = c["per_part"], c["process"]
+    else:
+        pid = process_id(process)
+        row = estimate(st, p, pid, [q], options, shop, currency, candidate=candidate, dfm_cache=dfm_cache)
+        r = row
+        val = row["totals"]["curve"][0]["per_part"]
+        if complete_only and not row["totals"]["complete"]:
+            val = None
+    tot = (row or {}).get("totals") or {}
+    ev = sorted({e for ln in (row or {}).get("lines", []) if ln.get("amount") is not None for e in ln["evidence"]})
+    return {"value": val, "process": pid, "label": LABELS.get(pid) if pid else None, "quantity": q,
+            "currency": r["currency"], "shop": r["shop"], "evidence": ev, "assumed_share": tot.get("assumed_share"),
+            "not_counted": tot.get("not_counted") or [], "rates_digest": rates_mod.digest()}
+
+
+def cost(st, p: dict, process: str = "auto", quantity: int = 1, options: dict | None = None, shop: str | None = None,
+         currency: str | None = None, complete_only: bool = True, candidate: dict | None = None,
+         dfm_cache: dict | None = None) -> float | None:
+    """Cost per part at `quantity` in the shop's currency, for an objective: one process, or "auto" for the cheapest
+    process whose lines are all counted. None when nothing can be costed in full (never a guess)."""
+    return point(st, p, process, quantity, options, shop, currency, candidate, dfm_cache, complete_only)["value"]
 
 
 def objective(process: str = "auto", quantity: int = 1, **kw):
-    """A callable (st, p) -> float | None for optimise / a Pareto front: cost per part at a quantity."""
-    def f(st, p):
-        return cost(st, p, process, quantity, **kw)
+    """A callable (st, p, candidate=None) -> float | None for optimise / a Pareto front: cost per part at a
+    quantity. f.point(st, p, candidate=None) returns the value with its evidence (see point())."""
+    def f(st, p, candidate=None):
+        return cost(st, p, process, quantity, candidate=candidate, **kw)
+
+    def pt(st, p, candidate=None):
+        return point(st, p, process, quantity, candidate=candidate, **kw)
     f.__name__ = f"cost_{process}_{quantity}"
     f.unit = "per part"
+    f.point = pt
+    f.process, f.quantity = process, int(quantity)
     return f
 
 

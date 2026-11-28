@@ -3,7 +3,8 @@ terminal. Both print JSON on standard output; progress goes to standard error.
 
     form optimize pareto <project> --minimize mass_g [--minimize fea.max_displacement_mm] [--maximize METRIC]
                          [--require "fea.safety_factor>=3"] [--vary t:3:10] [--study ID] [--modal-study ID]
-                         [--solves 24] [--seconds 900] [--evaluations N] [--per-kg 25] [--full]
+                         [--solves 24] [--seconds 900] [--evaluations N] [--per-kg 25]
+                         [--cost-process auto|fdm|sla|sls|mjf|lpbf|cnc --cost-quantity 1000 --shop S] [--full]
     form optimize pareto <project> --show [RUN] [--full]         the stored search (the newest)
     form optimize pareto <project> --save INDEX[:NAME] [--run RUN]   keep a point as a named variant
     form optimize pareto --verify                                 the search on ZDT1 and ZDT2 against the known fronts
@@ -64,7 +65,8 @@ def _flags(args: list, spec: dict) -> tuple:
 PARETO = {"--minimize": ("minimize", "list"), "--maximize": ("maximize", "list"), "--require": ("require", "list"),
           "--vary": ("vary", "list"), "--study": ("study", "str"), "--modal-study": ("modal_study", "str"),
           "--solves": ("solves", "int"), "--seconds": ("seconds", "float"), "--evaluations": ("evaluations", "int"),
-          "--per-kg": ("per_kg", "float"), "--full": ("full", "bool"), "--show": ("show", "opt"),
+          "--per-kg": ("per_kg", "float"), "--cost-process": ("cost_process", "str"),
+          "--cost-quantity": ("cost_quantity", "int"), "--shop": ("shop", "str"), "--full": ("full", "bool"), "--show": ("show", "opt"),
           "--save": ("save", "str"), "--run": ("run", "str"), "--verify": ("verify", "bool")}
 TOPOLOGY = {"--volfrac": ("volfrac", "float"), "--mass": ("mass_g", "float"), "--safety-factor": ("safety_factor", "float"),
             "--study": ("study", "str"), "--mode": ("mode", "str"), "--pull": ("pull", "str"), "--h": ("h", "float"),
@@ -144,6 +146,9 @@ def main(argv: list) -> int:
                     "vary": vary, "study": o.get("study", ""), "modal_study": o.get("modal_study", ""),
                     "budget": {k: o[k] for k in ("solves", "seconds", "evaluations") if k in o},
                     "rates": {"per_kg": o["per_kg"]} if "per_kg" in o else None}
+            if any(k in o for k in ("cost_process", "cost_quantity", "shop")):     # cost.per_part (form/costing)
+                body["costing"] = {"process": o.get("cost_process", "auto"), "quantity": o.get("cost_quantity", 1),
+                                   **({"shop": o["shop"]} if o.get("shop") else {})}
             rec = design.run(st, pid, body, on_progress=_progress)
             _out(tools.digest(rec, bool(o.get("full"))))
             return 0 if rec["front"] else 3

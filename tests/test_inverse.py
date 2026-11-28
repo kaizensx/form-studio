@@ -231,6 +231,40 @@ class Requests(unittest.TestCase):
         self.assertEqual((shown["state"], shown["result"]["id"]), ("current", rec["id"]))
         self.assertEqual(len(shown["result"]["chart"]["points"]), len(rec["points"]))
 
+    def test_cost_per_part_is_an_objective_labelled_as_its_rates_are(self):
+        """form/costing's models on each candidate: computed from its own volume and box, never the head's slice."""
+        from form import costing
+        st, p = self.st, self.st.load(self.pid)
+        for body, word in (({"minimize": ["cost.per_part"], "costing": {"process": "injection"}}, "cannot be costed per candidate"),
+                           ({"minimize": ["cost.total"]}, "cost.per_part"),
+                           ({"minimize": ["mass_g"], "costing": {"quantity": 10}}, "no objective or requirement"),
+                           ({"minimize": ["cost.per_part"], "costing": {"speed": 1}}, "Unknown costing field")):
+            with self.assertRaises(StudioError, msg=str(body)) as cm:
+                design.clean(st, p, body)
+            self.assertIn(word, str(cm.exception) + " " + cm.exception.hint)
+        # the candidate's numbers, not the head's: a candidate twice the volume costs more by FDM
+        small = costing.point(st, p, "fdm", 10, candidate={"volume_mm3": 5000, "size": [40, 30, 5]})
+        big = costing.point(st, p, "fdm", 10, candidate={"volume_mm3": 10000, "size": [40, 30, 10]})
+        self.assertGreater(big["value"], small["value"])
+        self.assertIn("assumed", small["evidence"])
+        with self.assertRaises(StudioError):
+            costing.estimate(st, p, "sheet_metal", [10], candidate={"volume_mm3": 5000, "size": [40, 30, 5]})
+        f = costing.objective("fdm", 10)
+        self.assertEqual(f(st, p, {"volume_mm3": 5000, "size": [40, 30, 5]}), small["value"])
+        rec = design.run(st, self.pid, {"minimize": ["mass_g", "cost.per_part"], "costing": {"process": "fdm", "quantity": 10},
+                                        "budget": {"evaluations": 8, "seconds": 120}})
+        ax = rec["chart"]["axes"][1]
+        self.assertEqual(ax["metric"], "cost.per_part")
+        self.assertTrue(ax["unit"].endswith("/part"))
+        cost_ax = rec["objectives"][1]
+        self.assertIn("assumed", cost_ax["evidence"])                                  # the rates' own classes
+        self.assertIn("computed volume and bounding box", cost_ax["evidence"])
+        for pt in rec["points"]:
+            if pt["ok"]:
+                self.assertGreater(pt["metrics"]["cost.per_part"], 0)
+                self.assertEqual(pt["cost"]["process"], "fdm")
+        self.assertEqual(rec["costing"]["quantity"], 10)
+
     def test_the_tools_are_registered_and_the_listing_names_what_can_vary(self):
         from form import mcp_server
         by = {t.name: t for t in asyncio.run(mcp_server.build().list_tools())}
