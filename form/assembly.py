@@ -25,6 +25,7 @@ import time
 import numpy as np
 
 from .recipes import RecipeError
+from .recipes.assembly import ROTARY
 
 VOL_TOL = 0.01          # mm³; boolean noise on touching faces stays far below this
 DEFAULT_BUDGET_S = 45.0
@@ -532,7 +533,7 @@ def _mate_row(m, lab, B, F0, tol2, warn, bud):
 
 def _sweep_row(j, spec, a, B, tol2, warn, bud, lab, note, n, total):
     from . import collide
-    unit = "°" if j.kind == "hinge" else " mm"
+    unit = "°" if j.kind in ROTARY else " mm"
     moving = spec.moved_by(j.id)
     still = [p.id for p in spec.parts if p.id not in moving]
     pairs = [(m, s) for m in moving for s in still if spec.mate(m, s) is None]
@@ -558,7 +559,7 @@ def _sweep_row(j, spec, a, B, tol2, warn, bud, lab, note, n, total):
                       samples=[], joint=j.id)
     res = collide.sweep(B, frames, pairs, values, lambda m, v1, v2: travel[m](v1, v2), tol=tol2, warn=warn,
                         cutoff=max(2.0, 4 * warn), deadline=bud.end, refine=not detent,
-                        min_step=max(0.25, (hi - lo) / 240) if j.kind == "hinge" else max(0.1, (hi - lo) / 80),
+                        min_step=max(0.25, (hi - lo) / 240) if j.kind in ROTARY else max(0.1, (hi - lo) / 80),
                         max_evals=160, on_sample=tick)
     samples = []
     worst, near = None, None
@@ -579,7 +580,7 @@ def _sweep_row(j, spec, a, B, tol2, warn, bud, lab, note, n, total):
         how = (f"{who} checked at the {len(spec.detents(j))} positions it can rest at (every {j.step:g}{unit} from "
                f"{lo:g} to {hi:g}{unit}); between them the detent rides over by design, so it is not swept.")
     else:
-        how = f"{who} swept {lo:g}–{hi:g}{unit} " + ("about its hinge axis" if j.kind == "hinge" else "along its slide direction")
+        how = f"{who} swept {lo:g}–{hi:g}{unit} " + ("about its axis" if j.kind in ROTARY else "along its slide direction")
         if res.unproven:
             iv = ", ".join(f"{x:g}–{y:g}{unit}" for x, y in res.unproven[:4]) + (" …" if len(res.unproven) > 4 else "")
             added = len(res.samples) - len(values)

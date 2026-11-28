@@ -161,7 +161,7 @@ def clean_pose(spec, pose) -> dict:
             raise StudioError(f"The value of joint “{k}” is not a number.")
         lo, hi = js[k].range
         if not (min(lo, hi) - 1e-9 <= v <= max(lo, hi) + 1e-9):
-            unit = "°" if js[k].kind == "hinge" else " mm"
+            unit = " mm" if js[k].kind == "slide" else "°"
             raise StudioError(f"{v:g}{unit} is outside the range of joint “{k}” ({lo:g} to {hi:g}{unit}).")
         out[k] = v
     return out

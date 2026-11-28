@@ -116,7 +116,7 @@ instead.
 
 ## Tools at a glance
 
-98 tools. Read-only tools never change a project.
+101 tools. Read-only tools never change a project.
 
 | Tool | Access | What it does |
 |---|---|---|
@@ -159,7 +159,7 @@ instead.
 | [`replace_part_guide`](#replace_part_guide) | read-only | Guide a replacement part from a photo. |
 | [`turntable`](#turntable) | read-only | Render a turntable of the head revision from the kernel's mesh. |
 | [`remove_text`](#remove_text) | changes | Remove lettering added with add_text (mark_id like "text_1"; get_design_source shows the block). |
-| [`assembly_instructions`](#assembly_instructions) | changes | Write assembly instructions. Assembly instructions as a PDF from the design's assembly declaration: a parts page with computed volumes, then one page per part going on (in the declaration's parent order, at its explode offset, with arrows). |
+| [`assembly_instructions`](#assembly_instructions) | changes | Write assembly instructions. Assembly instructions as a PDF from the design's assembly declaration: a parts page with computed volumes, then one page per part going on (in the declaration's parent order, at its explode offset, with arrows; after assembly_sequence, in the computed order with each arrow along the proved insertion direction). |
 | [`checkout_revision`](#checkout_revision) | changes | Make an earlier revision the head again (nothing is deleted). |
 | [`set_print_setup`](#set_print_setup) | changes | Set the print setup. Print orientation (as_modelled, on_back, on_front, on_left, on_right, inverted, or a "down:x,y,z" id from suggest_orientation), the acceptable total fit gap window, and whether the pipeline slices automatically. |
 | [`explore_alternatives`](#explore_alternatives) | read-only | Build a small grid of real variants (1-2 parameters, up to 5 values each) and rank them. |
@@ -183,6 +183,9 @@ instead.
 | [`analyze`](#analyze) | read-only | Analyze the part as a map. An analysis map of the part, computed from the real geometry: a picture with its legend, and the statistics. |
 | [`measure`](#measure) | read-only | Measure distances and features of the part. |
 | [`mass_properties`](#mass_properties) | read-only | Mass, centre of mass, inertia tensor and principal axes, computed on the B-rep (OCCT), per part and for the whole. |
+| [`motion_study`](#motion_study) | read-only | Play a mechanism over time and check it along the whole motion. |
+| [`robot_files`](#robot_files) | read-only | Write robot files from the assembly: URDF, SRDF and MJCF (MuJoCo) with one link per part, joints from the declared joints with their limits (hinge revolute or continuous, slide prismatic; cylindrical and ball split in URDF, native in MJCF), couplings as mimic and equality joints, loops as MJCF equality connects (URDF is a tree: listed), inertia per link from the B-rep mass properties (mass, centre of mass and tensor in the link frame, the part's sourced density), visual STL per link and collision as CoACD convex pieces when installed, else a convex hull (collision="hull" \| "box" \| "coacd"). |
+| [`assembly_sequence`](#assembly_sequence) | read-only | Compute an order the parts can go together in, and each part's insertion direction: by disassembly, taking out one part at a time that can leave on a straight line (local freedom from the contact normals, then a collision sweep until it is clear); the assembly order is the reverse. |
 | [`analyze_selection`](#analyze_selection) | read-only | Analyse a selection on the CAD solid without saving it. |
 | [`list_annotations`](#list_annotations) | read-only | List annotations. The selections the person named and kept on this design (annotations): name, note, the revision they were made on, the picked items and their computed analysis, and `text` describing each. |
 | [`annotate`](#annotate) | changes | Keep a selection on the head revision with a name and a note (for example a place you want the person to look at, or one you changed). |
@@ -773,7 +776,8 @@ highlight: a feature id to pick out. values: render an uncommitted candidate (sa
 
 Animate a design. Make motion from real geometry. kind="turntable" spins the head revision. kind="morph" builds every in-between
 design from from_rev (default: head) to to_rev or to_values, so you can show how a change transforms the part.
-Returns the file path and a still. fmt: gif or webp.
+kind="motion" plays the mechanism (motion_study's default driver, loops solved) as an MP4 film (ffmpeg; frames
+is the frame count). Returns the file path and a still. fmt: gif or webp (turntable and morph).
 
 | Argument | Type | Required |
 |---|---|---|
@@ -967,7 +971,8 @@ Remove lettering added with add_text (mark_id like "text_1"; get_design_source s
 ### `assembly_instructions`
 
 Write assembly instructions. Assembly instructions as a PDF from the design's assembly declaration: a parts page with computed volumes, then
-one page per part going on (in the declaration's parent order, at its explode offset, with arrows). Step text is
+one page per part going on (in the declaration's parent order, at its explode offset, with arrows; after
+assembly_sequence, in the computed order with each arrow along the proved insertion direction). Step text is
 the part's note, or what the declaration says. Returns the PDF path, page images and the steps. A design without
 an assembly() has none.
 
@@ -1384,6 +1389,84 @@ computed (closed mesh) for a mesh design; a printed part is taken solid (100 % i
 | `frame` | string \| null |  |
 | `rev` | integer \| null |  |
 | `library` | boolean |  |
+
+### `motion_study`
+
+*Read-only.*
+
+Play a mechanism over time and check it along the whole motion. drivers: [{"joint": id, "from": deg|mm,
+"to": ...}] (a ramp over duration_s), or {"joint", "keys": [[t_s, value], ...]}, {"joint", "speed", "start"},
+{"joint", "sine": {"amplitude", "center", "period_s", "phase_deg"}}; "dof": 1 drives a cylindrical joint's slide.
+Default: the first joint no coupling drives, over its range. The design's couplings (gears, rack, lead screw,
+belt, cam) drive their joints, and closed loops (Loop: a four-bar's coupler pinned to its rocker) are solved per
+frame by Newton's method on the loop-closure equations; a frame the linkage cannot reach is reported as not
+closing, never posed. Returns per frame every joint's value, velocity and acceleration; traces ([{"part", "at":
+[x, y, z]}], default the loop pins or the moving parts' centres) with path, velocity and acceleration;
+clearance between every pair moving relative to each other at every frame, with the minimum gap, its time and
+pair, the first contact, and the intervals between frames proven free or only sampled; holding torque on each
+driven joint under gravity (virtual work; needs materials, or assume_material for a labelled what-if).
+video=True also renders an MP4 (ffmpeg; never a GIF). Evidence: computed (kinematics), computed (mesh distance),
+computed (virtual work, quasi-static, gravity only). Stored by geometry key and inputs.
+
+| Argument | Type | Required |
+|---|---|---|
+| `project` | string | yes |
+| `drivers` | array \| null |  |
+| `duration_s` | number |  |
+| `frames` | integer |  |
+| `hold` | object \| null |  |
+| `traces` | array \| null |  |
+| `clearance` | boolean |  |
+| `torque` | boolean |  |
+| `video` | boolean |  |
+| `budget_s` | number |  |
+| `assume_material` | string \| null |  |
+| `gravity` | array \| null |  |
+| `rev` | integer \| null |  |
+
+### `robot_files`
+
+*Read-only.*
+
+Write robot files from the assembly: URDF, SRDF and MJCF (MuJoCo) with one link per part, joints from the
+declared joints with their limits (hinge revolute or continuous, slide prismatic; cylindrical and ball split in
+URDF, native in MJCF), couplings as mimic and equality joints, loops as MJCF equality connects (URDF is a tree:
+listed), inertia per link from the B-rep mass properties (mass, centre of mass and tensor in the link frame,
+the part's sourced density), visual STL per link and collision as CoACD convex pieces when installed, else a
+convex hull (collision="hull" | "box" | "coacd"). limits: {joint: {"effort", "velocity"}} (else 0, flagged).
+SRDF disables Adjacent, Default (joined by design or touching at rest) and Never pairs (no contact at `samples`
+random poses within limits: sampled, not proven). Health checks: positive-definite inertia, triangle
+inequality, mesh paths, unit joint axes, one tree, no self-collision at the zero pose. The files are then loaded
+by yourdfpy or urdfpy and MuJoCo where installed (here or the robot.mujoco engine; the MJCF also stepped 1 s,
+simulated), else validated structurally, and the result says which. Returns the file paths, checks and
+validation.
+
+| Argument | Type | Required |
+|---|---|---|
+| `project` | string | yes |
+| `collision` | string |  |
+| `assume_material` | string \| null |  |
+| `limits` | object \| null |  |
+| `samples` | integer |  |
+| `rev` | integer \| null |  |
+
+### `assembly_sequence`
+
+*Read-only.*
+
+Compute an order the parts can go together in, and each part's insertion direction: by disassembly, taking
+out one part at a time that can leave on a straight line (local freedom from the contact normals, then a
+collision sweep until it is clear); the assembly order is the reverse. Threads unscrew along their Mate axis,
+snaps deflect, press fits push. Smallest parts are tried first. The exploded view and assembly_instructions then
+follow it (each part along its own free direction; the arrows are the proved directions). A set that cannot
+come apart one at a time is reported, never ordered by guess. Evidence: computed (geometric feasibility); the
+limits (no gravity, fixtures, tool access or flexible parts) come with every result.
+
+| Argument | Type | Required |
+|---|---|---|
+| `project` | string | yes |
+| `budget_s` | number |  |
+| `rev` | integer \| null |  |
 
 ### `analyze_selection`
 

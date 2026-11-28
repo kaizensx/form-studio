@@ -14,6 +14,27 @@
   materials`. New engineering materials: alloy steel 4140, white oak, nylon PA6 (moulded).
 - **Concept cards show mass and material.** `propose_concepts` takes a material per concept; a print concept without
   one is shown in PLA, marked assumed.
+- **Motion studies.** A mechanism played over time from its own declaration: drivers (a ramp, keyframes, a speed or a
+  sine), couplings (gears, rack and pinion, lead screw, belt, cam) and closed loops solved per frame by Newton's method
+  on the loop-closure equations, so a four-bar moves as one. Frames a linkage cannot reach (beyond its Grashof limit)
+  are reported, never posed. Points are traced with path, velocity and acceleration; every pair of parts that moves
+  relative to another is checked at every frame, with the smallest gap, when it happens and the first contact; the
+  holding torque under gravity of each driven joint comes from the parts' masses. An MP4 film of the motion (ffmpeg,
+  no GIF). MCP `motion_study`, `animate(kind="motion")`, `form motion`. Verified against the closed-form four-bar
+  (Freudenstein) to 1e-5°, and the non-Grashof case frame by frame.
+- **More joints.** `cylindrical` (turns and slides on one axis) and `ball` joints; `Coupling`, `gears`, `rack`,
+  `lead_screw`, `cam` and `Loop` in the assembly declaration.
+- **Robot files.** URDF, SRDF and MJCF from the assembly: a link per part, joints with their limits, couplings as
+  mimic and equality joints, loops as MJCF connects, inertia per link from the B-rep mass properties, visual meshes
+  and collision as CoACD pieces or convex hulls. Health checks (positive-definite inertia, triangle inequality, mesh
+  paths, unit axes, one tree, no self-collision at rest), then the files are loaded by yourdfpy and MuJoCo (a new
+  optional engine, MuJoCo 4.0.1 and yourdfpy 0.0.60 in their own Python), or validated structurally and labelled so.
+  MCP `robot_files`, `form urdf`, `form mjcf`.
+- **Assembly sequence.** A feasible order and each part's straight insertion direction, by disassembly: local freedom
+  from the contact normals, then a collision sweep. Threads unscrew along their mate axis. The exploded view and the
+  assembly instructions follow it, so each arrow is a proved direction. A set that cannot come apart one at a time is
+  reported, never ordered by guess. MCP `assembly_sequence`, `form sequence`.
+- Bench entries Motion, Robot files and Assembly steps (registered when the Bench is present).
 
 ### Changed
 

@@ -43,7 +43,7 @@ SCHEMA: dict[str, dict] = {
                       "help": "false: CAD-Recode is never asked, also when it is installed (non-commercial licence)."},
     **{"use." + k: {"type": "bool", "tab": "software", "hidden": True, "label": "Use " + n,
                     "help": "false: " + n + " is never called, also when it is installed."}
-       for k, n in (("coacd", "CoACD"), ("corpus", "the CADEvolve corpus"), ("blender", "Blender"), ("freecad", "FreeCAD"),
+       for k, n in (("coacd", "CoACD"), ("mujoco", "MuJoCo"), ("corpus", "the CADEvolve corpus"), ("blender", "Blender"), ("freecad", "FreeCAD"),
                     ("openscad", "OpenSCAD"), ("bambu", "Bambu Studio"), ("orca", "OrcaSlicer"), ("prusa", "PrusaSlicer"),
                     ("superslicer", "SuperSlicer"), ("qidi", "QIDISlicer"), ("elegoo", "ElegooSlicer"),
                     ("snapmaker", "Snapmaker Orca"))},

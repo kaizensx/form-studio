@@ -139,6 +139,9 @@ under the data folder (`form/engines.py`), showing its size and licence first. T
   environment: build123d 0.13.0 (Apache License 2.0), NumPy 2.5.4, SciPy 1.18.1 and scikit-learn 1.9.1
   (BSD-3-Clause), trimesh 5.2.1 (MIT), manifold3d 3.5.5 (Apache License 2.0).
 - **CoACD** 1.0.14 (game collision, `game.coacd`; https://github.com/SarahWeiii/CoACD). Licence: MIT. With NumPy 2.5.4.
+- **MuJoCo** 4.0.1 (robot files loaded and stepped, `robot.mujoco`; https://github.com/google-deepmind/mujoco).
+  Licence: Apache License 2.0. With **yourdfpy** 0.0.60 (https://github.com/clemense/yourdfpy, MIT), its dependencies
+  trimesh (MIT) and lxml (BSD-3-Clause), and NumPy 2.5.5. Licences read from the installed packages' metadata.
 - **uv** 0.13.7 (https://github.com/astral-sh/uv), downloaded from its GitHub release and checked against a pinned
   SHA-256 before use, makes these environments. Licence: MIT OR Apache-2.0. The Python 3.12 it installs for them is
   CPython (Python Software Foundation License) from uv's managed builds.

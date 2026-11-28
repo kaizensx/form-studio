@@ -7,6 +7,7 @@ run an optional engine asks `on(id, cfg)` first, so one that is switched off is 
     recon.learned   CAD-Recode         [recon] learned          on    (used whenever it is installed, as before)
     recon.cadfit    CADFit             [recon] cadfit           off   (Settings turns it on when it installs it)
     game.coacd      CoACD              [use] coacd              on
+    robot.mujoco    MuJoCo             [use] mujoco             on
     exemplars.cadevolve  CADEvolve     [use] corpus             on
     blender, freecad, openscad         [use] <id>               on
     slicer.<kind>                      [use] <kind>             on
@@ -34,6 +35,10 @@ SWITCHES: dict[str, dict] = {
         "key": "use.coacd", "default": True, "name": "CoACD",
         "effect": "On: a game asset may ask for collision=\"coacd\" (several convex pieces). Off: every game asset "
                   "gets one convex hull per part."},
+    "robot.mujoco": {
+        "key": "use.mujoco", "default": True, "name": "MuJoCo",
+        "effect": "On: robot files are loaded by yourdfpy and MuJoCo (and the MJCF stepped for a second) when it is "
+                  "installed. Off: they are validated structurally only, and say so."},
     "exemplars.cadevolve": {
         "key": "use.corpus", "default": True, "name": "the CADEvolve corpus",
         "effect": "On: the agent's example search adds reference CadQuery programs from this corpus after Form "

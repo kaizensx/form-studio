@@ -58,7 +58,7 @@ GROUPS = [("engine", "Form Studio itself"), ("ai", "Claude Code"), ("agents", "O
 CAPABILITY_OF_GROUP = {"engine": "core", "slicer": "print", "ai": "agent", "agents": "agent", "form": "core"}
 CAPABILITY_OF_ID = {"parts": "parts", "blender": "render", "freecad": "exchange", "openscad": "exchange",
                     "recon.learned": "mesh", "recon.cadfit": "mesh", "exemplars.cadevolve": "core",
-                    "game.coacd": "render"}
+                    "game.coacd": "render", "robot.mujoco": "exchange"}
 
 
 # ---- model --------------------------------------------------------------------------------------------------------
@@ -622,6 +622,36 @@ def _m_coacd(platform, ctx) -> list[Method]:
                    commands=engines.commands(lod.COACD_ENGINE, cfg), action=_coacd_engine(cfg), note=note)]
 
 
+def _mujoco_ready(cfg: dict) -> str:
+    from . import engines, robot
+    if engines.python(robot.ENGINE, cfg) is not None:
+        return "its own Python (" + engines._tilde(engines.env_dir(robot.ENGINE, cfg)) + ")"
+    return ""
+
+
+def _d_mujoco(cfg, ctx) -> Found:
+    where = _mujoco_ready(cfg)
+    if where:
+        return Found("ok", f"Installed in {where}. Robot files are loaded by yourdfpy and MuJoCo.")
+    return Found("missing", "Optional. Not installed. Robot files are validated structurally without it.")
+
+
+def _mujoco_engine(cfg: dict):
+    def run(io) -> str:
+        from . import engines, robot
+        return engines.build(robot.ENGINE, cfg, io)
+    return run
+
+
+def _m_mujoco(platform, ctx) -> list[Method]:
+    from . import engines, robot
+    cfg = ctx.get("cfg") or _cfg_default()
+    note = ("MuJoCo is Apache-2.0 (google-deepmind/mujoco), yourdfpy MIT (clemense/yourdfpy). They run out of the app, "
+            "in a Python of their own, only to load the robot files Form Studio writes.")
+    return [Method("engine", "Its own Python, set up by Form Studio", kind="action", streams=True,
+                   commands=engines.commands(robot.ENGINE, cfg), action=_mujoco_engine(cfg), note=note)]
+
+
 def _m_claude(platform, ctx) -> list[Method]:
     # The commands on the official setup page (CLAUDE_DOCS), unchanged.
     if platform == "windows":
@@ -857,6 +887,17 @@ REGISTRY: list[Software] = [
                    "game engine's physics. Worth it for game assets with hollows, arches or handles, where one convex "
                    "hull per part would close the openings. Runs in its own Python, out of the app.",
              gives="Tighter collision for game assets than one convex hull per part."),
+    Software("robot.mujoco", "MuJoCo check for robot files",
+             "Optional: loads the URDF with yourdfpy and the MJCF with MuJoCo, and steps it for a second under gravity. "
+             "Runs in its own Python, out of the app.",
+             "optional", "engine", _d_mujoco, _m_mujoco,
+             size="about 120 MB (its own Python 3.12 with MuJoCo, yourdfpy and NumPy)",
+             homepage="https://github.com/google-deepmind/mujoco", licence="Apache-2.0 (MuJoCo); MIT (yourdfpy)",
+             licence_url="https://github.com/google-deepmind/mujoco/blob/main/LICENSE",
+             about="A physics engine (MuJoCo) and a URDF reader (yourdfpy) that open the robot files Form Studio writes "
+                   "from an assembly, so they are proved to load, not only written. Worth it when the robot files go "
+                   "to ROS, MoveIt or MuJoCo. Runs in its own Python, out of the app.",
+             gives="Robot files loaded by real parsers, and the MJCF stepped under gravity (simulated)."),
     Software("exemplars.cadevolve", "Reference CadQuery corpus (CADEvolve)",
              "Optional: about 8,000 parametric CadQuery generators from CADEvolve, offered to the agent after Form "
              "Studio's own design examples, labelled reference CadQuery, not the Form API. Read as text, never run.",
@@ -929,7 +970,7 @@ def get(sid: str) -> Software:
 # (<data>/.engines/<id>), CAD-Recode's weights, the CADEvolve corpus. Software installed by another installer (a
 # slicer, Blender, an agent app, libraries in Form Studio's own Python) is never removed here. A folder named by an
 # environment variable (FORM_CADRECODE_DIR, FORM_EXEMPLAR_CORPUS_DIR) belongs to whoever set it and is left alone.
-REMOVABLE = ("recon.learned", "recon.cadfit", "game.coacd", "exemplars.cadevolve")
+REMOVABLE = ("recon.learned", "recon.cadfit", "game.coacd", "robot.mujoco", "exemplars.cadevolve")
 
 
 def removable_paths(sid: str, cfg: dict) -> list[Path]:
@@ -937,7 +978,7 @@ def removable_paths(sid: str, cfg: dict) -> list[Path]:
         return []
     from . import engines
     out: list[Path] = []
-    if sid in ("recon.learned", "recon.cadfit", "game.coacd"):
+    if sid in ("recon.learned", "recon.cadfit", "game.coacd", "robot.mujoco"):
         out.append(engines.env_dir(sid, cfg))
     if sid == "recon.learned" and not os.environ.get("FORM_CADRECODE_DIR"):
         out.append(_weights_dir(cfg))

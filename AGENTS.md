@@ -36,6 +36,9 @@ Prefer the MCP server (`form-mcp`). Without MCP, the `form` CLI does the same an
 | Turn an STL, OBJ or 3MF into a design by the route its triage chooses (parametric CAD, a surface body, a mesh body, parts) | `reconstruct` | `form reconstruct part.stl --tolerance 0.02` |
 | Rebuild a mesh by hand: what is left to add or cut, then tune the sizes | `reference_residual`, `fit_params`, `compare_to_reference` | — |
 | Assembly instructions as a PDF | `assembly_instructions` | `form instructions <p> --out steps.pdf` |
+| Play a mechanism: loops, couplings, traces, clearance along the cycle, holding torque, an MP4 | `motion_study` | `form motion <p> --drivers '[{"joint": "crank", "from": 0, "to": 360}]'` |
+| URDF, SRDF and MJCF with inertia from the B-rep, checked and parsed back | `robot_files` | `form urdf <p>`, `form mjcf <p>` |
+| A feasible assembly order and insertion directions (the explode and instructions follow it) | `assembly_sequence` | `form sequence <p>` |
 
 Every design has a **purpose**: `print` (for 3D printing) or `model` (just a 3D model: rendering, CAD exchange, CNC,
 laser, moulding). `get_project` reports it and `form_overview` says whether the person prints at all (`has_printer`).

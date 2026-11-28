@@ -7,6 +7,7 @@ of its own, made with one click from Settings > Engines & software, and runs out
         recon.learned/              CAD-Recode: torch, transformers, safetensors (pinned)
         recon.cadfit/               CADFit: build123d, trimesh, scikit-learn, SciPy, manifold3d (pinned)
         game.coacd/                 CoACD: approximate convex decomposition for game collision (pinned)
+        robot.mujoco/               MuJoCo and yourdfpy: robot files loaded and stepped (pinned)
 
 An environment is built in a temporary folder next to its final place and moved there only when every step worked
 (uv venv, uv pip install, an import check, the engine's own extra step such as its weights). A failed or cancelled
@@ -67,6 +68,12 @@ SPECS: dict[str, dict] = {
         # CoACD 1.0.14 (MIT) ships abi3 wheels for macOS arm64, Linux x86_64/arm64 and Windows x86_64
         "pins": ("coacd==1.0.14", "numpy==2.5.4"),
         "check": "import coacd, numpy; import form.game.lod",
+    },
+    "robot.mujoco": {
+        "label": "MuJoCo",
+        # MuJoCo 4.0.1 (Apache-2.0) and yourdfpy 0.0.60 (MIT): the robot files are loaded, and the MJCF stepped, here
+        "pins": ("mujoco==4.0.1", "yourdfpy==0.0.60", "numpy==2.5.5"),
+        "check": "import mujoco, yourdfpy, numpy; import form.robot",
     },
 }
 

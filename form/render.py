@@ -54,7 +54,8 @@ def posed(view_data: dict, pose: str) -> dict:
     move = {}
     for part in a["parts"]:
         M = np.array(part["placement"]["m"], dtype=np.float64)
-        off = np.array(part["explode_total"] if pose == "exploded" else (0.0, 0.0, 0.0), dtype=np.float64)
+        off = np.array((part.get("sequence_explode") or part["explode_total"]) if pose == "exploded" else (0.0, 0.0, 0.0),
+                       dtype=np.float64)       # a computed assembly sequence (form/sequence.py) explodes along its directions
         move[part["id"]] = (M[:, :3], M[:, 3] + off)
     mesh = []
     for m in view_data["mesh"]:

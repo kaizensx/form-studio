@@ -157,12 +157,12 @@ Item {
             var j = jointById(ch[i]), v = j ? (pose[j.id] || 0) : 0
             if (!j || !v || j.kind === "fixed") continue
             var ax = Qt.vector3d(j.axis[0], j.axis[1], j.axis[2]).normalized()
-            if (j.kind === "hinge") {
+            if (j.kind !== "slide") {             // hinge, cylindrical and ball turn about their axis (first degree of freedom)
                 var r = Quaternion.fromAxisAndAngle(ax, v), o = Qt.vector3d(j.origin[0], j.origin[1], j.origin[2])
                 t = r.times(t.minus(o)).plus(o); q = r.times(q)
             } else t = t.plus(ax.times(v))
         }
-        if (mode === "exploded") { var e = x.explode_total || x.explode; t = t.plus(Qt.vector3d(e[0], e[1], e[2]).times(explode)) }
+        if (mode === "exploded") { var e = x.sequence_explode || x.explode_total || x.explode; t = t.plus(Qt.vector3d(e[0], e[1], e[2]).times(explode)) }
         return { pos: t, rot: q }
     }
     // ── points on parts, from the print frame (where the engine computes) to where the part is drawn now ──
@@ -234,7 +234,7 @@ Item {
         } else if (on && asmMode === "exploded") {
             var asm = a
             for (var i = 0; i < asm.parts.length; i++) {
-                var x = asm.parts[i], xe = x.explode_total || x.explode, e = Qt.vector3d(xe[0], xe[1], xe[2]).times(explode)
+                var x = asm.parts[i], xe = x.sequence_explode || x.explode_total || x.explode, e = Qt.vector3d(xe[0], xe[1], xe[2]).times(explode)
                 lo = Qt.vector3d(Math.min(lo.x, x.bbox[0][0] + e.x), Math.min(lo.y, x.bbox[0][1] + e.y), Math.min(lo.z, x.bbox[0][2] + e.z))
                 hi = Qt.vector3d(Math.max(hi.x, x.bbox[1][0] + e.x), Math.max(hi.y, x.bbox[1][1] + e.y), Math.max(hi.z, x.bbox[1][2] + e.z))
             }

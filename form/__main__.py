@@ -44,6 +44,11 @@
   form mass <project> [--part P] [--pose JSON] [--material M] [--frame as_built|assembled] [--library]
                                      mass, centre of mass, inertia and principal axes from the B-rep, per part and assembled
   form materials [ID]                the materials library: density and mechanical properties, each with its source
+  form motion <project> [--drivers JSON] [--duration S] [--frames N] [--traces JSON] [--hold JSON] [--video]
+                                     a motion study: loops closed, points traced, clearance along the cycle, holding torque
+  form urdf|mjcf <project> [--collision auto|coacd|hull|box] [--assume M] [--limits JSON]
+                                     robot files (URDF, SRDF, MJCF) with inertia and meshes per link, checked and parsed back
+  form sequence <project> [--budget S]   an assembly order and each part's insertion direction (the explode follows it)
   form orient <project> [--apply [id]]   rank the ways the part can lie on the plate; --apply sets the best (or the id given)
   form variants list|save|promote|delete <project> [name] [k=v ...]   named variants of a design
   form share <project> [--out card.png] [--photo]      1600 x 900 share card of the head revision
@@ -540,6 +545,34 @@ def main(argv=None):
     ms.add_argument("--library", action="store_true", help="add the sourced record of each material used")
     mt = sub.add_parser("materials", help="the materials library with sources: materials [ID]")
     mt.add_argument("id", nargs="?")
+    mo = sub.add_parser("motion", help="motion study: motion <project> [--drivers JSON] [--duration S] [--frames N] "
+                                       "[--traces JSON] [--hold JSON] [--video]")
+    mo.add_argument("project")
+    mo.add_argument("--drivers", help='JSON, e.g. \'[{"joint": "crank", "from": 0, "to": 360}]\'')
+    mo.add_argument("--duration", type=float, default=2.0)
+    mo.add_argument("--frames", type=int, default=49)
+    mo.add_argument("--traces", help='JSON, e.g. \'[{"part": "coupler", "at": [10, 0, 0]}]\'')
+    mo.add_argument("--hold", help="JSON {joint: value} for joints nothing drives")
+    mo.add_argument("--no-clearance", action="store_true")
+    mo.add_argument("--no-torque", action="store_true")
+    mo.add_argument("--video", action="store_true", help="also an MP4 (needs ffmpeg)")
+    mo.add_argument("--budget", type=float, default=60.0, help="seconds for the clearance check")
+    mo.add_argument("--assume", help="a material for parts without one (labelled), for the torque")
+    mo.add_argument("--rev", type=int)
+    mo.add_argument("--full", action="store_true", help="print every frame (default: frames per joint and trace are left out)")
+    for nm in ("urdf", "mjcf"):
+        rb = sub.add_parser(nm, help=f"robot files (URDF, SRDF and MJCF; prints the {nm.upper()} path first): {nm} <project> "
+                                     "[--collision auto|coacd|hull|box] [--assume M] [--limits JSON]")
+        rb.add_argument("project")
+        rb.add_argument("--collision", default="auto", choices=["auto", "coacd", "hull", "box"])
+        rb.add_argument("--assume", help="a material for parts without one (labelled)")
+        rb.add_argument("--limits", help='JSON {joint: {"effort": N·m, "velocity": rad/s}}')
+        rb.add_argument("--samples", type=int, default=64, help="random poses for the SRDF's Never pairs")
+        rb.add_argument("--rev", type=int)
+    sq = sub.add_parser("sequence", help="assembly order and insertion directions: sequence <project> [--budget S]")
+    sq.add_argument("project")
+    sq.add_argument("--budget", type=float, default=90.0)
+    sq.add_argument("--rev", type=int)
     apx = sub.add_parser("appearance", help="colour and material of the design or one part: --color #rrggbb --material petg [--part ID]")
     apx.add_argument("project")
     apx.add_argument("--part", default="")
@@ -787,6 +820,47 @@ def main(argv=None):
             r["headline"] = massprops.headline(r)
             if a.library:
                 r["library"] = {k: ml.record(k) for k in r["materials"]}
+            _print(r)
+        elif a.cmd == "motion":
+            from . import motion
+
+            def js(x, what):
+                try:
+                    return json.loads(x) if x else None
+                except ValueError:
+                    raise StudioError(f"--{what} is JSON.")
+            r = motion.run(st, st.load(a.project), drivers=js(a.drivers, "drivers"), duration_s=a.duration, frames=a.frames,
+                           hold=js(a.hold, "hold"), traces=js(a.traces, "traces"), clearance_check=not a.no_clearance,
+                           torque_check=not a.no_torque, video=a.video, budget_s=a.budget, assume=a.assume, rev=a.rev)
+            r["headline"] = motion.headline(r)
+            if not a.full:
+                r.pop("frames", None)
+                for j in r.get("joints", []):
+                    for k in ("value", "velocity", "acceleration"):
+                        j.pop(k, None)
+                for t in r.get("traces", []):
+                    for k in ("positions_mm", "velocity_mm_s", "acceleration_mm_s2", "speed_mm_s", "accel_mm_s2"):
+                        t.pop(k, None)
+                if r.get("clearance"):
+                    r["clearance"].pop("per_frame", None)
+                if r.get("torque"):
+                    for j in r["torque"].get("joints", []):
+                        j.pop("values", None)
+            _print(r)
+        elif a.cmd in ("urdf", "mjcf"):
+            from . import robot
+            try:
+                lim = json.loads(a.limits) if a.limits else None
+            except ValueError:
+                raise StudioError("--limits is JSON.")
+            r = robot.write(st, st.load(a.project), collision=a.collision, assume_material=a.assume, limits=lim,
+                            samples=a.samples, rev=a.rev)
+            r["headline"] = robot.headline(r)
+            _print({"file": r["paths"][a.cmd], **r})
+        elif a.cmd == "sequence":
+            from . import sequence
+            r = sequence.plan(st, st.load(a.project), budget_s=a.budget, rev=a.rev)
+            r["headline"] = sequence.headline(r)
             _print(r)
         elif a.cmd == "materials":
             from . import material_library as ml
