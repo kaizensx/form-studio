@@ -5,8 +5,8 @@ every page, and Engines & software shows “Use in Form Studio” for what is in
 Environment (tests/test_ui_journeys.py test_settings_tour): FORM_APPEARANCE picks the appearance for the run."""
 from _lib import open_sheet_wait
 
-PAGES = (("general", "General"), ("chat", "Agents & models"), ("software", "Engines & software"), ("apps", "Other apps"),
-         ("backups", "Backups"), ("updates", "Updates"), ("advanced", "Advanced"))
+PAGES = (("general", "General"), ("chat", "Agents & models"), ("software", "Engines & software"), ("costs", "Costs"),
+         ("apps", "Other apps"), ("backups", "Backups"), ("updates", "Updates"), ("advanced", "Advanced"))
 
 
 def _row(ui, name, sid):
