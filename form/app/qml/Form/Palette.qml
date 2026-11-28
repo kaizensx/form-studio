@@ -345,6 +345,6 @@ Item {
             Row { objectName: "paletteTab"; spacing: 5; Kbd { keys: "Tab" } Txt { kind: "fine"; text: pal.everywhere ? (Store.project && Store.screen === "work" ? "back to " + Store.project.name : "commands only") : "search everywhere"; anchors.verticalCenter: parent.verticalCenter
                 width: Math.min(implicitWidth, 190); elide: Text.ElideRight; wrapMode: Text.NoWrap } } }
         Txt { anchors.bottom: parent.bottom; anchors.bottomMargin: 12; anchors.right: parent.right; anchors.rightMargin: 22; kind: "fine"; mono: true; tone: 3
-            text: pal.everywhere && q.text.trim().length >= 2 && pal.foundFor === q.text.trim() ? (pal.found.length ? "said in " + F.plural(pal.found.length, "conversation") : "said in no conversation") : pal.all.length + " commands" }
+            text: pal.everywhere && q.text.trim().length >= 2 && pal.foundFor === q.text.trim() ? (pal.found.length ? "said in " + F.plural(pal.found.length, "conversation") : "nothing more inside conversations") : pal.all.length + " commands" }
     }
 }

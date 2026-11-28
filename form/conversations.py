@@ -584,16 +584,17 @@ class Conversations:
                 continue
             if words:
                 title, preview = str(meta.get("title", "")), str(meta.get("preview", ""))
-                hay, said_in = (title + " " + preview).lower(), [preview]
+                hay, said_in = (title + " " + preview).lower(), None
                 if not all(w in hay for w in words):
-                    said_in = [str(e.get("text", "")) for e in self.events(d.name) if e.get("t") in ("user", "text")]
+                    said_in = self._said(d.name)
                     hay += " " + " ".join(said_in).lower()
                     if not all(w in hay for w in words):
                         continue
                 # words that are not all in the title were said in the conversation: `match` is the line around the
-                # first of them inside the one message that holds it, as it was written (the palette's "search
-                # everywhere" quotes it)
+                # first of them inside the one message that holds it, as it was written, your own messages before
+                # the replies (the palette's "search everywhere" quotes it)
                 if not all(w in title.lower() for w in words):
+                    said_in = said_in if said_in is not None else self._said(d.name)
                     hit = next(((m, w) for w in words for m in said_in if w in m.lower()), None)
                     if hit:
                         meta = dict(meta, match=self._snippet(hit[0], hit[1]))
@@ -608,6 +609,12 @@ class Conversations:
                     one.append(m)
             out = one
         return out[:limit]
+
+    def _said(self, cid: str) -> list[str]:
+        """Every message of a conversation as text: what the person wrote first, then the replies."""
+        evs = self.events(cid)
+        return ([str(e.get("text", "")) for e in evs if e.get("t") == "user"]
+                + [str(e.get("text", "")) for e in evs if e.get("t") == "text"])
 
     @staticmethod
     def _snippet(hay: str, word: str, span: int = 60) -> str:

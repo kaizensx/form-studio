@@ -60,6 +60,7 @@ def run(ui):
     row = [r for r in shown(ui) if r["id"] == "found." + cid][0]
     ui.check("quokka pocket" in row["text"] and row["g"] == "Everywhere", f"the row quotes the line around the word: {row['text']}")
     ui.check(title in row["hint"], f"and names the conversation: {row['hint']}")
+    ui.check("You said" not in row["text"], f"your own message is quoted, not the reply that repeats it: {row['text']}")
     ui.check(ui.sees("Everywhere", ui.item("paletteScope")), "the scope says Everywhere")
     ui.settle(300)
     ui.shot("palette-everywhere")
