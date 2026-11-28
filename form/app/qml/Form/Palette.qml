@@ -166,6 +166,9 @@ Item {
         return out
     }
     readonly property var picks: { var p = []; for (var i = 0; i < rows.length; i++) if (!rows[i].head) p.push(i); return p }
+    // what typing highlights: the closest match, wherever its group is listed (the rows stay in group order)
+    readonly property int best: { var b = 0, s = -1e9; for (var i = 0; i < picks.length; i++) { var r = rows[picks[i]]; if (r.score !== undefined && r.score > s) { s = r.score; b = i } } return b }
+    function pickBest() { sel = best; if (picks.length) list.positionViewAtIndex(picks[sel], ListView.Contain) }
     function lit(text, at) {
         if (!at || !at.length) return text.replace(/&/g, "&amp;").replace(/</g, "&lt;")
         var s = "", set = {}
@@ -193,7 +196,7 @@ Item {
         Text { x: 22; y: 7; height: 44; verticalAlignment: Text.AlignVCenter; text: "›"; color: Theme.datum
             font.family: Theme.mono; font.pixelSize: 20; font.weight: Theme.wMedium; renderType: Theme.textRender }
         Field { id: q; x: 40; y: 14; width: parent.width - 62; height: 32; bare: true; placeholder: "Search commands, designs and conversations"
-            onEdited: { pal.sel = 0; list.positionViewAtBeginning() }
+            onEdited: { pal.sel = 0; list.positionViewAtBeginning(); Qt.callLater(pal.pickBest) }     // once the rows follow the text
             input.font.pixelSize: 15
             input.Keys.onPressed: function (e) {
                 if (e.key === Qt.Key_Down || (e.key === Qt.Key_N && (e.modifiers & Qt.ControlModifier))) { pal.move(1); e.accepted = true }

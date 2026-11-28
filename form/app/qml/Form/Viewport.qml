@@ -322,7 +322,7 @@ Item {
                 hi = Qt.vector3d(Math.max(hi.x, x.bbox[1][0] + e.x), Math.max(hi.y, x.bbox[1][1] + e.y), Math.max(hi.z, x.bbox[1][2] + e.z))
             }
         }
-        if (laid) {                          // the plates themselves are part of what is shown
+        if (laid && !!platePlan) {           // the plates themselves are part of what is shown (the plan goes null a moment on a commit)
             var n = platePlan.plates.length
             lo = Qt.vector3d(Math.min(lo.x, 0), Math.min(lo.y, 0), lo.z)
             hi = Qt.vector3d(Math.max(hi.x, plateOffset(n) + plateBed[0]), Math.max(hi.y, plateBed[1]), hi.z)
