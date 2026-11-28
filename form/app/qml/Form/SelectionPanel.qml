@@ -122,6 +122,10 @@ Rectangle {
                 Btn { objectName: "featureHere"; small: true; icon: "wrench"; text: "Feature here…"; visible: !!sp.flat
                     tip: "A screw boss or a snap-fit hook on this flat face, as a feature of the design"
                     onClicked: Store.openSheet("feature", { item: sp.flat }) }
+                Btn { objectName: "partHere"; small: true; icon: "wrench"; text: "Part here…"
+                    visible: sp.items.some(function (x) { return !!x.on })
+                    tip: "A screw, insert, bearing or other bought part on this hole or face: its hole is cut and its fit checked"
+                    onClicked: Store.openSheet("parts", { item: sp.items.filter(function (x) { return !!x.on })[0] }) }
                 Btn { small: true; kind: "quiet"; text: "Clear"; onClicked: Store.selClear() }
             }
             Column {

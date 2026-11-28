@@ -58,6 +58,13 @@ SCHEMA: dict[str, dict] = {
     "data.dir": {"type": "path", "tab": "general", "label": "Project folder", "restart": True,
                  "help": "Where designs, their history and releases are kept. Takes effect when Form Studio restarts; "
                          "existing projects are not moved."},
+    "parts.catalogue": {"type": "bool", "tab": "general", "label": "Supplier catalogue service (parts list)",
+                        "help": "Off by default. On: the parts list can search a supplier catalogue for part numbers; before "
+                                "each search it shows what is sent (the designation only) and to whom, and waits for you. "
+                                "No provider is configured yet, so nothing is sent; supplier numbers come from you or a "
+                                "link you give."},
+    "parts.catalogue_provider": {"type": "str", "tab": "general", "hidden": True, "label": "Catalogue provider",
+                                 "help": "The provider id (form/bom.py PROVIDERS). Empty: none."},
     "updates.check": {"type": "bool", "tab": "updates", "label": "Check for a newer Form Studio once a day",
                       "help": "Reads public release information from GitHub. Nothing is downloaded or installed."},
     "updates.channel": {"type": "choice", "tab": "updates", "label": "Update channel", "choices": ["stable", "preview"],

@@ -475,6 +475,32 @@ def main(argv=None):
     eg.add_argument("--list", action="store_true")
     eg.add_argument("--remove", metavar="ID")
     eg.add_argument("--expect-head", type=int)
+    # -- standard parts and the parts list (form/catalog.py, form/placement.py, form/bom.py) --
+    pa = sub.add_parser("parts", help="standard parts from published tables: parts search QUERY | families | describe "
+                                      "SPEC [--step] | din DESIGNATION | snap|place|list|fit|remove <project> ...")
+    pa.add_argument("action", choices=("search", "families", "describe", "din", "snap", "place", "list", "fit", "remove"))
+    pa.add_argument("args", nargs="*", help="search: the query; describe: a spec as JSON or family:size; din: the "
+                                            "designation; snap/place/list/fit/remove: the project first")
+    pa.add_argument("--spec", help='the part as JSON ({"family": "iso4762", "size": "M3", "length": 10}) or family:size')
+    pa.add_argument("--at", metavar="x,y,z", help="a point on a hole's wall or a flat face, mm")
+    pa.add_argument("--normal", metavar="x,y,z", help="outward direction (needed with --no-snap)")
+    pa.add_argument("--depth", type=float, help="host thickness the cut goes through (default: measured)")
+    pa.add_argument("--qty", type=int, default=1)
+    pa.add_argument("--no-cut", action="store_true", help="record the part without cutting its mating feature")
+    pa.add_argument("--no-snap", action="store_true", help="use --at and --normal as given")
+    pa.add_argument("--step", action="store_true", help="describe: also build it and write a STEP")
+    pa.add_argument("--expect-head", type=int)
+    bo = sub.add_parser("bom", help="the parts list: bom <project> [--csv FILE | --pdf FILE] | supplier add|remove "
+                                    "<project> DESIGNATION ... | catalogue [QUERY] [--confirm]")
+    bo.add_argument("args", nargs="+", help="<project>, or supplier add|remove <project> DESIGNATION, or catalogue [QUERY]")
+    bo.add_argument("--csv", metavar="FILE")
+    bo.add_argument("--pdf", metavar="FILE")
+    bo.add_argument("--no-made", action="store_true", help="purchased items only (no kernel call for the made parts)")
+    bo.add_argument("--supplier")
+    bo.add_argument("--part-number")
+    bo.add_argument("--url", default="")
+    bo.add_argument("--note", default="")
+    bo.add_argument("--confirm", action="store_true", help="catalogue: really search after reading what is sent")
     gd = sub.add_parser("diff", help="what changed between two revisions, computed on the solids: diff <project> A [B] [--png FILE]")
     gd.add_argument("project")
     gd.add_argument("a", type=int)
@@ -749,6 +775,81 @@ def main(argv=None):
                                   a.expect_head, origin="cli")
                 out["printability"] = engrave.printability(a.text, a.height, a.depth, a.sunk, nz)
                 _print(out)
+        elif a.cmd == "parts":
+            from . import catalog, placement
+            xyz = lambda t: [float(x) for x in t.split(",")]
+
+            def spec_of(t):
+                if not t:
+                    raise StudioError("Give the part: --spec as JSON, or family:size (form parts search finds one).")
+                if t.strip().startswith("{"):
+                    return json.loads(t)
+                fam, _, size = t.partition(":")
+                return {"family": fam, "size": size}
+            args = list(a.args)
+            if a.action == "search":
+                _print({"results": catalog.search(" ".join(args)), "note": "Local tables only; nothing was sent anywhere."})
+            elif a.action == "families":
+                _print({"families": catalog.families()})
+            elif a.action == "din":
+                _print(catalog.din(" ".join(args)))
+            elif a.action == "describe":
+                sp = spec_of(a.spec or (args[0] if args else ""))
+                if a.step:
+                    out = st.root / ".catalog" / "step"
+                    out.mkdir(parents=True, exist_ok=True)
+                    it = catalog.resolve(sp)
+                    _print(catalog.part_info(st, it, step_path=str(out / f"{it['family']}-{it['size']}.step")))
+                else:
+                    _print(catalog.describe(sp))
+            else:
+                if not args:
+                    raise StudioError(f"parts {a.action} needs the project.")
+                p = st.load(args[0])
+                if a.action == "list":
+                    _print({"placements": placement.list_parts(st, p)})
+                elif a.action == "fit":
+                    _print(placement.fit(st, p))
+                elif a.action == "remove":
+                    if len(args) < 2:
+                        raise StudioError("parts remove <project> std_N")
+                    _print(placement.remove(st, p, args[1], a.expect_head, origin="cli"))
+                elif a.action == "snap":
+                    if not a.at:
+                        raise StudioError("Give --at x,y,z.")
+                    _print(placement.snap(st, p, xyz(a.at), xyz(a.normal) if a.normal else None))
+                else:
+                    if not a.at:
+                        raise StudioError("Give --at x,y,z (a point on a hole's wall or a flat face).")
+                    _print(placement.place(st, p, spec_of(a.spec or (args[1] if len(args) > 1 else "")), xyz(a.at),
+                                           xyz(a.normal) if a.normal else None, a.depth, a.qty, not a.no_cut,
+                                           not a.no_snap, None, a.expect_head, origin="cli"))
+        elif a.cmd == "bom":
+            from . import bom as bm
+            args = list(a.args)
+            if args[0] == "catalogue":
+                q = " ".join(args[1:])
+                _print(bm.catalogue_search(st.cfg, q, a.confirm) if q else bm.catalogue_status(st.cfg))
+            elif args[0] == "supplier":
+                if len(args) < 4 or args[1] not in ("add", "remove"):
+                    raise StudioError("bom supplier add|remove <project> DESIGNATION --supplier NAME --part-number N [--url URL]")
+                p = st.load(args[2])
+                dsg = " ".join(args[3:])
+                if args[1] == "add":
+                    _print(bm.add_supplier(st, p, dsg, a.supplier, a.part_number, a.url, a.note, by="person"))
+                else:
+                    _print(bm.remove_supplier(st, p, dsg, a.supplier or "", a.part_number or ""))
+            else:
+                p = st.load(args[0])
+                b = bm.build(st, p, made=not a.no_made)
+                if a.csv:
+                    Path(a.csv).write_text(bm.csv_text(b), encoding="utf-8")
+                    b["csv"] = str(Path(a.csv).resolve())
+                if a.pdf:
+                    import shutil as _sh
+                    _sh.copyfile(bm.pdf(st, p, b), a.pdf)
+                    b["pdf"] = str(Path(a.pdf).resolve())
+                _print(b)
         elif a.cmd == "diff":
             from . import geomdiff
             import shutil as _sh

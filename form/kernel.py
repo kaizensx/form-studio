@@ -1393,3 +1393,7 @@ from .candidates import KERNEL_OPS as _CANDIDATE_OPS  # noqa: E402  (several can
 OPS.update(_CANDIDATE_OPS)
 from .massprops import KERNEL_OPS as _MASS_OPS  # noqa: E402  (mass, centre of mass and inertia from the B-rep)
 OPS.update(_MASS_OPS)
+from .catalog import KERNEL_OPS as _CATALOG_OPS  # noqa: E402  (standard parts: build and measure one part)
+OPS.update(_CATALOG_OPS)
+from .placement import KERNEL_OPS as _PLACEMENT_OPS  # noqa: E402  (standard parts placed: snap and fit)
+OPS.update(_PLACEMENT_OPS)

@@ -74,14 +74,8 @@ NUTS = {
     "square": ("DIN 562 thin square nut (s, m)", {
         "M2": (4.0, 1.2), "M2.5": (5.0, 1.6), "M3": (5.5, 1.8), "M4": (7.0, 2.2), "M5": (8.0, 2.7), "M6": (10.0, 3.2)}),
 }
-# Brass heat-set inserts, CNC Kitchen standard and short versions, from the product pages at cnckitchen.store
-# (e.g. /products/heat-set-insert-m3-x-5-7-100-pieces): (insert outer diameter, length, recommended hole
-# diameter, minimum wall around the hole), mm. The hole diameter is the published one; it is not an FDM guess.
-INSERT_SOURCE = "CNC Kitchen heat-set insert datasheet (cnckitchen.store), recommended hole"
-INSERTS = {
-    "M2": (3.6, 3.0, 3.2, 1.3), "M2.5": (4.6, 4.0, 4.0, 1.6), "M3": (4.6, 5.7, 4.0, 1.6), "M3-short": (4.6, 3.0, 4.0, 1.6),
-    "M4": (6.3, 8.1, 5.7, 2.1), "M4-short": (6.3, 4.0, 5.7, 2.1), "M5": (7.1, 9.5, 6.5, 2.6), "M5-short": (7.1, 5.8, 6.5, 2.6),
-}
+# Brass heat-set inserts (CNC Kitchen product pages): the table lives in form.catalog, the standard-parts library.
+from .catalog import INSERT_SOURCE, INSERTS  # noqa: E402
 # Deep-groove ball bearings, ISO 15: bore d, outside D, width B, inner-ring shoulder d1, max housing shoulder Da.
 BEARING_SOURCE = "ISO 15 deep-groove ball bearing (SKF catalogue values, as tabulated in bd_warehouse)"
 BEARINGS = {

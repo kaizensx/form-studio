@@ -289,6 +289,34 @@ each one named as it arrives.
 - **Meshes stay honest.** An STL, 3MF or OpenSCAD mesh brought into the kernel keeps every triangle as a face. Volume,
   wall thickness and exports work on it; it is never written to STEP or called a CAD solid.
 
+## Standard parts and the parts list
+
+- **A library generated from the standards' tables.** Socket head cap screws (ISO 4762, and DIN 912 ordered as its
+  successor), button heads (ISO 7380-1), countersunk screws (ISO 10642), hex nuts (ISO 4032), washers (ISO 7089),
+  brass heat-set inserts (CNC Kitchen datasheet), deep-groove ball bearings 60x, 62x, 6xx and 608 (ISO 15), dowel pins
+  (ISO 8734), shaft collars (DIN 705 A), ground shafts and LM6/8/10/12UU bushings (THK catalogue), GT2 pulleys and
+  belts, NEMA 17 and 23 motors (NEMA ICS 16 envelope), V-Slot 2020 and 2040 extrusion with T-nuts (OpenBuilds), NdFeB
+  disc magnets with their grade (N35 to N52), and O-rings (ISO 3601-1) with their gland. Every dimension names its
+  table; a size that is not in a table is refused, and a value no source gives is marked assumed. Every part is real
+  CAD; threads are cosmetic and say so. Designations are the ones a buyer orders by ("ISO 4762 M5×12 A2-70").
+  MCP `standard_part`, `form parts`.
+- **Pick a hole or a face, and the part is placed in one action.** A point on a hole's wall snaps to the hole's axis
+  and opening; a point on a flat face to the face. The host's thickness there picks the cut depth and a screw's stock
+  length. The matching clearance hole and counterbore (ISO 273), insert pocket, nut trap, bearing seat, housing bore,
+  magnet pocket, gland or motor mount is cut into the design as a feature of its source (a new revision, built in the
+  kernel), and the part enters the assembly as purchased. The fit is checked on the B-rep: the part as fitted is
+  intersected with the cut host (a clearance part must not touch it; an insert or press-fit pin must grip), and the
+  clearance per side is computed from the two tables. In the app: select a point, **Part here…**, or Bench › Standard
+  parts.
+- **A parts list a buyer can order from.** Purchased items grouped by designation with quantity, material and mass
+  (the maker's catalogue value when it gives one, else the modelled volume on the B-rep times the sourced density,
+  else none), and the made parts with their mass (mass properties). CSV and a PDF page for the drawing set. Bench ›
+  Parts list; MCP `bom`; `form bom`.
+- **Supplier numbers only from you.** A part number is recorded only when you type it, or from a page at a link you
+  give, stamped with who added it, the link and the date; none is ever generated. An optional catalogue service is in
+  Settings, off by default: before each search it says what is sent (the designation only) and to whom, and waits for
+  you. No provider is configured yet, so nothing is sent.
+
 
 ## Meshes rebuilt as clean CAD by the agent
 
@@ -618,7 +646,7 @@ either. A real thin fin still fails.
 | OpenSCAD | Builds `.scad` designs; Customizer ranges become parameters |
 | Blender | Photoreal renders; its 3D-Print Toolbox checks when the add-on is installed |
 | Your slicer | Slices, and opens the 3MF or G-code in it |
-| Any MCP client | The full engine over 100 tools ([MCP reference](MCP.md)) |
+| Any MCP client | The full engine over 103 tools ([MCP reference](MCP.md)) |
 
 When a program's version outside the supported range is why something failed, the error names the supported versions
 and what to do.
