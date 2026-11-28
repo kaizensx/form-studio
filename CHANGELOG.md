@@ -4,6 +4,16 @@
 
 ### New
 
+- **Benchmarks in public.** `form bench list|run|publish` runs Form Studio's own verification suites and publishes
+  every row, failures included, with the commit, machine and date: strength studies against textbook and NAFEMS cases,
+  calculators against published worked examples, ISO 286 limits against the ISO 286-2 tables, every manufacturability
+  rule probed on both sides of its threshold, and mesh to editable CAD against tolerance. The results are
+  `docs/BENCHMARKS.md` and the site's benchmarks page; the Benchmark suites workflow regenerates them on dev, so they
+  are never edited by hand. **`form bench cadbench`** runs Parametric CAD Bench v3 (100 public FreeCAD tasks,
+  Apache-2.0) through Form Studio: each task's prompt to the agent with Form Studio's MCP server attached, in a data
+  folder of its own, scored by the task's own verifier image with no network; `form bench oracle` checks that a
+  task's reference scores 1.0 through the same path. The stand-in agent proves the plumbing; the score is pending a
+  run with a real model.
 - **The Bench.** Every study, route and document of a design in one listing: at the top of the Review pane the
   studies (checks, assembly and joints, requirements, analysis maps, fit, critique, slice, print simulation,
   orientation, every printer, cost, make it lighter), at the top of the Make pane the routes (exports, 3MF with

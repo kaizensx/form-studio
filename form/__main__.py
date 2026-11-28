@@ -27,6 +27,7 @@
   form replace --photo broken.jpg [--name X]           a replacement for a broken part, from a photo, in a chat
   form feature <project> boss --at x,y,z --normal ...  a screw boss or snap-fit hook in the code
   form study list|run|show <project> [id] [--force]   the Bench: every study, route and document, with its state
+  form bench list|run|publish|cadbench|oracle          benchmarks: own suites and Parametric CAD Bench v3, published
   form tree <project> [suppress|restore|move|rename FEATURE] [--upto FEATURE]   the feature tree, by hand
   form model <project> fillet|chamfer|hole|pattern|shell --at x,y,z ... [--preview]   a picked feature as code
   form model <project> extrude|cut|revolve --sketch F.json [--at x,y,z] [--depth D]    a feature from a sketch
@@ -254,6 +255,9 @@ def main(argv=None):
     if argv[:1] == ["secrets"]:                    # agent keys (Gemini); values never on the command line
         from .secrets import main as secrets_main
         return secrets_main(argv[1:])
+    if argv[:1] == ["bench"]:                      # benchmarks in public: own suites, Parametric CAD Bench v3
+        from .bench import main_cli as bench_main
+        return bench_main(argv[1:])
     if argv[:1] == ["study"]:                      # the Bench: every study, route and document with its state (form/studies.py)
         from .studies import main_cli as study_main
         return study_main(argv[1:])
