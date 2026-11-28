@@ -2057,6 +2057,30 @@ def build() -> MCPServer:
             return analysis.measure(st, p, from_point, to_point, rev)
         return await _run(go)
 
+    @mcp.tool(annotations=RO)
+    async def mass_properties(project: str, part: str = "", pose: dict | None = None, material: str | None = None,
+                              frame: str | None = None, rev: int | None = None, library: bool = False) -> dict:
+        """Mass, centre of mass, inertia tensor and principal axes, computed on the B-rep (OCCT), per part and for the
+        whole. Units: mm, g, g·mm² (also kg·m²); inertia is about the centre of mass in the design's axes, and about the
+        origin. A design that declares an assembly is reported assembled; pose={joint id: value} (degrees for a hinge,
+        mm for a slide) moves its joints; frame="as_built" gives the solids where the design builds them. Each part's
+        density comes from its material (set_appearance; the design's code may declare one per Part), with the
+        document it was read from; a part without a material has no mass (the volume centroid is given instead).
+        material= is a what-if for every part (or for `part`), nothing saved. library=True adds the full sourced
+        record of each material used (E, Poisson's ratio, yield, UTS, thermal, a printed filament's X-Y and Z values
+        and its Z knock-down; a value no source gives is listed as unsourced). Evidence class: computed (B-rep), or
+        computed (closed mesh) for a mesh design; a printed part is taken solid (100 % infill)."""
+        st = studio()
+        def go():
+            from . import material_library as ml, massprops
+            p = st.load(project)
+            r = massprops.compute(st, p, part=part, pose=pose, material=material, frame=frame, rev=rev)
+            r["headline"] = massprops.headline(r)
+            if library:
+                r["library"] = {k: ml.record(k) for k in r["materials"]}
+            return r
+        return await _run(go)
+
     # ── selections, annotations, colours and materials (form/selection.py, form/materials.py) ──
     @mcp.tool(annotations=RO)
     async def analyze_selection(project: str, items: list[dict], rev: int | None = None) -> dict:
@@ -2105,8 +2129,9 @@ def build() -> MCPServer:
         get_project / render). Filaments (a print design): PLA, PETG, ABS, ASA, TPU, PA (nylon), PC, PLA-CF, PETG-CF, PA-CF; Form Studio
         adds their notes to the checks (heat, sunlight, warping, flexible, fibre-filled) and the slicer picks the matching filament.
         Engineering materials (a model design: CNC, casting, rendering): AL-6061, AL-7075, STEEL, STAINLESS, BRASS, COPPER, TITANIUM,
-        OAK, WALNUT, MAPLE, PINE, POM, PTFE, PEEK, PMMA ("aluminium 7075", "delrin" also work), with bd_materials' typical density and
-        look; get_project then reports the computed mass (volume x typical density). The colour is drawn and written into the 3MF;
+        STEEL-4140, OAK, OAK-WHITE, WALNUT, MAPLE, PINE, POM, PTFE, PEEK, PMMA, NYLON-PA6 ("aluminium 7075", "delrin" also work), with
+        their datasheet density (bd_materials' typical one where none is sourced) and look; mass_properties then gives mass, centre
+        of mass and inertia. The colour is drawn and written into the 3MF;
         stored in the project's material fields (parts.<id>.material). Leave an argument out to keep it; clear=True removes both."""
         st = studio()
         from . import materials
@@ -2527,12 +2552,15 @@ def build() -> MCPServer:
                                run: bool = True, ctx: Context = None) -> dict:
         """Propose concepts. For a new idea: build 2-4 genuinely different concepts as real designs, so the person can pick one.
         concepts: [{"title": short name, "rationale": one line on the approach, "source": design code as for
-        create_design (see design_guide), "language": "python", "values": {...} or null}]. Make them different
+        create_design (see design_guide), "language": "python", "values": {...} or null, "material": "PETG" | "AL-6061" | ...
+        (optional; set_appearance's keys)}]. Give each concept the material it would be made in: its card shows the mass
+        (computed on the B-rep in that material; without one a print concept is shown in PLA, marked assumed). Make them different
         structural approaches (how it holds, mounts, opens), not size variants. Each becomes its own project
         ("<name> · A", "· B", ...). A concept that fails to build comes back in "failed" with its error; the others are
         kept. group: an open group's id to add concepts to (at most 6 in a group), e.g. one mixed concept when the
         person asks for "the base of A with the hook of C". With run=True each is exported and checked.
-        Returns the board: {id, name, state, members: [{project, letter, title, rationale, numbers}], failed}."""
+        Returns the board: {id, name, state, members: [{project, letter, title, rationale, numbers}], failed};
+        numbers: size, volume, mass_g with its material and how it is known."""
         from . import concepts as concepts_mod
         st = studio()
         by = _origin(ctx).replace("agent:", "") or "agent"

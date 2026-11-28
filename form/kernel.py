@@ -1374,3 +1374,5 @@ from .candidates import KERNEL_OPS as _CANDIDATE_OPS  # noqa: E402  (several can
 OPS.update(_CANDIDATE_OPS)
 from .fea.prep import KERNEL_OPS as _FEA_OPS  # noqa: E402  (strength studies: the solid as STEP, the picked faces)
 OPS.update(_FEA_OPS)
+from .massprops import KERNEL_OPS as _MASS_OPS  # noqa: E402  (mass, centre of mass and inertia from the B-rep)
+OPS.update(_MASS_OPS)

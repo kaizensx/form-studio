@@ -13,7 +13,9 @@ are PLA, PETG, ABS, ASA, TPU, PA, PC and the fibre-filled PLA-CF, PETG-CF, PA-CF
 
 Form Studio uses the material for the material notes in the checks (heat, sunlight, warping, flexible filament,
 fibre-filled), the solid-mass estimate and the names in the 3MF it writes. Property values are typical figures from
-filament datasheets; brands differ. They feed heuristics, never a computed result.
+filament datasheets; brands differ. They feed heuristics, never a computed result. The densities are those of
+form/material_data.py (one manufacturer's datasheet per filament, cited there), which also holds each filament's
+sourced mechanical properties for the mass properties and the studies (form/material_library.py: record, prop).
 
 A design that is not printed (CNC, casting, rendering) can also take an engineering material: aluminium 6061 and
 7075, mild and stainless steel, brass, copper, titanium, woods and engineering plastics (ENGINEERING, from
@@ -28,31 +30,31 @@ MATERIALS = {
     "PLA": {"label": "PLA", "process": "fdm", "density_g_cm3": 1.24, "heat_c": 55, "nozzle_c": [190, 220], "bed_c": [50, 60],
             "color": "#e9e5dc", "warp": "low", "uv": "poor", "flex": "rigid",
             "note": "Easy to print and stiff. Softens from about 55 °C and creeps under a constant load when warm."},
-    "PETG": {"label": "PETG", "process": "fdm", "density_g_cm3": 1.27, "heat_c": 70, "nozzle_c": [230, 250], "bed_c": [70, 85],
+    "PETG": {"label": "PETG", "process": "fdm", "density_g_cm3": 1.28, "heat_c": 70, "nozzle_c": [230, 250], "bed_c": [70, 85],
              "color": "#cfe3e8", "warp": "low", "uv": "fair", "flex": "tough",
              "note": "Tougher than PLA and fine in warm water. Strings; bridges sag a little more."},
-    "ABS": {"label": "ABS", "process": "fdm", "density_g_cm3": 1.04, "heat_c": 95, "nozzle_c": [240, 260], "bed_c": [95, 110],
+    "ABS": {"label": "ABS", "process": "fdm", "density_g_cm3": 1.05, "heat_c": 95, "nozzle_c": [240, 260], "bed_c": [95, 110],
             "color": "#e4e1da", "warp": "high", "uv": "poor", "flex": "tough",
             "note": "Heat resistant and tough. Shrinks as it cools: large flat parts lift without an enclosure."},
-    "ASA": {"label": "ASA", "process": "fdm", "density_g_cm3": 1.07, "heat_c": 95, "nozzle_c": [240, 260], "bed_c": [90, 110],
+    "ASA": {"label": "ASA", "process": "fdm", "density_g_cm3": 1.05, "heat_c": 95, "nozzle_c": [240, 260], "bed_c": [90, 110],
             "color": "#dcdad5", "warp": "high", "uv": "good", "flex": "tough",
             "note": "Like ABS with good resistance to sunlight. Needs an enclosure for large parts."},
-    "TPU": {"label": "TPU", "process": "fdm", "density_g_cm3": 1.21, "heat_c": 60, "nozzle_c": [220, 240], "bed_c": [30, 60],
+    "TPU": {"label": "TPU", "process": "fdm", "density_g_cm3": 1.22, "heat_c": 60, "nozzle_c": [220, 240], "bed_c": [30, 60],
             "color": "#3b3f44", "warp": "low", "uv": "fair", "flex": "flexible",
             "note": "Flexible and impact resistant (95A). Print slowly; bridges and steep overhangs droop."},
-    "PA": {"label": "Nylon (PA)", "process": "fdm", "density_g_cm3": 1.14, "heat_c": 80, "nozzle_c": [250, 280], "bed_c": [70, 90],
+    "PA": {"label": "Nylon (PA)", "process": "fdm", "density_g_cm3": 1.12, "heat_c": 80, "nozzle_c": [250, 280], "bed_c": [70, 90],
            "color": "#efeadc", "warp": "high", "uv": "fair", "flex": "tough",
            "note": "Tough and wear resistant. Absorbs moisture: dry it before printing. Warps on large flat parts."},
     "PC": {"label": "Polycarbonate (PC)", "process": "fdm", "density_g_cm3": 1.20, "heat_c": 115, "nozzle_c": [260, 300], "bed_c": [100, 120],
            "color": "#d6dde2", "warp": "high", "uv": "fair", "flex": "tough",
            "note": "Strongest and most heat resistant of the common filaments. Needs a hot, enclosed printer."},
-    "PLA-CF": {"label": "PLA-CF (carbon fibre)", "process": "fdm", "density_g_cm3": 1.29, "heat_c": 60, "nozzle_c": [210, 240], "bed_c": [50, 60],
+    "PLA-CF": {"label": "PLA-CF (carbon fibre)", "process": "fdm", "density_g_cm3": 1.22, "heat_c": 60, "nozzle_c": [210, 240], "bed_c": [50, 60],
                "color": "#3a3c3f", "warp": "low", "uv": "poor", "flex": "rigid", "fibre": True,
                "note": "Stiffer than PLA with a matte finish. Abrasive: needs a hardened nozzle."},
-    "PETG-CF": {"label": "PETG-CF (carbon fibre)", "process": "fdm", "density_g_cm3": 1.30, "heat_c": 75, "nozzle_c": [240, 260], "bed_c": [70, 80],
+    "PETG-CF": {"label": "PETG-CF (carbon fibre)", "process": "fdm", "density_g_cm3": 1.25, "heat_c": 75, "nozzle_c": [240, 260], "bed_c": [70, 80],
                 "color": "#35383b", "warp": "low", "uv": "fair", "flex": "tough", "fibre": True,
                 "note": "Stiff and dimensionally stable. Abrasive: needs a hardened nozzle."},
-    "PA-CF": {"label": "PA-CF (carbon fibre)", "process": "fdm", "density_g_cm3": 1.20, "heat_c": 150, "nozzle_c": [270, 300], "bed_c": [80, 100],
+    "PA-CF": {"label": "PA-CF (carbon fibre)", "process": "fdm", "density_g_cm3": 1.09, "heat_c": 150, "nozzle_c": [270, 300], "bed_c": [80, 100],
               "color": "#2f3134", "warp": "high", "uv": "fair", "flex": "tough", "fibre": True,
               "note": "Very stiff and heat resistant. Abrasive and hygroscopic: hardened nozzle, dry filament, enclosure."},
 }
@@ -71,7 +73,7 @@ ENGINEERING_SPEC = {
     "BRASS": ("brass", "Brass C360", "Free-machining; fittings, bushings and decorative parts."),
     "COPPER": ("copper", "Copper C110", "Conducts heat and electricity best; soft and gummy to machine."),
     "TITANIUM": ("titanium", "Titanium grade 5", "Strong and light, resists corrosion; slow and costly to machine."),
-    "OAK": ("oak", "Oak", "Hard, open-grained hardwood; cuts cleanly along the grain."),
+    "OAK": ("oak", "Oak (red)", "Hard, open-grained hardwood; cuts cleanly along the grain."),
     "WALNUT": ("walnut", "Walnut", "Dark, fine-grained hardwood; machines and finishes well."),
     "MAPLE": ("maple", "Maple", "Pale, dense hardwood; holds small detail."),
     "PINE": ("pine", "Pine", "Light softwood; dents easily, cheap for jigs and furniture."),
@@ -79,11 +81,15 @@ ENGINEERING_SPEC = {
     "PTFE": ("ptfe", "PTFE", "Very low friction and chemically inert; soft, creeps under load."),
     "PEEK": ("peek", "PEEK", "High-temperature engineering plastic; strong, stiff and costly."),
     "PMMA": ("pmma", "Acrylic (PMMA)", "Clear; laser-cuts with polished edges; brittle under impact."),
+    "STEEL-4140": ("alloy_steel", "Alloy steel 4140", "Chromoly: tough and hardenable; shafts, axles and tooling."),
+    "OAK-WHITE": ("oak", "White oak", "Dense, closed-grain oak; resists rot; furniture and boat work."),
+    "NYLON-PA6": ("nylon", "Nylon PA6 (moulded)", "Tough and wear resistant; absorbs moisture, which softens it."),
 }
 ENGINEERING_ALIASES = {"ALUMINIUM": "AL-6061", "ALUMINUM": "AL-6061", "ALU": "AL-6061", "6061": "AL-6061",
                        "AL6061": "AL-6061", "ALUMINIUM 6061": "AL-6061", "ALUMINUM 6061": "AL-6061",
                        "7075": "AL-7075", "AL7075": "AL-7075", "ALUMINIUM 7075": "AL-7075", "ALUMINUM 7075": "AL-7075",
-                       "MILD STEEL": "STEEL", "MILD_STEEL": "STEEL", "STAINLESS STEEL": "STAINLESS", "SS304": "STAINLESS",
+                       "MILD STEEL": "STEEL", "4140": "STEEL-4140", "CHROMOLY": "STEEL-4140",
+                       "WHITE OAK": "OAK-WHITE", "RED OAK": "OAK", "PA6 MOULDED": "NYLON-PA6", "MILD_STEEL": "STEEL", "STAINLESS STEEL": "STAINLESS", "SS304": "STAINLESS",
                        "304": "STAINLESS", "TI": "TITANIUM", "TI6AL4V": "TITANIUM", "ACETAL": "POM", "DELRIN": "POM",
                        "TEFLON": "PTFE", "ACRYLIC": "PMMA", "PLEXIGLASS": "PMMA"}
 
@@ -101,9 +107,12 @@ def engineering() -> dict:
                 m = ml.get(name)
             except KeyError:
                 continue
+            d = (ml._data().get(k) or {}).get("properties", {}).get("density")   # a sourced datasheet density wins
+            d = d if d and d.get("value") else None
+            rho = d["value"] if d else m["density_kg_m3"]
             out[k] = {"label": label, "kind": "engineering", "process": "machined", "category": m["category"],
-                      "density_g_cm3": round(m["density_kg_m3"] / 1000.0, 3), "color": m["color"],
-                      "finish": m["finish"], "note": note, "source": m["source"]}
+                      "density_g_cm3": round(rho / 1000.0, 3), "color": m["color"],
+                      "finish": m["finish"], "note": note, "source": d["source"] if d else m["source"]}
         _ENG = out
     return _ENG
 
@@ -316,7 +325,7 @@ def mass(p: dict, volume_mm3: float | None, part: str = "") -> dict | None:
         return None
     i = info(m)
     return {"grams": mass_g(volume_mm3, m), "material": m, "label": i["label"], "density_g_cm3": i["density_g_cm3"],
-            "evidence": "computed", "source": "modelled volume x typical density from "
+            "evidence": "computed", "source": "modelled volume x density from "
             + ("filament datasheets, if printed solid" if i["kind"] == "filament" else i["source"].split(" (")[0])}
 
 

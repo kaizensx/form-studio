@@ -282,6 +282,34 @@ class Materials(unittest.TestCase):
         self.assertEqual(m["sources"]["nu"]["evidence"], material.ASSUMED)
         self.assertEqual(m["sources"]["E"]["evidence"], "specified (datasheet)")
 
+    @unittest.skipUnless(material.library_ready(), "this build's materials library has no sourced mechanical properties")
+    def test_the_real_library_gives_every_value_with_its_document(self):
+        m = material.resolve("AL-6061", need=("E", "poisson", "k", "cte"))
+        self.assertEqual((m["key"], m["E"], m["nu"], m["yield"], m["density"]), ("AL-6061", 68900.0, 0.33, 276.0, 2700.0))
+        self.assertEqual((m["k"], m["cte"]), (167.0, 2.36e-05))
+        for name in ("E", "nu", "yield", "k", "cte", "density"):
+            self.assertTrue(m["sources"][name]["source"], name)
+        self.assertTrue(m["sources"]["E"]["url"].startswith("http"))
+        self.assertEqual(m["sources"]["E"]["evidence"], ml.EVIDENCE_SPECIFIED)
+        self.assertEqual(material.resolve("aluminium 7075")["key"], "AL-7075")          # the library's aliases
+        with self.assertRaises(StudioError) as cm:                                     # mild steel: no k sourced
+            material.resolve("STEEL", need=("k",))
+        self.assertIn("thermal conductivity", str(cm.exception))
+
+    @unittest.skipUnless(material.library_ready(), "this build's materials library has no sourced mechanical properties")
+    def test_a_real_filament_needs_its_poisson_ratio_given_and_is_judged_across_the_layers(self):
+        with self.assertRaises(StudioError) as cm:
+            material.resolve("PLA")
+        self.assertIn("Poisson's ratio for PLA", str(cm.exception))
+        m = material.resolve({"key": "PLA", "poisson": 0.35})
+        self.assertEqual(m["sources"]["nu"]["evidence"], material.ASSUMED)
+        self.assertEqual(m["sources"]["E"]["evidence"], ml.EVIDENCE_SPECIFIED)
+        self.assertEqual(m["E"], 1000 * ml.prop("PLA", "E")["value"])                   # the in-plane modulus
+        self.assertEqual(m["yield"], ml.prop("PLA", "uts", "z")["value"])
+        self.assertIn("across the layers", m["strength_basis"])
+        self.assertAlmostEqual(m["knockdown"]["ratio"], ml.knockdown_z("PLA")["uts"]["ratio"])
+        self.assertIn("not simulated", " ".join(m["notes"]))
+
     def test_a_name_needs_a_library_with_mechanical_properties(self):
         if material.library_ready():
             self.skipTest("this build's materials library has sourced mechanical properties")
@@ -552,7 +580,8 @@ class RealStudies(WithStudio):
         self.assertEqual(lt["require"], ["fea.safety_factor >= 50"])
 
     def test_87_heat_and_thermal_stress(self):
-        hot = {**ALU, "k_W_mK": 167, "cte_per_K": 23.6e-6}
+        lib = material.library_ready()                  # the real library when it is in this build, else given values
+        hot = "AL-6061" if lib else {**ALU, "k_W_mK": 167, "cte_per_K": 23.6e-6}
         th = [{"type": "temperature", "faces": [[33, 20, 3], [65, 20, 3]], "value_C": 90},
               {"type": "convection", "faces": [[3, 20, 60]], "h_W_m2K": 50, "ambient_C": 20}]
         d = study.define(self.st, self.load(), {"kind": "thermal", "material": hot, "thermal": th, "mesh": {"budget_s": LIMIT_S}})
@@ -569,9 +598,18 @@ class RealStudies(WithStudio):
         T = decode(f, "temperature")
         self.assertAlmostEqual(float(T.max()), r["t_max_C"], delta=0.5)
         self.assertEqual(f["units"]["temperature"], "degC")
-        self.assertEqual(r["materials"]["design"]["sources"]["k"]["source"], "test fixture")
+        src = r["materials"]["design"]["sources"]["k"]
+        self.assertTrue(src["source"] and (src["url"].startswith("http") if lib else src["source"] == "test fixture"))
+        self.assertEqual(r["materials"]["design"]["k"], 167.0)
         with self.assertRaises(StudioError) as cm:                       # no conductivity: refused, nothing assumed
             study.run(self.st, self.p["id"], study.define(self.st, self.load(), {"kind": "thermal", "material": ALU, "thermal": th})["id"])
+        if lib:                                          # the design's own material, set as any design's is
+            from form import materials as app
+            app.set_appearance(self.st, self.p["id"], material="AL-7075")
+            own = study.define(self.st, self.load(), {**STATIC, "material": None})
+            self.assertEqual(study.materials_for(self.st, self.load(), own)[""]["key"], "AL-7075")
+            self.assertEqual(study.state(self.st, self.load(), own["id"])["state"], "never")
+            study.remove(self.st, self.load(), own["id"])
         self.assertIn("thermal conductivity", str(cm.exception))
         ts = study.define(self.st, self.load(), {"kind": "thermal_stress", "material": hot, "thermal": th, "reference_C": 20,
                                                  "fixtures": STATIC["fixtures"], "mesh": {"budget_s": LIMIT_S}})
