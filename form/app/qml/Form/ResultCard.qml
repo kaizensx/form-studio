@@ -50,6 +50,8 @@ Column {
         value: rc.mine ? rc.r.study || "" : ""; onPicked: function (v) { Results.setStudy(v) } }
     Txt { objectName: "notConverged"; visible: rc.kind === "field" && rc.r.converged !== true; width: parent.width; color: Theme.signal
         text: rc.kind === "field" ? "Did not converge: " + (rc.r.why || "no reason given") : "" }
+    // the verdict in one sentence, and the load scale of a linear static study (StudyVerdict.qml)
+    StudyVerdict { width: parent.width; r: rc.kind === "field" && rc.r.converged === true ? rc.r : null }
     Column { width: parent.width; spacing: 2; visible: rc.kind === "field"
         Repeater { model: rc.kind === "field" ? rc.r.lines.slice(rc.lead ? 1 : 0) : []
             Line { required property var modelData; objectName: "resultLine"; k: modelData.k; v: modelData.v; ev: modelData.ev; note: modelData.note || "" } } }

@@ -51,6 +51,36 @@
   symmetric, reversed), two-angle Revolutions, AdditivePipe/SubtractivePipe, AdditiveLoft, Mirrored, Draft and datum
   Planes (their offset bound to the spreadsheet) come back native and checked against Form Studio's solid; the
   rest goes in decomposed or frozen with the reason.
+- **What changed, between any two revisions** (direction I, pro surfaces). A revision card's list button, a
+  revision in the Overview and a feature's "Compare versions…" open one sheet with three ways to look: one model (the
+  newer solid with what changed or was added lit, the older one's edges as blueprint ghosts), side by side (both
+  revisions in their own 3D view, turned and zoomed by one camera) and the script (the design source as a line diff,
+  coloured as Python). Beside them: the dimensions that changed, old → new; the volume, size and body count of both
+  solids and the material added and removed, from the geometric diff (booleans on the B-rep, computed); and every
+  feature as added, removed, changed (with why: its code, its values, or its faces through a feature before it),
+  suppressed or the same. Either revision can step along the history, and "Show on the stage" puts it beside the
+  head. `GET /compare` reads both revisions without building; `geometry_diff` now also returns both solids' boxes
+  and body counts.
+- **A property card per hand feature.** Opening a fillet, chamfer, hole, pattern, shell, extrude, cut or revolve in
+  the tree shows its sections (edges and size; standard, size and depth; direction and instances; faces and wall;
+  section, end condition and depth). Every field writes the feature's parameter as a draft the kernel previews at
+  once, with the change in volume; OK saves one revision, Cancel goes back to the head. What a field cannot change is
+  said from the feature's code (the picked edges, the standard a hole's size came from, a pattern's direction). A
+  cut's end condition is Blind or Through all, as the engine builds them today; reverse, a second direction, draft
+  and a thin wall appear by themselves once the engine writes their parameters (`FeatureKinds.js`). The picked-feature
+  panel previews as you type and ends in OK / Cancel too.
+- **The Bench as tiles.** The ⌘B sheet switches between its four columns and a tile grid: each chapter tiled
+  Analysis, Manufacturing and Documents, every tile an icon, a short name, one plain sentence of what you get, our
+  state dot with its number and evidence word, and Run.
+- **More rows in the tree:** Equations (the design's values, opening the Values view), Material, Purchased parts
+  (from the parts list), the Origin with its XY, XZ and YZ planes (a plane starts a sketch on it), an eye per feature
+  that hides it in the view only (never suppress), each hand-drawn sketch nested under its feature, and a PMI section
+  with what the drawing declares: datums, toleranced dimensions with their ISO 286 limits once a drawing is made,
+  GD&T, surface texture and notes (`GET /pmi`).
+- **A strength study's verdict in one sentence**, with its stated-error bound rounded down ("Holds the load with a
+  safety factor of 5.4 (at least 5.3 with the stated error)"), and for a linear static study a load-scale slider
+  from ¼ to 4 ×, labelled "linear: exact for this model": the factor, the peak stress and the displacement follow
+  it exactly without solving again. Other studies have no slider.
 
 - **A reply ends in Sources, built from the tool log** (direction I, wave O). Every tool call of a turn whose result
   says how its content is known is one numbered row with its evidence word: SIMULATED, COMPUTED, SPECIFIED, OPENED,

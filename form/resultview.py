@@ -214,6 +214,10 @@ def _strength(st, p: dict, e: dict, opts: dict) -> dict:
                     "singular": [{"at": s.get("at"), "label": s.get("label"), "why": s.get("why"),
                                   "radius_mm": s.get("left_out_within_mm"), "nodes": s.get("nodes_left_out"),
                                   "by_refinement": s.get("stress_there_MPa_by_refinement")} for s in r.get("singularities") or []]})
+        # the verdict's numbers (ResultCard's sentence and its load-scale slider): a linear static study scales exactly
+        # with its loads, so the card may say what the factor is at k times them; a thermal stress study does not
+        out["safety"] = {k: sf.get(k) for k in ("value", "low", "against")} if sf.get("value") is not None else None
+        out["linear"] = kind == "static"
         if sf.get("value") is not None:
             lines.append({"k": "Safety factor", "v": "%.2f" % sf["value"], "ev": "simulated",
                           "note": ("at least %.2f with the stated error, against %s" % (sf.get("low") or sf["value"], sf.get("against") or "the strength"))})

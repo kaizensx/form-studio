@@ -17,6 +17,9 @@ Glass {
     readonly property var sel: Store.benchSheetSel ? Store.benchEntry(Store.benchSheetSel) : null
     readonly property int cols: width >= 980 ? 4 : width >= 560 ? 2 : 1
     property string only: ""
+    // list: the four columns of rows | tiles: the chapters tiled Analysis / Manufacturing / Documents (BenchTiles.qml)
+    property string look: "list"
+    onLookChanged: fl.contentY = 0
     radius: Theme.rPane
     opacity: on ? 1 : 0; visible: opacity > 0.01
     Behavior on opacity { NumberAnimation { duration: bs.on ? Theme.base : Theme.exit; easing.type: Easing.BezierSpline; easing.bezierCurve: Theme.easeMode } }
@@ -37,19 +40,23 @@ Glass {
             text: Store.project ? Store.project.name + " · " + F.pad(Store.project.head) : "" }
         Seg { id: filt; objectName: "benchFilter"; visible: bs.cols >= 2; anchors.left: meta.visible ? meta.right : nm.right; anchors.leftMargin: 24; anchors.verticalCenter: parent.verticalCenter
             model: [{ value: "", text: "All " + bs.count("") }, { value: "current", text: "Current " + bs.count("current") }, { value: "stale", text: "Stale " + bs.count("stale") },
-                    { value: "never", text: "Not run " + bs.count("never") }, { value: "needs", text: (bs.cols >= 4 ? "Needs something " : "Needs ") + bs.count("needs") }]
+                    { value: "never", text: "Not run " + bs.count("never") }, { value: "needs", text: (bs.width >= 1180 ? "Needs something " : "Needs ") + bs.count("needs") }]
             value: bs.only; onPicked: function (v) { bs.only = v } }
         Btn { id: close; objectName: "benchClose"; anchors.right: parent.right; anchors.verticalCenter: parent.verticalCenter; kind: "quiet"; small: true; icon: "x"; tip: "Close the Bench"; keys: "Ctrl+B"
             onClicked: Store.benchOpen = false }
-        Field { id: finder; objectName: "benchFind"; visible: bs.cols >= 4; anchors.right: close.left; anchors.rightMargin: 12; anchors.verticalCenter: parent.verticalCenter; width: 220; height: 32
+        Seg { id: lookSeg; objectName: "benchLook"; anchors.right: close.left; anchors.rightMargin: 12; anchors.verticalCenter: parent.verticalCenter; implicitHeight: 28
+            model: [{ value: "list", text: "List", tip: "Four columns of rows" }, { value: "tiles", text: "Tiles", tip: "Each chapter tiled: Analysis, Manufacturing, Documents" }]
+            value: bs.look; onPicked: function (v) { bs.look = v } }
+        Field { id: finder; objectName: "benchFind"; visible: bs.cols >= 4; anchors.right: lookSeg.left; anchors.rightMargin: 12; anchors.verticalCenter: parent.verticalCenter; width: bs.width >= 1180 ? 220 : 136; height: 32
             placeholder: "Find a job   /"; onEdited: function (t) { Store.benchFind = t }
             // Esc (Main.qml) clears the find first, then closes the sheet
             Connections { target: Store; function onBenchFindChanged() { if (finder.text !== Store.benchFind) finder.text = Store.benchFind } } } }
 
     Flickable { id: fl; x: 20; y: 76; width: parent.width - 40; height: parent.height - y - foot.height - legend.height - 22 - 20
-        contentHeight: grid.implicitHeight + 8; clip: true; boundsBehavior: Flickable.StopAtBounds
+        contentHeight: (bs.look === "tiles" ? tiles.implicitHeight : grid.implicitHeight) + 8; clip: true; boundsBehavior: Flickable.StopAtBounds
         ScrollBar.vertical: ScrollBar { width: 6 }
-        Grid { id: grid; columns: bs.cols; columnSpacing: 14; rowSpacing: 10; width: parent.width - 8
+        BenchTiles { id: tiles; visible: bs.look === "tiles"; x: 8; width: parent.width - 24; find: Store.benchFind; only: bs.only }
+        Grid { id: grid; visible: bs.look === "list"; columns: bs.cols; columnSpacing: 14; rowSpacing: 10; width: parent.width - 8
             readonly property real cw: Math.floor((width - (bs.cols - 1) * columnSpacing) / bs.cols)
             Repeater { model: ["design", "check", "make", "document"]
                 Bench { required property string modelData; required property int index

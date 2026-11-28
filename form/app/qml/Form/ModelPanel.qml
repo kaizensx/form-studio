@@ -35,7 +35,9 @@ Column {
                                        : [{ k: "count", t: "Count", v: "3", u: "" }, { k: "pitch", t: "Pitch", v: "10" }] })
     readonly property var names: ({ fillet: "Fillet", chamfer: "Chamfer", hole: "Hole", shell: "Shell", pattern: "Pattern" })
     function v(k, d) { return vals[k] !== undefined && String(vals[k]).trim() !== "" ? vals[k] : d }
-    function set(k, x) { var o = Object.assign({}, vals); o[k] = x; vals = o; reset() }
+    function set(k, x) { var o = Object.assign({}, vals); o[k] = x; vals = o; reset(); live.restart() }
+    // every field is previewed by the kernel as it changes (the property card's live preview), after a short pause
+    Timer { id: live; interval: 380; onTriggered: if (mp.kind && !mp.busy && !mp.adding && (mp.picks.length > 0 || (mp.kind === "pattern" && mp.of !== ""))) mp.preview() }
     function body(preview) {
         var b = { kind: kind, picks: picks, preview: preview, expect_head: Store.project ? Store.project.head : null }
         var fs = fields[kind] || []
@@ -85,6 +87,7 @@ Column {
                           + (errorHint ? " (" + errorHint + ")" : "") + ". Can you make it work, keeping it as one feature in the code?")
     }
 
+    Txt { kind: "cap"; visible: !!mp.kind; text: (mp.names[mp.kind] || "") + " · property card" }
     Row { spacing: 6; visible: mp.kinds.length > 1
         Repeater { model: mp.kinds
             Btn { required property var modelData; objectName: "model_" + modelData; small: true; kind: mp.kind === modelData ? "primary" : "quiet"
@@ -139,7 +142,7 @@ Column {
     Loader { width: parent.width; sourceComponent: mp.actionsHere ? mp.actionRow : null }
     property Component actionRow: Component { Flow { spacing: 6
         Btn { objectName: "modelPreview"; small: true; icon: "eye"; text: "Preview"; busy: mp.busy; busyText: "Building…"; enabled: !!mp.kind && !mp.adding; onClicked: mp.preview() }
-        Btn { objectName: "modelAdd"; small: true; kind: "primary"; icon: "plus"; text: "Add to design"; busy: mp.adding; busyText: "Building…"
+        Btn { objectName: "modelAdd"; small: true; kind: "primary"; icon: "check"; text: "OK"; busy: mp.adding; busyText: "Building…"
             enabled: !!mp.draft && mp.draft.preview.ok && !mp.busy; onClicked: mp.add()
             tip: "Writes it into the design's code as one feature with its parameters, and builds a new revision" }
         Btn { objectName: "modelFixAgent"; small: true; kind: "quiet"; icon: "sparkles"; text: "Fix with your agent"; visible: mp.error !== ""; onClicked: mp.fixWithAgent() }

@@ -59,6 +59,9 @@ Rectangle {
             active: ch.comparing
             tip: ch.comparing ? "Stop comparing" : "Show " + (ch.change ? F.pad(ch.change.from) : "") + " as a ghost over the current head"
             onClicked: Store.compareChange(ch.change) }
+        Btn { objectName: "changeDetails"; visible: !ch.isNew && !ch.other; small: true; kind: "quiet"; icon: "list_checks"
+            tip: "What changed: one model, side by side, the script, the dimensions and the solid's deltas"
+            onClicked: Store.openSheet("compare", { a: ch.change.from, b: ch.change.to }) }
         Btn { objectName: "changeUndo"; visible: !ch.isNew; small: true; kind: "quiet"; icon: "undo_2"
             enabled: !Store.hasDraft && !Store.chatBusy
             tip: "Go back: make " + (ch.change ? F.pad(ch.change.from) : "") + " the head again"
