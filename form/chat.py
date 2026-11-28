@@ -33,6 +33,7 @@ from .agents import compat
 from .agents import providers as providers_mod
 from .agents.models import Learned, Recent
 from .agents.base import Run, short as _short  # noqa: F401  (_short: kept for callers of the old name)
+from . import cite
 from . import verdict as verdict_mod
 from .conversations import ConversationError, Conversations, run_cost
 
@@ -337,6 +338,7 @@ class ChatJob:
         self.parser = None
         self.tools: dict = {}                  # tool call id -> name, to recognise what a result belongs to
         self.steps = 0
+        self.inputs: dict = {}                 # tool call id -> its input, as the agent's parser shortened it
         self.before: set | None = None         # project ids that existed when the message was sent
         self.attachments: list[dict] = []
         self.stop_asked = False
@@ -473,6 +475,12 @@ class Chat:
             job = ChatJob(message, meta.get("project") or project, session, cid, agent, model, effort or "")
             job.attachments = self.store.attachments(cid, attachments or [])
             job.note = note or ""
+            try:                               # what the person changed by hand since the last reply goes with the message
+                by_hand = cite.hand_note(self.store.events(cid))
+            except ConversationError:
+                by_hand = ""
+            if by_hand:
+                job.note = (job.note + "\n\n" if job.note else "") + by_hand
             job.before = self._project_ids()
             job.ask = bool(ask)
             job.head0 = self._head(job.project)
@@ -927,9 +935,18 @@ class Chat:
             elif t == "tool":
                 job.steps += 1
                 job.tools[ev.get("id")] = ev.get("name", "")
+                job.inputs[ev.get("id")] = ev.get("input", "")
             elif t == "result":
                 full = ev.pop("full", "") or ""
                 self._enrich(job, ev, full)
+                # what the reply rests on is read here, from the call and its result (form/cite.py)
+                src = cite.source_of(ev.get("name", ""), job.inputs.get(ev.get("id")), full, bool(ev.get("ok")))
+                if src:
+                    ev["source"] = src
+                if ev.get("name") == "plan_design" and ev.get("ok"):
+                    steps = cite.plan_steps(full)
+                    if steps:
+                        ev["plan"] = steps
                 self._note_verdicts(job, ev, full)
                 if ev.get("name") == "suggest_replies" and ev.get("ok"):
                     opts = self._suggestions(full)

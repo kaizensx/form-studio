@@ -8,8 +8,9 @@ Txt {
     id: md
     property string source: ""
     property bool revs: false            // "r04" in a reply links to that revision (agent replies only)
+    property var cites: []               // [[index, [figures]]]: numbers that stand in a source's tool result get its index (form/cite.py)
     readonly property var look: ({ revs: revs, mono: Theme.mono, code_bg: String(Theme.well), rule: String(Theme.plate4), muted: String(Theme.ink3), link: String(Theme.datum),
-                                   code_px: Theme.tBody - 1, head_px: Theme.tLead })
+                                   code_px: Theme.tBody - 1, head_px: Theme.tLead, cites: cites })
     textFormat: Text.RichText
     text: source === "" ? "" : Bridge.markdown(source, look)
     lineHeight: 1.45

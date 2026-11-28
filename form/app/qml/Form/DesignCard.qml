@@ -87,7 +87,7 @@ Item {
     // the caption: its number on Home, the name, the revision, released or not; then what it is and when it changed
     Column { id: cap; visible: !card.editing && !card.asking; y: card.plinth + 6; width: parent.width; spacing: 5
         Row { id: line; anchors.horizontalCenter: parent.horizontalCenter; spacing: 9; height: 20
-            Txt { id: no; visible: !card.member; mono: true; font.pixelSize: 11; tone: 3; text: card.order < 9 ? "0" + (card.order + 1) : card.order + 1; anchors.verticalCenter: parent.verticalCenter }
+            Txt { id: no; visible: false; mono: true; font.pixelSize: 11; tone: 3; text: card.order < 9 ? "0" + (card.order + 1) : card.order + 1; anchors.verticalCenter: parent.verticalCenter }
             Txt { text: card.p.name || ""; font.pixelSize: 15; font.weight: Theme.wSemi; font.letterSpacing: -0.15; lineHeight: 1.0; anchors.verticalCenter: parent.verticalCenter
                 width: Math.min(implicitWidth, Math.max(40, cap.width - 12 - (no.visible ? no.width + 9 : 0) - rev.width - 9 - (rel.visible ? rel.width + 9 : 0)))
                 elide: Text.ElideRight; wrapMode: Text.NoWrap }

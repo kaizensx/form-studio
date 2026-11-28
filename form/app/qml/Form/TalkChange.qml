@@ -34,8 +34,9 @@ Rectangle {
 
     readonly property bool detailed: feats.length > 0 || params.length > 0
     implicitHeight: 44 + (detailed ? detail.implicitHeight + 10 : 0) + (asking ? 36 : 0)
-    radius: Theme.rMd
-    color: Theme.plate2
+    // the same quiet well as the Sources and the plan (TalkCard.qml)
+    radius: 14
+    color: Theme.dark ? Qt.rgba(0, 0, 0, 0.20) : Qt.rgba(1, 1, 1, 0.55)
     border.color: asking ? Theme.alpha(Theme.signal, 0.45) : comparing ? Theme.alpha(Theme.blueprint, 0.5) : Theme.rule
     Behavior on border.color { Tint {} }
     clip: true

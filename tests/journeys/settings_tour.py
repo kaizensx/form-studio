@@ -23,6 +23,14 @@ def run(ui):
     open_sheet_wait(ui, "settings")
     ui.wait_until(lambda: ui.store.get("config") is not None and ui.store.get("software") is not None, 90, "the settings and the software list")
     card = ui.item("sheetCard")
+    # Reduce Motion: the person's own switch; it takes effect at once and movement is dropped (Theme.move returns 0)
+    ui.eq(ui.js("Theme.reduced"), False, "motion is on to begin with")
+    ui.scroll_to("reduceMotionToggle")
+    ui.click("reduceMotionToggle")
+    ui.wait_until(lambda: ui.js("Theme.reduced") is True and ui.js("Theme.move(200)") == 0, 5, "Reduce Motion to be on")
+    ui.shot(f"settings-reduce-motion-{theme}")
+    ui.click("reduceMotionToggle")
+    ui.wait_until(lambda: ui.js("Theme.reduced") is False and ui.js("Theme.move(200)") == 200, 5, "Reduce Motion to be off again")
     printing = ui.js("Store.printOn") is True
     for value, text in PAGES + ((("printer", "Printing"),) if printing else ()):
         ui.click("settingsNav_" + value)

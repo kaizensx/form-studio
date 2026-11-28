@@ -25,11 +25,12 @@ Item {
     property bool breathe: false
     property real vignetteK: 1
     readonly property bool plain: GraphicsInfo.api === GraphicsInfo.Software
-    // breathing is stepped five times a second, not animated: a still window then redraws five times a second
-    // instead of sixty, and the steps (half a percent each) cannot be seen
+    // breathing is stepped, not animated: a still window then redraws five times in two seconds instead of sixty
+    // times a second. A step moves the pool's opacity by 3 % of itself at most, under one level of an 8-bit
+    // channel in both themes (the pool adds some twenty levels at its brightest), so the steps cannot be seen
     property real phase: 0
     readonly property real poolOpacity: 0.91 + 0.09 * Math.cos(phase)
-    Timer { interval: 200; repeat: true; running: room.breathe && room.visible && !Theme.reduced; onTriggered: room.phase += 0.1654 }
+    Timer { interval: 400; repeat: true; running: room.breathe && room.visible && !Theme.reduced; onTriggered: room.phase += 0.3308 }
 
     ShaderEffect {
         anchors.fill: parent; visible: !room.plain; blending: !room.wall

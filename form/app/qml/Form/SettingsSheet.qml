@@ -310,7 +310,17 @@ Item {
                                 anchors.bottom: parent.bottom; anchors.bottomMargin: 12 }
                             MouseArea { id: lm; anchors.fill: parent; hoverEnabled: true; cursorShape: Qt.PointingHandCursor
                                 onClicked: Theme.setAppearance(look.modelData.value) } }
-                    } } }
+                    } }
+                // Reduce Motion: every movement becomes a short fade (Theme.move, Theme.shift). The system's own
+                // setting turns it on too, and then this switch only says so.
+                Rectangle { objectName: "settingsReduceMotion"; width: parent.width; height: 62; radius: 16; color: Theme.glass
+                    Column { x: 18; anchors.verticalCenter: parent.verticalCenter; width: parent.width - 36 - rmT.width - 16; spacing: 3
+                        Txt { text: "Reduce motion"; font.weight: Theme.wMedium }
+                        Txt { kind: "fine"; width: parent.width; elide: Text.ElideRight; wrapMode: Text.NoWrap
+                            text: Bridge.reducedMotion ? "On: this computer asks apps to reduce motion." : "Panes, the build and results arrive with a short fade instead of moving. Follows the system's setting too." } }
+                    Toggle { id: rmT; objectName: "reduceMotionToggle"; anchors.right: parent.right; anchors.rightMargin: 18; anchors.verticalCenter: parent.verticalCenter
+                        checked: Theme.reduced; enabled: !Bridge.reducedMotion; opacity: enabled ? 1 : 0.5
+                        onToggled: function (on) { Theme.reduceMotion = on } } } }
             Group { title: "Set up for"; applies: "Applies at once"
                 sub: "Turning one on installs only what it needs, with every command in the log. Turning one off hides it; nothing is uninstalled."
                 Txt { visible: !Store.caps; kind: "fine"; tone: 3; text: "Reading what Form Studio is set up for…" }

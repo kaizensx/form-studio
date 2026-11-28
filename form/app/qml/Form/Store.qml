@@ -2336,6 +2336,28 @@ QtObject {
     property var lightbox: null                  // { url, caption, note } — an image shown large over the window
     function showImage(url, caption, note) { lightbox = { url: url, caption: caption || "", note: note || "" } }
     property var paletteRecent: []               // ids of the commands run last, newest first (remembered by Main.qml)
+    // ── saved prompts: a message kept as a command with a name; the palette lists them (remembered by Talk.qml) ──
+    property var savedPrompts: []                // [{ name, text }], newest first
+    function promptName(text) { var l = String(text || "").trim().split("\n")[0].replace(/\s+/g, " "); return l.length > 52 ? l.slice(0, 51).replace(/\s+\S*$/, "") + "…" : l }
+    function promptSaved(text) { return savedPrompts.some(function (p) { return p.text === text }) }
+    function togglePrompt(text) {
+        text = String(text || "").trim()
+        if (!text) return
+        if (promptSaved(text)) { savedPrompts = savedPrompts.filter(function (p) { return p.text !== text }); toast("Removed from your commands"); return }
+        savedPrompts = [{ name: promptName(text), text: text }].concat(savedPrompts).slice(0, 40)
+        toast("Saved as a command", "“" + promptName(text) + "” is in the palette")
+    }
+    // ── commands on the selection: what is picked on the part goes with the next message ("On 2 edges") ──
+    readonly property string selScope: {
+        if (!selItems.length || !selection) return ""
+        var n = ({}), order = []
+        selItems.forEach(function (it) { var k = it.kind || "point"; if (!n[k]) { n[k] = 0; order.push(k) } n[k]++ })
+        return "On " + order.map(function (k) { return n[k] + " " + k + (n[k] === 1 ? "" : "s") }).join(", ")
+    }
+    function scoped(text) {
+        if (!selScope || !selection || !selection.text) return text
+        return selScope + " of " + (project ? project.name : "this design") + ":\n" + selection.text + "\n\n" + text
+    }
     function notePaletteRun(id) { if (!id) return; var r = paletteRecent.filter(function (x) { return x !== id }); r.unshift(id); paletteRecent = r.slice(0, 8) }
     function renameProject(id, name) {
         // show the new name at once: the engine may be busy building thumbnails and answer seconds later
