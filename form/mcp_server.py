@@ -1320,7 +1320,8 @@ def build() -> MCPServer:
                       to_values: dict[str, float] | None = None, frames: int = 24, fmt: str = "gif") -> list:
         """Animate a design. Make motion from real geometry. kind="turntable" spins the head revision. kind="morph" builds every in-between
         design from from_rev (default: head) to to_rev or to_values, so you can show how a change transforms the part.
-        Returns the file path and a still. fmt: gif or webp."""
+        kind="motion" plays the mechanism (motion_study's default driver, loops solved) as an MP4 film (ffmpeg; frames
+        is the frame count). Returns the file path and a still. fmt: gif or webp (turntable and morph)."""
         st = studio()
         def go():
             from . import animate as anim
@@ -1342,8 +1343,15 @@ def build() -> MCPServer:
                     info = anim.morph(st, p, a, b, out, frames=max(8, min(frames, 48)), title=p["name"])
                 except ValueError as e:
                     raise StudioError(str(e))
+            elif kind == "motion":
+                from . import motion
+                r = motion.run(st, p, frames=max(12, min(frames, motion.MAX_FRAMES)), video=True)
+                v = r.get("video") or {}
+                if not v.get("file"):
+                    raise StudioError(v.get("error") or "The motion film could not be made.")
+                return v, Path(v["still"])
             else:
-                raise StudioError("kind is turntable or morph.")
+                raise StudioError("kind is turntable, morph or motion.")
             from PIL import Image as PImage
             still = out.with_suffix(".png")
             im = PImage.open(out)
@@ -1894,7 +1902,8 @@ def build() -> MCPServer:
     @mcp.tool(annotations=RW)
     async def assembly_instructions(project: str, rev: int | None = None) -> dict:
         """Write assembly instructions. Assembly instructions as a PDF from the design's assembly declaration: a parts page with computed volumes, then
-        one page per part going on (in the declaration's parent order, at its explode offset, with arrows). Step text is
+        one page per part going on (in the declaration's parent order, at its explode offset, with arrows; after
+        assembly_sequence, in the computed order with each arrow along the proved insertion direction). Step text is
         the part's note, or what the declaration says. Returns the PDF path, page images and the steps. A design without
         an assembly() has none."""
         st = studio()
@@ -2502,6 +2511,79 @@ def build() -> MCPServer:
             r["headline"] = massprops.headline(r)
             if library:
                 r["library"] = {k: ml.record(k) for k in r["materials"]}
+            return r
+        return await _run(go)
+
+    @mcp.tool(annotations=RO)
+    async def motion_study(project: str, drivers: list[dict] | None = None, duration_s: float = 2.0, frames: int = 49,
+                           hold: dict | None = None, traces: list[dict] | None = None, clearance: bool = True,
+                           torque: bool = True, video: bool = False, budget_s: float = 60.0,
+                           assume_material: str | None = None, gravity: list[float] | None = None,
+                           rev: int | None = None) -> dict:
+        """Play a mechanism over time and check it along the whole motion. drivers: [{"joint": id, "from": deg|mm,
+        "to": ...}] (a ramp over duration_s), or {"joint", "keys": [[t_s, value], ...]}, {"joint", "speed", "start"},
+        {"joint", "sine": {"amplitude", "center", "period_s", "phase_deg"}}; "dof": 1 drives a cylindrical joint's slide.
+        Default: the first joint no coupling drives, over its range. The design's couplings (gears, rack, lead screw,
+        belt, cam) drive their joints, and closed loops (Loop: a four-bar's coupler pinned to its rocker) are solved per
+        frame by Newton's method on the loop-closure equations; a frame the linkage cannot reach is reported as not
+        closing, never posed. Returns per frame every joint's value, velocity and acceleration; traces ([{"part", "at":
+        [x, y, z]}], default the loop pins or the moving parts' centres) with path, velocity and acceleration;
+        clearance between every pair moving relative to each other at every frame, with the minimum gap, its time and
+        pair, the first contact, and the intervals between frames proven free or only sampled; holding torque on each
+        driven joint under gravity (virtual work; needs materials, or assume_material for a labelled what-if).
+        video=True also renders an MP4 (ffmpeg; never a GIF). Evidence: computed (kinematics), computed (mesh distance),
+        computed (virtual work, quasi-static, gravity only). Stored by geometry key and inputs."""
+        st = studio()
+        def go():
+            from . import motion
+            p = st.load(project)
+            r = motion.run(st, p, drivers=drivers, duration_s=duration_s, frames=frames, hold=hold, traces=traces,
+                           clearance_check=clearance, torque_check=torque, video=video, budget_s=budget_s,
+                           assume=assume_material, gravity=tuple(gravity or (0.0, 0.0, -1.0)), rev=rev)
+            r["headline"] = motion.headline(r)
+            return r
+        return await _run(go)
+
+    @mcp.tool(annotations=RO)
+    async def robot_files(project: str, collision: str = "auto", assume_material: str | None = None,
+                          limits: dict | None = None, samples: int = 64, rev: int | None = None) -> dict:
+        """Write robot files from the assembly: URDF, SRDF and MJCF (MuJoCo) with one link per part, joints from the
+        declared joints with their limits (hinge revolute or continuous, slide prismatic; cylindrical and ball split in
+        URDF, native in MJCF), couplings as mimic and equality joints, loops as MJCF equality connects (URDF is a tree:
+        listed), inertia per link from the B-rep mass properties (mass, centre of mass and tensor in the link frame,
+        the part's sourced density), visual STL per link and collision as CoACD convex pieces when installed, else a
+        convex hull (collision="hull" | "box" | "coacd"). limits: {joint: {"effort", "velocity"}} (else 0, flagged).
+        SRDF disables Adjacent, Default (joined by design or touching at rest) and Never pairs (no contact at `samples`
+        random poses within limits: sampled, not proven). Health checks: positive-definite inertia, triangle
+        inequality, mesh paths, unit joint axes, one tree, no self-collision at the zero pose. The files are then loaded
+        by yourdfpy or urdfpy and MuJoCo where installed (here or the robot.mujoco engine; the MJCF also stepped 1 s,
+        simulated), else validated structurally, and the result says which. Returns the file paths, checks and
+        validation."""
+        st = studio()
+        def go():
+            from . import robot
+            p = st.load(project)
+            r = robot.write(st, p, collision=collision, assume_material=assume_material, limits=limits, samples=samples,
+                            rev=rev)
+            r["headline"] = robot.headline(r)
+            return r
+        return await _run(go)
+
+    @mcp.tool(annotations=RO)
+    async def assembly_sequence(project: str, budget_s: float = 90.0, rev: int | None = None) -> dict:
+        """Compute an order the parts can go together in, and each part's insertion direction: by disassembly, taking
+        out one part at a time that can leave on a straight line (local freedom from the contact normals, then a
+        collision sweep until it is clear); the assembly order is the reverse. Threads unscrew along their Mate axis,
+        snaps deflect, press fits push. Smallest parts are tried first. The exploded view and assembly_instructions then
+        follow it (each part along its own free direction; the arrows are the proved directions). A set that cannot
+        come apart one at a time is reported, never ordered by guess. Evidence: computed (geometric feasibility); the
+        limits (no gravity, fixtures, tool access or flexible parts) come with every result."""
+        st = studio()
+        def go():
+            from . import sequence
+            p = st.load(project)
+            r = sequence.plan(st, p, budget_s=budget_s, rev=rev)
+            r["headline"] = sequence.headline(r)
             return r
         return await _run(go)
 

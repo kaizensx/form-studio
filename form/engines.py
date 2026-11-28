@@ -8,6 +8,7 @@ of its own, made with one click from Settings > Engines & software, and runs out
         recon.cadfit/               CADFit: build123d, trimesh, scikit-learn, SciPy, manifold3d (pinned)
         game.coacd/                 CoACD: approximate convex decomposition for game collision (pinned)
         fea/                        strength studies: Netgen, scikit-fem, SciPy, PyAMG (pinned)
+        robot.mujoco/               MuJoCo and yourdfpy: robot files loaded and stepped (pinned)
 
 An environment is built in a temporary folder next to its final place and moved there only when every step worked
 (uv venv, uv pip install, an import check, the engine's own extra step such as its weights). A failed or cancelled
@@ -78,6 +79,12 @@ SPECS: dict[str, dict] = {
                  "pyamg==5.4.1", "numpy==2.5.5"),
         "check": ("import netgen.occ, netgen.meshing, skfem, scipy.sparse.linalg, pyamg, numpy; "
                   "import form.fea.core, form.fea.run, form.fea.verify"),
+    },
+    "robot.mujoco": {
+        "label": "MuJoCo",
+        # MuJoCo 4.0.1 (Apache-2.0) and yourdfpy 0.0.60 (MIT): the robot files are loaded, and the MJCF stepped, here
+        "pins": ("mujoco==4.0.1", "yourdfpy==0.0.60", "numpy==2.5.5"),
+        "check": "import mujoco, yourdfpy, numpy; import form.robot",
     },
 }
 

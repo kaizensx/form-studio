@@ -191,7 +191,7 @@ Item {
             var j = jointById(ch[i]), v = j ? ((at || pose)[j.id] || 0) : 0
             if (!j || !v || j.kind === "fixed") continue
             var ax = Qt.vector3d(j.axis[0], j.axis[1], j.axis[2]).normalized()
-            if (j.kind === "hinge") {
+            if (j.kind !== "slide") {             // hinge, cylindrical and ball turn about their axis (first degree of freedom)
                 var r = Quaternion.fromAxisAndAngle(ax, v), o = Qt.vector3d(j.origin[0], j.origin[1], j.origin[2])
                 t = r.times(t.minus(o)).plus(o); q = r.times(q)
             } else t = t.plus(ax.times(v))
@@ -216,7 +216,9 @@ Item {
     readonly property real restLift: asm ? -Math.min.apply(null, asm.parts.map(function (x) { return x.bbox[0][2] })) : 0
     function explodeOff(x) {
         if (!x || x.id === anchorId) return Qt.vector3d(0, 0, 0)
-        var a = partById(anchorId), ae = a ? (a.explode_total || a.explode) : [0, 0, 0], e = x.explode_total || x.explode
+        // a computed assembly sequence (form/sequence.py) explodes along its own directions, about the same anchor
+        var a = partById(anchorId), ae = a ? (a.sequence_explode || a.explode_total || a.explode) : [0, 0, 0]
+        var e = x.sequence_explode || x.explode_total || x.explode
         var d = Qt.vector3d(e[0] - ae[0], e[1] - ae[1], e[2] - ae[2]).times(explode)
         return x.bbox[0][2] + restLift + d.z < -1e-9 ? Qt.vector3d(d.x, d.y, -d.z) : d
     }

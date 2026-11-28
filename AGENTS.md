@@ -49,6 +49,9 @@ Prefer the MCP server (`form-mcp`). Without MCP, the `form` CLI does the same an
 | An engineering drawing from the solid (dimensions bound to parameters, fits, GD&T only where declared) | `drawing` | `form drawing <p> --sheet A3 --out part.pdf` |
 | STEP AP242 with PMI, read back | `export_pmi` | `form drawing pmi <p>` |
 | Check a person's drawing against the part (never guess a digit: mark it unsure) | `check_drawing` | `form drawing check <p> theirs.pdf` |
+| Play a mechanism: loops, couplings, traces, clearance along the cycle, holding torque, an MP4 | `motion_study` | `form motion <p> --drivers '[{"joint": "crank", "from": 0, "to": 360}]'` |
+| URDF, SRDF and MJCF with inertia from the B-rep, checked and parsed back | `robot_files` | `form urdf <p>`, `form mjcf <p>` |
+| A feasible assembly order and insertion directions (the explode and instructions follow it) | `assembly_sequence` | `form sequence <p>` |
 
 Every design has a **purpose**: `print` (for 3D printing) or `model` (just a 3D model: rendering, CAD exchange, CNC,
 laser, moulding). `get_project` reports it and `form_overview` says whether the person prints at all (`has_printer`).

@@ -155,6 +155,9 @@ under the data folder (`form/engines.py`), showing its size and licence first. T
   Because the LGPL libraries are separate, replaceable files in an environment the person can change, Form Studio's
   own code stays MIT. Gmsh (GPL-2.0-or-later) and CalculiX (GPL-2.0-or-later) were considered and are not used,
   shipped or downloaded.
+- **MuJoCo** 4.0.1 (robot files loaded and stepped, `robot.mujoco`; https://github.com/google-deepmind/mujoco).
+  Licence: Apache License 2.0. With **yourdfpy** 0.0.60 (https://github.com/clemense/yourdfpy, MIT), its dependencies
+  trimesh (MIT) and lxml (BSD-3-Clause), and NumPy 2.5.5. Licences read from the installed packages' metadata.
 - **uv** 0.13.7 (https://github.com/astral-sh/uv), downloaded from its GitHub release and checked against a pinned
   SHA-256 before use, makes these environments. Licence: MIT OR Apache-2.0. The Python 3.12 it installs for them is
   CPython (Python Software Foundation License) from uv's managed builds.

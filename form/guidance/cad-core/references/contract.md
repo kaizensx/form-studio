@@ -205,7 +205,8 @@ HARDWARE: form.parts  (use it; do not guess screw, nut, insert, bearing or gear 
 
 ASSEMBLIES (for solids >= 2; without one the app can show the parts only as modelled and pulled apart, never
   assembled, and checks nothing about how they meet)
-  from form.recipes.base import Access, Assembly, Hardware, Mate, Part, fixed, hinge, slide
+  from form.recipes.base import Access, Assembly, Hardware, Mate, Part, fixed, hinge, slide  (and cylindrical, ball,
+       Coupling, gears, rack, lead_screw, cam, Loop)
   Part(id, label, solid, move, rotate, explode, note, attach="")   solid = index of the printed body, numbered left to
        right on the plate (bounding-box centre X, then Y, then Z), OR an (x, y, z) point inside that body as built: use a
        point whenever parts share an axis (a gearbox's housing, suns and carriers), so you never count solids by hand.
@@ -226,10 +227,17 @@ ASSEMBLIES (for solids >= 2; without one the app can show the parts only as mode
          joints=[hinge("arm", (1, 0, 0), pivot1, (-60, 60), parent="base", id="arm_tilt", label="Arm tilt"),
                  hinge("cup", (1, 0, 0), pivot2, (-90, 90), parent="arm", id="cup_tilt", label="Cup tilt")]
        Moving Arm tilt swings the arm, the cup and the cup bolt together; Cup tilt swings the cup and its bolt about an
-       axis that is wherever the arm put it. Never give a part both attach= and a joint, or two joints; no loops.
-       A closed linkage (a four-bar) is a loop: declare its pins as Mate(..., "pin") and put its motion in derived()
-       from craft.four_bar (swing, transmission angle), not as joints. Gears are not joints either: model them in mesh
-       with their backlash as the gap.
+       axis that is wherever the arm put it. Never give a part both attach= and a joint, or two joints.
+  MORE JOINTS: cylindrical(part, axis, origin, (lo_deg, hi_deg), (lo_mm, hi_mm), parent=) turns and slides on one axis
+       (pose [deg, mm]); ball(part, origin, (lo_deg, hi_deg), parent=) turns every way (pose [rx, ry, rz]).
+  COUPLINGS: couplings=[gears("pinion", "wheel", 12, 36), rack("pinion", "rack", pitch_d), lead_screw("screw", "nut",
+       lead), cam("camshaft", "follower", [(deg, value), ...]), Coupling(driver, follower, ratio, offset)]: the
+       follower joint is driven by the driver joint (each in its own unit). Gears still mesh as modelled solids, with
+       their backlash as the gap; the coupling says how they turn together.
+  CLOSED LOOPS: a four-bar is a tree (ground -> crank -> coupler; ground -> rocker) plus loops=[Loop("coupler",
+       "rocker", at=pin_point, axis=(0, 0, 1))]: the point is on both parts at rest and stays common to both; with axis
+       it is a pin. motion_study solves the loop per frame (Newton on the loop-closure equations) and reports frames
+       the linkage cannot reach. A Loop pair is not booleaned (it touches by design, like a Mate).
   Mate(a, b, kind, clearance, label): two parts that touch or interlock BY DESIGN, kind = pin | thread | slip | snap |
        press | contact. Declare one for every pin in its hole and every thread in its thread: they are then not booleaned
        (fine threads are slow and always "collide"); their gap is measured once and compared with clearance (designed
@@ -237,8 +245,13 @@ ASSEMBLIES (for solids >= 2; without one the app can show the parts only as mode
   Hardware(name, size, qty, source, note, after=part_id, access=(Access(at, axis, tool_d, length),))
        bought parts for the BOM; access = a straight tool path ending at the screw head, pointing the way it is driven,
        checked against the parts in place after `after`.
-  Assembly(parts, joints, hardware, mates, clearance_warn=0.1, budget_s=None)   budget_s: seconds for the assembly checks
-       (default [assembly].budget_s = 45); when it runs out the checks say which ranges they reached, never "clear".
+  Assembly(parts, joints, hardware, mates, clearance_warn=0.1, budget_s=None, couplings=[], loops=[])   budget_s:
+       seconds for the assembly checks (default [assembly].budget_s = 45); when it runs out the checks say which ranges
+       they reached, never "clear".
+  After it builds: motion_study (drivers over time, loops closed, traces with velocity and acceleration, clearance along
+  the whole cycle, holding torque under gravity, video=True for an MP4), robot_files (URDF, SRDF, MJCF with inertia from
+  the B-rep; give each part a material), assembly_sequence (a feasible order and each part's insertion direction; the
+  exploded view and the instructions follow it).
   Form Studio then checks, from the solids: overlap when assembled, the smallest gap, each mated fit, each joint swept
   through its range with its whole chain (first contact angle, worst overlap; free between samples is proven where the
   clearance exceeds the travel, otherwise reported as sampled only), and tool access. A wrong declaration (unknown part,

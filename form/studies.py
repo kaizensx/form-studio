@@ -39,7 +39,7 @@ STAGE = {"study": "prove", "route": "release", "document": "release"}     # the 
 STATES = ("never", "current", "stale", "failed", "running", "unavailable", "n/a")
 BY = ("engine", "agent", "person")       # who runs it: Form Studio here, the agent (it must look), or a person
 PROVIDERS: tuple = ("form.massprops", "form.modelling", "form.fea.bench", "form.calc.bench", "form.dfm", "form.sheet",
-                    "form.drawing.bench", "form.bom")   # later waves: each module has register_studies(register)
+                    "form.drawing.bench", "form.bom", "form.motion")   # later waves: each module has register_studies(register)
 RUNNING_TTL = 6 * 3600                   # a run marker older than this is a process that died, not a run
 
 

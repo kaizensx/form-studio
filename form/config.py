@@ -74,7 +74,7 @@ DEFAULTS = {
     # Both are the "Use in Form Studio" switches of Settings › Engines & software (form/use.py).
     "recon": {"cadfit": False, "learned": True},
     # "Use in Form Studio" for the other optional engines and apps (form/use.py): false = installed but never called.
-    "use": {"coacd": True, "corpus": True, "blender": True, "freecad": True, "openscad": True,
+    "use": {"coacd": True, "mujoco": True, "corpus": True, "blender": True, "freecad": True, "openscad": True,
             "bambu": True, "orca": True, "prusa": True, "superslicer": True, "qidi": True, "elegoo": True,
             "snapmaker": True},
     # Design refinement (form/refine): after every build, named and reversible refine features (fillet tiers, parting

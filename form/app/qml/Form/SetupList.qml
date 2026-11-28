@@ -44,6 +44,7 @@ Rectangle {
         if (id === "recon.learned") return "sparkles"
         if (id === "recon.cadfit") return "scan_line"
         if (id === "game.coacd") return "gamepad_2"
+        if (id === "robot.mujoco") return "bot"
         if (id === "exemplars.cadevolve") return "library"
         if (id === "blender") return "image"
         if (id === "freecad") return "box"

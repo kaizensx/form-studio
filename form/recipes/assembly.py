@@ -24,6 +24,20 @@ Kinematic tree
   axis moves with it. ``parent=""`` on a joint means the world, which is how every declaration before chains
   existed reads (the joint moves only its part, since nothing was attached to it).
 
+Joint kinds
+  ``hinge`` (revolute, degrees), ``slide`` (prismatic, mm), ``cylindrical`` (turns about and slides along one axis:
+  a pose value is degrees, or [degrees, mm]; ``range2`` is the slide range), ``ball`` (spherical about ``origin``: a
+  pose value is degrees about ``axis``, or [rx, ry, rz] degrees about the assembled X, Y and Z axes, applied as
+  build123d's Rot) and ``fixed``. Every check that sweeps a joint sweeps its first degree of freedom.
+
+Couplings and closed loops (form/motion.py solves them)
+  ``Coupling(driver, follower, ratio, offset)`` ties one joint to another: gears, a rack and pinion, a lead screw or a
+  belt (follower = ratio * driver + offset, each in its own unit), or a cam (``profile``: follower value against the
+  driver's angle over one turn). ``Loop(a, b, at, axis)`` closes a kinematic loop: the point ``at`` (assembled frame)
+  belongs to part a and to part b and stays common to both in every pose; with ``axis`` the two parts also keep that
+  axis common (a pin), without it they share only the point (a ball). A four-bar linkage is a tree (ground, crank,
+  coupler; ground, rocker) plus one Loop where the coupler meets the rocker.
+
 Joined pairs
   ``Mate(a, b, kind)`` says two parts touch or interlock by design (a pin in its hole, a thread in a thread, a
   press fit). They are not booleaned against each other; their gap is checked once against the declared
@@ -34,8 +48,12 @@ from __future__ import annotations
 import math
 from dataclasses import asdict, dataclass, field
 
-KINDS = ("hinge", "slide", "fixed")
-KIND_ALIAS = {"slider": "slide", "revolute": "hinge", "prismatic": "slide", "rigid": "fixed"}
+KINDS = ("hinge", "slide", "cylindrical", "ball", "fixed")
+ROTARY = ("hinge", "cylindrical", "ball")      # their first degree of freedom is an angle (degrees)
+KIND_ALIAS = {"slider": "slide", "revolute": "hinge", "prismatic": "slide", "rigid": "fixed", "cylinder": "cylindrical",
+              "spherical": "ball"}
+DOF = {"hinge": 1, "slide": 1, "cylindrical": 2, "ball": 3, "fixed": 0}
+COUPLING_KINDS = ("gear", "rack", "screw", "belt", "linear", "cam")
 MATE_KINDS = ("pin", "thread", "press", "snap", "slip", "contact", "ratchet")
 
 
@@ -73,6 +91,7 @@ class Joint:
     samples: int = 13                           # coarse positions checked between lo and hi, ends included
     parent: str = ""                            # the part it moves relative to; "" = the world
     step: float = 0.0                           # > 0: a ratchet or detent; only multiples of step are positions it can rest at
+    range2: tuple = (0.0, 0.0)                  # cylindrical: the slide range (lo, hi) in mm along the axis
 
 
 def hinge(part: str, axis, origin, range_deg, samples: int = 13, id: str = "", label: str = "", parent: str = "",
@@ -92,6 +111,24 @@ def slide(part: str, axis, range_mm, samples: int = 9, id: str = "", label: str 
 
 
 slider = slide
+
+
+def cylindrical(part: str, axis, origin, range_deg, range_mm, samples: int = 13, id: str = "", label: str = "",
+                parent: str = "") -> Joint:
+    """A part that turns about a line and slides along it (a shaft in a plain bearing). range_deg and range_mm are
+    (lo, hi) limits; a pose value is degrees, or [degrees, mm]."""
+    lo, hi = _vec(range_deg, 2)
+    return Joint(id or f"{part}_cylindrical", label or "Cylindrical", part, "cylindrical", _vec(axis), _vec(origin), (lo, hi),
+                 int(samples), parent, 0.0, _vec(range_mm, 2))
+
+
+def ball(part: str, origin, range_deg=(-30.0, 30.0), axis=(0.0, 0.0, 1.0), samples: int = 13, id: str = "",
+         label: str = "", parent: str = "") -> Joint:
+    """A part that turns every way about a point (a ball joint). range_deg limits each of the three rotations; a pose
+    value is degrees about ``axis``, or [rx, ry, rz] degrees about the assembled X, Y and Z axes."""
+    lo, hi = _vec(range_deg, 2)
+    return Joint(id or f"{part}_ball", label or "Ball joint", part, "ball", _vec(axis), _vec(origin), (lo, hi), int(samples),
+                 parent, 0.0)
 
 
 def fixed(part: str, parent: str, id: str = "", label: str = "") -> Joint:
@@ -119,6 +156,65 @@ class Mate:
     label: str = ""
     axis: tuple | None = None
     origin: tuple = (0.0, 0.0, 0.0)
+
+
+@dataclass(frozen=True)
+class Coupling:
+    """One joint driven by another. follower = ratio * driver + offset, each in its own unit (degrees for a hinge, mm
+    for a slide): gears turn ratio = -z_driver / z_follower (external, axes declared the same way), a rack moves
+    pi * d / 360 mm per degree of its pinion, a lead screw lead / 360 mm per degree. kind "cam": the follower's value
+    is read from ``profile`` ((driver degrees, follower value), ...), over one turn, linearly between points and
+    repeating every 360 degrees; ratio and offset are then unused."""
+    driver: str                                 # joint id
+    follower: str                               # joint id
+    ratio: float = 1.0
+    offset: float = 0.0
+    kind: str = "linear"                        # gear | rack | screw | belt | linear | cam
+    label: str = ""
+    profile: tuple = ()
+
+    def value(self, x: float) -> float:
+        """The follower's value when the driver is at x."""
+        if self.kind != "cam":
+            return self.ratio * x + self.offset
+        import numpy as np
+        pts = sorted((float(a) % 360.0, float(b)) for a, b in self.profile)
+        xs = [a for a, _ in pts] + [pts[0][0] + 360.0]
+        ys = [b for _, b in pts] + [pts[0][1]]
+        t = (x - xs[0]) % 360.0 + xs[0]
+        return float(np.interp(t, xs, ys))
+
+
+def gears(driver: str, follower: str, teeth_driver: int, teeth_follower: int, internal: bool = False, label: str = "") -> Coupling:
+    """A gear pair: the follower turns z_driver / z_follower as far, the other way round for external gears."""
+    r = float(teeth_driver) / float(teeth_follower)
+    return Coupling(driver, follower, r if internal else -r, 0.0, "gear", label or f"Gears {teeth_driver}:{teeth_follower}")
+
+
+def rack(pinion: str, rack_joint: str, pitch_diameter: float, label: str = "") -> Coupling:
+    """A rack driven by its pinion: pi * d mm per turn."""
+    return Coupling(pinion, rack_joint, math.pi * float(pitch_diameter) / 360.0, 0.0, "rack", label or "Rack and pinion")
+
+
+def lead_screw(screw: str, nut: str, lead: float, label: str = "") -> Coupling:
+    """A nut on a turning screw: `lead` mm per turn (negative for a left-hand thread)."""
+    return Coupling(screw, nut, float(lead) / 360.0, 0.0, "screw", label or f"Lead screw {lead:g} mm")
+
+
+def cam(driver: str, follower: str, profile, label: str = "") -> Coupling:
+    """A cam: the follower's value against the cam's angle, ((degrees, value), ...) over one turn."""
+    return Coupling(driver, follower, 1.0, 0.0, "cam", label or "Cam", tuple((float(a), float(b)) for a, b in profile))
+
+
+@dataclass(frozen=True)
+class Loop:
+    """A closed kinematic loop: the point ``at`` (assembled frame, every joint at 0) is on part a and on part b and stays
+    common to both. axis: a pin's direction there (the parts also keep it common); None: they share only the point."""
+    a: str
+    b: str
+    at: tuple
+    axis: tuple | None = None
+    label: str = ""
 
 
 @dataclass(frozen=True)
@@ -164,23 +260,48 @@ def placement_matrix(p: Part):
     return M
 
 
-def joint_matrix(j: Joint, value: float):
-    """4x4 motion of a joint at `value` (degrees or mm), acting in the assembled frame."""
+def _axis_rot(u, deg):
+    import numpy as np
+    t = math.radians(deg)
+    K = np.array([[0, -u[2], u[1]], [u[2], 0, -u[0]], [-u[1], u[0], 0]])
+    return np.eye(3) + math.sin(t) * K + (1 - math.cos(t)) * (K @ K)
+
+
+def values_of(j: Joint, value) -> list:
+    """A pose value as one number per degree of freedom (missing ones are 0). A ball joint given one number keeps it
+    as one: a turn about its declared axis."""
+    n = DOF.get(j.kind, 1)
+    if value is None:
+        vals = []
+    elif isinstance(value, (list, tuple)) or hasattr(value, "__len__"):
+        vals = [float(x) for x in value]
+    else:
+        vals = [float(value)]
+    if j.kind == "ball" and len(vals) == 1:
+        return vals
+    return (vals + [0.0] * n)[:max(n, 1)]
+
+
+def joint_matrix(j: Joint, value):
+    """4x4 motion of a joint at `value` (degrees or mm; a list for a cylindrical or ball joint), assembled frame."""
     import numpy as np
     M = np.eye(4)
-    if j.kind == "fixed" or not value:
+    if j.kind == "fixed":
+        return M
+    v = values_of(j, value)
+    if not any(v):
         return M
     n = math.sqrt(sum(a * a for a in j.axis)) or 1.0
     u = np.array(j.axis, float) / n
-    if j.kind == "hinge":
-        t = math.radians(value)
-        K = np.array([[0, -u[2], u[1]], [u[2], 0, -u[0]], [-u[1], u[0], 0]])
-        R = np.eye(3) + math.sin(t) * K + (1 - math.cos(t)) * (K @ K)
-        o = np.array(j.origin, float)
-        M[:3, :3] = R
-        M[:3, 3] = o - R @ o
-    else:
-        M[:3, 3] = u * value
+    o = np.array(j.origin, float)
+    if j.kind == "slide":
+        M[:3, 3] = u * v[0]
+        return M
+    R = _rot_xyz(*v) if j.kind == "ball" and len(v) == 3 else _axis_rot(u, v[0])
+    M[:3, :3] = R
+    M[:3, 3] = o - R @ o
+    if j.kind == "cylindrical" and len(v) > 1:
+        M[:3, 3] += u * v[1]
     return M
 
 
@@ -193,6 +314,8 @@ class Assembly:
     derived: bool = False                       # made by FORM from separate solids (no assembly() declared): view only
     mates: list = field(default_factory=list)   # Mate items: pairs joined by design
     budget_s: float | None = None               # time for the assembly checks; None = the studio's [assembly].budget_s
+    couplings: list = field(default_factory=list)  # Coupling items: joints driven by other joints (gears, racks, cams)
+    loops: list = field(default_factory=list)   # Loop items: closed kinematic loops (form/motion.py solves them)
 
     def __post_init__(self):
         js = []
@@ -270,6 +393,10 @@ class Assembly:
     def mate(self, a: str, b: str):
         return next((m for m in self.mates if {m.a, m.b} == {a, b}), None)
 
+    def pinned(self, a: str, b: str):
+        """The Loop that pins these two parts together, or None (such a pair touches by design, like a Mate)."""
+        return next((lp for lp in self.loops if {lp.a, lp.b} == {a, b}), None)
+
     def detents(self, j: Joint) -> list:
         """The positions a ratchet joint can rest at (multiples of step within the range)."""
         lo, hi = j.range
@@ -311,7 +438,9 @@ class Assembly:
             if j.parent and j.parent == j.part:
                 out.append(f"Joint {j.id} moves {j.part} relative to itself; parent must be another part.")
             if j.kind not in KINDS:
-                out.append(f"Joint {j.id}: kind must be hinge, slide or fixed (got “{j.kind}”).")
+                out.append(f"Joint {j.id}: kind must be hinge, slide, cylindrical, ball or fixed (got “{j.kind}”).")
+            if j.kind == "cylindrical" and not j.range2[0] <= j.range2[1]:
+                out.append(f"Joint {j.id}: range2 (the slide range) must be (lo, hi) with lo <= hi.")
             if j.kind != "fixed" and sum(a * a for a in j.axis) < 1e-12:
                 out.append(f"Joint {j.id}: axis is zero.")
             if j.kind != "fixed" and j.samples < 2:
@@ -355,6 +484,41 @@ class Assembly:
                 out.append(f"Mate {m.a}/{m.b}: axis must be three numbers, not zero.")
             if len(tuple(m.origin)) != 3:
                 out.append(f"Mate {m.a}/{m.b}: origin must be three numbers.")
+        jd = {j.id: j for j in self.joints}
+        led = {}
+        for c in self.couplings:
+            for x in (c.driver, c.follower):
+                if x not in jd:
+                    out.append(f"Coupling {c.driver}/{c.follower} names unknown joint “{x}”.")
+                elif jd[x].kind == "fixed":
+                    out.append(f"Coupling {c.driver}/{c.follower}: joint {x} is fixed and cannot move.")
+            if c.driver == c.follower:
+                out.append(f"Coupling {c.driver}/{c.follower} drives a joint by itself.")
+            if c.kind not in COUPLING_KINDS:
+                out.append(f"Coupling {c.driver}/{c.follower}: kind must be one of {', '.join(COUPLING_KINDS)} (got “{c.kind}”).")
+            if c.kind == "cam" and len(c.profile) < 2:
+                out.append(f"Coupling {c.driver}/{c.follower}: a cam needs a profile of at least two (degrees, value) points.")
+            if c.follower in led:
+                out.append(f"Joint {c.follower} is driven by two couplings ({led[c.follower]}, {c.driver}); give it one.")
+            led[c.follower] = c.driver
+        for start in led:                         # a follower that drives its own driver, at any depth
+            cur, seen = start, set()
+            while cur in led and cur not in seen:
+                seen.add(cur)
+                cur = led[cur]
+            if cur in seen:
+                out.append("Couplings " + " → ".join(sorted(seen)) + " drive each other in a circle.")
+                break
+        for lp in self.loops:
+            for x in (lp.a, lp.b):
+                if x not in idset:
+                    out.append(f"Loop {lp.a}/{lp.b} names unknown part “{x}”.")
+            if lp.a == lp.b:
+                out.append(f"Loop {lp.a}/{lp.b} closes a part on itself.")
+            if len(tuple(lp.at)) != 3:
+                out.append(f"Loop {lp.a}/{lp.b}: at must be three numbers.")
+            if lp.axis is not None and (len(lp.axis) != 3 or sum(a * a for a in lp.axis) < 1e-12):
+                out.append(f"Loop {lp.a}/{lp.b}: axis must be three numbers, not zero.")
         for h in self.hardware:
             if h.after and h.after not in idset:
                 out.append(f"Hardware {h.name} is fitted after unknown part “{h.after}”.")
@@ -373,7 +537,50 @@ class Assembly:
         return {"parts": [asdict(p) for p in self.parts], "joints": joints,
                 "hardware": [{**asdict(h), "access": [asdict(a) for a in h.access]} for h in self.hardware],
                 "mates": [asdict(m) for m in self.mates],
+                "couplings": [asdict(c) for c in self.couplings], "loops": [asdict(lp) for lp in self.loops],
                 "clearance_warn": self.clearance_warn, "derived": self.derived}
+
+    @classmethod
+    def from_public(cls, d: dict) -> "Assembly":
+        """The declaration rebuilt from public() (or from the assembly view, which carries the same keys and more)."""
+        from dataclasses import fields
+
+        def make(T, row):
+            names = {f.name for f in fields(T)}
+            kw = {}
+            for k, v in row.items():
+                if k not in names:
+                    continue
+                if isinstance(v, list):
+                    v = tuple(tuple(x) if isinstance(x, list) else x for x in v)
+                kw[k] = v
+            return T(**kw)
+
+        hw = [make(Hardware, {**h, "access": tuple(make(Access, a) for a in h.get("access") or [])})
+              for h in d.get("hardware") or []]
+        rows = []
+        for x in d.get("parts") or []:            # the assembly view gives the placement as a matrix, not move/rotate
+            if "move" not in x and isinstance(x.get("placement"), dict) and x["placement"].get("m"):
+                x = {**x, **_move_rotate(x["placement"]["m"])}
+            rows.append(x)
+        return cls(parts=[make(Part, x) for x in rows], joints=[make(Joint, x) for x in d.get("joints") or []],
+                   hardware=hw, mates=[make(Mate, x) for x in d.get("mates") or []],
+                   couplings=[make(Coupling, x) for x in d.get("couplings") or []],
+                   loops=[make(Loop, x) for x in d.get("loops") or []],
+                   clearance_warn=float(d.get("clearance_warn", 0.1)), derived=bool(d.get("derived")))
+
+
+def _move_rotate(m) -> dict:
+    """move and rotate (build123d Rot: Rx @ Ry @ Rz, degrees) of a 3x4 placement matrix, so placement_matrix() gives
+    it back."""
+    R = [[float(m[r][c]) for c in range(3)] for r in range(3)]
+    b = math.asin(max(-1.0, min(1.0, R[0][2])))
+    if abs(R[0][2]) < 1 - 1e-12:
+        a = math.atan2(-R[1][2], R[2][2])
+        c = math.atan2(-R[0][1], R[0][0])
+    else:                                     # gimbal lock: put the whole turn about X
+        a, c = math.atan2(R[2][1], R[1][1]), 0.0
+    return {"move": tuple(float(m[r][3]) for r in range(3)), "rotate": tuple(math.degrees(x) for x in (a, b, c))}
 
 
 def from_solids(boxes: list) -> Assembly:

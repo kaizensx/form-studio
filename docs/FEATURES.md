@@ -261,6 +261,21 @@ each one named as it arrives.
 - **Assembly instructions as a PDF.** A parts page with each part's computed volume, then one page per part in the
   order the assembly attaches them, at its exploded offset with an arrow to where it seats. `form instructions`; MCP
   `assembly_instructions`.
+- **Cylindrical and ball joints, couplings and closed loops.** `cylindrical(...)`, `ball(...)`; `gears`, `rack`,
+  `lead_screw`, `cam` or any `Coupling(driver, follower, ratio, offset)`; `Loop(a, b, at, axis)` closes a linkage.
+- **Motion studies.** Drivers over time (ramp, keyframes, speed, sine), couplings applied and loops solved per frame
+  by Newton's method on the loop-closure equations; frames a linkage cannot reach are listed, near-dead points flagged.
+  Traces of points with path, velocity and acceleration; joints with theirs. Clearance between every pair moving
+  relative to each other at every frame (smallest gap, when, the first contact; intervals between frames proven free
+  or sampled only). Holding torque under gravity per driven joint, by virtual work on the parts' masses. An MP4 of the
+  motion. `form motion`; MCP `motion_study`, `animate(kind="motion")`.
+- **Robot files.** URDF, SRDF and MJCF with a link per part, inertia from the B-rep (mass, centre and tensor in the
+  link frame), visual STL and collision (CoACD or convex hulls), health checks, and loading by yourdfpy and MuJoCo
+  when installed (the MJCF also stepped for a second, simulated), else structural validation, stated. `form urdf`,
+  `form mjcf`; MCP `robot_files`.
+- **Assembly sequence.** An order the parts can go together in and each part's insertion direction, from contact
+  normals and a collision sweep (geometric feasibility, limits stated). The exploded view and the instructions follow
+  it. `form sequence`; MCP `assembly_sequence`.
 
 | | |
 |---|---|
