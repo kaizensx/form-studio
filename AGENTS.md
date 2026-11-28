@@ -56,6 +56,9 @@ Prefer the MCP server (`form-mcp`). Without MCP, the `form` CLI does the same an
 | The design as a FreeCAD PartDesign feature tree (sketches, pads, holes, fillets, patterns, a Params spreadsheet), recomputed and checked in FreeCAD | `freecad_partdesign` | `form export fcstd <p> --out part.FCStd --edit w=80` |
 | Assembly instructions as a PDF | `assembly_instructions` | `form instructions <p> --out steps.pdf` |
 | The gap between two faces of an assembly: its loop through the mates, worst case, RSS, Monte Carlo, Cpk, each tolerance's share, at a temperature span, what to tighten | `tolerance_stack` (`save=True` keeps it; the Bench entry `stack`), `get_tolerance_stack` | `form stack run <p> --a 100,0,0@screw --b 0,0,8 --tol screw_l=0.2 --temps -20,80` |
+| A strut lattice or TPMS inside a design, with a skin: B-rep or mesh (it says which and why), density, stiffness by scaling law, printability | `lattice_properties` (saves nothing) → `lattice_fill` | `form lattice props gyroid cell=8 density=0.2`, `form lattice fill <p> octet cell=8 strut_d=1 skin=1.2` |
+| A flat part's outline from a photo with a card, coin or ruler: a sketch in mm, every dimension with ± and "estimated from the photo" | `photo_profile` (`build=True` extrudes it; parameters stay assumed) | `form photo-profile part.jpg --card` |
+| A four-bar linkage from three poses, three angle pairs or a path: lengths, Grashof, transmission angle, defects, played against the targets | `linkage_synthesis` (`build=True` writes the assembly) | `form linkage motion --poses '[...]'` |
 | An engineering drawing from the solid (dimensions bound to parameters, fits, GD&T only where declared) | `drawing` | `form drawing <p> --sheet A3 --out part.pdf` |
 | STEP AP242 with PMI, read back | `export_pmi` | `form drawing pmi <p>` |
 | Check a person's drawing against the part (never guess a digit: mark it unsure) | `check_drawing` | `form drawing check <p> theirs.pdf` |

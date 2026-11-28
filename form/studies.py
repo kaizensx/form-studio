@@ -45,7 +45,7 @@ STATES = ("never", "current", "stale", "failed", "running", "unavailable", "n/a"
 BY = ("engine", "agent", "person")       # who runs it: Form Studio here, the agent (it must look), or a person
 PROVIDERS: tuple = ("form.massprops", "form.modelling", "form.fea.bench", "form.calc.bench", "form.inverse.bench",
                     "form.dfm", "form.sheet", "form.cam", "form.drawing.bench", "form.bom", "form.motion", "form.board.api",
-                    "form.printphys.bench", "form.costing", "form.stack.bench", "form.reports")   # later waves: each has register_studies(register)
+                    "form.printphys.bench", "form.costing", "form.stack.bench", "form.lattice.bench", "form.reports")   # later waves: each has register_studies(register)
 RUNNING_TTL = 6 * 3600                   # a run marker older than this is a process that died, not a run
 
 

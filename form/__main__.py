@@ -73,6 +73,12 @@
   form urdf|mjcf <project> [--collision auto|coacd|hull|box] [--assume M] [--limits JSON]
                                      robot files (URDF, SRDF, MJCF) with inertia and meshes per link, checked and parsed back
   form sequence <project> [--budget S]   an assembly order and each part's insertion direction (the explode follows it)
+  form lattice props|fill|show|remove|list ...   a strut lattice or TPMS in a region with a skin: B-rep or mesh (and
+                                     why), density, stiffness by scaling law, printability; JSON
+  form linkage motion|function|path ...  a four-bar from three poses, three angle pairs or a path: lengths, Grashof,
+                                     transmission angle, defects, played by the motion solver; --build writes it; JSON
+  form photo-profile PHOTO [--card|--coin C|--scale ...] [--build]   a part's outline from a photo with a reference:
+                                     lines and arcs in mm, each dimension with its uncertainty, estimated; JSON
   form orient <project> [--apply [id]]   rank the ways the part can lie on the plate; --apply sets the best (or the id given)
   form print orient <project> [--cosmetic X,Y,Z] [--study ID | --load X,Y,Z] [--calibrate] [--verify N] [--pick ID]
                                      the Pareto front of print orientations (support, time, strength, surface,
@@ -305,6 +311,15 @@ def main(argv=None):
     if argv[:1] == ["stack"]:                      # tolerance stack-up from the assembly (form/stack)
         from .stack.cli import main as stack_main
         return stack_main(argv[1:])
+    if argv[:1] == ["lattice"]:                    # lattices and TPMS infill (form/lattice)
+        from .lattice.cli import main as lattice_main
+        return lattice_main(argv[1:])
+    if argv[:1] == ["linkage"]:                    # four-bar synthesis: three positions, three angle pairs, a path (form/linkage)
+        from .linkage.tools import main as linkage_main
+        return linkage_main(argv[1:])
+    if argv[:1] == ["photo-profile"]:              # a photo with a reference object to a dimensioned profile (form/phototrace.py)
+        from .phototrace import main as photo_main
+        return photo_main(argv[1:])
     if argv[:1] == ["calc"]:                       # engineering calculators that write geometry (form/calc)
         from .calc.cli import main as calc_main
         return calc_main(argv[1:])

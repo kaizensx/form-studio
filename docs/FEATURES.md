@@ -668,6 +668,36 @@ set. Cost per part against quantity, the cheapest process at each quantity and w
 shop's rates and currency in Settings › Costs. `form cost`; MCP `estimate_cost`, `cost_compare`, `cost_rates`; the
 Bench's Cost per process. See [COST.md](COST.md).
 
+## Lattices and TPMS infill
+
+Fill a design, or a box inside it, with a lattice and leave a skin round it. The method, the scaling laws and the
+verification table are in [LATTICES.md](LATTICES.md).
+
+- **Cells.** Struts: BCC, FCC, octet, Kelvin. TPMS: gyroid, Schwarz P, Schwarz D (diamond), Neovius, each as a sheet
+  or a network. Sized by relative density, wall or strut diameter.
+- **B-rep where it can be, and it says which.** Struts are real cylinders and node spheres fused in OCCT (an exact
+  B-rep, written to STEP) up to about 900 struts, a mesh body above. A TPMS has no exact B-rep: a faceted B-rep cut
+  into the exact body while small, a mesh body when large. The result names the output and the reason.
+- **Graded.** Uniform, by distance from the boundary, a point or a plane, or by the von Mises field of a strength
+  study.
+- **Numbers with their kind.** Relative density computed on the cell and measured on the built solid; stiffness and
+  strength *computed (scaling law)* by Gibson and Ashby, with one cell solved by finite elements beside it on request.
+- **Printability.** The thinnest strut or wall against the process's sourced limit, and for resin and powder the
+  closed voids a skin leaves and whether the pores let the material out.
+
+`form lattice`; MCP `lattice_properties`, `lattice_fill`; the Bench's Lattice infill.
+
+## Starts from a photo and from a motion
+
+- **A photo with a reference object to a profile.** A flat part beside a bank card, a coin or two ruler marks becomes
+  a `form.sketch2d` profile of lines, arcs and circles in millimetres, each dimension with its uncertainty and marked
+  *estimated from the photo*. `form photo-profile`; MCP `photo_profile`.
+- **Four-bar synthesis.** Three poses (Burmester), three angle pairs (Freudenstein) or a path (optimisation, error
+  stated); Grashof, transmission angle and defect checks; played by the motion solver against the targets; written
+  as an assembly on request. `form linkage`; MCP `linkage_synthesis`.
+
+See [PHOTO_AND_LINKAGES.md](PHOTO_AND_LINKAGES.md).
+
 ## Tolerance stack-up
 
 Pick the two faces of a gap in an assembly, and Form Studio finds the loop of dimensions that sets it, then says how
@@ -873,7 +903,7 @@ far the gap moves. The method, the rules and the verification table are in [TOLE
 | OpenSCAD | Builds `.scad` designs; Customizer ranges become parameters |
 | Blender | Photoreal renders; its 3D-Print Toolbox checks when the add-on is installed |
 | Your slicer | Slices, and opens the 3MF or G-code in it |
-| Any MCP client | The full engine over 142 tools ([MCP reference](MCP.md)) |
+| Any MCP client | The full engine over 146 tools ([MCP reference](MCP.md)) |
 
 When a program's version outside the supported range is why something failed, the error names the supported versions
 and what to do.
