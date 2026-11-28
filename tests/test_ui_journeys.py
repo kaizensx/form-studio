@@ -188,6 +188,15 @@ class Journeys(unittest.TestCase):
     def test_modelling_light(self):         # the same on paper
         self.journey("modelling.py", env_extra={"FORM_APPEARANCE": "light"})
 
+    def test_modelling_small(self):         # the smallest window: Preview and Add stay in view, pinned at the pane's foot
+        self.journey("modelling.py", size="1120x700", env_extra={"FORM_APPEARANCE": "dark"})
+
+    def test_bracket_by_hand(self):         # Wave B acceptance: the bracket from Start blank, by hand, timed (< 120 s)
+        self.journey("bracket_by_hand.py", env_extra={"FORM_APPEARANCE": "dark"})
+
+    def test_bracket_by_hand_light(self):
+        self.journey("bracket_by_hand.py", env_extra={"FORM_APPEARANCE": "light"})
+
     def test_new_tools(self):              # 12.3: a boss at a face, every printer compared, a turntable, Open in <Slicer>
         # real slicers where they are installed (macOS here); elsewhere a stand-in OrcaSlicer that copies a fixture G-code
         # and writes the project 3MF its CLI writes. Opening the slicer app is recorded, never done (FORM_FAKE_LAUNCH).

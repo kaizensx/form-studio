@@ -74,6 +74,20 @@ def feats(ui):
 
 
 def menu(ui, fid, entry):
+    """Open a line's menu and run one entry. The listing is rebuilt when a revision lands (and when the conversation
+    column arrives with its first card): if the line went away between finding and pressing it, find it again."""
+    for attempt in range(3):
+        try:
+            return _menu(ui, fid, entry)
+        except RuntimeError:                       # the item was rebuilt under the pointer: try once the window rests
+            ui.key("Escape")
+            ui.idle(10)
+            ui.settle(600)
+    return _menu(ui, fid, entry)
+
+
+def _menu(ui, fid, entry):
+    ui.idle(10)
     row = ui.item("feature-" + fid)
     ui.scroll_to(row)
     ui.hover(ui.item("programPane"), 0.5, 0.01)            # off the line first: a rebuilt line needs the pointer to enter it
@@ -131,6 +145,13 @@ def journey_suppress_restore(ui):
     ui.check(ui.sees("suppressed", within=ui.item("feature-rib")), "the line says suppressed")
     src = ui.api("/projects/" + S["pid"] + "/tree")
     ui.check(src["features"][2]["suppressed"], "the engine reads it from the code")
+    # the hand edit is a revision card in the conversation, as an agent's change is
+    ui.wait_until(lambda: ui.js("Store.chatItems.some(function (e) { return e.t === 'act' && !!e.change && e.change.to === %d })"
+                                % (h0 + 1)), 15, "the revision card in the conversation")
+    cid = ui.js("Store.convId")
+    evs = ui.api("/conversations/" + cid)["items"]
+    card = [e for e in evs if e.get("t") == "act" and e.get("change")][-1]
+    ui.eq((card["text"], card["change"]["from"], card["change"]["to"]), ("Suppressed rib", h0, h0 + 1), "the card says what changed")
     crop(ui, "programPane", "program-suppressed")
     menu(ui, "rib", "Restore")
     after(ui, h0 + 1, "Rib restored")

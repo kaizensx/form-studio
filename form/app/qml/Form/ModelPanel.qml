@@ -46,7 +46,10 @@ Column {
             else if (b.standard === "plain") b.d = Number(v("d", "5"))
             else b.size = v("size", "M3")
         }
-        if (kind === "pattern") { b.of = of; b.mode = v("mode", "linear"); b.axis = v("axis", b.mode === "polar" ? "z" : "x") }
+        if (kind === "pattern") {
+            b.of = of; b.mode = v("mode", "linear"); b.axis = v("axis", b.mode === "polar" ? "z" : "x")
+            if (b.axis === "edge" && edgePick) { delete b.axis; b.picks = [edgePick] }       // the direction of a picked edge
+        }
         return b
     }
     function reset() {
@@ -64,13 +67,16 @@ Column {
     }
     function add() {
         adding = true
-        Store.ppost("/model", body(false)).then(function (r) {
+        Store.ensureConv().then(function (cid) {                 // the revision card goes in the open conversation
+            return Store.ppost("/model", Object.assign(body(false), { conversation: cid }))
+        }).then(function (r) {
             mp.adding = false
             Store.toast("You added " + r.said.replace(/^Added /, ""), "Written into the design's code as " + F.pad(r.head) + "; the checks run again.")
             if (r.job) Store.track(r.job)
             mp.draft = null
             Store.selClear()
             Store.refresh(true)
+            Store._chatTick()
             mp.done()
         }, function (e) { mp.adding = false; mp.error = e.message || "Refused."; mp.errorHint = e.hint || "" })
     }
@@ -97,7 +103,16 @@ Column {
             visible: mp.v("standard", "clearance") === "clearance"; value: mp.v("style", "plain"); onPicked: function (x) { mp.set("style", x) } } }
     Seg { visible: mp.kind === "pattern"; model: [{ value: "linear", text: "Linear" }, { value: "polar", text: "Polar" }]
         value: mp.v("mode", "linear"); onPicked: function (x) { mp.set("mode", x) } }
-    Seg { visible: mp.kind === "pattern"; model: ["x", "y", "z"]; value: mp.v("axis", mp.v("mode", "linear") === "polar" ? "z" : "x")
+    // a picked edge (Annotate, Edge mode) can give the direction: a line, or a round edge's axis for a polar pattern
+    readonly property var edgePick: {
+        var its = Store.selection ? Store.selection.items : []
+        for (var i = 0; i < its.length; i++) if (its[i].kind === "edge" && its[i].edge && its[i].edge.midpoint) return { at: its[i].edge.midpoint }
+        return null
+    }
+    Seg { objectName: "patternAxis"; visible: mp.kind === "pattern"
+        model: [{ value: "x", text: "x" }, { value: "y", text: "y" }, { value: "z", text: "z" },
+                { value: "edge", text: "Picked edge", off: !mp.edgePick, tip: "Pick an edge in Annotate (Edge mode) first" }]
+        value: mp.v("axis", mp.v("mode", "linear") === "polar" ? "z" : "x")
         onPicked: function (x) { mp.set("axis", x) } }
     Grid { width: parent.width; columns: 2; columnSpacing: 10; rowSpacing: 6
         Repeater { model: mp.fields[mp.kind] || []
@@ -118,11 +133,15 @@ Column {
                 text: mp.draft ? mp.draft.preview.craft_notes.join(" ") : "" }
             Txt { objectName: "modelRefused"; width: parent.width; kind: "fine"; color: Theme.amber; visible: mp.error !== ""; text: mp.error }
             Txt { width: parent.width; kind: "fine"; tone: 2; visible: mp.errorHint !== ""; text: mp.errorHint } } }
-    Flow { width: parent.width; spacing: 6
+    // the actions: here, or pinned at the foot of the pane that holds this panel (actionsHere: false), so Preview
+    // and Add stay in view however long the selection above them is
+    property bool actionsHere: true
+    Loader { width: parent.width; sourceComponent: mp.actionsHere ? mp.actionRow : null }
+    property Component actionRow: Component { Flow { spacing: 6
         Btn { objectName: "modelPreview"; small: true; icon: "eye"; text: "Preview"; busy: mp.busy; busyText: "Building…"; enabled: !!mp.kind && !mp.adding; onClicked: mp.preview() }
         Btn { objectName: "modelAdd"; small: true; kind: "primary"; icon: "plus"; text: "Add to design"; busy: mp.adding; busyText: "Building…"
             enabled: !!mp.draft && mp.draft.preview.ok && !mp.busy; onClicked: mp.add()
             tip: "Writes it into the design's code as one feature with its parameters, and builds a new revision" }
         Btn { objectName: "modelFixAgent"; small: true; kind: "quiet"; icon: "sparkles"; text: "Fix with your agent"; visible: mp.error !== ""; onClicked: mp.fixWithAgent() }
-        Btn { small: true; kind: "quiet"; text: "Cancel"; visible: !!mp.draft || mp.error !== ""; onClicked: { mp.reset(); mp.done() } } }
+        Btn { small: true; kind: "quiet"; text: "Cancel"; visible: !!mp.draft || mp.error !== ""; onClicked: { mp.reset(); mp.done() } } } }
 }

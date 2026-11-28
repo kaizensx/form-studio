@@ -18,7 +18,20 @@
   queries (the features that made them, their kind, direction and place), so a parameter change keeps them; a
   rebuild that cannot find one leaves the feature out and says which. Fix with your agent puts a refusal in the
   conversation.
-- **The same headless.** `edit_design` gains the ops `suppress`, `restore`, `move` and `rename`; `add_feature`
+- **Sketch, then extrude, cut or revolve.** Start blank → **Model it by hand** opens a sketch editor on a datum
+  plane; in a design, **Sketch here…** puts it on a picked flat face (its outline drawn as a reference) and the tool
+  dock's **Sketch** on a datum. Draw lines, rectangles and circles; lines drawn nearly level or upright snap
+  horizontal or vertical; dimension a line or a circle and the solver (form.sketch2d) keeps it true, with the
+  degrees of freedom left in mono. Every dimension is a parameter of the design, so changing one later re-solves the
+  sketch. A sketch feature's line menu has **Edit sketch…**. The bracket from Start blank (an L profile, four
+  dimensions, a 40 mm extrusion, an M4 hole, a 2 mm fillet) is a timed interface test.
+- **Hand tools in the dock and in the conversation.** The tool dock has a group for Sketch, Fillet or chamfer and
+  Hole, shell or sketch on a face. A pattern can take its direction from a picked edge (a straight edge: along it; a
+  round one: around its axis). Every change made by hand appears in the open conversation as the same revision
+  card an agent's change gets. Preview and Add to design stay pinned at the foot of the selection pane.
+- **The same headless.** New MCP tools `get_sketch` and `edit_sketch` (ops on points, lines, circles, arcs,
+  constraints and dimensions; refused when the sketch would not solve or close); `add_feature` kinds `extrude`,
+  `cut` and `revolve` with a sketch; `form sketch`, `form model ... extrude|cut|revolve`. `edit_design` gains the ops `suppress`, `restore`, `move` and `rename`; `add_feature`
   the kinds `fillet`, `chamfer`, `hole`, `pattern` and `shell` (with `preview`); `render(upto=)` and
   `get_design_source`'s `tree`. In the terminal: `form tree <project>` (and `suppress|restore|move|rename`,
   `--upto`), `form model <project> fillet|chamfer|hole|pattern|shell`, `form render --upto`.

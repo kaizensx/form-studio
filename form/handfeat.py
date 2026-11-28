@@ -430,9 +430,57 @@ def op_model_pick(key, recipe_id, values, kind, picks, opts=None, tol=0.05):
                 out["through_mm"] = round(max(ds), 3) if ds else None
             except Exception:
                 out["through_mm"] = None
+    elif kind == "direction":
+        # a pattern's direction from a picked edge: a line gives its direction; a circle its axis and centre
+        hit = _nearest_edge(body, (picks or [{}])[0].get("at") or [0, 0, 0])
+        if hit is None or hit[0] > max(1.0, 0.02 * max(sz)):
+            raise RecipeError("No edge near the picked point", "", "Pick a straight edge (linear) or a round one (polar).")
+        e = hit[1]
+        if e.geom_type.name == "LINE":
+            out["axis"] = _unit([b - a for a, b in zip(_vec(e.position_at(0)), _vec(e.position_at(1)))])
+            out["edge"] = "line"
+        elif e.geom_type.name == "CIRCLE":
+            from OCP.BRepAdaptor import BRepAdaptor_Curve
+            c = BRepAdaptor_Curve(e.wrapped).Circle()
+            ax, loc = c.Axis().Direction(), c.Location()
+            out["axis"] = [round(ax.X(), 6) + 0.0, round(ax.Y(), 6) + 0.0, round(ax.Z(), 6) + 0.0]
+            out["origin"] = [round(loc.X(), 4), round(loc.Y(), 4), round(loc.Z(), 4)]
+            out["edge"] = "circle"
+        else:
+            raise RecipeError(f"A {e.geom_type.name.lower()} edge gives no direction", "",
+                              "Pick a straight edge (linear) or a round one (polar).")
+    elif kind == "sketch":
+        # the plane of a sketch on a picked flat face: the face as a stable query, a frame, and its outline in it
+        at = (picks or [{}])[0].get("at") or [0, 0, 0]
+        d, f = _nearest_face(body, at)
+        if d > 0.5 or f.geom_type.name != "PLANE":
+            raise RecipeError("A sketch goes on a flat face", "", "Click a flat face, or sketch on a datum plane.")
+        q = face_query(f, own, lo, sz)
+        n = q["normal"]
+        ref = (1.0, 0.0, 0.0) if abs(n[0]) < 0.9 else (0.0, 1.0, 0.0)
+        dot = sum(a * b for a, b in zip(ref, n))
+        x = _unit_keep([r - dot * c for r, c in zip(ref, n)])
+        y = [n[1] * x[2] - n[2] * x[1], n[2] * x[0] - n[0] * x[2], n[0] * x[1] - n[1] * x[0]]
+        o = [round(t, 4) for t in at]
+
+        def local(p):
+            r = [p[i] - o[i] for i in range(3)]
+            return [round(sum(a * b for a, b in zip(r, x)), 4), round(sum(a * b for a, b in zip(r, y)), 4)]
+        outline = []
+        for e in f.edges():
+            k = 2 if e.geom_type.name == "LINE" else max(8, min(64, int(e.length / 1.0)))
+            outline.append([local(_vec(e.position_at(i / (k - 1)))) for i in range(k)])
+        out["plane"] = {"face": q, "origin": o, "x": [round(t, 6) + 0.0 for t in x], "y": [round(t, 6) + 0.0 for t in y],
+                        "normal": n}
+        out["outline"] = outline
     else:
-        raise RecipeError(f"Picking for {kind!r} is not a thing", "", "fillet, chamfer, hole or shell.")
+        raise RecipeError(f"Picking for {kind!r} is not a thing", "", "fillet, chamfer, hole, shell, direction or sketch.")
     return out
+
+
+def _unit_keep(d) -> list:
+    n = math.sqrt(sum(x * x for x in d)) or 1.0
+    return [x / n for x in d]
 
 
 KERNEL_OPS = {"model_pick": op_model_pick}

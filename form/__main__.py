@@ -28,6 +28,8 @@
   form feature <project> boss --at x,y,z --normal ...  a screw boss or snap-fit hook in the code
   form tree <project> [suppress|restore|move|rename FEATURE] [--upto FEATURE]   the feature tree, by hand
   form model <project> fillet|chamfer|hole|pattern|shell --at x,y,z ... [--preview]   a picked feature as code
+  form model <project> extrude|cut|revolve --sketch F.json [--at x,y,z] [--depth D]    a feature from a sketch
+  form sketch <project> FEATURE [--ops JSON] [--set name=v]   a feature's sketch, solved; edit it
   form verify <project> <release>    re-hash a release against its manifest
   form chat "message" [--project ID] [--conversation ID] [--agent claude|codex] [--model X] [--attach FILE] [--json]
                                      one message to an agent with FORM's tools; streams the reply, saves the conversation
@@ -399,7 +401,10 @@ def main(argv=None):
     mo = sub.add_parser("model", help="a picked feature as code: model <project> fillet|chamfer|hole|pattern|shell "
                                       "[--at x,y,z ...] [options] [--preview]")
     mo.add_argument("project")
-    mo.add_argument("kind", choices=["fillet", "chamfer", "hole", "pattern", "shell"])
+    mo.add_argument("kind", choices=["fillet", "chamfer", "hole", "pattern", "shell", "extrude", "cut", "revolve"])
+    mo.add_argument("--sketch", metavar="FILE.json", help="extrude, cut, revolve: the sketch ({plane, points, entities, "
+                    "constraints}); with --at, it goes on the face at that point")
+    mo.add_argument("--axis-entity", type=int, help="revolve: the sketch line it turns about")
     mo.add_argument("--at", action="append", default=[], metavar="x,y,z", help="a point on an edge (fillet, chamfer) "
                     "or on a face (hole, shell); repeat for several edges")
     for k in ("radius", "length", "thickness", "nominal", "d", "depth", "pitch", "angle", "head_d", "head_depth"):
@@ -416,6 +421,19 @@ def main(argv=None):
     mo.add_argument("--after", help="the feature it goes after (default: last)")
     mo.add_argument("--preview", action="store_true", help="build and report, save nothing")
     mo.add_argument("--expect-head", type=int)
+    sk = sub.add_parser("sketch", help="a feature's sketch: sketch <project> FEATURE (solved, degrees of freedom) | "
+                                       "--ops JSON|- | --set NAME=VALUE ... [--preview] | sketch --new NAME --file F.json "
+                                       "[--depth D] (a new design from a sketch on a datum plane)")
+    sk.add_argument("project", nargs="?")
+    sk.add_argument("feature", nargs="?")
+    sk.add_argument("--ops", help="edit_sketch ops as JSON, or - for stdin")
+    sk.add_argument("--set", action="append", default=[], metavar="NAME=VALUE", help="a named dimension's value")
+    sk.add_argument("--preview", action="store_true")
+    sk.add_argument("--expect-head", type=int)
+    sk.add_argument("--new", metavar="NAME", help="start a design from --file (extruded --depth mm)")
+    sk.add_argument("--file", metavar="F.json")
+    sk.add_argument("--depth", type=float, default=10.0)
+    sk.add_argument("--purpose", default="model")
     # -- analysis on the model (form/analysis.py) --
     az = sub.add_parser("analyze", help="an analysis map: wall thickness, overhangs, layer cross-section, small features")
     az.add_argument("project")
@@ -736,6 +754,36 @@ def main(argv=None):
                 out = fh.add(st, p, a.kind, xyz(a.at), xyz(a.normal), a.expect_head, "cli", **o)
                 out["checks"] = fh.checks(out["features"][-1], st.slicer_info(p=p).get("nozzle_mm"), a.allow_strain)
                 _print(out)
+        elif a.cmd == "sketch":
+            from . import modelling
+            if a.new:
+                if not a.file:
+                    raise StudioError("--new needs --file F.json (the sketch).")
+                data = json.loads(Path(a.file).read_text(encoding="utf-8"))
+                p = modelling.start_from_sketch(st, a.new, data, "extrude", a.purpose, depth=a.depth)
+                job = st.run_sync(p["id"])
+                _print({"project": p["id"], "head": p["head"], "pipeline": job_digest(job)})
+                return 0
+            if not (a.project and a.feature):
+                raise StudioError("Give a project and the feature whose sketch it is.", "`form tree <project>` lists them.")
+            p = st.load(a.project)
+            ops = json.loads(sys.stdin.read() if a.ops == "-" else a.ops) if a.ops else []
+            for kv in a.set:
+                k, _, val = kv.partition("=")
+                ops.append({"op": "set", "name": k, "value": float(val)})
+            if not ops:
+                _print(modelling.get_sketch(st, p, a.feature))
+            else:
+                eops, _new = modelling.sketch_edit_ops(st, p, a.feature, ops)
+                if a.preview:
+                    pv = modelling.preview(st, p, eops)
+                    pv.pop("rid", None)
+                    _print({"saved": False, "ops": eops, "preview": pv})
+                else:
+                    r = modelling.commit(st, p, eops, a.expect_head, "cli", note=f"Changed the sketch of {a.feature}")
+                    r.pop("project")
+                    st.activity(a.project, "commit", f"r{r['head']:02d}: {r['said']}", by="cli")
+                    _print({**r, "pipeline": job_digest(st.run_sync(a.project))})
         elif a.cmd in ("tree", "model"):
             from . import modelling
             p = st.load(a.project)
@@ -769,6 +817,10 @@ def main(argv=None):
                         o["axis"] = a.axis if a.axis.lower().lstrip("+-") in ("x", "y", "z") else xyz(a.axis)
                     if a.origin:
                         o["origin"] = xyz(a.origin)
+                    if a.sketch:
+                        o["sketch"] = json.loads(Path(a.sketch).read_text(encoding="utf-8"))
+                    if a.axis_entity is not None:
+                        o["axis_entity"] = a.axis_entity
                     planned = modelling.plan(st, p, a.kind, [{"at": xyz(t)} for t in a.at], **o)
                     ops = planned["ops"]
                 if a.preview:

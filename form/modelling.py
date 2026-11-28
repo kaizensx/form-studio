@@ -42,8 +42,10 @@ import re
 from . import edits, featureprog
 
 TREE_OPS = ("suppress", "restore", "move", "rename")
-KINDS = ("fillet", "chamfer", "hole", "pattern", "shell")
-ROLES = {"fillet": "finish", "chamfer": "finish", "hole": "interface", "pattern": "structure", "shell": "structure"}
+SKETCH_KINDS = ("extrude", "cut", "revolve")
+KINDS = ("fillet", "chamfer", "hole", "pattern", "shell") + SKETCH_KINDS
+ROLES = {"fillet": "finish", "chamfer": "finish", "hole": "interface", "pattern": "structure", "shell": "structure",
+         "extrude": "structure", "cut": "structure", "revolve": "structure"}
 EVIDENCE = "computed (B-rep)"
 RB_START = "# ---- Form Studio: rollback view (built up to one feature; never saved) ----"
 RB_END = "# ---- end of rollback view ----"
@@ -182,12 +184,21 @@ def tree_of(source: str) -> list:
     except (edits._Bad, SyntaxError):
         return []
     mod_funcs = {n.name for n in tree.body if isinstance(n, (ast.FunctionDef, ast.AsyncFunctionDef))}
+    owned: dict = {}                                  # a feature that hands v to a helper reads its own parameters
+    for key, call in edits._param_calls(tree)[1].items():
+        f = edits._param_fields(call).get("feature")
+        if isinstance(f, ast.Constant) and isinstance(f.value, str):
+            owned.setdefault(f.value, []).append(key)
     ids = list(nodes)
     out, prev = [], None
     for fid in ids:
         fn = nodes[fid]
         kw = _deco_kw(fn)
         r = _reads(fn, set(ids))
+        vname = fn.args.args[1].arg if len(fn.args.args) > 1 else "v"
+        if any(isinstance(x, ast.Call) and any(isinstance(a, ast.Name) and a.id == vname for a in x.args)
+               for x in ast.walk(fn)):
+            r["params"] = sorted(set(r["params"]) | set(owned.get(fid, [])))
         r["helpers"] = [h for h in r["helpers"] if h in mod_funcs]
         row = {"id": fid, "label": kw.get("label") or fid.replace("_", " ").capitalize(), "role": kw.get("role", "structure"),
                "suppressed": bool(kw.get("suppressed")), "after": prev, "reads": r}
@@ -434,6 +445,15 @@ def plan(st, p: dict, kind: str, picks: list | None = None, **o) -> dict:
         fid = str(o["feature_id"])
     vals = st.rev(p)["values"]
     picked = None
+    if kind in SKETCH_KINDS:
+        return _plan_sketch(st, p, c, kind, fid, n, picks, o)
+    if kind == "pattern" and picks:                    # the direction (and a polar axis) from a picked edge
+        at = picks[0].get("at") if isinstance(picks[0], dict) else picks[0]
+        d = st._k("model_pick", key=st.geometry_key(p, c["rid"], vals), recipe_id=c["rid"], values=vals,
+                  kind="direction", picks=[{"at": [float(x) for x in at]}], opts={}, p=p)
+        o = {**o, "axis": d["axis"], **({"origin": d["origin"]} if d.get("origin") else {})}
+        o.setdefault("mode", "polar" if d.get("edge") == "circle" else "linear")
+        picked = d
     if kind != "pattern":
         clean = []
         for i, pk in enumerate(picks or [], 1):
@@ -534,6 +554,172 @@ def plan(st, p: dict, kind: str, picks: list | None = None, **o) -> dict:
                 **({"after": o["after"]} if o.get("after") else {})})
     return {"feature": fid, "label": label_n, "kind": kind, "summary": summary, "ops": ops, "picked": picked,
             "params": params, "evidence": EVIDENCE}
+
+
+# ---- sketches (B3): a sketch on a datum or a picked face, extruded, cut or revolved ---------------------------------
+
+def _sketch_code(kind: str, fid: str, label: str, data: dict, axis: int | None = None) -> str:
+    from . import handsketch
+    lit = handsketch.literal(data, "        ")
+    if kind == "revolve":
+        call = (f"handsketch.revolve(body, self._form_trail, sketch, v, {_q(fid)}, {int(axis)}, "
+                f"v[{_q(fid + '_angle')}], {_q('add')})")
+    else:
+        call = (f"handsketch.extrude(body, self._form_trail, sketch, v, {_q(fid)}, v[{_q(fid + '_depth')}], "
+                f"{_q('add' if kind == 'extrude' else 'cut')})")
+    return (f"@feature({_q(label)}, role=\"structure\")\ndef {fid}(self, v, body):\n"
+            f"    from form import handsketch\n    sketch = {lit}\n    return {call}\n")
+
+
+def _sketch_parts(kind, fid, n, data, o):
+    """(params, code, summary, label) of one sketch feature."""
+    from . import handsketch
+    sol = handsketch.solve(data)
+    if not sol["ok"]:
+        raise _err(f"The sketch does not solve: {sol['error']}", sol.get("hint") or "")
+    if not sol["closed"]:
+        raise _err("The sketch has no closed profile.", "Join the lines end to end into a closed loop (or draw a circle).")
+    label = o.get("label") or f"{kind.capitalize()} {n}"
+    params = handsketch.params(data, fid)
+    axis = None
+    if kind == "revolve":
+        axis = int(o.get("axis_entity", -1))
+        ang = _num(o, "angle", 0.1, 360, "The revolve angle", 360.0)
+        params.append(_param(f"{fid}_angle", f"{label} angle", ang, 1, 360, fid, "degrees turned", step=1, unit="°"))
+        summary = f"{label}: the sketch turned {ang:g}° about line {axis}"
+    else:
+        dflt = 10.0 if kind == "extrude" else 0.0
+        depth = _num(o, "depth", 0, 5000, "The depth", dflt)
+        if kind == "extrude" and depth <= 0:
+            raise _err("An extrusion needs a depth above 0.")
+        params.append(_param(f"{fid}_depth", f"{label} depth" + (" (0 = through)" if kind == "cut" else ""), depth, 0 if kind == "cut" else 0.1,
+                             max(depth * 5, 50), fid, "along the sketch plane's normal" + (", into the part" if kind == "cut" else "")))
+        summary = f"{label}: the sketch {'extruded' if kind == 'extrude' else 'cut'} " + \
+            (f"{depth:g} mm" if depth else "through everything")
+    nd = len([x for x in sol["dims"] if x["name"]])
+    summary += f" ({nd} dimension{'s' if nd != 1 else ''} as parameters, {'fully constrained' if sol['fully_constrained'] else str(sol['dof']) + ' degrees of freedom left'})"
+    return params, _sketch_code(kind, fid, label, data, axis), summary, label
+
+
+def sketch_plane(st, p: dict, at) -> dict:
+    """The plane and outline of a sketch on the flat face at a picked point (computed in the kernel)."""
+    c = _canonical(st, p)
+    vals = st.rev(p)["values"]
+    return st._k("model_pick", key=st.geometry_key(p, c["rid"], vals), recipe_id=c["rid"], values=vals,
+                 kind="sketch", picks=[{"at": [float(x) for x in at]}], opts={}, p=p)
+
+
+def _plan_sketch(st, p, c, kind, fid, n, picks, o):
+    from . import handsketch
+    data = o.get("sketch")
+    if not isinstance(data, dict):
+        raise _err(f"A {kind} needs its sketch.", "Give sketch: {plane, points, entities, constraints} "
+                   "(get_sketch shows the form), or draw it in the sketch editor.")
+    data = handsketch.check(data)
+    picked = None
+    if picks and not o.get("keep_plane"):
+        picked = sketch_plane(st, p, (picks[0].get("at") if isinstance(picks[0], dict) else picks[0]))
+        data = {**data, "plane": picked["plane"]}
+    params, code, summary, label = _sketch_parts(kind, fid, n, data, o)
+    ops = [{"op": "insert", "param": prm} for prm in params]
+    ops.append({"op": "insert", "feature": fid, "code": code, "label": label, "role": "structure",
+                **({"after": o["after"]} if o.get("after") else {})})
+    return {"feature": fid, "label": label, "kind": kind, "summary": summary, "ops": ops, "picked": picked,
+            "params": params, "evidence": EVIDENCE, "sketch": data}
+
+
+SKETCH_DESIGN = '''"""{title}: modelled by hand in Form Studio, starting from a sketch."""
+from form.featureprog import FeatureDesign, feature
+from form.recipes.base import Param
+
+
+class Design(FeatureDesign):
+    title = {title_lit}
+    params = [{params}]
+
+{feature}'''
+
+
+def sketch_design_source(name: str, data: dict, kind: str = "extrude", **o) -> tuple[str, str]:
+    """(the source of a new design whose first feature is this sketch extruded or revolved, its summary)."""
+    if kind not in ("extrude", "revolve"):
+        raise _err("A design starts from an extrusion or a revolve of its sketch.")
+    if "face" in (data.get("plane") or {}):
+        raise _err("The first sketch goes on a datum plane (XY, XZ or YZ): there is no face yet.")
+    fid = f"{kind}_1"
+    params, code, summary, _label = _sketch_parts(kind, fid, 1, data, o)
+    import textwrap
+    ptext = (",\n              ").join(edits._param_text(prm) for prm in params)
+    src = SKETCH_DESIGN.format(title=name, title_lit=_q(name), params=ptext, feature=textwrap.indent(code, "    "))
+    return src, summary
+
+
+def start_from_sketch(st, name: str, data: dict, kind: str = "extrude", purpose: str = "model", **o) -> dict:
+    """A new design from a sketch drawn on a datum plane (Start blank, by hand). Returns the project."""
+    from . import handsketch
+    name = " ".join(str(name or "").split())[:80] or "Untitled design"
+    src, summary = sketch_design_source(name, handsketch.check(data), kind, **o)
+    p = st.create_design(name, src, "", purpose=purpose)
+    st.activity(p["id"], "commit", f"r01: Created {name} by hand: {summary}", by="you")
+    return st.load(p["id"])
+
+
+def _sketch_node(source: str, fid: str):
+    tree = ast.parse(featureprog.strip_partial(source))
+    c = featureprog._feature_class(tree)
+    fn = next((n for n in (c.body if c else []) if isinstance(n, ast.FunctionDef) and n.name == fid), None)
+    if fn is None:
+        raise _err(f"No feature “{fid}” in this design.", "Features: " + ", ".join(featureprog.feature_ids(source)) + ".")
+    for x in ast.walk(fn):
+        if isinstance(x, ast.Assign) and any(isinstance(t, ast.Name) and t.id == "sketch" for t in x.targets) \
+                and isinstance(x.value, ast.Dict):
+            return fn, x
+    raise _err(f"{fid} has no sketch.", "Features made from a sketch (extrude, cut, revolve) hold one: "
+               "`sketch = {...}` in their method.")
+
+
+def get_sketch(st, p: dict, fid: str) -> dict:
+    from . import handsketch
+    c = _canonical(st, p)
+    fn, node = _sketch_node(c["source"], fid)
+    data = ast.literal_eval(node.value)
+    vals = st.rev(p)["values"]
+    solved = handsketch.solve(data, vals, fid + "_")
+    kind = "revolve" if "handsketch.revolve" in ast.unparse(fn) else "cut" if "\"cut\"" in ast.unparse(fn) or "'cut'" in ast.unparse(fn) else "extrude"
+    return {"project": p["id"], "head": p["head"], "feature": fid, "kind": kind, "sketch": data, "solved": solved,
+            "values": {k: vals[k] for k in vals if k.startswith(fid + "_")}, "evidence": "solved by form.sketch2d"}
+
+
+def sketch_edit_ops(st, p: dict, fid: str, ops: list | None = None, sketch: dict | None = None) -> tuple[list, dict]:
+    """(edit ops for the design, the new sketch): sketch ops applied (or a whole new sketch), solved, then written
+    back into the feature's method; named dimensions added or removed become parameters, a set dimension a value."""
+    from . import handsketch
+    c = _canonical(st, p)
+    fn, node = _sketch_node(c["source"], fid)
+    old = ast.literal_eval(node.value)
+    new = handsketch.check(sketch) if sketch is not None else handsketch.apply_ops(old, ops or [])[0]
+    vals = st.rev(p)["values"]
+    sets = {o["name"]: float(o["value"]) for o in ops or [] if isinstance(o, dict) and o.get("op") == "set"}
+    trial = {**vals, **{fid + "_" + k: v for k, v in sets.items()}}
+    sol = handsketch.solve(new, trial, fid + "_")
+    if not sol["ok"]:
+        raise _err(f"Refused: the sketch would not solve: {sol['error']}", sol.get("hint") or "Nothing was changed.",
+                   status=422)
+    if not sol["closed"]:
+        raise _err("Refused: the sketch would have no closed profile.", "Join its lines end to end.", status=422)
+    ind = " " * (node.col_offset + 4)
+    new_src = edits._cut(c["source"], node.value, handsketch.literal(new, ind))
+    spans = featureprog.method_spans(new_src)
+    x, y = spans[fid]
+    import textwrap
+    code = textwrap.dedent("\n".join(new_src.splitlines()[x - 1:y]))
+    out = [{"op": "replace", "feature": fid, "code": code}]
+    before = {q["key"] for q in handsketch.params(old, fid)}
+    after = {q["key"]: q for q in handsketch.params(new, fid)}
+    out += [{"op": "insert", "param": q} for k, q in after.items() if k not in before]
+    out += [{"op": "delete", "param": k} for k in sorted(before - set(after))]
+    out += [{"op": "set_param", "param": fid + "_" + k, "value": v} for k, v in sets.items() if fid + "_" + k in after]
+    return out, new
 
 
 # ---- preview and commit ---------------------------------------------------------------------------------------------

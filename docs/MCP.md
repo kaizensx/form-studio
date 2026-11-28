@@ -116,7 +116,7 @@ instead.
 
 ## Tools at a glance
 
-97 tools. Read-only tools never change a project.
+99 tools. Read-only tools never change a project.
 
 | Tool | Access | What it does |
 |---|---|---|
@@ -152,6 +152,8 @@ instead.
 | [`geometry_diff`](#geometry_diff) | changes | Diff the geometry of two revisions. |
 | [`add_text`](#add_text) | changes | Put raised (or, with sunk, cut-in) lettering on a flat face of a Python design, as a real feature of its source: a new revision whose build adds a stage text_N with Form Studio's bundled font. |
 | [`add_feature`](#add_feature) | changes | Add a feature to a Python design as a new revision. |
+| [`get_sketch`](#get_sketch) | read-only | Get the sketch of a feature made from one (extrude, cut, revolve): its plane, points, entities (line, circle, arc) and constraints, solved by form.sketch2d: point positions, the profile, degrees of freedom left, and the named dimensions with their values (each is a parameter "<feature>_<name>"). |
+| [`edit_sketch`](#edit_sketch) | changes | Edit a feature's sketch with ops (or send the whole sketch), as one revision. |
 | [`remove_feature`](#remove_feature) | changes | Remove a feature as a new revision: a standard feature added with add_feature ("boss_1", "hook_1"), or any feature of a FeatureDesign (its method goes; the features before it load from their checkpoints). |
 | [`compare_printers`](#compare_printers) | read-only | Slice the head revision's exported model for real on every printer set up in every installed slicer (the selected printers first, up to limit; or only the printer ids given, from list_printers) and return each one's simulated print time, filament grams and cost from the user's prices, with the fastest, least filament and cheapest. |
 | [`make_lighter`](#make_lighter) | read-only | Make it lighter: search changes that reduce mass while every check that passes now still passes. |
@@ -863,7 +865,12 @@ origin, count, angle step degrees), "shell" (thickness; one pick on the face to 
 picks: [{"at": [x, y, z]}] in design mm (analyze_selection gives points on edges and faces). Edges and faces
 are kept as stable queries (the features that made them, their class, direction and place), not indexes;
 a rebuild that cannot find one leaves the feature out and says which. preview=True builds and reports
-(volume, box, faces, build log) and saves nothing.
+(volume, box, faces, build log) and saves nothing. A pattern's direction can come from a picked edge (picks:
+a line gives linear along it; a circle, polar about its axis).
+From a sketch: kind="extrude" | "cut" | "revolve" with sketch = {plane, points, entities, constraints}
+(get_sketch shows the form; plane {"datum": "XY"|"XZ"|"YZ", "offset"} or a picked face: give picks=[{"at": ...}]
+on it), depth (mm; a cut with depth 0 goes through), angle and axis_entity (a line of the sketch) for revolve.
+Named dimensions become parameters "<feature>_<name>"; the sketch must solve and close.
 
 | Argument | Type | Required |
 |---|---|---|
@@ -906,6 +913,45 @@ a rebuild that cannot find one leaves the feature out and says which. preview=Tr
 | `angle` | number \| null |  |
 | `axis` |  |  |
 | `origin` | array \| null |  |
+| `preview` | boolean |  |
+| `sketch` | object \| null |  |
+| `axis_entity` | integer \| null |  |
+
+### `get_sketch`
+
+*Read-only.*
+
+Get the sketch of a feature made from one (extrude, cut, revolve): its plane, points, entities (line, circle,
+arc) and constraints, solved by form.sketch2d: point positions, the profile, degrees of freedom left, and the
+named dimensions with their values (each is a parameter "<feature>_<name>"). Change it with edit_sketch.
+
+| Argument | Type | Required |
+|---|---|---|
+| `project` | string | yes |
+| `feature` | string | yes |
+
+### `edit_sketch`
+
+Edit a feature's sketch with ops (or send the whole sketch), as one revision. Ops, in order:
+{"op": "add_point", "at": [x, y]}; {"op": "add_line", "from": i | [x, y], "to": ...};
+{"op": "add_polyline", "points": [...], "close": true} (lines within 2 degrees of horizontal or vertical get that
+constraint); {"op": "add_rect", "at": [x, y], "size": [w, h]}; {"op": "add_circle", "center": i | [x, y], "r": 5};
+{"op": "add_arc", "center", "start", "end"}; {"op": "constrain", "kind": coincident|horizontal|vertical|parallel|
+perpendicular|tangent|equal|midpoint|on|symmetric|fix, "entities": [...], "points": [...]};
+{"op": "dimension", "kind": length|distance|hdist|vdist|radius|diameter|angle, "entities"|"points", "value",
+"name"} (a name makes it a parameter; "" keeps it fixed); {"op": "set", "name": "w", "value": 70};
+{"op": "move", "point": i, "to": [x, y]}; {"op": "delete", "constraint" | "entity": i};
+{"op": "construction", "entity": i}. "Make it symmetric" is a symmetric constraint about a construction line.
+Refused with the reason when the sketch would not solve (over-constrained, out of reach) or not close; nothing
+is saved then. preview=True builds and reports. The checks run again on the saved revision.
+
+| Argument | Type | Required |
+|---|---|---|
+| `project` | string | yes |
+| `feature` | string | yes |
+| `ops` | array \| null |  |
+| `sketch` | object \| null |  |
+| `expect_head` | integer \| null |  |
 | `preview` | boolean |  |
 
 ### `remove_feature`

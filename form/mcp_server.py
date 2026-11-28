@@ -1405,7 +1405,8 @@ def build() -> MCPServer:
                           fit: str = "", nominal: float | None = None, d: float | None = None, style: str = "",
                           depth: float | None = None, of: str = "", mode: str = "", count: int | None = None,
                           pitch: float | None = None, angle: float | None = None, axis: Any = None,
-                          origin: list[float] | None = None, preview: bool = False, ctx: Context = None):
+                          origin: list[float] | None = None, preview: bool = False, sketch: dict | None = None,
+                          axis_entity: int | None = None, ctx: Context = None):
         """Add a feature to a Python design as a new revision. kind="code" (a FeatureDesign): feature = its id, code = one
         method `def <feature>(self, v, body): return body_after`, label/role for the feature list, after = the feature
         it goes after (default: last). Only it is built: the features before it load from their checkpoints, and the
@@ -1431,7 +1432,12 @@ def build() -> MCPServer:
         picks: [{"at": [x, y, z]}] in design mm (analyze_selection gives points on edges and faces). Edges and faces
         are kept as stable queries (the features that made them, their class, direction and place), not indexes;
         a rebuild that cannot find one leaves the feature out and says which. preview=True builds and reports
-        (volume, box, faces, build log) and saves nothing."""
+        (volume, box, faces, build log) and saves nothing. A pattern's direction can come from a picked edge (picks:
+        a line gives linear along it; a circle, polar about its axis).
+        From a sketch: kind="extrude" | "cut" | "revolve" with sketch = {plane, points, entities, constraints}
+        (get_sketch shows the form; plane {"datum": "XY"|"XZ"|"YZ", "offset"} or a picked face: give picks=[{"at": ...}]
+        on it), depth (mm; a cut with depth 0 goes through), angle and axis_entity (a line of the sketch) for revolve.
+        Named dimensions become parameters "<feature>_<name>"; the sketch must solve and close."""
         st = studio()
         from . import modelling
         if kind in modelling.KINDS:
@@ -1439,7 +1445,8 @@ def build() -> MCPServer:
                                         size=size if kind == "hole" else None, fit=fit or None, nominal=nominal, d=d,
                                         style=style or None, depth=depth, of=of or None, mode=mode or None, count=count,
                                         pitch=pitch, angle=angle, axis=axis, origin=origin, after=after or None,
-                                        feature_id=feature or None).items() if x is not None}
+                                        feature_id=feature or None, sketch=sketch, axis_entity=axis_entity,
+                                        label=label or None).items() if x is not None}
             draft = "draft-" + uuid.uuid4().hex[:10]
 
             def go_pick():
@@ -1507,6 +1514,54 @@ def build() -> MCPServer:
         if rf and isinstance(out, dict):
             out["refinement"] = rf
         return out
+
+    @mcp.tool(annotations=RO)
+    async def get_sketch(project: str, feature: str) -> dict:
+        """Get the sketch of a feature made from one (extrude, cut, revolve): its plane, points, entities (line, circle,
+        arc) and constraints, solved by form.sketch2d: point positions, the profile, degrees of freedom left, and the
+        named dimensions with their values (each is a parameter "<feature>_<name>"). Change it with edit_sketch."""
+        st = studio()
+
+        def go():
+            from . import modelling
+            return modelling.get_sketch(st, st.load(project), feature)
+        return await _run(go)
+
+    @mcp.tool(annotations=RW, structured_output=False)
+    async def edit_sketch(project: str, feature: str, ops: list[dict] | None = None, sketch: dict | None = None,
+                          expect_head: int | None = None, preview: bool = False, ctx: Context = None) -> list:
+        """Edit a feature's sketch with ops (or send the whole sketch), as one revision. Ops, in order:
+        {"op": "add_point", "at": [x, y]}; {"op": "add_line", "from": i | [x, y], "to": ...};
+        {"op": "add_polyline", "points": [...], "close": true} (lines within 2 degrees of horizontal or vertical get that
+        constraint); {"op": "add_rect", "at": [x, y], "size": [w, h]}; {"op": "add_circle", "center": i | [x, y], "r": 5};
+        {"op": "add_arc", "center", "start", "end"}; {"op": "constrain", "kind": coincident|horizontal|vertical|parallel|
+        perpendicular|tangent|equal|midpoint|on|symmetric|fix, "entities": [...], "points": [...]};
+        {"op": "dimension", "kind": length|distance|hdist|vdist|radius|diameter|angle, "entities"|"points", "value",
+        "name"} (a name makes it a parameter; "" keeps it fixed); {"op": "set", "name": "w", "value": 70};
+        {"op": "move", "point": i, "to": [x, y]}; {"op": "delete", "constraint" | "entity": i};
+        {"op": "construction", "entity": i}. "Make it symmetric" is a symmetric constraint about a construction line.
+        Refused with the reason when the sketch would not solve (over-constrained, out of reach) or not close; nothing
+        is saved then. preview=True builds and reports. The checks run again on the saved revision."""
+        st = studio()
+
+        def go():
+            from . import handsketch, modelling
+            p = st.load(project)
+            eops, new = modelling.sketch_edit_ops(st, p, feature, ops, sketch)
+            if preview:
+                pv = modelling.preview(st, p, eops)
+                pv.pop("rid", None)
+                return {"saved": False, "ops": eops, "preview": pv}
+            r = modelling.commit(st, p, eops, expect_head, _origin(ctx), note=f"Changed the sketch of {feature}")
+            return {"saved": True, "head": r["head"], "summary": r["said"], "preview": r["preview"],
+                    "solved": handsketch.solve(new, st.rev(st.load(project))["values"], feature + "_")}
+        out = await _run(go)
+        if not out["saved"]:
+            return [json.dumps(out, indent=1, default=str)]
+        act(project, "commit", f"r{out['head']:02d}: {out['summary']}", ctx)
+        jid = st.run(project)
+        out["pipeline"] = job_digest(await _wait_job(st, jid, 45))
+        return await _with_views(st, project, out)
 
     @mcp.tool(annotations=RW)
     async def remove_feature(project: str, feature_id: str, expect_head: int | None = None) -> dict:

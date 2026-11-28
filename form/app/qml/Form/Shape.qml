@@ -64,11 +64,14 @@ Column {
     }
     function treeOp(op) {
         if (rollTo) Store.endScrub()
-        return Store.ppost("/tree", { ops: [op], expect_head: Store.project ? Store.project.head : null }).then(function (r) {
+        return Store.ensureConv().then(function (cid) {          // the revision card goes in the open conversation
+            return Store.ppost("/tree", { ops: [op], expect_head: Store.project ? Store.project.head : null, conversation: cid })
+        }).then(function (r) {
             Store.toast(r.said, "Written into the design's code as " + F.pad(r.head) + "; the checks run again.")
             if (r.job) Store.track(r.job)
             root.tree = null; root.openId = ""; root.openWhat = ""
             Store.refresh(true)
+            Store._chatTick()
             return true
         }, function (e) { Store.fail(e); return false })
     }
@@ -103,11 +106,14 @@ Column {
                 { text: sup ? "Restore" : "Suppress", icon: sup ? "eye" : "eye_off", enabled: i > 0,
                   run: function () { root.treeOp({ op: sup ? "restore" : "suppress", feature: f.id }) } },
                 { text: "Rename…", icon: "pencil", run: function () { root.openId = f.id; root.openWhat = "rename" } },
+                { text: "Edit sketch…", icon: "pen_tool", visible: /^(extrude|cut|revolve)_/.test(f.id), enabled: /^(extrude|cut|revolve)_/.test(f.id) && !sup,
+                  run: function () { Store.pget("/sketch?feature=" + f.id).then(function (r) {
+                      Store.openSheet("handsketch", { mode: "edit", feature: f.id, sketch: r.sketch, values: r.values }) }, function (e) { Store.fail(e) }) } },
                 { text: "Move up", icon: "chevron_up", enabled: i > 1, run: function () { root.treeOp({ op: "move", feature: f.id, before: fs[i - 1].id }) } },
                 { text: "Move down", icon: "chevron_down", enabled: i > 0 && i < fs.length - 1, run: function () { root.treeOp({ op: "move", feature: f.id, after: fs[i + 1].id }) } },
                 { sep: true },
                 { text: "Pattern…", icon: "repeat", enabled: i > 0 && !sup, run: function () { root.openId = f.id; root.openWhat = "pattern" } },
-                { text: "What it depends on", icon: "git_branch", run: function () { root.openId = f.id; root.openWhat = "deps"; root.loadTree() } }]
+                { text: "What it depends on", icon: "git_branch", run: function () { root.openId = f.id; root.openWhat = "deps"; root.loadTree() } }].filter(function (e) { return e.visible !== false })
     }
     PopMenu { id: rowMenu; objectName: "featureMenu"; property int at: -1; model: root.menuFor(at) }
     Connections { target: Store; function onPidChanged() { root.tree = null; root.openId = ""; root.openWhat = "" } }

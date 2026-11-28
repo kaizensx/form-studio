@@ -297,6 +297,144 @@ class Mcp(unittest.TestCase):
         texts, _ = call("edit_design", {"project": p["id"], "ops": [{"op": "suppress", "feature": "rib_slot"}],
                                         "run": False, "look": False})
         self.assertEqual(json.loads(texts[0])["head"], p["head"] + 1)
+        # B3 headless: a design from a sketch, then its sketch read and changed by ops
+        b = modelling.start_from_sketch(st, "Bracket mcp", bracket_sketch(), "extrude", depth=40)
+        out = json.loads(call("get_sketch", {"project": b["id"], "feature": "extrude_1"})[0][0])
+        self.assertEqual(out["solved"]["dof"], 0)
+        self.assertEqual(sorted(d["name"] for d in out["solved"]["dims"]), ["base", "height", "t", "t2"])
+        out = json.loads(call("edit_sketch", {"project": b["id"], "feature": "extrude_1", "preview": True,
+                                              "ops": [{"op": "set", "name": "base", "value": 90}]})[0][0])
+        self.assertFalse(out["saved"])
+        self.assertAlmostEqual(out["preview"]["bbox_mm"]["after"][1][0], 90.0, places=4)
+        with self.assertRaises(Exception) as e:
+            call("edit_sketch", {"project": b["id"], "feature": "extrude_1",
+                                 "ops": [{"op": "dimension", "kind": "length", "entities": [2], "value": 30, "name": "clash"}]})
+        self.assertIn("would not solve", str(e.exception))
+        self.assertEqual(st.load(b["id"])["head"], b["head"])
+
+
+def bracket_sketch():
+    """An L-shaped bracket profile on XZ: base 60, upright 40, both 5 thick, fully constrained."""
+    from form import handsketch
+    d, _ = handsketch.apply_ops(
+        {"plane": {"datum": "XZ", "offset": 0}, "points": [[0, 0], [60, 0], [60, 5], [5, 5], [5, 40], [0, 40]],
+         "fixed": [0], "entities": [], "constraints": []},
+        [{"op": "add_polyline", "points": [0, 1, 2, 3, 4, 5], "close": True},
+         {"op": "dimension", "kind": "length", "entities": [0], "value": 60, "name": "base"},
+         {"op": "dimension", "kind": "length", "entities": [5], "value": 40, "name": "height"},
+         {"op": "dimension", "kind": "length", "entities": [1], "value": 5, "name": "t"},
+         {"op": "dimension", "kind": "hdist", "points": [0, 3], "value": 5, "name": "t2"}])
+    return d
+
+
+class SketchData(unittest.TestCase):
+    """No kernel: sketches as data, solved by form.sketch2d; ops and their refusals."""
+
+    def test_solve_and_dof(self):
+        from form import handsketch
+        s = handsketch.solve(bracket_sketch())
+        self.assertTrue(s["ok"] and s["closed"])
+        self.assertEqual(s["dof"], 0)
+        d = bracket_sketch()
+        d["constraints"] = [c for c in d["constraints"] if c.get("name") != "t2"]
+        self.assertEqual(handsketch.solve(d)["dof"], 1)                     # one dimension less, one freedom
+        moved = handsketch.solve(bracket_sketch(), {"x_base": 80}, "x_")
+        self.assertAlmostEqual(max(p[0] for p in moved["points"]), 80.0, places=6)
+
+    def test_ops_and_refusals(self):
+        from form import handsketch
+        d, made = handsketch.apply_ops(handsketch.empty(), [{"op": "add_rect", "at": [0, 0], "size": [30, 20]},
+                                                             {"op": "add_circle", "center": [15, 10], "r": 4}])
+        self.assertEqual(len(d["entities"]), 5)
+        self.assertEqual([c["k"] for c in d["constraints"]], ["horizontal", "vertical", "horizontal", "vertical"])
+        s = handsketch.solve(d)
+        self.assertTrue(s["ok"] and s["closed"])
+        self.assertEqual(s["loops"], 2)
+        for bad, why in (([{"op": "add_line", "from": 0, "to": 99}], "no point 99"),
+                         ([{"op": "explode"}], "unknown sketch op"),
+                         ([{"op": "constrain", "kind": "glue", "entities": [0]}], "unknown constraint"),
+                         ([{"op": "delete"}], "delete needs")):
+            with self.assertRaises(handsketch.SketchError) as e:
+                handsketch.apply_ops(d, bad)
+            self.assertIn(why, str(e.exception))
+        over = bracket_sketch()
+        over["constraints"].append({"k": "length", "e": [2], "value": 30})     # base minus t2 is 55, not 30
+        self.assertFalse(handsketch.solve(over)["ok"])
+        self.assertIn("does not solve", handsketch.solve(over)["error"])
+
+    def test_the_literal_round_trips(self):
+        import ast as _ast
+        from form import handsketch
+        d = bracket_sketch()
+        self.assertEqual(_ast.literal_eval(handsketch.literal(d)), handsketch.check(d))
+
+
+class Sketches(unittest.TestCase):
+    """The kernel builds: a design from a sketch, a sketch edited, a cut on a picked face, a revolve, a pattern along
+    a picked edge; each survives a sweep of the sketch's own dimension."""
+
+    @classmethod
+    def setUpClass(cls):
+        cls.st = main_studio()
+        cls.p = modelling.start_from_sketch(cls.st, "Bracket", bracket_sketch(), "extrude", depth=40)
+
+    def load(self):
+        return self.st.load(self.p["id"])
+
+    def test_1_design_from_a_sketch(self):
+        p = self.load()
+        s = self.st.head_summary(p)
+        self.assertAlmostEqual(s["volume_mm3"], (60 * 5 + 35 * 5) * 40, places=3)
+        self.assertEqual([round(x, 6) for x in s["bbox"][1]], [60.0, 0.0, 40.0])
+        src = self.st.source_text(p)
+        self.assertIn("handsketch.extrude", src)
+        self.assertIn('"name": "base"', src)
+        for k in ("extrude_1_base", "extrude_1_height", "extrude_1_t", "extrude_1_t2", "extrude_1_depth"):
+            self.assertIn(k, self.st.rev(p)["values"])
+
+    def test_2_edit_the_sketch(self):
+        p = self.load()
+        ops, _new = modelling.sketch_edit_ops(self.st, p, "extrude_1", [{"op": "set", "name": "base", "value": 80}])
+        modelling.commit(self.st, p, ops)
+        p = self.load()
+        self.assertAlmostEqual(self.st.head_summary(p)["bbox"][1][0], 80.0, places=4)
+        self.assertEqual(self.st.rev(p)["values"]["extrude_1_base"], 80.0)
+        with self.assertRaises(StudioError) as e:
+            modelling.sketch_edit_ops(self.st, p, "extrude_1", [{"op": "delete", "entity": 0}])
+        self.assertIn("no closed profile", str(e.exception))
+
+    def test_3_cut_on_a_picked_face_and_a_pattern_along_an_edge(self):
+        from form import handsketch
+        p = self.load()
+        pl = modelling.sketch_plane(self.st, p, [40, -20, 5])
+        self.assertEqual(pl["plane"]["face"]["owner"], "extrude_1")
+        self.assertTrue(pl["outline"])
+        sk, _ = handsketch.apply_ops(handsketch.empty(pl["plane"]),
+                                     [{"op": "add_circle", "center": [0, 0], "r": 3},
+                                      {"op": "dimension", "kind": "diameter", "entities": [0], "value": 6, "name": "d"}])
+        plan = modelling.plan(self.st, p, "cut", None, sketch=sk, depth=0)
+        v0 = self.st.head_summary(p)["volume_mm3"]
+        modelling.commit(self.st, p, plan["ops"], planned=plan)
+        p = self.load()
+        self.assertAlmostEqual(v0 - self.st.head_summary(p)["volume_mm3"], 3.14159265 * 9 * 5, delta=0.5)
+        self.assertEqual({e["feature"]: e["status"] for e in self.st.rev(p)["build_log"]}["extrude_1"], "checkpoint")
+        for base in (50, 110):
+            self.assertFalse(self.st.preview(p, {"extrude_1_base": base}).get("skipped"), base)
+        # the bracket's long bottom edge gives the direction
+        pat = modelling.plan(self.st, p, "pattern", [{"at": [30, -40, 0]}], of="cut_1", count=3, pitch=15)
+        self.assertEqual(pat["picked"]["axis"], [1.0, 0.0, 0.0])
+        pv = modelling.preview(self.st, p, pat["ops"])
+        self.assertTrue(pv["ok"], pv)
+        self.assertAlmostEqual(-pv["volume_mm3"]["change"], 2 * 3.14159265 * 9 * 5, delta=1.0)
+
+    def test_4_revolve(self):
+        from form import handsketch
+        sk, _ = handsketch.apply_ops({"plane": {"datum": "XZ", "offset": 0}, "points": [[0, 0], [0, 10], [4, 10], [4, 0]],
+                                      "fixed": [0], "entities": [], "constraints": []},
+                                     [{"op": "add_polyline", "points": [0, 1, 2, 3], "close": True}])
+        src, _summary = modelling.sketch_design_source("Peg", sk, "revolve", axis_entity=0, angle=360)
+        p = self.st.create_design("Peg", src, purpose="model")
+        self.assertAlmostEqual(self.st.head_summary(p)["volume_mm3"], 3.14159265 * 16 * 10, delta=0.5)
 
 
 if __name__ == "__main__":

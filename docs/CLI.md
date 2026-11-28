@@ -127,6 +127,9 @@ message, with what the design is for.
 | `form tree <project> --upto FEATURE [--png FILE]` | The part as it stood after one feature, from the checkpoints (never saved); also `form render <project> --upto FEATURE` |
 | `form model <project> fillet\|chamfer --at x,y,z [--at ...] --radius R\|--length L` | A fillet or chamfer on the edges nearest the points, written as one feature with its parameter |
 | `form model <project> hole --at x,y,z [--standard clearance\|tapped\|iso286\|plain] [--size M3] [--fit H7 --nominal 8] [--style counterbore\|countersink] [--depth 0]` | A hole into the face at the point; sizes from ISO 273, the tap drill table or ISO 286, with their source |
+| `form model <project> extrude\|cut\|revolve --sketch F.json [--at x,y,z] [--depth D] [--axis-entity N]` | A feature from a sketch, on a datum plane or the face at the point |
+| `form sketch <project> FEATURE [--ops JSON\|-] [--set NAME=VALUE] [--preview]` | A feature's sketch solved (degrees of freedom, dimensions), or changed by `edit_sketch` ops |
+| `form sketch --new NAME --file F.json [--depth D]` | A new design whose first feature is the sketch extruded |
 | `form model <project> pattern --of FEATURE [--mode linear --axis x --count 3 --pitch 12 \| --mode polar --axis z --count 6]` and `shell --thickness T [--at x,y,z]` | A pattern of one feature; a shell open at the picked face. `--preview` builds and reports without saving |
 | `form diff <project> A [B] [--png FILE]` | What changed between two revisions on the solids: material added and removed, with volumes and regions |
 | `form import-reference <project> FILE [--name N]` | Keep a part, mesh, scan or zip of them as a reference of the design: copied, measured in the kernel (box and volume, computed) and drawn in blueprint; a design reads it with `self.reference(name)`. STEP, IGES, BREP and every mesh and point cloud format; a zip imports each part in it. MCP `import_reference` |

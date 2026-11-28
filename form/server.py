@@ -641,6 +641,10 @@ def make_handler(st: Studio):
                 owned = printers_mod.route_post(st, path, body)
                 if owned is not None:
                     return self._json(owned)
+            from . import modelling_api                    # sketches drawn by hand, before a project exists
+            got = modelling_api.route_global_post(st, path, body)
+            if got is not None:
+                return self._json(got)
             m = re.fullmatch(r"/api/projects/([a-z0-9-]+)/([a-z_]+)", path)
             if not m:
                 raise StudioError("Not found.", status=404)
