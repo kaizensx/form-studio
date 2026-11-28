@@ -383,12 +383,12 @@ def register_studies(register) -> None:
     register(Study("board.fit", "study", "Board and enclosure",
                    "The board against its enclosure on the solids: walls, standoffs, connector plugs, part heights "
                    "under the lid, screwdriver access.", "computed", run=_fit_run, key=_fit_key, needs=("board",),
-                   inputs=("geometry", "the board file"), app="board", tool="board_check", order=47))
+                   inputs=("geometry", "the board file"), app="board", tool="board_check", order=76))
     register(Study("board.checks", "study", "Board checks",
                    "KiCad's own DRC and ERC through the person's kicad-cli, and the board against JLCPCB, PCBWay and "
                    "OSH Park's published limits.", "KiCad's report; rule (fab pages)", run=_checks_run, key=_checks_key,
                    needs=("board",), inputs=("the board file", "KiCad's version", "the fab pages' date"), app="board",
-                   tool="board_check", order=48))
+                   tool="board_check", order=77))
     register(Study("doc.board_fab", "document", "Board fab files",
                    "Gerbers, drill files, pick-and-place, BOM and the board STEP from the person's KiCad.",
                    "made by KiCad", run=_fab_run, key=_checks_key, needs=("board",),

@@ -990,7 +990,7 @@ def _builtin() -> None:
     reg(Study("game", "route", "Game asset", "LODs, UVs, baked maps and collision for Godot, Unity or Unreal.",
               "computed", run=_game_run, needs=("game",), app="game", tool="game_asset", heavy=True, order=20))
     reg(Study("release", "route", "Release", "The gate, then a person's approval: the files frozen with SHA-256 hashes.",
-              "computed", state_fn=_release_state, by="person", app="release", tool="request_release", order=30))
+              "computed", state_fn=_release_state, by="person", app="release", tool="request_release", order=99))   # last: after every route a wave adds
     # Documents (Make)
     for i, (name, label, doc, needs) in enumerate((
             ("BOM.csv", "Parts list", "Printed parts and bought hardware, each with its evidence.", ()),

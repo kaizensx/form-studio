@@ -399,11 +399,11 @@ def register_studies(register) -> None:
                    "The flat pattern's DXF as a laser shop reads it: closed contours, duplicates, crossings, text, "
                    "holes against the thickness, each rule with its source.", "computed (2D), rules with sources",
                    run=cut_run, key=key("cut"), inputs=("geometry", "rule table"), app="sheet", tool="cut_file_check",
-                   order=61))
+                   order=70))
     register(Study("sheet_bend_order", "study", "Bend order",
                    "A sequence a press brake can form with a stated V-die and gooseneck punch, or the collisions that "
                    "rule one out.", "model (2D press-brake cross-section)", run=brake_run, key=key("brake"),
-                   inputs=("geometry", "bend table", "tool model"), app="sheet", tool="bend_order", heavy=True, order=62))
+                   inputs=("geometry", "bend table", "tool model"), app="sheet", tool="bend_order", heavy=True, order=71))
 
 
 __all__ = ["flat_pattern", "profile", "cut_check", "bend_order", "service_preflight", "dfm_check", "render_flat",

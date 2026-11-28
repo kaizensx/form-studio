@@ -373,7 +373,7 @@ def register_studies(register) -> None:
     register(Study("parts.standard", "study", "Standard parts",
                    "Purchased parts placed on the design, each with its mating cut, checked for fit on the B-rep.",
                    "computed", run=_parts_run, key=_parts_key, inputs=("geometry (the placements are in the source)",),
-                   app="parts", tool="standard_part", order=46))
+                   app="parts", tool="standard_part", order=74))
     register(Study("doc.bom", "document", "Parts list",
                    "What to buy by standard designation, with quantity, material, mass and supplier numbers; CSV and a "
                    "PDF page.", "computed", run=_list_run, key=_list_key,

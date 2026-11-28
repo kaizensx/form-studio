@@ -82,7 +82,7 @@ Column {
                                 Txt { objectName: "benchHeadline"; width: parent.width; visible: text !== ""; mono: true; font.pixelSize: 11; tone: 3; elide: Text.ElideRight; wrapMode: Text.Wrap; maximumLineCount: 2
                                     text: row.e.state === "unavailable" || row.e.state === "n/a" ? (row.e.why || "")
                                         : row.e.state === "failed" ? ((row.e.error && row.e.error.message) || "failed")
-                                        : row.e.headline ? row.e.headline + (row.e.evidence ? "  ·  " + row.e.evidence : "") : ""
+                                        : row.e.headline ? row.e.headline + (row.e.evidence ? "  ·  " + row.e.evidence.replace(/-/g, "-\u2060") : "") : ""   // a word joiner: "B-rep" never breaks at its hyphen
                                     color: row.e.state === "failed" ? Theme.signal : Theme.ink3
                                     opacity: row.e.state === "stale" ? 0.75 : 1 } }
                             // the state, lettered in neutral mono; the run mark takes its place under the pointer

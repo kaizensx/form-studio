@@ -398,9 +398,11 @@ def register_studies(register) -> None:
         if pid == "sheet_metal":
             continue
         run, key = _bench(pid)
-        register(Study(f"dfm_{pid}", "study", f"Manufacturability: {labels[pid]}",
-                       f"Every {labels[pid].lower()} rule measured on the exact solid, each limit with its source, "
+        short = labels[pid].split(" (")[0]               # "Metal printing (LPBF)": the line keeps the words
+        register(Study(f"dfm_{pid}", "study", f"{short} check",
+                       f"Manufacturability: every {labels[pid].lower()} rule measured on the exact solid, each limit with "
+                       "its source, "
                        "drawn on the part, with fixes proved by checking again.",
                        "computed (B-rep), rules with sources", run=run, key=key,
                        inputs=("geometry", "rule table", "options"), app="dfm", tool="manufacturability",
-                       heavy=pid in ("cnc", "injection"), order=40 + i))
+                       heavy=pid in ("cnc", "injection"), order=60 + i))   # after the print studies, as one block

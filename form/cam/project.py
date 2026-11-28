@@ -460,4 +460,4 @@ def register_studies(register) -> None:
                    "Toolpaths for a 3-axis mill or router, posted for your controller, read back and run on a stock "
                    "model: gouge, leftover material, collisions and cycle time, measured against the design.",
                    "simulated (stock height field), not proven on a machine", run=run, key=key,
-                   inputs=("geometry", "tools", "options", "post"), app="cam", tool="cam_simulate", heavy=True, order=60))
+                   inputs=("geometry", "tools", "options", "post"), app="cam", tool="cam_simulate", heavy=True, order=68))
