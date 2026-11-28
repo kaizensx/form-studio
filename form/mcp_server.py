@@ -1637,52 +1637,34 @@ def build() -> MCPServer:
                           pitch: float | None = None, angle: float | None = None, axis: Any = None,
                           origin: list[float] | None = None, preview: bool = False, sketch: dict | None = None,
                           axis_entity: int | None = None, options: dict | None = None, ctx: Context = None):
-        """Add a feature to a Python design as a new revision. kind="code" (a FeatureDesign): feature = its id, code = one
-        method `def <feature>(self, v, body): return body_after`, label/role for the feature list, after = the feature
-        it goes after (default: last). Only it is built: the features before it load from their checkpoints, and the
-        stage is shown in Form Studio as it builds. Returns the head, build_log (per feature: built, checkpoint or
-        skipped, with seconds, solids and volume change) and a six-view sheet and a section: look. A feature that adds
-        parts says so in the code (`@feature("Lenses", parts=2)`); while parts are still to come the revision is
-        saved as partial (release blocked). If it fails, no revision is made and the diagnosis comes back
-        (partial=True saves it left out, release blocked).
-        Standard features: on a flat face of a Python design, written into its source as a feature block and built
-        in the kernel as a new revision. kind="boss": a screw boss (size M2..M5; hole tapped = ISO tap drill, clearance =
-        ISO 273, insert = a typical heat-set insert hole; height, outer_d, hole_d, hole_depth in mm). kind="snap_hook":
-        a cantilever snap-fit hook (length, thickness, width, lip = undercut, lip_height; up = the lip's direction).
-        at / normal: a point on the face and its outward normal (analyze_selection gives them). Returns the new head, the
-        features and check rows: boss wall vs the nozzle; hook strain 1.5·t·y/L² vs allow_strain (a rule of thumb when
-        not given). Remove one with remove_feature.
-        Picked features (written as one named method plus its parameters, through the edit protocol; previewed in the
-        kernel first and refused with the reason when a feature would be left out; the checks then run again):
-        kind="fillet" (picks near edges, radius), "chamfer" (picks near edges, length), "hole" (one pick on a flat face;
-        standard clearance (size M2..M6, fit close|normal|loose: ISO 273), tapped (size: tap drill), iso286 (nominal and
-        fit such as H7: ISO 286, modelled at mid-tolerance) or plain (d); style plain|counterbore|countersink; depth
-        0 = through), "pattern" (of = a feature id; mode linear: axis x|y|z or [x,y,z], count, pitch mm; polar: axis,
-        origin, count, angle step degrees), "shell" (thickness; one pick on the face to leave open, or none).
-        picks: [{"at": [x, y, z]}] in design mm (analyze_selection gives points on edges and faces). Edges and faces
-        are kept as stable queries (the features that made them, their class, direction and place), not indexes;
-        a rebuild that cannot find one leaves the feature out and says which. preview=True builds and reports
-        (volume, box, faces, build log) and saves nothing. A pattern's direction can come from a picked edge (picks:
-        a line gives linear along it; a circle, polar about its axis).
-        From a sketch: kind="extrude" | "cut" | "revolve" with sketch = {plane, points, entities, constraints}
-        (get_sketch shows the form; plane {"datum": "XY"|"XZ"|"YZ", "offset"} or a picked face: give picks=[{"at": ...}]
-        on it), depth (mm; a cut with depth 0 goes through), angle and axis_entity (a line of the sketch) for revolve.
-        Named dimensions become parameters "<feature>_<name>"; the sketch must solve and close.
-        End conditions (options= for extrude, cut): end blind | through | next (up to next) | face | vertex | offset
-        (from a face) | mid (mid-plane); to_at (a point on the face) or to ([x, y, z], a vertex); offset; reverse;
-        draft (degrees); end2, depth2, to2_at, offset2, draft2 (a second direction); thin, thin_mode one | mid | two,
-        thin2 (a thin wall); new_body. Revolve: end angle | face (to_at), angle2 (the other way), mid, reverse.
-        More kinds, their fields in options=: "sweep" (sketch = the profile; path a sketch, or path_picks on the
-        body's edges; twist; cut or new_body), "loft" (sections: 2 or more sketches; ruled), "rib" (sketch = an open
-        line; thickness; direction parallel | normal; flip), "mirror" (plane "XY" | "XZ" | "YZ" with plane_offset, a
-        datum plane id or {"at": point on a flat face}; of = feature ids, none = the whole body), "draft" (picks on
-        faces, angle, neutral = a plane, flip), "move_face" (picks, distance), "thicken" (a pick on a face, or a
-        sketch; thickness, both, new_body), "boolean" (op combine | subtract | intersect; target and tools: points
-        inside the bodies), "split" (plane, keep both | above | below), "variable_fillet" (picks near edges, r_start,
-        r_end, start: a point at the r_start end), "datum_plane" (base and offset, angle, about x | y; a pick on a
-        flat face; or through: 3 points; a sketch on it has plane {"ref": its id}), "datum_axis" (through: 2 points;
-        base X | Y | Z with origin; edge_at; or planes: two). Sizes become parameters; what cannot be made is
-        refused with the reason."""
+        """Add a feature to a Python design as a new revision, built in the kernel; returns the head, build_log and
+        a six-view sheet and a section: look. A failure makes no revision and returns the diagnosis (partial=True
+        saves it left out, release blocked). preview=True builds and reports, saves nothing. Remove: remove_feature.
+        kind="code" (a FeatureDesign): feature = id, code = `def <feature>(self, v, body): return body_after`,
+        label/role, after (default: last); earlier features load from checkpoints. Parts it adds:
+        `@feature("Lenses", parts=2)`; while parts are to come the revision is partial.
+        On a flat face (at / normal from analyze_selection): "boss" (size M2..M5; hole tapped = ISO tap drill,
+        clearance = ISO 273, insert; height, outer_d, hole_d, hole_depth), "snap_hook" (length, thickness, width,
+        lip, lip_height, up); checked: boss wall vs nozzle, hook strain 1.5·t·y/L² vs allow_strain.
+        Picked (one named method plus parameters; refused with the reason when it cannot be made):
+        "fillet" (radius), "chamfer" (length), "hole" (one face pick; standard clearance (size M2..M6, fit
+        close|normal|loose), tapped, iso286 (nominal, fit e.g. H7, mid-tolerance) or plain (d); style
+        plain|counterbore|countersink; depth 0 = through), "pattern" (of = feature id; linear: axis, count, pitch;
+        polar: axis, origin, count, angle; or from a picked edge), "shell" (thickness; pick the open face or none).
+        picks: [{"at": [x, y, z]}] in mm, kept as stable queries, not indexes.
+        From a sketch: "extrude" | "cut" | "revolve", sketch = {plane, points, entities, constraints} (get_sketch;
+        plane {"datum": "XY"|"XZ"|"YZ", "offset"}, {"ref": datum id} or picks on a face), depth (cut 0 = through),
+        angle, axis_entity. Named dimensions become parameters "<feature>_<name>".
+        options= end conditions, extrude/cut: end blind|through|next|face|vertex|offset|mid; to_at (face point),
+        to (vertex), offset, reverse, draft; end2, depth2, to2_at, offset2, draft2; thin, thin_mode one|mid|two,
+        thin2; new_body. Revolve: end angle|face, angle2, mid, reverse.
+        options= for: "sweep" (sketch profile; path sketch or path_picks; twist; cut, new_body), "loft" (sections:
+        2+ sketches; ruled), "rib" (open line; thickness; direction parallel|normal; flip), "mirror" (plane
+        XY|XZ|YZ + plane_offset, datum id or {"at"}; of = ids, none = body), "draft" (face picks, angle, neutral,
+        flip), "move_face" (picks, distance), "thicken" (face pick or sketch; thickness, both, new_body),
+        "boolean" (op combine|subtract|intersect; target, tools: points inside), "split" (plane, keep
+        both|above|below), "variable_fillet" (picks, r_start, r_end, start), "datum_plane" (base, offset, angle,
+        about; a face pick; or through 3 points), "datum_axis" (through 2 points; base + origin; edge_at; planes)."""
         st = studio()
         from . import modelling
         if kind in modelling.KINDS:

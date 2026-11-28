@@ -273,7 +273,7 @@ class Ribs(unittest.TestCase):
 
     @classmethod
     def setUpClass(cls):
-        from test_modelling import bracket_sketch
+        from tests.test_modelling import bracket_sketch
         cls.st = Studio(config.load())
         cls.p = modelling.start_from_sketch(cls.st, "Bracket rib", bracket_sketch(), "extrude", depth=40)
 
