@@ -31,7 +31,7 @@ class Wiring(unittest.TestCase):
         t = tools()
         self.assertIn("model_mesh", t)
         self.assertIn("game_asset", t)
-        self.assertEqual(len(t), 97)   # prepare_recipe_submission retired, edit_design and triage added
+        self.assertEqual(len(t), 99)   # ... and strength_study, get_strength_study
         self.assertIn("hybrid", t["design_guide"].description)
         self.assertIn("game", t["design_guide"].description)
         self.assertIn("route", t["plan_design"].description)

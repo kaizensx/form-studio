@@ -139,6 +139,18 @@ under the data folder (`form/engines.py`), showing its size and licence first. T
   environment: build123d 0.13.0 (Apache License 2.0), NumPy 2.5.4, SciPy 1.18.1 and scikit-learn 1.9.1
   (BSD-3-Clause), trimesh 5.2.1 (MIT), manifold3d 3.5.5 (Apache License 2.0).
 - **CoACD** 1.0.14 (game collision, `game.coacd`; https://github.com/SarahWeiii/CoACD). Licence: MIT. With NumPy 2.5.4.
+- **Strength studies (FEA)** (`fea`, `form/fea/`). Libraries in its environment, each used as the unmodified wheel
+  from PyPI and loaded only by that environment's own Python, never linked into Form Studio:
+  **Netgen** (netgen-mesher 6.2.2608, https://github.com/NGSolve/netgen), the tetrahedral mesher, GNU Lesser General
+  Public License 2.1 (`LGPL-2.1-only` in its metadata); **netgen-occt** 7.8.1, the Open CASCADE Technology build Netgen
+  reads STEP with, GNU LGPL 2.1 with the Open CASCADE exception (https://dev.opencascade.org/resources/licensing);
+  **scikit-fem** 12.0.2 (https://github.com/kinnala/scikit-fem), the quadratic tetrahedron's shape functions,
+  BSD-3-Clause; **SciPy** 1.18.1, sparse matrices, SuperLU and ARPACK, BSD-3-Clause (its wheel bundles OpenBLAS,
+  BSD-3-Clause, and the GCC runtime libraries under GPL-3.0-or-later with the GCC Runtime Library Exception);
+  **PyAMG** 5.4.1 (https://github.com/pyamg/pyamg), algebraic multigrid, MIT; **NumPy** 2.5.5, BSD-3-Clause.
+  Because the LGPL libraries are separate, replaceable files in an environment the person can change, Form Studio's
+  own code stays MIT. Gmsh (GPL-2.0-or-later) and CalculiX (GPL-2.0-or-later) were considered and are not used,
+  shipped or downloaded.
 - **uv** 0.13.7 (https://github.com/astral-sh/uv), downloaded from its GitHub release and checked against a pinned
   SHA-256 before use, makes these environments. Licence: MIT OR Apache-2.0. The Python 3.12 it installs for them is
   CPython (Python Software Foundation License) from uv's managed builds.

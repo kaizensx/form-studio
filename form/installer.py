@@ -58,7 +58,7 @@ GROUPS = [("engine", "Form Studio itself"), ("ai", "Claude Code"), ("agents", "O
 CAPABILITY_OF_GROUP = {"engine": "core", "slicer": "print", "ai": "agent", "agents": "agent", "form": "core"}
 CAPABILITY_OF_ID = {"parts": "parts", "blender": "render", "freecad": "exchange", "openscad": "exchange",
                     "recon.learned": "mesh", "recon.cadfit": "mesh", "exemplars.cadevolve": "core",
-                    "game.coacd": "render"}
+                    "game.coacd": "render", "fea": "core"}
 
 
 # ---- model --------------------------------------------------------------------------------------------------------
@@ -622,6 +622,33 @@ def _m_coacd(platform, ctx) -> list[Method]:
                    commands=engines.commands(lod.COACD_ENGINE, cfg), action=_coacd_engine(cfg), note=note)]
 
 
+# ---- Strength studies (form/fea): Netgen, scikit-fem, SciPy and PyAMG in an environment of their own -----------------
+
+def _d_fea(cfg, ctx) -> Found:
+    from . import engines, fea
+    if engines.python(fea.ENGINE, cfg) is not None:
+        return Found("ok", "Installed in its own Python (" + engines._tilde(engines.env_dir(fea.ENGINE, cfg)) +
+                     "). Strength, modal and buckling studies can run.")
+    return Found("missing", "Optional. Not installed. Strength studies say so and compute nothing without it.")
+
+
+def _fea_engine(cfg: dict):
+    def run(io) -> str:
+        from . import engines, fea
+        return engines.build(fea.ENGINE, cfg, io)
+    return run
+
+
+def _m_fea(platform, ctx) -> list[Method]:
+    from . import engines, fea
+    cfg = ctx.get("cfg") or _cfg_default()
+    note = ("Netgen (the mesher, with its own Open CASCADE build) is LGPL-2.1 and is used as unmodified wheels from "
+            "PyPI; scikit-fem and SciPy are BSD-3-Clause, PyAMG is MIT. They run out of the app, in a Python of "
+            "their own; nothing else changes.")
+    return [Method("engine", "Its own Python, set up by Form Studio", kind="action", streams=True,
+                   commands=engines.commands(fea.ENGINE, cfg), action=_fea_engine(cfg), note=note)]
+
+
 def _m_claude(platform, ctx) -> list[Method]:
     # The commands on the official setup page (CLAUDE_DOCS), unchanged.
     if platform == "windows":
@@ -857,6 +884,19 @@ REGISTRY: list[Software] = [
                    "game engine's physics. Worth it for game assets with hollows, arches or handles, where one convex "
                    "hull per part would close the openings. Runs in its own Python, out of the app.",
              gives="Tighter collision for game assets than one convex hull per part."),
+    Software("fea", "Strength studies (FEA)",
+             "Optional: the solver for strength, modal and buckling studies. Netgen meshes the solid, scikit-fem, "
+             "SciPy and PyAMG solve it. Runs in its own Python, out of the app.",
+             "optional", "engine", _d_fea, _m_fea,
+             size="about 135 MB (its own Python 3.12 with Netgen, scikit-fem, SciPy, PyAMG and NumPy)",
+             homepage="https://ngsolve.org", licence="LGPL-2.1 (Netgen), BSD-3-Clause (scikit-fem, SciPy, NumPy), MIT (PyAMG)",
+             licence_url="https://github.com/NGSolve/netgen/blob/master/LICENSE",
+             about="Answers “will it hold?” on a design: pick the faces that are held and the faces that are loaded, "
+                   "and get stress, displacement and a safety factor against the material's yield, with the "
+                   "discretisation error stated. It also gives natural frequencies and the load at which a slender "
+                   "part buckles. The mesh is refined until the answer stops changing; a study that does not converge "
+                   "says so. Linear elastic, small strain. Runs on this computer, out of the app.",
+             gives="Strength, modal and buckling studies with a stated error, checked against textbook cases."),
     Software("exemplars.cadevolve", "Reference CadQuery corpus (CADEvolve)",
              "Optional: about 8,000 parametric CadQuery generators from CADEvolve, offered to the agent after Form "
              "Studio's own design examples, labelled reference CadQuery, not the Form API. Read as text, never run.",
@@ -929,7 +969,7 @@ def get(sid: str) -> Software:
 # (<data>/.engines/<id>), CAD-Recode's weights, the CADEvolve corpus. Software installed by another installer (a
 # slicer, Blender, an agent app, libraries in Form Studio's own Python) is never removed here. A folder named by an
 # environment variable (FORM_CADRECODE_DIR, FORM_EXEMPLAR_CORPUS_DIR) belongs to whoever set it and is left alone.
-REMOVABLE = ("recon.learned", "recon.cadfit", "game.coacd", "exemplars.cadevolve")
+REMOVABLE = ("recon.learned", "recon.cadfit", "game.coacd", "fea", "exemplars.cadevolve")
 
 
 def removable_paths(sid: str, cfg: dict) -> list[Path]:
@@ -937,7 +977,7 @@ def removable_paths(sid: str, cfg: dict) -> list[Path]:
         return []
     from . import engines
     out: list[Path] = []
-    if sid in ("recon.learned", "recon.cadfit", "game.coacd"):
+    if sid in ("recon.learned", "recon.cadfit", "game.coacd", "fea"):
         out.append(engines.env_dir(sid, cfg))
     if sid == "recon.learned" and not os.environ.get("FORM_CADRECODE_DIR"):
         out.append(_weights_dir(cfg))

@@ -1,0 +1,328 @@
+# Strength studies
+
+"Will it hold?" answered on a design: pick the faces that are held and the faces that are loaded, and get stress,
+displacement and a safety factor against the material's yield, with the discretisation error stated. The same engine
+gives natural frequencies and the load at which a slender part buckles.
+
+Every result carries its evidence class: `simulated (FEA, linear static, converged to 1.1 %)`. A study that does not
+reach its tolerance reads `simulated (FEA, linear static, not converged)`, says why, and gives no safety factor.
+
+- [What a study is](#what-a-study-is)
+- [Supports and loads](#supports-and-loads)
+- [Materials](#materials)
+- [How the error is stated](#how-the-error-is-stated)
+- [Singularities](#singularities)
+- [What the model does not cover](#what-the-model-does-not-cover)
+- [Verification](#verification)
+- [Timings](#timings)
+- [Tools and commands](#tools-and-commands)
+- [Stored results and staleness](#stored-results-and-staleness)
+- [Field data](#field-data)
+- [The engine and its licences](#the-engine-and-its-licences)
+- [The Bench entry](#the-bench-entry)
+
+## What a study is
+
+| Kind | Answers | Headline |
+|---|---|---|
+| `static` | Stress and displacement under the loads | Safety factor, peak von Mises stress ± error, largest displacement |
+| `modal` | The frequencies the part rings at | Natural frequencies in Hz (a part with no supports is a free body) |
+| `buckling` | When a slender part gives way sideways | The factor on the loads at which the perfect elastic part buckles |
+
+The solid is the design's B-rep. Netgen meshes it into tetrahedra, with more elements on fillets and around holes; the
+solver uses quadratic (10-node) tetrahedra. A design that declares an assembly is solved assembled, with its parts
+bonded where they touch and a material for each part.
+
+## Supports and loads
+
+A face is picked as a point on it, `[x, y, z]` in design millimetres on the part as printed, the same points
+`analyze_selection` takes.
+
+| Support | Meaning |
+|---|---|
+| `fixed` | No movement in any direction |
+| `roller` | Free to slide in the face, held across it: a part resting on a surface, or a symmetry plane |
+| `pin` | A cylindrical face that may turn about its axis and is held across and along it |
+
+| Load | Unit | Meaning |
+|---|---|---|
+| `force` | N | A force vector spread evenly over the picked faces |
+| `pressure` | MPa | Pushes on the face along its normal |
+| `preload` | N | A bolt's clamping force: two equal and opposite forces pressing two face sets together. A modelled connector: the bolt's own stiffness is not in the model |
+| `gravity` | g | The part's own weight in a direction |
+
+Loads act on faces, never on a point or an edge: a point load has no finite stress under it. A static or buckling
+study whose supports leave a rigid motion free is refused, with the number of motions that are free.
+
+## Materials
+
+A study uses four numbers: Young's modulus, Poisson's ratio, the yield strength and the density. Each comes from the
+materials library with the document it was read from, or is given with the study together with its source.
+
+```json
+{"material": "AL-6061"}
+{"material": {"name": "S355JR", "E_GPa": 210, "poisson": 0.3, "yield_MPa": 355, "density_kg_m3": 7850,
+              "source": "EN 10025-2, mill certificate 4711"}}
+{"material": {"key": "PLA", "poisson": 0.35}}
+```
+
+Nothing is defaulted. Without Young's modulus or Poisson's ratio the study is refused and names the missing value.
+Without a yield strength the study runs and reports stress and displacement, and no safety factor. A value given
+without a source is recorded as `assumed`.
+
+A printed filament is solved as a solid isotropic part with the in-plane modulus of the datasheet's specimens. Its
+strength is the weakest sourced direction, the ultimate strength across the layers when the datasheet has it, and the
+datasheet's Z / X-Y ratio is named in the result as the knock-down applied. Layers, infill and walls are not simulated.
+
+## How the error is stated
+
+The mesh is refined until the answer stops changing.
+
+1. The solid is meshed and solved at least three times. For a static study each new mesh is finer where the error
+   indicator of the last one is large (Zienkiewicz-Zhu stress recovery), so the elements go to the fillets, the holes
+   and the load path. The surface is meshed again from the B-rep at every level, so curved faces get closer to their
+   true shape each time. Each level has at least 1.5 times the elements of the one before.
+2. Every level is kept in the result: unknowns, strain energy, largest displacement, peak von Mises stress and the
+   error indicator in the energy norm.
+3. The stated error of a quantity is the larger of **twice the change over the last refinement** and the remaining
+   change by Aitken's extrapolation of the last three levels. It is an estimate with a margin, not a mathematical
+   bound. A sequence that is not shrinking has no basis for an error statement and is reported as not converged.
+4. A study is converged when the stated error of the peak stress is within 5 % and that of the displacement within
+   1 % (1 % for a frequency, 2 % for a buckling factor), and the reactions balance the loads. The tolerances can be
+   tightened per study.
+5. Reactions at the supports are summed and compared with the applied loads, forces and moments; the residual is in
+   the result.
+
+The safety factor is the strength over the peak von Mises stress outside the singular zones. It comes with a lower
+value that applies the stated error, and with the source of the strength it is measured against.
+
+## Singularities
+
+At a sharp inside corner the elastic stress is unbounded (Williams, 1952): the number a mesh gives there grows with
+every refinement and is a property of the mesh, not of the part. Form Studio finds these edges on the mesh (two faces
+that meet at more than 180° inside the solid, turning by more than 15°), holds refinement back there, and leaves the
+stress within a stated radius of them out of the peak and the safety factor. The radius is 2 % of the part's diagonal,
+between 0.5 and 3 mm, and can be set per study.
+
+The edge of a fixed face and the edge of a loaded face are treated the same way when the peak is there and the stress
+there rises at each of the last two refinements, by more than 8 % in all: a perfectly rigid support and a load that
+ends abruptly are models with a singular line. Stress that merely has not settled yet is not called singular; the
+study keeps refining, or ends as not converged.
+
+Each one is listed in the result with where it is, why it is singular, how many nodes were left out, and the stress
+there at every refinement, so the growth is visible. The fix for a sharp corner is a fillet; with a fillet the
+stress converges and counts.
+
+## What the model does not cover
+
+- **Linear elastic material.** No yielding, no creep, no fatigue, no impact. A safety factor below 1 means the linear
+  model predicts yield; it does not say how the part fails.
+- **Small strain and small displacement.** The load does not change the shape it acts on.
+- **Isotropic, homogeneous solids.** A printed part's layers and infill are not in the model.
+- **Bonded contact only.** Parts are joined where they touch; sliding, opening and friction are not modelled.
+- **Linear buckling** is the load of the perfect elastic part. A real part, never perfectly straight, buckles
+  earlier.
+- **A study is evidence, not a certificate.** It does not replace a test of the made part.
+
+## Verification
+
+The solver is checked against cases with a known answer, through the same code path a design's study takes: Netgen
+meshing, faces found from picked points, supports, loads, refinement and the stated error. Each quantity has the
+tolerance it must meet. `tests/test_fea_verification.py` runs the suite; this table is written from a run by
+`scripts/gen_strength_docs.py`.
+
+<!-- verification:begin -->
+| Case | Quantity | Reference | Expected | Got | Error | Tolerance | Pass |
+|---|---|---|---|---|---|---|---|
+| Cantilever beam, end load | tip deflection | Timoshenko beam: F L^3/(3 E I) + F L/(kappa G A) | 0.19162 mm | 0.19161 mm | 0.01 % | 1.0 % | PASS |
+|  | tip deflection (Euler-Bernoulli, no shear) | F L^3/(3 E I) | 0.19048 mm | 0.19161 mm | 0.59 % | 1.5 % | PASS |
+|  | bending stress near mid-span, top fibre | M c / I at that node | 29.926 MPa | 29.924 MPa | 0.01 % | 2.0 % | PASS |
+| Plate with a hole in tension | peak stress at the hole / applied stress (Kt, gross) | Howland/Heywood in Peterson, chart 4.1 (d/W = 0.2); Kirsch gives 3 for an infinite plate | 3.1488 | 3.1695 | 0.66 % | 3.0 % | PASS |
+| Thick cylinder under internal pressure | peak von Mises stress (at the bore) | Lame, plane strain | 231.32 MPa | 232.73 MPa | 0.61 % | 2.0 % | PASS |
+|  | radial displacement of the bore | Lame, plane strain | 0.018159 mm | 0.018143 mm | 0.08 % | 1.0 % | PASS |
+| Cantilever under its own weight | tip deflection under gravity | w L^4/(8 E I) | 0.035192 mm | 0.035203 mm | 0.03 % | 1.0 % | PASS |
+| Two bonded solids in series | elongation of two bonded solids | F L1/(E1 A) + F L2/(E2 A) | 0.0085714 mm | 0.0085714 mm | 0.00 % | 0.5 % | PASS |
+|  | safety factor (the weaker solid governs) | yield / (F / A) | 24 | 24 | 0.00 % | 1.0 % | PASS |
+| Block under a bolt preload | shortening under a bolt preload | N L/(E A) | 0.0029762 mm | 0.0029762 mm | 0.00 % | 0.5 % | PASS |
+|  | stress under a bolt preload | N / A | 12.5 MPa | 12.5 MPa | 0.00 % | 1.0 % | PASS |
+| Natural frequencies of a cantilever | mode 1: first bending, thin direction | Euler-Bernoulli, beta L = 1.8751 | 104.44 Hz | 104.88 Hz | 0.42 % | 2.0 % | PASS |
+|  | mode 2: first bending, stiff direction | Euler-Bernoulli, beta L = 1.8751 | 208.88 Hz | 209.04 Hz | 0.08 % | 2.0 % | PASS |
+|  | mode 3: second bending, thin direction | Euler-Bernoulli, beta L = 4.6941 | 654.51 Hz | 655.57 Hz | 0.16 % | 2.0 % | PASS |
+| Natural frequencies of a free beam | free-free mode 1: bending, thin direction | Euler-Bernoulli, beta L = 4.7300 | 664.56 Hz | 663.28 Hz | 0.19 % | 2.0 % | PASS |
+|  | free-free mode 2: bending, stiff direction | Euler-Bernoulli, beta L = 4.7300 | 1329.1 Hz | 1317.5 Hz | 0.88 % | 2.0 % | PASS |
+| Euler buckling of a column | buckling load factor | Euler: pi^2 E I/(4 L^2) / P | 10.795 | 10.815 | 0.18 % | 2.0 % | PASS |
+| Sharp inside corner (singularity) | the sharp inside corner is named and its stress left out | Williams (1952): the stress at a re-entrant corner is unbounded | yes | yes |  |  | PASS |
+
+| Case | Study | Refinements | Unknowns | Stated error | Converged | Time |
+|---|---|---|---|---|---|---|
+| Cantilever beam, end load | static | 3 | 4,380 | 0.5 % | yes | 0.23 s |
+| Plate with a hole in tension | static | 3 | 22,572 | 1.2 % | yes | 1.26 s |
+| Thick cylinder under internal pressure | static | 4 | 33,234 | 1.9 % | yes | 2.02 s |
+| Cantilever under its own weight | static | 3 | 2,574 | 0.1 % | yes | 0.09 s |
+| Two bonded solids in series | static | 3 | 3,843 | 0.1 % | yes | 0.17 s |
+| Block under a bolt preload | static | 3 | 29,100 | 0.1 % | yes | 1.79 s |
+| Natural frequencies of a cantilever | modal | 3 | 3,474 | 0.2 % | yes | 0.16 s |
+| Natural frequencies of a free beam | modal | 3 | 3,474 | 0.1 % | yes | 0.16 s |
+| Euler buckling of a column | buckling | 3 | 5,541 | 0.5 % | yes | 0.22 s |
+| Sharp inside corner (singularity) | static | 5 | 105,135 | 4.5 % | yes | 6.12 s |
+
+18 quantities in 10 cases, all within tolerance; 12.22 s in total. Run on 2026-11-28 with Netgen 6.2.2608, scikit-fem 12.0.2, SciPy 1.18.1, PyAMG 5.4.1 and NumPy 2.5.5.
+<!-- verification:end -->
+
+The cases:
+
+- **Cantilever beam.** 100 × 10 × 10 mm, 100 N at the free end, ν = 0. Deflection against Timoshenko's beam with
+  shear (κ = 10(1 + ν)/(12 + 11ν)) and against Euler-Bernoulli; bending stress against M c / I.
+- **Plate with a hole.** A 200 × 100 × 2 mm strip with a 20 mm hole in 100 MPa tension, one eighth by symmetry,
+  solved to a stress tolerance of 2 %.
+  Howland's solution for a finite width as fitted by Heywood (Peterson's Stress Concentration Factors, chart 4.1):
+  Ktn = 2 + 0.284(1 − d/W) − 0.600(1 − d/W)² + 1.32(1 − d/W)³ on the net section. Kirsch's infinite plate gives 3.
+- **Thick cylinder.** Inner radius 20 mm, outer 40 mm, 100 MPa inside, plane strain, a quarter by symmetry, solved
+  to a stress tolerance of 2 %. Lamé's
+  hoop, radial and axial stress at the bore, and the bore's radial displacement.
+- **Self weight.** A cantilever under gravity, w L⁴ / (8 E I).
+- **Two bonded solids.** Steel and aluminium end to end in tension: springs in series, and the weaker solid sets the
+  safety factor.
+- **Bolt preload.** A block clamped by a preload: N L / (E A) and N / A.
+- **Natural frequencies.** A clamped-free and a free-free steel beam against Euler-Bernoulli,
+  f = (βL)² / (2π L²) · √(E I / ρ A) with βL = 1.8751, 4.6941 and 4.7300 (Blevins, table 8-1).
+- **Euler column.** A clamped-free column, P = π² E I / (4 L²).
+- **Sharp inside corner.** An L-bracket without a fillet: the study must name the corner, show its stress growing with
+  refinement, and report a peak that leaves it out.
+
+Run it yourself:
+
+```bash
+form strength verify            # JSON: every case, expected, got, error, tolerance, pass
+form strength verify cantilever plate_with_hole
+```
+
+## Timings
+
+A typical bracket, solved to convergence: an aluminium L-bracket 80 × 40 × 60 mm, 6 mm thick, with a 6 mm fillet and
+three 6 mm holes, fixed at the two base holes and loaded at the hole of the upright.
+
+<!-- timings:begin -->
+| Study | Time | Unknowns | Tetrahedra | Refinements | Evidence | Result |
+|---|---|---|---|---|---|---|
+| static | 22.8 s | 248,271 | 54,445 | 4 | simulated (FEA, linear static, converged to 3.5 %) | peak von Mises 50.7 MPa, safety factor 5.45 |
+| modal | 9.6 s | 71,583 | 13,103 | 3 | simulated (FEA, modal, converged to 0.5 %) | first frequencies 928, 1360, 3159 Hz |
+| buckling | 10.8 s | 71,583 | 13,103 | 3 | simulated (FEA, linear buckling, converged to 0.4 %) | load factor 152.3 |
+
+Machine: arm64, Darwin 27.3.0, 18 cores. The time is the whole study in the engine: every mesh, every solve, the stress recovery and the field data.
+<!-- timings:end -->
+
+A study runs in the background. It reports its progress (meshing, solving refinement n with its unknowns) and can be
+cancelled at any time; a cancelled run stores nothing. A study stops refining when the next level would pass its time
+budget (90 s by default) or its limit of unknowns (600,000 for a static study, 160,000 for modal and buckling), and
+then says that it stopped before converging.
+
+## Tools and commands
+
+Two MCP tools, and the same from the terminal with JSON output.
+
+| MCP tool | Command | Does |
+|---|---|---|
+| `strength_study` | `form strength static\|modal\|buckling <project> ...` | Defines a study and runs it. With no definition: the design's studies and their states |
+| `strength_study(study=...)` | `form strength run <project> <study>` | Runs a saved study again |
+| `get_strength_study` | `form strength show <project> <study>` | State, progress, the result, the field file; `cancel=True` stops a running study |
+| | `form strength list <project>` | The design's studies with their states |
+| | `form strength verify` | The verification suite |
+
+`form study strength ...`, `form study static ...`, `form study modal ...` and `form study buckling ...` are the same
+commands.
+
+```bash
+form strength static bracket --fix 33,20,3 --fix 65,20,3 --force 3,20,45:300,0,-200 --material AL-6061
+form strength modal bracket --fix 33,20,3 --modes 4 --material AL-6061
+form strength buckling column --fix 5,5,0 --force 5,5,200:0,0,-1000 \
+     --material '{"E_GPa": 210, "poisson": 0.3, "yield_MPa": 355, "density_kg_m3": 7850, "source": "EN 10025-2"}'
+```
+
+```json
+{"project": "bracket", "kind": "static", "material": "AL-6061",
+ "fixtures": [{"type": "fixed", "faces": [[33, 20, 3], [65, 20, 3]]}],
+ "loads": [{"type": "force", "faces": [[3, 20, 45]], "vector": [300, 0, -200]}]}
+```
+
+The command exits 0 with a converged result, 3 when the study ran and did not converge, and 1 on an error.
+
+What a result holds: `headline`, `evidence`, `how_known`, `converged` (and `not_converged_because`),
+`safety_factor` (`value`, `low`, `against`, `strength_source`, `at`), `peak_von_mises_MPa` and `peak_at`,
+`max_displacement_mm`, `discretisation_error`, `singularities`, `equilibrium`, `convergence.levels`, `mesh`,
+`materials` (every number with its source), `assumptions`, `faces` (what each picked point landed on), and for the
+other kinds `frequencies_Hz`, `modes`, `load_factor` and `meaning`.
+
+## Stored results and staleness
+
+A study's definition is kept in the project file. Its result is stored beside the revision under a key made of:
+
+- the geometry key of the revision (the design's code, the kernel and the parameter values),
+- the definition (kind, supports, loads, mesh options),
+- the numbers of every material used,
+- the engine and the versions of its libraries.
+
+A result is current only when it exists under the key of the head revision. After a change to the geometry, the
+loads, a material's sourced value or the engine, the stored result is stale: it is still shown, marked with the
+revision it describes, and its field is no longer drawn. Nothing marks a result current by hand.
+
+## Field data
+
+For the viewport: the outside surface of the finest mesh with per-vertex results. `get_strength_study` returns
+`field_file`, a JSON file beside the result (`<project>/artifacts/studies/strength.<study>/<key>.field.json`).
+
+```json
+{"format": "form.fea.field/1", "version": 1, "study": "s1a2b3c", "rev": 4, "kind": "static", "frame": "as built",
+ "evidence": "simulated (FEA, linear static, converged to 1.1 %)",
+ "units": {"length": "mm", "stress": "MPa", "frequency": "Hz"},
+ "vertices": 5195, "triangles": 10398,
+ "positions": "<base64: float32 little-endian, 3 per vertex>",
+ "indices":   "<base64: uint32 little-endian, 3 per triangle, outward winding>",
+ "face":      "<base64: uint32, one per triangle: the B-rep face it lies on>",
+ "fields": {
+   "displacement":  {"type": "f4", "components": 3, "data": "<base64>"},
+   "von_mises":     {"type": "f4", "components": 1, "data": "<base64>"},
+   "safety_factor": {"type": "f4", "components": 1, "data": "<base64>"},
+   "singular":      {"type": "u1", "components": 1, "data": "<base64>"}},
+ "ranges": {"von_mises": [0.02, 124.0], "safety_factor": [2.2, 13800.0], "displacement": [-0.31, 0.21]}}
+```
+
+- `displacement`: mm, per vertex. Add a multiple of it to `positions` for the deformed shape.
+- `von_mises`: MPa, the smoothed nodal stress.
+- `safety_factor`: strength over von Mises stress at that vertex; absent when no strength is sourced.
+- `singular`: 1 where the vertex lies in a singular zone that was left out of the verdict. Draw these differently:
+  their stress is not a result.
+- A modal or buckling study has `modes` instead: `count` shapes of 3 components per vertex, each scaled so its largest
+  component is 1, with `mode_frequencies_Hz` or `mode_load_factors`.
+- `frame` is `as built` for one solid and `assembled` for a design of several parts.
+
+About 90 bytes per vertex; a bracket's field is 0.2 to 0.5 MB.
+
+## The engine and its licences
+
+The solver libraries are an optional engine with a Python of its own, installed from Settings, Engines & software
+with one click (about 135 MB). Form Studio itself stays importable and MIT without them; the solver runs out of
+process.
+
+| Library | Version | Role | Licence |
+|---|---|---|---|
+| Netgen (`netgen-mesher`) | 6.2.2608 | Tetrahedral mesh from the B-rep | LGPL-2.1 |
+| `netgen-occt` | 7.8.1 | The Open CASCADE build Netgen reads STEP with | LGPL-2.1 with the Open CASCADE exception |
+| scikit-fem | 12.0.2 | Shape functions of the quadratic tetrahedron | BSD-3-Clause |
+| SciPy | 1.18.1 | Sparse matrices, SuperLU, ARPACK | BSD-3-Clause |
+| PyAMG | 5.4.1 | Algebraic multigrid preconditioner | MIT |
+| NumPy | 2.5.5 | Arrays | BSD-3-Clause |
+
+The LGPL libraries are used as unmodified wheels in a separate environment. Gmsh and CalculiX (both GPL) are not used.
+
+How it solves: element matrices are assembled from the shape-function gradients; one load case is solved by conjugate
+gradients preconditioned with smoothed-aggregation multigrid, using the six rigid-body modes as its near-null space
+(a sparse direct factorisation below 15,000 unknowns); frequencies and buckling factors come from shift-invert
+Lanczos on a factorisation made once.
+
+## The Bench entry
+
+`form/fea/bench.py` registers one entry, **Strength**, for the Bench: current only when every study of the design is
+current for the head revision, stale when any is, with the lowest safety factor as its headline and a run action
+that solves every study that is not current. It plugs into the Bench's hook for later waves, a module listed in
+`studies.PROVIDERS` that exposes `register_studies(register)`.

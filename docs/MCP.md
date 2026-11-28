@@ -116,7 +116,7 @@ instead.
 
 ## Tools at a glance
 
-97 tools. Read-only tools never change a project.
+99 tools. Read-only tools never change a project.
 
 | Tool | Access | What it does |
 |---|---|---|
@@ -217,6 +217,8 @@ instead.
 | [`export_conversation`](#export_conversation) | read-only | Export a conversation. A saved conversation as Markdown (format="md", to read or share) or JSON (format="json", to import again). |
 | [`model_mesh`](#model_mesh) | changes | Model a subdivision cage in Blender with declarative ops (never code), e.g. [{"op":"cage_new","primitive":"cube","size":[40,30,20]}, {"op":"name_region","name":"top", "faces":{"normal":[0,0,1],"within_deg":10}}, {"op":"extrude_region","faces":{"region":"top"},"offset":8}]. |
 | [`game_asset`](#game_asset) | changes | Make a design a game asset: LOD0-LOD3 at triangle budgets (from subdivision cage levels first; decimated LODs are automatic retopology), UVs (region seams or Smart UV, packed), materials from the design's zones, Cycles-baked base colour, normal, ORM and AO maps (texture_px 1024\|2048\|4096; bake fast\|quality), convex-hull collision per part (collision="coacd" when CoACD is installed), pivot and scale. |
+| [`strength_study`](#strength_study) | changes | Run a strength study on the design: will it hold? |
+| [`get_strength_study`](#get_strength_study) | read-only | Read a strength study: its state (never, running with progress, current, stale with the revision the stored result describes, failed with why), and the result. |
 
 ## Tools
 
@@ -1889,6 +1891,75 @@ Reads the project, never changes it. Every check is computed from the written GL
 | `retopo` | string |  |
 | `formats` | array \| null |  |
 | `materials` | object \| null |  |
+
+### `strength_study`
+
+Run a strength study on the design: will it hold? Finite elements on the B-rep (quadratic tetrahedra, Netgen
+mesh), refined until the answer stops changing, with the discretisation error stated. kind: "static" (stress,
+displacement, safety factor against the material's yield), "modal" (natural frequencies; no supports = free
+body; loads ignored) or "buckling" (the factor on the loads at which it buckles).
+Faces are picked as points on the part, [x, y, z] in design millimetres, each part as printed (as for
+analyze_selection, which shows the face a point lands on).
+fixtures: [{"type": "fixed" | "roller" | "pin", "faces": [[x, y, z], ...]}]. fixed: no movement. roller: slides
+in the face, cannot leave it (a symmetry plane). pin: a cylindrical face that may turn about its axis.
+loads: [{"type": "force", "faces": [...], "vector": [Fx, Fy, Fz]}] newtons, spread over the faces (or
+"magnitude" and "direction"); {"type": "pressure", "faces": [...], "value_MPa": p}; {"type": "preload",
+"faces": [under the head], "faces_b": [under the nut], "force_N": N} a bolt's clamping force as a modelled
+connector; {"type": "gravity", "g": 1, "direction": [0, 0, -1]}.
+material: a key of the materials library ("AL-6061", "PETG": E, Poisson's ratio, yield and density with their
+sources), or values with where they are from: {"name", "E_GPa", "poisson", "yield_MPa", "density_kg_m3",
+"source"}; left out: the design's material (set_appearance). materials: {part id: material} for several parts,
+which are solved assembled and bonded where they touch. Nothing is assumed: without E or Poisson's ratio the
+study is refused; without a yield strength there is no safety factor.
+mesh: optional {"h0" start size mm, "levels_max", "dof_max", "budget_s", "tol_stress" 0.05, "tol_disp" 0.01,
+"singular_radius" mm}. The study is saved in the project and runs in the background: read it with
+get_strength_study(project, study, wait_s). study="<id>" alone runs a saved study again (after a change it is
+stale); with a definition it replaces that study; remove=True deletes it. No arguments but project: the
+design's studies with their states. Evidence class: simulated (FEA, <kind>, converged to N %), or "not
+converged", which gives no safety factor. Stress at a sharp inside corner is named as singular and left out.
+Linear elastic, small strain; a printed part is solved solid and isotropic. Needs the optional strength engine
+(setup_status); without it nothing is computed and the call says so.
+
+| Argument | Type | Required |
+|---|---|---|
+| `project` | string | yes |
+| `kind` | string |  |
+| `fixtures` | array \| null |  |
+| `loads` | array \| null |  |
+| `material` | string \| object \| null |  |
+| `materials` | object \| null |  |
+| `modes` | integer \| null |  |
+| `mesh` | object \| null |  |
+| `name` | string |  |
+| `study` | string |  |
+| `run_now` | boolean |  |
+| `force` | boolean |  |
+| `remove` | boolean |  |
+
+### `get_strength_study`
+
+*Read-only.*
+
+Read a strength study: its state (never, running with progress, current, stale with the revision the
+stored result describes, failed with why), and the result. Waits up to wait_s seconds for a running study.
+The result gives the headline, the evidence class, the safety factor with its lower value under the stated
+error and the source of the strength it is against, peak von Mises stress and where, largest displacement,
+natural frequencies or the buckling load factor, the discretisation error, every singularity that was left
+out (where, why, how the stress there grew with refinement), the balance of reactions and loads, the mesh, the
+material's numbers with their sources and the assumptions. converged=false means the tolerance was not
+reached: the numbers are reported with why, and no safety factor is given. full=True adds every refinement
+level's record. field_file is the path of the field data for a viewer (per-vertex displacement, von Mises
+stress and safety factor on the surface mesh; docs/STRENGTH.md); field=True returns it inline (large).
+cancel=True stops a running study; nothing is stored for a cancelled run.
+
+| Argument | Type | Required |
+|---|---|---|
+| `project` | string | yes |
+| `study` | string | yes |
+| `wait_s` | number |  |
+| `full` | boolean |  |
+| `field` | boolean |  |
+| `cancel` | boolean |  |
 
 ## Prompts
 

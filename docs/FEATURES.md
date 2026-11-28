@@ -11,6 +11,7 @@ as an MCP tool ([MCP reference](MCP.md)), unless noted. 3D printing is optional 
 - [Optimisation and alternatives](#optimisation-and-alternatives)
 - [Parts you already have](#parts-you-already-have)
 - [Checks and evidence](#checks-and-evidence)
+- [Strength studies](#strength-studies)
 - [Analysis, measurement and annotations](#analysis-measurement-and-annotations)
 - [Revisions, branches and variants](#revisions-branches-and-variants)
 - [Colours and materials](#colours-and-materials)
@@ -472,6 +473,36 @@ shown as a pass.
 resting in its nut is not a 0 mm wall, and only faces within 30° of parallel count, so a tapered edge is not a wall
 either. A real thin fin still fails.
 
+## Strength studies
+
+"Will it hold?" on any design, with the error stated. Pick the faces that are held and the faces that are loaded;
+the solid is meshed into quadratic tetrahedra, finer on fillets and holes, and solved again and again until the
+answer stops changing. The full method and the verification table are in [STRENGTH.md](STRENGTH.md).
+
+| Study | Result |
+|---|---|
+| Linear static | Safety factor against the material's yield, peak von Mises stress ± its error, largest displacement |
+| Modal | Natural frequencies and mode shapes, held or as a free body |
+| Linear buckling | The factor on the loads at which the perfect elastic part buckles |
+
+- **Supports and loads on picked faces:** fixed, roller and pin; force, pressure, a bolt's preload and gravity. A
+  design of several parts is solved assembled, bonded where the parts touch, with a material for each.
+- **Evidence:** `simulated (FEA, linear static, converged to 1.1 %)`. The convergence of every refinement is kept,
+  the reactions are balanced against the loads, and a study that does not converge says so and gives no safety
+  factor.
+- **Singularities are named.** Stress at a sharp inside corner, or at the edge of a rigid support where it keeps
+  growing, is listed with its location and growth and left out of the verdict.
+- **Sourced materials.** Young's modulus, Poisson's ratio, yield and density come with their documents; nothing is
+  defaulted.
+- **Verified.** Ten textbook cases, 18 quantities, each within its tolerance: beams, a plate with a hole, a thick
+  cylinder, frequencies, Euler buckling.
+- **Stored with the revision.** A result goes stale after any change to the geometry, the loads, the material or
+  the engine, and says which revision it describes.
+- **Headless:** `strength_study`, `get_strength_study`; `form strength static|modal|buckling|run|list|show|verify`.
+  Runs in the background with progress and cancel; a typical bracket converges in about 25 s.
+- **Optional engine:** Netgen, scikit-fem, SciPy and PyAMG in a Python of their own (about 135 MB), installed from
+  Settings.
+
 ## Analysis, measurement and annotations
 
 | | |
@@ -581,7 +612,7 @@ either. A real thin fin still fails.
 | OpenSCAD | Builds `.scad` designs; Customizer ranges become parameters |
 | Blender | Photoreal renders; its 3D-Print Toolbox checks when the add-on is installed |
 | Your slicer | Slices, and opens the 3MF or G-code in it |
-| Any MCP client | The full engine over 97 tools ([MCP reference](MCP.md)) |
+| Any MCP client | The full engine over 99 tools ([MCP reference](MCP.md)) |
 
 When a program's version outside the supported range is why something failed, the error names the supported versions
 and what to do.

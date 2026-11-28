@@ -2676,6 +2676,8 @@ def build() -> MCPServer:
     from . import game
     blender_model.register(mcp, studio, _run)
     game.register(mcp, studio, _run)
+    from .fea import tools as fea_tools       # strength studies: strength_study, get_strength_study (form/fea)
+    fea_tools.register_tools(mcp, studio, _run, RO, RW, _origin)
     return mcp
 
 

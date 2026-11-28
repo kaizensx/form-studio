@@ -2,6 +2,40 @@
 
 ## Unreleased
 
+### New
+
+- **Strength studies with a stated error.** Pick the faces that are held and the faces that are loaded, and get
+  stress, displacement and a safety factor against the material's yield; also natural frequencies (modal) and the
+  load at which a slender part buckles. Supports are fixed, roller and pin; loads are force, pressure, a bolt's
+  preload and gravity. A design of several parts is solved assembled, bonded where its parts touch, with a material
+  for each. Netgen meshes the B-rep into quadratic tetrahedra, finer on fillets and holes, and the solid is meshed
+  and solved again until the answer stops changing. Every result says how it is known:
+  `simulated (FEA, linear static, converged to 1.1 %)`, with the convergence of every refinement kept. A study that
+  does not reach its tolerance says so and gives no safety factor.
+- **Singularities are named, never reported as strength.** At a sharp inside corner the elastic stress has no finite
+  value. The study finds such edges, leaves the stress within a stated radius of them out of the peak and the safety
+  factor, and lists each with where it is, why, and how the stress there grew with refinement. The edge of a fixed
+  face and the edge of a loaded face are treated the same way when the stress there keeps growing.
+- **Material numbers with their sources.** A study takes Young's modulus, Poisson's ratio, yield strength and
+  density from the materials library, each with its document, or from values given with the study and their source.
+  Nothing is defaulted: a missing modulus stops the study, a missing yield strength means no safety factor. A
+  printed filament is solved solid and isotropic, judged against its weakest sourced strength, and says so.
+- **A verification suite, published.** Ten textbook cases with 18 quantities, each with its reference and tolerance:
+  a cantilever against Timoshenko and Euler-Bernoulli, a plate with a hole against Peterson's chart, Lamé's thick
+  cylinder, self weight, two bonded solids, a bolt preload, the frequencies of a clamped and a free beam, Euler's
+  column, and a sharp corner that must be named. [docs/STRENGTH.md](docs/STRENGTH.md) has the table;
+  `form strength verify` runs it.
+- **Headless and in the background.** `strength_study` and `get_strength_study` over MCP, and `form strength
+  static|modal|buckling|run|list|show|verify` (also as `form study strength ...`) with JSON output. A study runs
+  as a job with progress and cancel. Its result is stored beside the revision under a key of the geometry, the
+  loads, the material's numbers and the engine, so it goes stale after any change and says which revision it
+  describes. A typical bracket converges in about 25 s.
+- **Field data for the viewport.** Each result has a compact surface field: per-vertex displacement, von Mises
+  stress, safety factor and a mask of the singular zones; mode shapes for modal and buckling studies.
+- **The solver is an optional engine.** "Strength studies (FEA)" in Settings, Engines & software installs Netgen
+  (LGPL-2.1, unmodified wheels), scikit-fem and SciPy (BSD-3-Clause) and PyAMG (MIT) into a Python of their own,
+  about 135 MB. Without it a study computes nothing and says how to get it.
+
 ## 1.1.0
 
 Form Studio 1.1 is the largest release since 1.0. The app has a new look and layout, Lightdesk: the 3D view fills

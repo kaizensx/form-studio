@@ -1372,3 +1372,5 @@ from .appearance import KERNEL_OPS as _APPEARANCE_OPS  # noqa: E402  (material z
 OPS.update(_APPEARANCE_OPS)
 from .candidates import KERNEL_OPS as _CANDIDATE_OPS  # noqa: E402  (several candidates built and scored)
 OPS.update(_CANDIDATE_OPS)
+from .fea.prep import KERNEL_OPS as _FEA_OPS  # noqa: E402  (strength studies: the solid as STEP, the picked faces)
+OPS.update(_FEA_OPS)

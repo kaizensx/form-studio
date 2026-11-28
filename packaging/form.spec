@@ -57,11 +57,16 @@ for sub in ("", "vendor"):
 ENGINE_SRC += [(ROOT / "form" / "recon" / "cadfit" / n, "engine_src/form/recon/cadfit") for n in ("LICENSE", "PERMISSION.md")]
 # CoACD (game collision, form/engines.py "game.coacd") runs `python -m form.game.lod coacd ...` in its environment
 ENGINE_SRC += [(p, "engine_src/form/game") for p in sorted((ROOT / "form" / "game").glob("*.py"))]
+# Strength studies (form/engines.py "fea") run `python -m form.fea.run <job>` in their environment
+ENGINE_SRC += [(p, "engine_src/form/fea") for p in sorted((ROOT / "form" / "fea").glob("*.py"))]
 datas += [(str(p), dest) for p, dest in ENGINE_SRC]
 # Inside the app itself, CADFit's search code and trimesh (which only that code imports) stay out: the search runs in
 # its own environment. Its reader (cqrun) and _compat stay in: the app reads the program CADFit sends back.
 CADFIT_ONLY = ("form.recon.cadfit.vendor", "form.recon.cadfit.driver")
-hidden += [m for m in collect_submodules("form") if not m.startswith(CADFIT_ONLY)]
+# The same for the strength solver: core, mesh, solve, verify and run import Netgen, scikit-fem and PyAMG, which only
+# the FEA engine's environment has; the app keeps the definition, storage, tools and CLI side of form/fea.
+FEA_ONLY = ("form.fea.core", "form.fea.mesh", "form.fea.solve", "form.fea.verify", "form.fea.run")
+hidden += [m for m in collect_submodules("form") if not m.startswith(CADFIT_ONLY + FEA_ONLY)]
 datas += collect_data_files("form", include_py_files=False)
 # exemplar designs are read as source text by design_examples, so they ship as files too
 datas += [(str(p), "form/exemplars") for p in (ROOT / "form" / "exemplars").glob("*.py") if not p.name.startswith("_")]

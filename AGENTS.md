@@ -30,6 +30,7 @@ Prefer the MCP server (`form-mcp`). Without MCP, the `form` CLI does the same an
 | Ask the person to measure a dimension | `ask_measurement` (where, tolerance, diagram; the answer is committed with how it was measured) | `form chat` prompts in the terminal |
 | Offer next steps | `suggest_replies` (up to three buttons under the reply) | — |
 | Put text on a flat face (a feature in the source) | `add_text`, `remove_text` | `form engrave <p> TEXT --at x,y,z --normal x,y,z` |
+| Will it hold: stress, displacement and a safety factor with a stated error; frequencies; buckling | `strength_study` → `get_strength_study` | `form strength static <p> --fix x,y,z --force x,y,z:Fx,Fy,Fz --material AL-6061` |
 | See what changed in the solid between revisions | `geometry_diff` | `form diff <p> 1 3 --png diff.png` |
 | Assess anything the person brings (mesh, STEP, photo, PDF, link, words) and get the route | `triage` | `form triage scan.stl` |
 | Turn an STL, OBJ or 3MF into a design by the route its triage chooses (parametric CAD, a surface body, a mesh body, parts) | `reconstruct` | `form reconstruct part.stl --tolerance 0.02` |
