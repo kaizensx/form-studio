@@ -4,6 +4,18 @@
 
 ### Added
 
+- **The tolerance loop, the topology run and two Pareto fronts are drawn** (direction I, decision 7). Selecting
+  *Tolerance stack-up* in Check stands the parts assembled and draws the loop the engine stored (`draw`): a line per
+  link along the gap's direction, the gap lit, a cross in each face of the loop, each link's length at its middle;
+  the strip says worst case, RSS and Cpk with the three largest shares, the card every share. *Topology
+  optimisation* draws the density at the part's surface as material removed, and plays the run once from the even
+  start to its last iteration (the engine's own frames), then scrubs on the strip's timeline. *Inverse design* and the
+  print *Orientation front* show their front as a chart in the card: a point under the pointer names itself; an
+  inverse design point opens as the draft (built and previewed, nothing kept until committed), an orientation shows
+  its numbers. The topology playback has not been run on a machine with the FEA engine yet.
+- **A Bench row shows a short number** (`row`: `SF 2.41`, `gap 3.000 mm`, `38 % lighter`); the card keeps the
+  engine's sentence. An engine may give its own `row`.
+
 - **A reply ends in Sources, built from the tool log** (direction I, wave O). Every tool call of a turn whose result
   says how its content is known is one numbered row with its evidence word: SIMULATED, COMPUTED, SPECIFIED, OPENED,
   MEASURED or ASSUMED. The word is the result's own `evidence`; a document or link that was read is OPENED, a
@@ -55,6 +67,17 @@
     (`form-dfm-overlay/1`) gains `face`, the B-rep face of each triangle.
 
 ### Changed
+
+- Result labels on the part (manufacturability findings, CNC marks, loads, the loop's lengths) are seated clear of
+  every marker, ring and lock and of each other (`Labels.js` gains a `keep` kind); the CNC leftover label is no
+  longer drawn over by its marker.
+- A still workspace draws nothing, with the window active or not, in every mode, column open or folded
+  (`tests/journeys/stage_idle.py`). The caret is the one exception and redraws two steps a cycle: Qt's own cursor
+  flash, which kept running under the drawn caret and doubled its frames, is off (16 frames in 3 s before, 5 now).
+  The pool no longer breathes; the viewport's labels are seated only for a few frames after something moves them;
+  a button's sheen stops when the button is hidden.
+- Sketch on part: a revolve's dashed outline draws the circles of its farthest and nearest points instead of eight
+  sampled ones; the orthographic sketch camera stands further back, so the floor never passes behind the profile.
 
 - **The live line in the conversation** names what the agent is doing in the design's words, the tool and the step
   ("Running the strength study · strength_study · step 3"), or the feature a build is on. The Designing screen uses

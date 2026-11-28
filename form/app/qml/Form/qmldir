@@ -89,3 +89,4 @@ ResultCard 1.0 ResultCard.qml
 DrawingPane 1.0 DrawingPane.qml
 OverLine 1.0 OverLine.qml
 InkLine 1.0 InkLine.qml
+FrontChart 1.0 FrontChart.qml

@@ -20,6 +20,9 @@ Column {
         : kind === "dfm" ? [String(count("fail")), (count("fail") === 1 ? "rule fails" : "rules fail") + (count("warn") ? ", " + count("warn") + " warn" : "") + (count("not_checked") ? ", " + count("not_checked") + " not checked" : "")]
         : kind === "cam" ? [r.summary.cycle_time || "", "cycle time, " + r.summary.verdict] : kind === "flat" && r.size_mm ? [F.fmt(r.size_mm[0], 1) + " × " + F.fmt(r.size_mm[1], 1), "mm flat, " + r.bends.length + " bends"]
         : kind === "drawing" ? [r.name || "Sheet", r.dims.length + " dimensions, " + r.dims.filter(function (d) { return d.editable }).length + " bound to a parameter"]
+        : kind === "stack" ? [Results.fmt(r.gap.nominal, ""), "mm gap, RSS " + Results.fmt(r.rss[0], "") + " to " + Results.fmt(r.rss[1], "mm")]
+        : kind === "topology" ? [String(Math.max(0, (r.history || []).length - 1)), "iterations" + (r.converged ? ", converged" : ", stopped before converging")]
+        : kind === "front" ? [String(r.front.length), r.app === "inverse" ? "variants on the front" : "orientations on the front"]
         : kind === "motion" && r.clearance && r.clearance.min ? [Results.fmt(r.clearance.min.clearance_mm, ""), "mm smallest gap, at " + Results.fmt(r.clearance.min.t, "s")] : null
     spacing: 10
 
@@ -153,6 +156,36 @@ Column {
         Line { k: "Smallest gap"; v: rc.kind === "motion" && rc.r.clearance ? rc.r.clearance.value : "not checked"; ev: rc.kind === "motion" && rc.r.clearance ? "computed" : "" }
         Line { k: "First contact"; v: rc.kind === "motion" && rc.r.clearance ? (rc.r.clearance.first_contact_t !== null && rc.r.clearance.first_contact_t !== undefined ? Results.fmt(rc.r.clearance.first_contact_t, "s") : "none") : ""; ev: "computed" }
     }
+
+    // ── tolerance stack-up: the gap's numbers and the largest shares ──
+    Column { width: parent.width; spacing: 2; visible: rc.kind === "stack"
+        Line { k: "Worst case"; v: rc.kind === "stack" ? Results.fmt(rc.r.worst_case[0], "") + " to " + Results.fmt(rc.r.worst_case[1], "mm") : ""; ev: "computed" }
+        Line { k: "RSS"; v: rc.kind === "stack" ? Results.fmt(rc.r.rss[0], "") + " to " + Results.fmt(rc.r.rss[1], "mm") : ""; ev: "computed" }
+        Line { k: "Cpk"; v: rc.kind === "stack" && rc.r.cpk !== null && rc.r.cpk !== undefined ? rc.r.cpk.toFixed(2) : "no spec"; ev: rc.kind === "stack" ? Results.evWord(rc.r.spec.evidence) : "" }
+        Repeater { model: rc.kind === "stack" ? rc.r.chart : []
+            Line { required property var modelData; objectName: "stackShare"; k: modelData.label; v: F.fmt(modelData.percent, 1) + " %"; ev: "computed" } }
+    }
+
+    // ── topology: the run, iteration by iteration ──
+    Column { width: parent.width; spacing: 2; visible: rc.kind === "topology"
+        readonly property var h: rc.kind === "topology" ? (rc.r.history || []) : []
+        readonly property var at: h.length ? h[Math.min(h.length - 1, Results.iteration)] : null
+        Line { k: "Iteration"; v: rc.kind === "topology" ? Results.iteration + " of " + Results.duration : ""; ev: "simulated" }
+        Line { k: "Compliance"; v: parent.at && parent.at.compliance ? Results.fmt(parent.at.compliance, "N·mm") : "the even start"; ev: "simulated" }
+        Line { k: "Material kept"; v: parent.at && parent.at.volume !== null && parent.at.volume !== undefined ? F.fmt(100 * parent.at.volume, 1) + " %" : ""; ev: "computed"
+            note: rc.kind === "topology" ? rc.r.resolution : "" }
+    }
+
+    // ── a front (inverse design, print orientation): the Pareto chart; a point opens its variant ──
+    FrontChart { objectName: "frontChart"; visible: rc.kind === "front"; width: parent.width; height: 168; r: rc.kind === "front" ? rc.r : null }
+    Column { width: parent.width; spacing: 2; visible: rc.kind === "front" && Results.point >= 0
+        readonly property var pt: { if (rc.kind !== "front") return null; var ps = rc.r.points; for (var i = 0; i < ps.length; i++) if (ps[i].index === Results.point) return ps[i]; return null }
+        Repeater { model: parent.pt ? rc.r.axes : []
+            Line { required property var modelData; required property int index; k: modelData.label; v: Results.fmt(parent.pt.at[index], modelData.unit); ev: rc.r.app === "inverse" ? "simulated" : index === 0 ? "computed" : "modelled" } }
+        Line { visible: !!parent.pt && rc.r.app === "printOrient"; k: "Tips over at"; v: parent.pt && parent.pt.tip_over_deg !== undefined && parent.pt.tip_over_deg !== null ? F.fmt(parent.pt.tip_over_deg, 0) + "°" : ""; ev: "computed"
+            note: parent.pt ? (parent.pt.label || "") : "" }
+    }
+    Txt { visible: rc.kind === "front"; width: parent.width; kind: "fine"; tone: 3; text: rc.kind === "front" ? rc.r.open + " " + rc.r.note : "" }
 
     // ── the drawing: what is selected on the sheet ──
     Txt { visible: rc.kind === "drawing"; width: parent.width; kind: "fine"; tone: 2

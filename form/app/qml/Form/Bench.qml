@@ -45,7 +45,7 @@ Column {
             gutter: root.sheet ? 4 : 28
             name: e.label; sub: root.sheet ? Store.benchSub(e) : ""
             state: Store.benchDot(e); dim: off
-            value: e.headline || ""; evidence: Store.evWord(e.evidence)
+            value: e.row || e.headline || ""; evidence: Store.evWord(e.evidence)      // the row's short number; the card has the sentence
             word: Store.benchWord(e); wordColor: e.state === "stale" ? Theme.amber : e.state === "failed" ? Theme.signal : e.state === "running" ? Theme.datum : Theme.ink3
             selected: root.sheet ? Store.benchSheetSel === e.id : (root.sel === e.id || (!!e.app && e.app.indexOf("map.") === 0 && Store.analysisMap === e.app.slice(4)))
             lights: Store.benchLights(e)

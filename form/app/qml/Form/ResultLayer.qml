@@ -20,7 +20,7 @@ Node {
     readonly property var r: live && Results.onPart ? Results.r : null
     readonly property string kind: r ? r.kind : ""
     // whether the result stands in for the clay part (the part is then not drawn under it)
-    readonly property bool covers: kind === "field" || kind === "dfm" || kind === "cam" || (kind === "flat" && foldK < 0.5)
+    readonly property bool covers: kind === "field" || kind === "dfm" || kind === "cam" || kind === "topology" || (kind === "flat" && foldK < 0.5)
     readonly property real px: port ? port.dist * 0.00044 : 1        // about one pixel at the part, in millimetres
     property alias fieldGeo: fgeo
     property alias fieldModel: fmodel
@@ -66,6 +66,48 @@ Node {
                 p = p.concat(lay.arrow(Qt.vector3d(g.at[0], g.at[1], g.at[2]).minus(d.times(L)), d, L, L * 0.2)) }
             return p }
         color: Theme.dark ? "#ffffff" : "#161616" }
+
+    // ── topology: the density at the surface, one picture per iteration (Results.iteration) ──
+    readonly property bool isTopo: kind === "topology"
+    Model {
+        visible: lay.isTopo; pickable: false
+        geometry: ResultGeometry { source: lay.isTopo ? ({ file: lay.r.file, kind: "topology", frame: Results.iteration }) : ({}) }
+        materials: CustomMaterial {
+            shadingMode: CustomMaterial.Shaded; cullMode: Material.NoCulling
+            vertexShader: "shaders/field.vert"; fragmentShader: "shaders/field.frag"
+            property real uDeform: 0; property real uScale: 0; property real uDevelop: 1; property real uMix: 1
+            property real uGlow: Theme.dark ? 0.85 : 0.0
+            property color uLow: Results.rampLow; property color uMid: Results.rampMid; property color uHigh: Results.rampHigh
+            property real uDither: lay.port ? lay.port.ditherK : 1; property real uFilmic: Theme.dark ? 1 : 0
+            property vector3d uClipN: lay.port ? lay.port.clipN : Qt.vector3d(0, 1, 0)
+            property real uClipD: lay.port ? lay.port.clipD : 0
+            property real uClip: lay.port && lay.port.clipOn ? 1 : 0
+        }
+    }
+    // ── tolerance stack-up: the loop through the mates (docs/TOLERANCES.md, `draw`): each link along the gap's
+    //    direction, the gap itself lit, a tick on every face of the loop along its normal ──
+    readonly property bool isStack: kind === "stack"
+    function _segs(which) {
+        var out = [], sg = isStack ? (r.draw.segments || []) : []
+        for (var i = 0; i < sg.length; i++) { var g = sg[i]
+            if ((which === "gap") !== (g.kind === "gap")) continue
+            out.push(g.from[0], g.from[1], g.from[2], g.to[0], g.to[1], g.to[2]) }
+        return out
+    }
+    OverLine { objectName: "stackLinks"; visible: lay.isStack; port: lay.port; depth: 0.2; weight: 2
+        points: lay._segs("link"); color: Theme.dark ? "#ffffff" : "#161616" }
+    OverLine { objectName: "stackGap"; visible: lay.isStack; port: lay.port; depth: 0; weight: 3
+        points: lay._segs("gap"); color: "#3ee6ff" }
+    OverLine { objectName: "stackFaces"; visible: lay.isStack; port: lay.port; depth: 0.1; weight: 2
+        points: { var out = [], fs = lay.isStack ? (lay.r.draw.faces || []) : [], L = Math.max(4, 14 * lay.px)
+            // a cross lying in each face of the loop (the normal runs along the chain, which the links already draw)
+            for (var i = 0; i < fs.length; i++) { var f = fs[i], c = f.center, nn = f.normal || f.axis
+                if (!c || !nn) continue
+                var n = Qt.vector3d(nn[0], nn[1], nn[2]).normalized(), a = Math.abs(n.z) < 0.9 ? Qt.vector3d(0, 0, 1) : Qt.vector3d(1, 0, 0)
+                var u = n.crossProduct(a).normalized(), v = n.crossProduct(u), o = Qt.vector3d(c[0], c[1], c[2])
+                ;[u, v].forEach(function (d) { var p = o.minus(d.times(L)), q = o.plus(d.times(L)); out.push(p.x, p.y, p.z, q.x, q.y, q.z) }) }
+            return out }
+        color: Theme.amber }
 
     // ── manufacturability ──
     readonly property bool isDfm: kind === "dfm"

@@ -21,10 +21,11 @@ import json
 import math
 from pathlib import Path
 
-KINDS = {"strength": "field", "cam": "cam", "dfm": "dfm", "sheet": "flat", "drawing": "drawing", "motion": "motion"}
+KINDS = {"strength": "field", "cam": "cam", "dfm": "dfm", "sheet": "flat", "drawing": "drawing", "motion": "motion",
+         "stack": "stack", "topology": "topology", "inverse": "front", "printOrient": "front"}
 # Hooks of engines that are not on this branch yet: their Bench entries will name these apps. Until then `describe`
 # answers {"kind": "none", "state": "unavailable"} for them and the window draws nothing.
-LATER = {"tolerance": "the tolerance loop (docs/TOLERANCES.md)", "topology": "topology optimisation (docs/OPTIMISATION.md)"}
+LATER: dict = {}
 
 NOT_TOLD = {
     "static": "Not told here: fatigue, yielding and what happens after it, buckling, impact, creep, how the bolts and "
@@ -76,7 +77,11 @@ def describe(st, p: dict, sid: str, opts: dict | None = None) -> dict:
     if kind is None:
         return {"kind": "none", "id": sid, "state": "n/a", "why": "This entry draws nothing on the part."}
     e = _entry(st, p, sid)
-    out = {"field": _strength, "dfm": _dfm, "cam": _cam, "flat": _flat, "drawing": _drawing, "motion": _motion}[kind](st, p, e, opts)
+    if kind == "front":
+        out = (_inverse if app == "inverse" else _orient)(st, p, e, opts)
+    else:
+        out = {"field": _strength, "dfm": _dfm, "cam": _cam, "flat": _flat, "drawing": _drawing, "motion": _motion,
+               "stack": _stack, "topology": _topology}[kind](st, p, e, opts)
     out.setdefault("kind", kind)
     out.setdefault("id", sid)
     out.setdefault("head", p.get("head"))
@@ -476,3 +481,112 @@ def _motion(st, p: dict, e: dict, opts: dict) -> dict:
                        for j in (r.get("torque") or {}).get("joints") or []],
             "notes": r.get("notes") or [],
             "not": "Not told here: forces between the parts, friction, inertia loads and play in the joints. The parts are rigid."}
+
+
+# ---- tolerance stack-up: the loop on the parts (docs/TOLERANCES.md, `draw`) -----------------------------------------
+
+def _stack(st, p: dict, e: dict, opts: dict) -> dict:
+    """The stack with the lowest Cpk among the current ones (the Bench entry's headline), or the one asked for: its
+    loop as the engine drew it (faces with their roles, segments along the gap's direction), the gap's numbers and
+    each contributor's share. Points are in the assembled frame at rest."""
+    from . import stack as S
+    rows = S.listing(st, p)
+    if not rows:
+        return _none(e, "stack", "No stack is defined yet: pick the two faces of a gap (tolerance_stack).")
+    pick = opts.get("study") or ""
+    cur = [r for r in rows if r["state"] == "current"]
+    if not cur:
+        return _none(e, "stack", rows[0].get("why") or "")
+    best = None
+    for r in cur:
+        res = S.stored(st, p, r["id"])[0] or {}
+        c = ((res.get("capability") or {}).get("rss") or {}).get("cpk")
+        k = c if isinstance(c, (int, float)) and math.isfinite(c) else math.inf
+        if r["id"] == pick:
+            best = (-math.inf, r, res)
+            break
+        if best is None or k < best[0]:
+            best = (k, r, res)
+    _, row, res = best
+    if not res.get("draw"):
+        return _none(e, "stack", "This stack was stored without its loop: run it again.")
+    g, wc, rs = res["gap"], res["worst_case"], res["rss"]
+    cap = (res.get("capability") or {}).get("rss") or {}
+    return {"kind": "stack", "state": "current", "rev": res.get("rev") or e.get("rev"), "study": row["id"],
+            "studies": [{"id": r["id"], "name": r.get("name") or r["id"], "state": r["state"]} for r in rows],
+            "name": res.get("name") or row.get("name") or "", "evidence": res.get("evidence") or e.get("evidence") or "computed",
+            "headline": res.get("headline") or "", "draw": res["draw"],
+            "gap": {"nominal": g["nominal"], "direction": g["direction"]},
+            "worst_case": [wc["min"], wc["max"]], "rss": [rs["min"], rs["max"]],
+            "spec": res.get("spec") or {}, "cpk": cap.get("cpk") if isinstance(cap.get("cpk"), (int, float)) and math.isfinite(cap["cpk"]) else None,
+            "chart": (res.get("chart") or [])[:6],
+            "not_told": "Not told here: tolerances on angles beyond the linear range, form errors not declared as GD&T, "
+                        "wear, load and assembly forces. " + ((res.get("caveats") or [""])[0])}
+
+
+# ---- topology optimisation: the density of every iteration (docs/OPTIMISATION.md, frames) --------------------------
+
+def _topology(st, p: dict, e: dict, opts: dict) -> dict:
+    """The newest run for the head: its frames file (the density at the part's surface vertices, one picture per
+    iteration from the even start) for the window to play, with each iteration's compliance and volume."""
+    from .topo import study as T
+    r = T.get(st, p)
+    if r is None:
+        return _none(e, "topology", "Not run yet.")
+    if r.get("stale"):
+        return {**_none(e, "topology", r.get("stale_why") or ""), "state": "stale"}
+    f = r.get("frames_file") or ""
+    meta, hist = {}, []
+    if f and Path(f).is_file():
+        d = _read(f) or {}
+        surf = d.get("surface") or {}
+        meta = {"frames": len(surf.get("frames") or []), "vertices": surf.get("vertices"), "triangles": surf.get("triangles")}
+        hist = [{k: x.get(k) for k in ("iteration", "compliance", "volume")} for x in d.get("frames") or []]
+    if not meta.get("frames"):
+        return {**_none(e, "topology", "This run kept no frames to play: run it again."), "state": "stale"}
+    st_ = r.get("settings") or {}
+    return {"kind": "topology", "state": "current", "rev": r.get("rev"), "run": r.get("id"), "file": f, **meta,
+            "headline": r.get("headline") or "", "evidence": r.get("evidence") or e.get("evidence") or "simulated",
+            "converged": bool(r.get("converged")), "volfrac": st_.get("volfrac"), "resolution": r.get("resolution") or "",
+            "history": hist,
+            "not_told": "Not told here: the density field is a layout, not a part; the pockets built from it are studied "
+                        "again, and their own study is what the safety factor is. " + (r.get("resolution") or "")}
+
+
+# ---- fronts: inverse design and print orientation (a Pareto chart in the card) -----------------------------------
+
+def _inverse(st, p: dict, e: dict, opts: dict) -> dict:
+    from .inverse import design as I
+    rec = I.get(st, p)
+    if rec is None:
+        return _none(e, "front", "Not run yet.")
+    if rec.get("stale"):
+        return {**_none(e, "front", "The design's source changed since this search: search again."), "state": "stale"}
+    ch = I.chart(rec)
+    axes = ch["axes"][:2]
+    pts = [{"index": x["index"], "at": x["at"][:2], "state": x["state"], "why": x.get("why"), "current": x.get("current"),
+            "values": x["values"]} for x in ch["points"] if len(x["at"]) >= 2 and None not in x["at"][:2]]
+    return {"kind": "front", "app": "inverse", "state": "current", "rev": rec.get("rev"), "run": rec.get("id"),
+            "evidence": rec.get("evidence") or e.get("evidence") or "", "headline": rec.get("headline") or "",
+            "axes": axes, "points": pts, "front": ch["front"], "note": ch["note"],
+            "open": "A point opens its variant as a draft: built and previewed, nothing kept until you commit it."}
+
+
+def _orient(st, p: dict, e: dict, opts: dict) -> dict:
+    from .printphys import orient as O
+    r = O.cached(st, p)
+    if r is None:
+        return _none(e, "front", "Not run yet.")
+    front = r.get("front") or []
+    axes = [{"metric": "support_mm3", "label": "Support", "unit": "mm³", "better": "lower"},
+            {"metric": "time_s", "label": "Print time", "unit": "min", "better": "lower"}]
+    pts = [{"index": i, "at": [x.get("support_mm3"), (x.get("time_s") or 0) / 60.0], "state": "front", "label": x.get("label"),
+            "current": bool(x.get("current")), "tip_over_deg": x.get("tip_over_deg"), "height_mm": x.get("height_mm"),
+            "down": x.get("down")} for i, x in enumerate(front) if x.get("support_mm3") is not None and x.get("time_s") is not None]
+    cal = (r.get("calibration") or {}).get("factors")
+    return {"kind": "front", "app": "printOrient", "state": "current", "rev": r.get("rev") or e.get("rev"),
+            "evidence": e.get("evidence") or "computed, modelled", "headline": O.headline(r),
+            "axes": axes, "points": pts, "front": [q["index"] for q in pts],
+            "note": "The orientations no other one beats on every objective at once; two of them drawn here. "
+                    + ("Time calibrated on a real slice." if cal else "Time uncalibrated: it ranks orientations and little more."),
+            "open": "A point shows its numbers. The pick is yours: print_orient(pick=) writes it to the print setup."}

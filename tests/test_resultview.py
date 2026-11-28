@@ -57,7 +57,39 @@ class Describe(unittest.TestCase):
         self.assertEqual(resultview.describe(self.st, self.p(), "mass")["kind"], "none")
         d = resultview.describe(self.st, self.p(), "no.such.entry")
         self.assertEqual((d["kind"], d["state"]), ("none", "unavailable"))
-        self.assertEqual(set(resultview.LATER), {"tolerance", "topology"})          # the hooks of the engines to come
+        self.assertEqual(set(resultview.LATER), set())          # the stack-up and topology engines are here now
+        for sid, kind in (("stack", "stack"), ("topology", "topology"), ("inverse", "front"), ("print.orient", "front")):
+            try:
+                d = resultview.describe(self.st, self.p(), sid)
+            except Exception as e:                                # noqa: BLE001
+                self.fail(f"{sid}: {e}")
+            if d["kind"] != "none":                               # an entry that does not apply to this design says so
+                self.assertEqual(d["kind"], kind, sid)
+                self.assertNotEqual(d["state"], "current", sid)
+
+    def test_2b_a_stack_loop_is_the_engines_own(self):
+        import sys
+        sys.path.insert(0, str(Path(__file__).resolve().parent))
+        from stack_designs import BOX_LID_SCREW
+        from form.stack import tools
+        pid = self.st.create_design("Box lid screw", BOX_LID_SCREW, purpose="model")["id"]
+        r = tools.call(self.st, pid, a={"at": [100, 0, 0], "part": "screw"}, b={"at": [0, 0, 8]}, save=True, name="Tip",
+                       tolerances={"screw_l": 0.2, "lid_t": 0.1, "hole_depth": 0.15}, samples=2000)
+        d = resultview.describe(self.st, self.st.load(pid), "stack")
+        self.assertEqual((d["kind"], d["state"]), ("stack", "current"))
+        self.assertEqual(d["draw"], r["draw"])
+        self.assertAlmostEqual(d["gap"]["nominal"], r["gap"]["nominal"], places=12)
+        self.assertEqual(d["rss"], [r["rss"]["min"], r["rss"]["max"]])
+        from form import studies
+        self.assertEqual(studies.show(self.st, self.st.load(pid), "stack")["row"], "gap 3.000 mm")
+
+    def test_2c_the_row_is_the_headlines_number(self):
+        from form.studies import row
+        self.assertEqual(row("safety factor 2.41 (at least 2.10); peak von Mises 41.2 MPa ± 3.1 %"), "SF 2.41")
+        self.assertEqual(row("gap 3.000 mm; worst case 2.550 to 3.450, RSS 2.7 to 3.2; Cpk 1.20"), "gap 3.000 mm")
+        self.assertEqual(row("6 pockets, 38 % lighter, 21.3 g, safety factor 2.10 (at least 1.90)"), "38 % lighter")
+        self.assertEqual(row("Injection moulding: review (2 fail, 1 warn)"), "review")
+        self.assertLessEqual(len(row("a very long headline with no number in it at all, and more words after")), 28)
 
     def test_3_a_manufacturability_check_is_the_engines_own(self):
         R.bench(self.st, self.pid, "dfm_injection", options={"resin": "abs"})

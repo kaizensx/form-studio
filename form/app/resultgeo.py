@@ -173,6 +173,22 @@ class ResultGeometry(QQuick3DGeometry):
             if len(st) == n:
                 uv1[:, 1] = st
             col = _linear(rgba) if len(rgba) == n else np.ones((n, 4), np.float32)
+        elif kind == "topology":
+            # one iteration of a topology run (form/topo/run.py frames.json): the density at the part's surface
+            # vertices, 255 solid. Drawn with the field's ramp as the material taken away (1 - density), so what
+            # the optimiser removes lights up and what it keeps stays clay.
+            surf = f.get("surface") or {}
+            pos = _b64(surf.get("positions"), "<f4").reshape(-1, 3)
+            tri = _b64(surf.get("indices"), "<u4").reshape(-1, 3)
+            fs = surf.get("frames") or []
+            n = len(pos)
+            k = max(0, min(len(fs) - 1, int(s.get("frame") or 0))) if fs else -1
+            dens = _b64(fs[k], "u1") if k >= 0 else np.zeros(0, np.uint8)
+            vals = 1.0 - dens.astype(np.float32) / 255.0 if len(dens) == n else np.zeros(n, np.float32)
+            uv0 = np.zeros((n, 2), np.float32)
+            uv1 = np.zeros((n, 2), np.float32)
+            uv0[:, 0] = vals
+            uv0[:, 1] = 0.0                              # the "develops" front is the iterations here, not a radius
         else:
             return self._empty()
         if not len(pos) or not len(tri) or int(tri.max()) >= len(pos):

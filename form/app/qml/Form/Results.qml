@@ -11,9 +11,9 @@ import QtQuick
 // LegendStrip is its legend under the part, ResultCard its numbers in the opened row, DrawingPane the sheet.
 QtObject {
     id: rs
-    readonly property var apps: ["strength", "dfm", "cam", "sheet", "drawing", "motion"]
+    readonly property var apps: ["strength", "dfm", "cam", "sheet", "drawing", "motion", "stack", "topology", "inverse", "printOrient"]
     // engines that are not on this branch yet: their entries will name these apps (form/resultview.py LATER)
-    readonly property var later: ["tolerance", "topology"]
+    readonly property var later: []
     function draws(e) { return !!e && apps.indexOf(e.app || "") >= 0 }
 
     property string id: ""               // the Bench entry shown
@@ -21,7 +21,7 @@ QtObject {
     property bool busy: false
     readonly property string kind: r && r.state === "current" ? r.kind : ""
     readonly property bool on: kind !== "" && !Store.hasDraft && !Store.compare
-    readonly property bool onPart: on && kind !== "drawing"
+    readonly property bool onPart: on && kind !== "drawing" && kind !== "front"
 
     // ── how it is looked at ──
     property string scale: "hue"         // hue: clay, cyan, white (one accent) | many: a conventional many-colour scale
@@ -51,9 +51,28 @@ QtObject {
         NumberAnimation { target: rs; property: "settle"; from: 0; to: 1; duration: Theme.develop - 320; easing.type: Easing.BezierSpline; easing.bezierCurve: Theme.easeMode }
     }
     property var _fade: NumberAnimation { target: rs; property: "settle"; from: 0; to: 1; duration: Theme.moment }
-    function cut() { if (_dev.running) { _dev.stop(); develop = 1; settle = 1 } }      // any input ends the moment
+    function cut() {                                       // any input ends the moment
+        if (_dev.running) { _dev.stop(); develop = 1; settle = 1 }
+        if (_grow.running) { _grow.stop(); t = duration; settle = 1 }
+    }
+    // topology: the moment is the run itself, played once from the even start to the last iteration (the real
+    // history the engine stored, one picture per iteration), then the legend settles. Reduce Motion: the last one.
+    property var _grow: SequentialAnimation {
+        NumberAnimation { target: rs; property: "t"; from: 0; to: rs.duration; duration: Math.max(600, Math.min(1600, rs.duration * 40)); easing.type: Easing.InOutSine }
+        NumberAnimation { target: rs; property: "settle"; from: 0; to: 1; duration: Theme.develop - 320; easing.type: Easing.BezierSpline; easing.bezierCurve: Theme.easeMode }
+    }
+    function _arriveTopology() {
+        t = duration
+        var key = Store.pid + "|" + r.id + "|" + r.run
+        if (_played[key]) return
+        _played[key] = true
+        developed++
+        if (Theme.reduced || duration <= 0) { settle = 0; _fade.restart(); return }
+        settle = 0; t = 0; _grow.restart()
+    }
     function _arrive() {
-        _dev.stop(); _fade.stop(); develop = 1; settle = 1
+        _dev.stop(); _fade.stop(); _grow.stop(); develop = 1; settle = 1
+        if (r && r.state === "current" && r.kind === "topology") { _arriveTopology(); return }
         if (!r || r.state !== "current" || r.kind !== "field") return
         var key = Store.pid + "|" + r.id + "|" + r.study + "|" + (r.mesh ? r.mesh.key : "")
         if (_played[key]) return
@@ -76,7 +95,7 @@ QtObject {
         _seq++; id = ""; r = null; busy = false; _resetView()
     }
     function _resetView() {
-        playing = false; t = 0; setup = 0; litRule = ""; flat = false; mode = 0; deformed = false; deformK = 0; hoverValue = NaN; selDim = ""
+        playing = false; t = 0; setup = 0; point = -1; litRule = ""; flat = false; mode = 0; deformed = false; deformK = 0; hoverValue = NaN; selDim = ""
         if (fix) dropFix()
         if (_posed) { Store.pose = ({}); Store.setAsmMode("print"); _posed = false }
     }
@@ -91,10 +110,20 @@ QtObject {
             rs.r = d
             if (d && d.kind === "field" && d.study) rs.study = d.study
             if (d && d.kind === "motion" && d.state === "current") rs._pose()
+            // a stack's loop is drawn in the assembled frame at rest: the parts stand assembled while it is shown
+            if (d && d.kind === "stack" && d.state === "current" && Store.assembly) { if (Store.asmMode !== "assembled") Store.setAsmMode("assembled"); rs._posed = true }
             // a CNC setup opens at its end: every path, and the stock the simulation left
             if (d && d.kind === "cam" && d.state === "current" && (!was || was.kind !== "cam")) rs.t = (d.setups[rs.setup] || {}).duration_s || 0
             if (!was || was.state !== d.state || (was.mesh && d.mesh && was.mesh.key !== d.mesh.key) || was.study !== d.study) rs._arrive()
         }, function (e) { if (seq === rs._seq) { rs.busy = false; rs.r = { kind: "none", id: rs.id, state: "failed", why: e.message || "It could not be read." } } })
+    }
+    // topology: which iteration is drawn (t counts iterations)
+    readonly property int iteration: kind === "topology" ? Math.max(0, Math.min(duration, Math.round(t))) : 0
+    // a front (inverse design, print orientation): the point whose numbers the card shows
+    property int point: -1
+    function openPoint(pt) {
+        point = pt.index
+        if (r && r.app === "inverse" && pt.values) Store.loadDraft(pt.values, "inverse design", "Inverse design " + (r.run || "") + ", point " + pt.index)
     }
     function setStudy(sid) { if (sid === study) return; study = sid; mode = 0; playing = false; deformed = false; deformK = 0; load() }
 
@@ -133,13 +162,14 @@ QtObject {
     function evWord(ev) { return String(ev || "").split(/[ ,(×]/)[0] }
 
     // ── time: a CNC setup or a motion cycle (Stock or layer scrub: follows the pointer; playing: 8 s at most) ──
-    readonly property real duration: !r ? 0 : kind === "cam" ? ((r.setups[setup] || {}).duration_s || 0) : kind === "motion" ? (r.duration_s || 0) : 0
-    readonly property real playRate: duration > 8 ? duration / 8 : 1
+    readonly property real duration: !r ? 0 : kind === "cam" ? ((r.setups[setup] || {}).duration_s || 0) : kind === "motion" ? (r.duration_s || 0)
+        : kind === "topology" ? Math.max(0, (r.frames || 1) - 1) : 0
+    readonly property real playRate: kind === "topology" ? Math.max(1, duration / 3) : duration > 8 ? duration / 8 : 1
     function scrub(x) { playing = false; t = Math.max(0, Math.min(duration, x)); if (kind === "motion") _pose() }
     function toggle() { if (!playing && duration > 0 && t >= duration - 1e-6) t = 0; playing = !playing }
     property var _clock: FrameAnimation {
         // one clock for whatever plays; it stops with the play button, so a still result is never redrawn
-        running: rs.playing && rs.on && (rs.kind === "cam" || rs.kind === "motion")
+        running: rs.playing && rs.on && (rs.kind === "cam" || rs.kind === "motion" || rs.kind === "topology")
         onTriggered: {
             var n = rs.t + frameTime * rs.playRate
             if (n >= rs.duration) { rs.t = rs.duration; rs.playing = false } else rs.t = n
