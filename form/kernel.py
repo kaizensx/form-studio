@@ -1393,3 +1393,5 @@ from .candidates import KERNEL_OPS as _CANDIDATE_OPS  # noqa: E402  (several can
 OPS.update(_CANDIDATE_OPS)
 from .handfeat import KERNEL_OPS as _HAND_OPS  # noqa: E402  (picked edges and faces as stable queries)
 OPS.update(_HAND_OPS)
+from .massprops import KERNEL_OPS as _MASS_OPS  # noqa: E402  (mass, centre of mass and inertia from the B-rep)
+OPS.update(_MASS_OPS)

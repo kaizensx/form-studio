@@ -2121,6 +2121,25 @@ QtObject {
         return { color: project.color || null, material: project.material || null, parts: out }
     }
     function loadMaterials() { if (!materialCat) get("/materials").then(function (r) { s.materialCat = r }, function () {}) }
+
+    // ── mass properties of the head (form/massprops.py): the size line's grams, MassReadout, MassLayer ──
+    // Asked again when the head, a material, the arrangement or (assembled) the pose changes; the geometry is
+    // measured once per revision by the engine, so a pose or material change is cheap.
+    property bool massOn: false                // the centre of mass and principal axes on the part, with the readout
+    property var mass: null                    // { total, parts, frame, pose, headline, ... } for the head, or null
+    readonly property string massFrame: assembly && asmMode === "assembled" ? "assembled" : "as_built"
+    readonly property bool massShown: !!mass && !hasDraft && !scrub && !compare && !(assembly && asmMode === "exploded")
+    readonly property string _massAsk: pid && project ? [pid, project.head, JSON.stringify(appearance), massFrame,
+                                                         massFrame === "assembled" ? JSON.stringify(pose) : ""].join("|") : ""
+    property var _massTimer: Timer { interval: 160; onTriggered: s.loadMass() }
+    on_MassAskChanged: { if (!_massAsk) mass = null; else _massTimer.restart() }
+    function loadMass() {
+        var ask = _massAsk, q = "?frame=" + massFrame
+        if (!ask) return
+        if (massFrame === "assembled" && Object.keys(pose).length) q += "&pose=" + encodeURIComponent(JSON.stringify(pose))
+        new Promise(function (res, rej) { var id = ++_rid; _pending[id] = [res, rej]        // quiet: nobody clicked for it
+            Bridge.request(id, "GET", "/projects/" + s.pid + "/mass" + q, null) }).then(function (r) { if (s._massAsk === ask) s.mass = r }, function () { if (s._massAsk === ask) s.mass = null })
+    }
     function material(id) {
         var ms = materialCat ? materialCat.materials : [], k = id ? String(id).toUpperCase() : ""
         if (k === "NYLON" || k === "PA/NYLON") k = "PA"

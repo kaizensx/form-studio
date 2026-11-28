@@ -192,6 +192,9 @@ HARDWARE: form.parts  (use it; do not guess screw, nut, insert, bearing or gear 
     j.length, j.base_min (thinnest base that holds it), j.dims (engagement), j.hardware(qty, after="lid") -> BOM rows
   Materials for parts that are not printed (density, look): from form import material_library as ml;
     ml.get("aluminum"), ml.mass_g(volume_mm3, "brass"), ml.zone("stainless", [features]) -> an appearance() zone.
+  Mass, centre of mass and inertia of the built design: the mass_properties tool (per part, assembled at a pose).
+    A Part(material="AL-6061") in assembly() gives that part its material when none is chosen for it; the sourced
+    properties (E, yield, UTS, ...) are ml.record("AL-6061") / ml.prop("PLA", "E", direction="z"); never assume one.
   M2-M6 screws, nuts, washers, inserts and 6xx bearings work everywhere from tables. Other sizes, threads, sprockets,
   pipes and gears need bd_warehouse and py_gearworks (they ship with the app); without them a RecipeError says how
   to install. Exemplars: lead_screw_axis, chain_drive, bottle_pipe_adapter.
