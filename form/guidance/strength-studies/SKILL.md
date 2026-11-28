@@ -6,7 +6,8 @@ description: Answer "will it hold?" on a FORM design with a strength study — s
 # Strength studies
 
 FORM tools: `analyze_selection()`, `strength_study()`, `get_strength_study()`, `set_appearance()`, `optimize()`,
-`make_lighter()`, `edit_design()`.
+`make_lighter()`, `inverse_design()`, `get_inverse_design()`, `topology_optimise()`, `get_topology()`,
+`apply_topology()`, `edit_design()`.
 
 A study is a simulation with a stated error. Report it as one: quote the evidence class it returns
 (`simulated (FEA, linear static, converged to 1.8 %)`), never "it will hold" on its own. Full method, limits and the
@@ -50,6 +51,14 @@ which a slender part buckles; a real part buckles earlier), `thermal` (steady te
 Making it lighter or stronger: `optimize(..., constraints=["fea.safety_factor >= 2"])` and
 `make_lighter(require=["fea.safety_factor >= 2"])` solve the study on real candidates, a bounded number of them. Only
 candidates listed under `strength.solved` with `ok` were checked; say how many were.
+
+A requirement instead of a guess ("hold 250 N with a safety factor of 3, as light as possible"): define the study,
+then `inverse_design(minimize=["mass_g"], require=["fea.safety_factor >= 3"])`. It searches the design's parameters
+and returns a Pareto front in which every variant was built and solved; quote the budget it used and say the front
+is approximate. Removing the material that carries no load: `topology_optimise(volfrac=0.5)` finds the layout on the
+study's mesh and rebuilds it as lightening pockets (features with `topo_inset`, `topo_fillet`, `topo_web`), then
+studies the rebuilt part. Report the rebuilt part's studied safety factor, never the density field's; when the
+outcome is "mesh body", say that it is a mesh and not editable CAD. Nothing changes until `apply_topology`.
 
 What a study does not tell you: fatigue, impact, creep, yielding, layer adhesion of a print, a bolted joint opening,
 sliding contact. Say so when the question touches one of them. A study is evidence, not a certificate, and not a

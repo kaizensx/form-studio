@@ -335,6 +335,7 @@ form tool get_project '{"project": "desk-stand"}'                               
 | **Engineering calculators and their verification** | [docs/CALCULATORS.md](docs/CALCULATORS.md) |
 | **CNC toolpaths and their stock simulation** | [docs/CAM.md](docs/CAM.md) |
 | **Print physics: orientation, strength as printed, warp risk** | [docs/PRINT_PHYSICS.md](docs/PRINT_PHYSICS.md) |
+| **Inverse design and topology optimisation, with their verification** | [docs/OPTIMISATION.md](docs/OPTIMISATION.md) |
 
 ## Community
 

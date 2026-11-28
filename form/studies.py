@@ -38,8 +38,8 @@ GROUPS = {"study": "Studies", "route": "Routes", "document": "Documents"}
 STAGE = {"study": "prove", "route": "release", "document": "release"}     # the stage whose pane lists the group
 STATES = ("never", "current", "stale", "failed", "running", "unavailable", "n/a")
 BY = ("engine", "agent", "person")       # who runs it: Form Studio here, the agent (it must look), or a person
-PROVIDERS: tuple = ("form.massprops", "form.modelling", "form.fea.bench", "form.calc.bench", "form.dfm", "form.sheet",
-                    "form.cam", "form.drawing.bench", "form.bom", "form.motion", "form.board.api",
+PROVIDERS: tuple = ("form.massprops", "form.modelling", "form.fea.bench", "form.calc.bench", "form.inverse.bench",
+                    "form.dfm", "form.sheet", "form.cam", "form.drawing.bench", "form.bom", "form.motion", "form.board.api",
                     "form.printphys.bench")   # later waves: each has register_studies(register)
 RUNNING_TTL = 6 * 3600                   # a run marker older than this is a process that died, not a run
 
@@ -332,7 +332,8 @@ def _base(ctx, s: Study) -> dict:
     return {"id": s.id, "group": s.group, "group_label": GROUPS[s.group], "stage": STAGE[s.group], "label": s.label,
             "doc": s.doc, "evidence": s.evidence, "by": s.by, "app": s.app, "tool": s.tool, "heavy": s.heavy,
             "needs": list(s.needs), "inputs": list(s.inputs), "head": ctx.p["head"], "headline": "", "rev": None,
-            **({"extra": dict(s.extra)} if s.extra else {})}      # e.g. the calculators' {"chapter": "design"}
+            **({"extra": dict(s.extra)} if s.extra else {}),      # e.g. the calculators' {"chapter": "design"}
+            **({"chapter": s.extra["chapter"]} if s.extra.get("chapter") else {})}      # the chapter whose pane lists it
 
 
 def _from_result(e: dict, res: dict, head: int) -> dict:

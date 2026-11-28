@@ -18,6 +18,10 @@
   form run <project> [--force]       regenerate outputs that are not current
   form render <project> [--view iso|front|...|sheet] [--highlight feature] [--out file.png]
   form optimize <project> --vary arm_t:4:20 --minimize solid_mass_g --require "statics.safety_factor>=3"
+  form optimize pareto <project> --minimize mass_g --require "fea.safety_factor>=3"
+                                     inverse design: the variants that meet a requirement, on a Pareto front; JSON
+  form optimize topology <project> --volfrac 0.5
+                                     topology optimisation written back as features (--apply keeps it); JSON
   form animate <project> [--morph 1:4] [--out x.gif]   turntable or revision morph
   form turntable <project> --fmt mp4|png|webp|gif      a turntable video or PNG sequence
   form compare-printers <project>                      slice on every printer: time, filament, cost
@@ -286,6 +290,9 @@ def main(argv=None):
     if argv[:1] == ["print"]:                      # print physics: orientation front, layered strength, warp (form/printphys)
         from .printphys.cli import main as print_main
         return print_main(argv[1:])
+    if argv[:1] == ["optimize"] and argv[1:2] and argv[1] in ("pareto", "topology"):
+        from .inverse.cli import main as search_main  # inverse design and topology optimisation (form/inverse, form/topo)
+        return search_main(argv[1:])
     if argv[:1] == ["calc"]:                       # engineering calculators that write geometry (form/calc)
         from .calc.cli import main as calc_main
         return calc_main(argv[1:])

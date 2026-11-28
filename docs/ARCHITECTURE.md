@@ -49,6 +49,7 @@ computed change impact, checks with evidence classes, the fit model, printer cal
 | Motion and robot files | `form/motion.py`, `form/robot.py`, `form/sequence.py` | Mechanisms played over time, URDF/SRDF/MJCF with inertia from the B-rep, assembly order and insertion directions |
 | Boards and enclosures | `form/board/` | KiCad and IDF boards read by Form Studio's own parsers, the enclosure made around them, the fit proved on the solids; KiCad's DRC/ERC and fab files through the person's own KiCad |
 | Print physics | `form/printphys/` | Print orientation as a Pareto front over support, time, strength, surface and tip-over, checked against real slices; strength as printed with a layered material (solved by `form/fea/`); a warp-risk indicator from a cited model |
+| Inverse design and topology optimisation | `form/inverse/`, `form/topo/` | A surrogate-assisted Pareto search over a design's parameters in which every reported variant is built and solved; SIMP on the strength study's mesh (in the FEA engine's Python), its density field rebuilt as pocket features and studied again ([OPTIMISATION.md](OPTIMISATION.md)) |
 | The Bench | `form/studies.py` | Every study, route and document of a design with its state from the head revision's keys; each wave registers through `PROVIDERS` |
 | MCP server | `form/mcp_server.py` | 127 tools over stdio |
 | CLI | `form/__main__.py` | Every capability as a JSON-printing command |

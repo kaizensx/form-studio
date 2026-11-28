@@ -25,6 +25,8 @@ Prefer the MCP server (`form-mcp`). Without MCP, the `form` CLI does the same an
 | Say what must be true, and read what was measured | `design_brief` (contract and audit) → `get_project` (`proof`) | — |
 | Read a datasheet or drawing | `read_document` (PDF pages as images) | — |
 | Find the best design under constraints | `optimize` | `form optimize <p> --vary arm_t:4:20 --minimize solid_mass_g --require "statics.safety_factor>=3"` |
+| Say what the part must do and get the variants that do it (a Pareto front; every variant built and studied) | `inverse_design` → `get_inverse_design` | `form optimize pareto <p> --minimize mass_g --minimize fea.max_displacement_mm --require "fea.safety_factor>=3"` |
+| Remove the material that carries no load, written back as features (pockets with parameters), studied again | `topology_optimise` → `get_topology` → `apply_topology` | `form optimize topology <p> --volfrac 0.5`, `form optimize topology <p> --apply` |
 | Show motion | `animate` (turntable or morph) | `form animate <p> --morph 1:4` |
 | Check this machine | `setup_status` (never run fixes without asking) | `form setup --check` |
 | Ask the person a blocking question | `ask_user` (a card in Form Studio's chat; elsewhere it tells you to ask yourself) | `form chat` prompts in the terminal |

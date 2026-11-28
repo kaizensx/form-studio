@@ -49,10 +49,10 @@ more revision (refine_design shows, undoes or turns it off). Long work answers w
 
 Rules:
 - Units are mm, degrees, grams. Only change parameters that describe_recipe lists.
-- preview_change before commit_change; pass expect_head so a newer revision is never overwritten.
+- Commit with expect_head so a newer revision is never overwritten.
 - Provenance is evidence. Mark a value "measured" only when the user measured it and told you the number. Never invent
   physical results: record_physical_result is only for what the user reports.
-- A slice is a simulation, not a print; fit yield is a model. Say so.
+- A slice is a simulation; fit yield is a model. Say so.
 - You cannot approve a release: request_release returns a link the user opens in Form Studio. Nothing here starts a
   print or sends files anywhere.
 - Every design has a purpose, "print" or "model" (just a 3D model; get_project says). For a model never ask about a
@@ -79,7 +79,7 @@ Rules:
   create_design relation="part_of"). A second create_design in a conversation says its relation: replaces, part_of,
   alternative or new.
 - "Will it hold?": strength_study, then get_strength_study (design_guide(topic="strength")). Quote its evidence and
-  lower safety factor; not converged means none.
+  lower safety factor; not converged means none. Lighter, still holding: inverse_design or topology_optimise.
 - Complex designs (mechanisms, organic or styled forms, textures, several parts) are staged: design_brief ->
   design_guide(topic=...), design_examples -> plan_design -> create_design(plan=...) -> look at the sheet -> critique
   -> update_design. The design_guide topics and the skills hold each workflow.
@@ -3410,6 +3410,10 @@ def build() -> MCPServer:
     calc_tools.register_tools(mcp, studio, _run, RO, RW, _origin)
     from .printphys import tools as print_tools   # print physics: print_orient, print_strength, print_warp (form/printphys)
     print_tools.register_tools(mcp, studio, _run, RO, RW, _origin)
+    from .inverse import tools as inverse_tools   # inverse design: inverse_design, get_inverse_design (form/inverse)
+    inverse_tools.register_tools(mcp, studio, _run, RO, RW, _origin)
+    from .topo import tools as topo_tools     # topology optimisation as features: topology_optimise, get_topology,
+    topo_tools.register_tools(mcp, studio, _run, RO, RW, _origin)      # apply_topology (form/topo)
     return mcp
 
 

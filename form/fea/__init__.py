@@ -18,6 +18,8 @@ design's B-rep.
     form/fea/cli.py       `form strength ...` and `form study strength|modal|buckling ...` (JSON)
     form/fea/bench.py     the Bench entry (form/studies.py)
 
+Topology optimisation (form/topo) runs in the same engine, on this package's mesh and solvers.
+
 The solver libraries are an optional engine with a Python of its own (form/engines.py "fea": Netgen, scikit-fem,
 SciPy, PyAMG, NumPy), installed from Settings with one click. Nothing in this package imports them except core, mesh,
 solve, verify and run, which only that Python runs. docs/STRENGTH.md has the method and the verification table.

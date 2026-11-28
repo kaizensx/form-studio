@@ -72,13 +72,17 @@ ENGINE_SRC += [(p, "engine_src/form/game") for p in sorted((ROOT / "form" / "gam
 ENGINE_SRC += [(p, "engine_src/form/fea") for p in sorted((ROOT / "form" / "fea").glob("*.py"))]
 # The MuJoCo check for robot files (form/engines.py "robot.mujoco") runs `python -m form.robot validate ...` there
 ENGINE_SRC += [(ROOT / "form" / "robot.py", "engine_src/form")]
+# Topology optimisation runs in the same environment: `python -m form.topo.run <job>` (SciPy, and form.fea's mesh and solvers)
+ENGINE_SRC += [(p, "engine_src/form/topo") for p in sorted((ROOT / "form" / "topo").glob("*.py"))]
 datas += [(str(p), dest) for p, dest in ENGINE_SRC]
 # Inside the app itself, CADFit's search code and trimesh (which only that code imports) stay out: the search runs in
 # its own environment. Its reader (cqrun) and _compat stay in: the app reads the program CADFit sends back.
 CADFIT_ONLY = ("form.recon.cadfit.vendor", "form.recon.cadfit.driver")
 # The same for the strength solver: core, mesh, solve, verify and run import Netgen, scikit-fem and PyAMG, which only
 # the FEA engine's environment has; the app keeps the definition, storage, tools and CLI side of form/fea.
-FEA_ONLY = ("form.fea.core", "form.fea.mesh", "form.fea.solve", "form.fea.verify", "form.fea.run")
+FEA_ONLY = ("form.fea.core", "form.fea.mesh", "form.fea.solve", "form.fea.verify", "form.fea.run",
+            # the optimiser's side of form/topo (SciPy, Netgen); the app keeps study, tools, emit and cad
+            "form.topo.simp", "form.topo.mesh3d", "form.topo.recon", "form.topo.run", "form.topo.verify")
 hidden += [m for m in collect_submodules("form") if not m.startswith(CADFIT_ONLY + FEA_ONLY)]
 datas += collect_data_files("form", include_py_files=False)
 # exemplar designs are read as source text by design_examples, so they ship as files too
