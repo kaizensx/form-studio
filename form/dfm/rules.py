@@ -24,15 +24,24 @@ from functools import lru_cache
 from pathlib import Path
 
 DIR = Path(__file__).with_name("rules")
+# Rule tables of checks that are not a process of a 3D part (the cut-file checker's laser, waterjet and router
+# tables, form/sheet/rules) are read with the same format from here; processes() does not list them.
+EXTRA_DIRS = (Path(__file__).resolve().parents[1] / "sheet" / "rules",)
+
+
+def _path(process: str) -> Path:
+    for d in (DIR, *EXTRA_DIRS):
+        p = d / f"{process}.toml"
+        if p.is_file():
+            return p
+    raise KeyError(process)
 ORDER = ("fail", "not_checked", "warn", "info", "pass", "n/a")
 PRINTING = ("fdm", "sla", "sls", "mjf", "lpbf")
 
 
 @lru_cache(maxsize=None)
 def _raw(process: str) -> dict:
-    path = DIR / f"{process}.toml"
-    if not path.is_file():
-        raise KeyError(process)
+    path = _path(process)
     return tomllib.loads(path.read_text(encoding="utf-8"))
 
 
@@ -51,7 +60,7 @@ def table(process: str) -> dict:
 
 def digest(process: str) -> str:
     """A hash of the table's text: part of every result's key, so editing a rule makes results stale."""
-    return hashlib.sha256((DIR / f"{process}.toml").read_bytes()).hexdigest()[:16]
+    return hashlib.sha256(_path(process).read_bytes()).hexdigest()[:16]
 
 
 def source_text(src: dict) -> str:
@@ -93,6 +102,12 @@ def limits(rule: dict, options: dict) -> tuple[float | None, float | None, str |
         if v == "tool_r":
             d = options.get("tool_d")
             return (float(d) / 2, None) if d else (None, "tool_d not stated")
+        if rule.get("per") and v is not None:
+            # a limit in multiples of an option (sheet metal: "4 t" is per = "t", value 4)
+            base = options.get(rule["per"])
+            if base in (None, ""):
+                return None, f"{rule['per']} not stated"
+            return float(v) * float(base), None
         return v, None
     f, why_f = pick(rule.get("fail")) if "fail" in rule else (None, None)
     w, why_w = pick(rule.get("warn")) if "warn" in rule else (None, None)
@@ -237,7 +252,8 @@ def evaluate(process: str, measured: dict, options: dict) -> dict:
                   "limit": f if s == "fail" else w, "unit": r.get("unit", ""), "op": r["op"],
                   "evidence": row["evidence"], "fix": r.get("fix")}
             for k in ("at", "faces", "feature", "features", "area_mm2", "kind", "axis", "depth_mm", "d_mm", "r_mm",
-                      "sharp", "nearest_drill_mm", "half", "how", "to", "voids", "size_mm", "machine_mm"):
+                      "sharp", "nearest_drill_mm", "half", "how", "to", "voids", "size_mm", "machine_mm", "loop", "bend",
+                      "layer", "handles", "text", "what"):
                 if k in it:
                     fd[k] = it[k]
             findings.append(fd)

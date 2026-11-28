@@ -509,6 +509,14 @@ volume and where it is, rapids through stock, shank and holder collisions, and t
 limits. A program goes into a release only with a current simulation, nothing assumed and your approval, labelled
 "simulated, not proven on a machine" until you record what it did on one. MCP `cam_plan`, `cam_post`,
 `cam_simulate`; `form cam`. See [CAM.md](CAM.md).
+**Sheet metal and cut parts.** Bent parts designed from flanges, hems, jogs, reliefs and louvres
+(`form.sheet.build`), unfolded on the exact solid with a K-factor from a cited table or your shop's value, and
+proved by folding the flat back onto the part within 0.01 mm. The flat pattern DXF has cut, bend (up and down, with
+angle, radius and K notes), etch and notes layers. Any DXF can be checked before a laser, waterjet or router cuts
+it, every rule with its fabricator source; a bend order is found with a stated press-brake model; flat parts export
+as profiles with optional kerf; a SendCutSend preflight checks material, thickness and limits without sending
+anything. `form sheet`; MCP `flat_pattern`, `cut_file_check`, `bend_order`, `service_preflight`. See
+[SHEET_METAL.md](SHEET_METAL.md).
 
 ## Analysis, measurement and annotations
 

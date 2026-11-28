@@ -1383,10 +1383,11 @@ def build() -> MCPServer:
         cavity depth, tool reach, thin walls, holes, setups), injection (a proposed pull direction and parting line,
         undercuts with the side action or lifter each needs, draft per face, wall range per resin, projected area,
         clamp tonnage), fdm, sla, sls, mjf, lpbf (walls, overhangs, holes, enclosed voids, build volume), sheet_metal
-        (routed to its own tool; not checked here). Default process: the design's own (purpose print: fdm).
+        (the part unfolded and folded back, flange length, holes to edge and bend, hems; flat_pattern has the rest).
+        Default process: the design's own (purpose print: fdm).
         options: cnc {tool_d (mm, needed), material: metal|plastic, axes: 3|4|5, flute_l, holder_d, rotary_axis};
         injection {resin: abs|pc|pp|nylon|..., pull: [x,y,z] or "auto", cavities, textured}; printing {up: [x,y,z],
-        machine: [x,y,z] mm, alloy for lpbf}; any process {overrides: {rule_id: {fail, warn}}} for a shop's limits
+        machine: [x,y,z] mm, alloy for lpbf}; sheet_metal {material, k, method: table|din6935, forming}; any process {overrides: {rule_id: {fail, warn}}} for a shop's limits
         (recorded as specified). A rule whose input is missing is not checked, and the verdict is then "not proven",
         never a pass. Returns rows (one per rule), findings (where, value, limit), the proposed fixes (apply_fix),
         the overlay file the viewport draws (form-dfm-overlay/1) and, with view (iso, top, ...), a picture."""
@@ -1488,6 +1489,95 @@ def build() -> MCPServer:
             out = cam.simulate(st, p, sim_cell=cell, force=force)
             out["status"] = cam.status(st, p)
             return out
+        return await _run(go)
+
+    @mcp.tool(annotations=RW)
+    async def flat_pattern(project: str, kind: str = "auto", options: dict | None = None, kerf: float = 0.0,
+                           rev: int | None = None, out: str = "") -> dict:
+        """Lay a part flat for cutting and write the DXF. kind "flat" (a bent sheet-metal part): the solid's skin
+        recognised (flat faces and cylindrical bends of one thickness), unfolded with a bend allowance θ·(r + K·t)
+        whose K-factor comes from a sourced table (options: material al_5052_h32|al_6061_t6|steel_mild|steel_304|
+        copper, method table|din6935, forming air|bottoming|coining, or k for your shop's own value, recorded as
+        specified), then folded back from the flat pattern's own numbers and compared with the solid (verify.max_mm
+        against 0.01 mm). The DXF has CUT (closed contours), BEND_UP and BEND_DOWN (centre lines), ETCH (label as
+        outlines: options.label) and NOTES (angle, radius, K, allowance per bend). What cannot be unfolded is named
+        with the face and why (a louvre, an edge round, two thicknesses). kind "profile" (any flat part for laser,
+        waterjet or router): the outline of its largest flat face, with kerf (mm) offsetting the cutter's path half
+        the kerf away from the material. "auto": flat when the part has bends, else profile. Returns the summary,
+        the bends, the verification, dxf and png paths. out: write the DXF there too."""
+        st = studio()
+        def go():
+            from . import sheet
+            p = st.load(project)
+            o = dict(options or {})
+            if kind not in ("auto", "flat", "profile"):
+                raise StudioError("kind is auto, flat or profile.")
+            if kind in ("auto", "flat"):
+                res = sheet.flat_pattern(st, p, o, rev, out=out or None)
+                if kind == "flat" or res.get("bends") or not res.get("entities"):
+                    if kind == "auto" and not res.get("entities"):
+                        pr = sheet.profile(st, p, kerf, o.get("label"), rev, out=out or None)
+                        if pr.get("entities"):
+                            return {"kind": "profile", **{k: v for k, v in pr.items() if k not in ("entities", "exact", "etch")}}
+                    return {"kind": "flat pattern", **sheet.summary(res), "dxf": res.get("dxf"), "png": res.get("png")}
+            pr = sheet.profile(st, p, kerf, o.get("label"), rev, out=out or None)
+            return {"kind": "profile", **{k: v for k, v in pr.items() if k not in ("entities", "exact", "etch")}}
+        return await _run(go)
+
+    @mcp.tool(annotations=RO)
+    async def cut_file_check(path: str = "", project: str = "", process: str = "laser", options: dict | None = None) -> dict:
+        """Check a DXF before a shop cuts it, or a design's own flat pattern or profile (written to DXF and read
+        back). process laser|waterjet|router. Layers are read by intent from their names (cut, bend, etch, ignore;
+        an unknown layer is taken as cut and listed). Rules, each with the fabricator page it came from (SendCutSend,
+        Protolabs) or marked unsourced: closed contours, duplicate and overlapping lines, crossing contours, tiny
+        segments, text not converted to outlines, cut geometry on one layer, units, the smallest hole or slot (per
+        process; laser 50 % of t), hole to edge, hole to bend line, inside corner radius (waterjet, router), part
+        size (router). options: t (thickness, mm; needed for the rules in multiples of t), units (mm|in, overrides
+        the file), material (router size limit). Returns rows, findings with places, and the layers it read."""
+        st = studio()
+        def go():
+            from . import sheet
+            from .sheet import cutcheck
+            proc = cutcheck.process_id(process)
+            if path:
+                return sheet.cut_check(path, proc, options or {})
+            if not project:
+                raise StudioError("Give path (a DXF) or project.")
+            return sheet.cut_check(None, proc, options or {}, st, st.load(project))
+        return await _run(go)
+
+    @mcp.tool(annotations=RW)
+    async def bend_order(project: str, options: dict | None = None, rev: int | None = None) -> dict:
+        """Find an order in which a press brake can form every bend of a sheet-metal part, with a stated tool model:
+        a V-die of 8 × t (Bystronic's rule, cited), an 88° groove, a gooseneck punch of stated dimensions sectioned to
+        the bend's length, the part air-bent and checked at 25, 50, 75 and 100 % of each bend against punch, ram,
+        die and bed, turned end for end when that helps. Returns the sequence (or that none exists with these
+        tools, or that the search budget ran out), each bend's collisions alone and after all others, the model with
+        its dimensions and evidence, and its limits (2D cross-section, no springback, hems need other tools).
+        options: punch gooseneck|straight, die_v (mm), and the flat_pattern K-factor options."""
+        st = studio()
+        def go():
+            from . import sheet
+            return sheet.bend_order(st, st.load(project), options or {}, rev)
+        return await _run(go)
+
+    @mcp.tool(annotations=RO)
+    async def service_preflight(project: str = "", path: str = "", service: str = "sendcutsend", material: str = "",
+                                thickness: float | None = None) -> dict:
+        """Check a part against a cutting and bending service's published materials, thicknesses and limits before
+        a person sends it: material offered, thickness on the service's list, bending offered at that thickness,
+        bend angle, flat size of a bent part, smallest laser hole, and the cut-file rules. Every limit names the page
+        and the date it was read; a table read more than 90 days ago says so. Nothing is uploaded and nothing is
+        ordered. project (its flat pattern or profile) or path (a DXF; give thickness in mm). service: sendcutsend.
+        material: al_5052_h32 or steel_mild (or their names)."""
+        st = studio()
+        def go():
+            from . import sheet
+            if path:
+                return sheet.service_preflight(service=service, material=material or None, t=thickness, path=path)
+            if not project:
+                raise StudioError("Give project or path.")
+            return sheet.service_preflight(st, st.load(project), service, material or None, thickness)
         return await _run(go)
 
     @mcp.tool(annotations=RW)

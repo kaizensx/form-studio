@@ -835,10 +835,11 @@ is geometry: process cnc (3/4/5-axis access for a flat end mill, internal corner
 cavity depth, tool reach, thin walls, holes, setups), injection (a proposed pull direction and parting line,
 undercuts with the side action or lifter each needs, draft per face, wall range per resin, projected area,
 clamp tonnage), fdm, sla, sls, mjf, lpbf (walls, overhangs, holes, enclosed voids, build volume), sheet_metal
-(routed to its own tool; not checked here). Default process: the design's own (purpose print: fdm).
+(the part unfolded and folded back, flange length, holes to edge and bend, hems; flat_pattern has the rest).
+Default process: the design's own (purpose print: fdm).
 options: cnc {tool_d (mm, needed), material: metal|plastic, axes: 3|4|5, flute_l, holder_d, rotary_axis};
 injection {resin: abs|pc|pp|nylon|..., pull: [x,y,z] or "auto", cavities, textured}; printing {up: [x,y,z],
-machine: [x,y,z] mm, alloy for lpbf}; any process {overrides: {rule_id: {fail, warn}}} for a shop's limits
+machine: [x,y,z] mm, alloy for lpbf}; sheet_metal {material, k, method: table|din6935, forming}; any process {overrides: {rule_id: {fail, warn}}} for a shop's limits
 (recorded as specified). A rule whose input is missing is not checked, and the verdict is then "not proven",
 never a pass. Returns rows (one per rule), findings (where, value, limit), the proposed fixes (apply_fix),
 the overlay file the viewport draws (form-dfm-overlay/1) and, with view (iso, top, ...), a picture.

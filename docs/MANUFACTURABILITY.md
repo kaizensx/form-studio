@@ -66,8 +66,16 @@ Options: `resin` (`abs`, `acetal`, `acrylic`, `lcp`, `lfrp`, `nylon`, `pc`, `pol
 
 The SLA, SLS, MJF and LPBF numbers are one maker's or one service's machine and material, named on every result.
 A shop's own limits are given as `overrides={"rule_id": {"fail": x, "warn": y}}` and the row then says
-*specified*, with the source it replaced. Sheet metal is its own tool (flat pattern and bends, a later wave);
-`sheet_metal` says so and passes nothing.
+*specified*, with the source it replaced.
+
+### Sheet metal (`sheet_metal`)
+
+Measured by `form/sheet` (the part unfolded on the B-rep and folded back to prove it) and judged here with the same
+rule format: one sheet that unfolds, the fold-back within 0.01 mm, no overlap in the flat, flange ≥ 4 t (Protolabs),
+flange for an 8 t V-die (Bystronic), hole ≥ t, hole to edge, hole to bend ≥ 4 t, hem inside diameter ≥ t
+(Protolabs). Options: `material`, `k`, `method` (table | din6935), `forming`. Limits in multiples of t use the
+rule field `per = "t"` with the measured thickness. The flat pattern DXF, the cut-file check, bend order and
+service preflight are their own tools: see [SHEET_METAL.md](SHEET_METAL.md).
 
 ## How it is measured
 

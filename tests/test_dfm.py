@@ -292,6 +292,7 @@ class Fixes(unittest.TestCase):
 
     @classmethod
     def setUpClass(cls):
+        cls.data = os.environ["FORM_DATA"]            # the data folder this Studio uses (another module may set it)
         cls.st = Studio(config.load())
 
     @classmethod
@@ -447,14 +448,17 @@ class Design(FeatureDesign):
         self.assertTrue(ov["lines"])
         self.assertTrue(all(set(m) >= {"at", "status", "rule", "label"} for m in ov["markers"]))
 
-    def test_sheet_metal_is_routed_not_passed(self):
+    def test_sheet_metal_is_measured_by_the_sheet_tool(self):
+        # a moulded cup with sharp inside corners is not one sheet with bends: the unfold says so and the verdict
+        # fails, never a pass (form/sheet, wave H)
         res = dfm.check(self.st, self._new("Sheet", self.CUP), "sheet_metal")
-        self.assertEqual(res["verdict"], "not proven")
-        self.assertIn("wave H", res["routed"])
+        rows = {r["id"]: r for r in res["rows"]}
+        self.assertEqual(rows["sheet.unfold"]["status"], "fail")
+        self.assertEqual(res["verdict"], "fail")
 
     def test_cli_prints_json(self):
         p = self._new("Cli", self.CUP)
-        env = {**os.environ, "FORM_DATA": TMP, "PYTHONPATH": str(ROOT)}
+        env = {**os.environ, "FORM_DATA": self.data, "PYTHONPATH": str(ROOT)}
         r = subprocess.run([sys.executable, "-m", "form", "dfm", p["id"], "--process", "injection", "--set", "resin=abs"],
                            capture_output=True, text=True, env=env, cwd=str(ROOT), timeout=600)
         self.assertEqual(r.returncode, 0, r.stderr[-2000:])

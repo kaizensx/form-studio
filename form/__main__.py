@@ -567,6 +567,22 @@ def main(argv=None):
     cm.add_argument("--cell", type=float, help="simulation cell size, mm")
     cm.add_argument("--out", help="with post: also copy the first program here")
     cm.add_argument("--force", action="store_true")
+    sh = sub.add_parser("sheet", help="sheet metal and cut parts, JSON: sheet flat <project> [--set material=steel_mild "
+                                      "--set k=0.42 --out part.dxf]; sheet profile <project> [--kerf 0.2]; sheet check "
+                                      "<file.dxf|project> [--process laser|waterjet|router --set t=2]; sheet bends "
+                                      "<project>; sheet preflight <project|file.dxf> [--service sendcutsend --material "
+                                      "al_5052_h32 --thickness 3.175]; sheet tables")
+    sh.add_argument("action", choices=["flat", "profile", "check", "bends", "preflight", "tables"])
+    sh.add_argument("target", nargs="?", default="", help="a project, or a DXF file for check and preflight")
+    sh.add_argument("--set", action="append", default=[], metavar="KEY=VALUE",
+                    help="material, k, method (table|din6935), forming (air|bottoming|coining), label, t, punch, die_v")
+    sh.add_argument("--kerf", type=float, default=0.0)
+    sh.add_argument("--process", default="laser")
+    sh.add_argument("--service", default="sendcutsend")
+    sh.add_argument("--material", default="")
+    sh.add_argument("--thickness", type=float)
+    sh.add_argument("--rev", type=int)
+    sh.add_argument("--out", help="write the DXF here too")
     gd = sub.add_parser("diff", help="what changed between two revisions, computed on the solids: diff <project> A [B] [--png FILE]")
     gd.add_argument("project")
     gd.add_argument("a", type=int)
@@ -989,6 +1005,40 @@ def main(argv=None):
                     _print(out)
                 else:
                     _print(cam.status(st, p))
+        elif a.cmd == "sheet":
+            from . import sheet
+            from .sheet import cutcheck as _cc, tables as _tb
+            sopts: dict = {}
+            for kv in a.set:
+                k, _, v = kv.partition("=")
+                sopts[k.strip()] = v.strip()
+            is_file = a.target.lower().endswith(".dxf")
+            if a.action == "tables":
+                _print({"bend": {k: v for k, v in _tb.bend_table().items() if k not in ("source", "material")},
+                        "services": {sid: {k: v for k, v in _tb.service(sid).items() if k not in ("source", "material")}
+                                     for sid in _tb.services()}})
+            elif a.action == "check":
+                if is_file:
+                    _print(sheet.cut_check(a.target, _cc.process_id(a.process), sopts))
+                else:
+                    _print(sheet.cut_check(None, _cc.process_id(a.process), sopts, st, st.load(a.target), a.rev))
+            elif a.action == "preflight":
+                if is_file:
+                    _print(sheet.service_preflight(service=a.service, material=a.material or None, t=a.thickness,
+                                                   path=a.target))
+                else:
+                    _print(sheet.service_preflight(st, st.load(a.target), a.service, a.material or None, a.thickness,
+                                                   rev=a.rev))
+            else:
+                p = st.load(a.target)
+                if a.action == "flat":
+                    res = sheet.flat_pattern(st, p, sopts, a.rev, out=a.out)
+                    _print({**sheet.summary(res), "dxf": res.get("dxf"), "png": res.get("png")})
+                elif a.action == "profile":
+                    res = sheet.profile(st, p, a.kerf, sopts.get("label"), a.rev, out=a.out)
+                    _print({k: v for k, v in res.items() if k not in ("entities", "exact", "etch")})
+                else:
+                    _print(sheet.bend_order(st, p, sopts, a.rev))
         elif a.cmd == "diff":
             from . import geomdiff
             import shutil as _sh

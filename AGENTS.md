@@ -38,6 +38,7 @@ Prefer the MCP server (`form-mcp`). Without MCP, the `form` CLI does the same an
 | See what changed in the solid between revisions | `geometry_diff` | `form diff <p> 1 3 --png diff.png` |
 | Can it be made (CNC, moulding, FDM, SLA, SLS, MJF, LPBF), with fixes proved by checking again | `manufacturability` → `apply_fix` | `form dfm <p> --process cnc --set tool_d=6 --set material=metal [--fix RULE]` |
 | CNC, 3-axis: toolpaths, G-code for a controller, read back and run on a stock model (gouge, leftover, collisions, cycle time); simulated, not proven on a machine | `cam_plan` → `cam_post` → `cam_simulate` | `form cam plan <p> --tool 6mm-flat --material aluminum`, `form cam post <p> --machine grbl` |
+| Sheet metal: flat pattern DXF (proved by folding back), cut-file check, bend order, a service's limits | `flat_pattern`, `cut_file_check`, `bend_order`, `service_preflight` | `form sheet flat <p> --set material=steel_mild`, `form sheet check part.dxf --set t=2` |
 | Assess anything the person brings (mesh, STEP, photo, PDF, link, words) and get the route | `triage` | `form triage scan.stl` |
 | Turn an STL, OBJ or 3MF into a design by the route its triage chooses (parametric CAD, a surface body, a mesh body, parts) | `reconstruct` | `form reconstruct part.stl --tolerance 0.02` |
 | Rebuild a mesh by hand: what is left to add or cut, then tune the sizes | `reference_residual`, `fit_params`, `compare_to_reference` | — |
