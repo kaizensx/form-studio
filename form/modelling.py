@@ -371,6 +371,21 @@ def view_upto(st, p: dict, fid: str, tol: float = 0.03) -> dict:
     return v
 
 
+def _spans(source: str) -> dict:
+    """Each method of the source's classes: the lines it takes there, decorators included (1-based, inclusive)."""
+    out: dict = {}
+    try:
+        mod = ast.parse(source)
+    except SyntaxError:
+        return out
+    for cls in mod.body:
+        if isinstance(cls, ast.ClassDef):
+            for fn in cls.body:
+                if isinstance(fn, ast.FunctionDef):
+                    out[fn.name] = [min([fn.lineno] + [d.lineno for d in fn.decorator_list]), fn.end_lineno or fn.lineno]
+    return out
+
+
 def tree(st, p: dict) -> dict:
     c = _canonical(st, p)
     head = st.rev(p)
@@ -382,8 +397,21 @@ def tree(st, p: dict) -> dict:
         if e:
             r["last_build"] = {k: e[k] for k in ("status", "s", "dvol", "solids") if k in e}
         r["reads"]["values"] = {k: vals[k] for k in r["reads"]["params"] if k in vals}
-    return {"project": p["id"], "head": p["head"], "form": c["mode"], "features": rows,
-            "evidence": "read from the source (static); last_build is the head's build log"}
+    # who made each feature: the first revision whose build log names it, and that revision's origin. A feature no
+    # build log names (a design older than build logs) carries no mark: nothing is guessed.
+    made: dict = {}
+    for rv in p.get("revisions") or []:
+        for e in rv.get("build_log") or []:
+            made.setdefault(e.get("feature"), {"rev": rv.get("n"), "origin": rv.get("origin") or "user"})
+    spans = _spans(c["source"])
+    for r in rows:
+        if r["id"] in made:
+            r["made"] = made[r["id"]]
+        if r["id"] in spans:
+            r["lines"] = spans[r["id"]]                  # its method in the source returned here, first and last line
+    return {"project": p["id"], "head": p["head"], "form": c["mode"], "features": rows, "source": c["source"],
+            "evidence": "read from the source (static); last_build is the head's build log; made is the first revision "
+                        "whose build log names the feature"}
 
 
 # ---- picked features: the ops that add one ---------------------------------------------------------------------------

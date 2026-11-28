@@ -77,6 +77,13 @@ class Bench(unittest.TestCase):
     def e(self, sid):
         return next(x for x in studies.listing(self.st, self.st.load(self.pid))["entries"] if x["id"] == sid)
 
+    def test_0_chapters(self):
+        """Every entry says which of the four chapters it is in: what shapes the design is Design, the rest by group."""
+        es = {x["id"]: x for x in studies.listing(self.st, self.st.load(self.pid))["entries"]}
+        self.assertEqual({es[i]["chapter"] for i in studies.DESIGN if i in es}, {"design"})
+        self.assertEqual((es["checks"]["chapter"], es["exports"]["chapter"], es["doc.bom"]["chapter"]), ("check", "make", "document"))
+        self.assertTrue(all(x["chapter"] in ("design", "check", "make", "document") for x in es.values()))
+
     def test_1_round_trip(self):
         self.assertEqual(self.e("test.values")["state"], "never")
         r = studies.start(self.st, self.pid, "test.values", wait=True)

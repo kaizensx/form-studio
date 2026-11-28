@@ -151,6 +151,16 @@ class Kernel(unittest.TestCase):
             modelling.view_upto(self.st, p, "nope")
         self.assertEqual(p["head"], self.load()["head"])                  # nothing saved
 
+    def test_1b_tree_says_where_and_who(self):
+        """The tree returns the code it read, each feature's lines in it, and the first revision that built it."""
+        t = modelling.tree(self.st, self.load())
+        lines = t["source"].split("\n")
+        for r in t["features"]:
+            a, b = r["lines"]
+            self.assertTrue(lines[a - 1].lstrip().startswith("@feature"), (r["id"], lines[a - 1]))
+            self.assertIn(f"def {r['id']}(", "\n".join(lines[a - 1:b]))
+            self.assertEqual(r["made"], {"rev": 1, "origin": self.st.rev(self.load(), 1).get("origin") or "user"})
+
     def test_2_suppress_restore(self):
         p = self.load()
         before = self.st.head_summary(p)["volume_mm3"]

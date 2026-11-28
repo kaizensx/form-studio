@@ -36,6 +36,10 @@ from typing import Callable
 VERSION = 1
 GROUPS = {"study": "Studies", "route": "Routes", "document": "Documents"}
 STAGE = {"study": "prove", "route": "release", "document": "document"}     # the stage whose pane lists the group
+# The Bench's four chapters are the app's four modes (direction I). A study that shapes the design, not one that judges
+# it, is in Design; the rest follow their group.
+CHAPTER = {"study": "check", "route": "make", "document": "document"}
+DESIGN = ("features", "proof", "materials", "lighter")
 STATES = ("never", "current", "stale", "failed", "running", "unavailable", "n/a")
 BY = ("engine", "agent", "person")       # who runs it: Form Studio here, the agent (it must look), or a person
 PROVIDERS: tuple = ("form.massprops", "form.modelling")   # later waves: each module has register_studies(register)
@@ -327,7 +331,8 @@ def _alive(pid) -> bool:
 
 # ---- one entry's state ----------------------------------------------------------------------------------------
 def _base(ctx, s: Study) -> dict:
-    return {"id": s.id, "group": s.group, "group_label": GROUPS[s.group], "stage": STAGE[s.group], "label": s.label,
+    return {"id": s.id, "group": s.group, "group_label": GROUPS[s.group], "stage": STAGE[s.group],
+            "chapter": "design" if s.id in DESIGN else CHAPTER[s.group], "label": s.label,
             "doc": s.doc, "evidence": s.evidence, "by": s.by, "app": s.app, "tool": s.tool, "heavy": s.heavy,
             "needs": list(s.needs), "inputs": list(s.inputs), "head": ctx.p["head"], "headline": "", "rev": None}
 
