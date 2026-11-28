@@ -9,7 +9,10 @@
   MEASURED or ASSUMED. The word is the result's own `evidence`; a document or link that was read is OPENED, a
   measurement you answered is MEASURED. A call that failed, or whose result names no class, is not a source
   (`form/cite.py`). A number in the reply carries a source's index only when that exact number stands in that
-  source's result. Nothing is taken from what the model says about itself.
+  source's result, and is set as a figure (mono, with its unit). Nothing is taken from what the model says about
+  itself. A document, a part or a link you gave that no tool opened is listed as NOT OPENED, or OPENED EARLIER when
+  a tool of an earlier turn opened it; a reply that states figures with no tool result behind them says MODEL
+  KNOWLEDGE. Those rows carry no number.
 - **The plan card.** When the agent plans a design (`plan_design`), its steps are a numbered card in the conversation.
   If it then asks for approval, the question is answered on the card: Approve, Edit (your words go back as the
   answer) or its other choice. A plan nobody was asked about is shown as the plan; the card says "approved by you"
@@ -29,7 +32,14 @@
   the same words.
 - **The palette** has the prompt's lit well, the open design as its scope, group names in grey capitals and one lit
   row. Revision cards share the look of the Sources and plan cards.
-- **A still window redraws less**: the room's light is stepped five times in two seconds, not five times a second.
+- **A still window redraws less**: the room's light is stepped five times in two seconds, not five times a second,
+  and the example prompts on Home change in seven steps every six seconds instead of a fade at sixty frames a second
+  (that fade was about ten redraws a second on a Home nobody touched). They rest while the window is in the background.
+
+### Fixed
+
+- **A hand edit's revision card reads the revision before the edit** (r04 → r05): the engine took the head after the
+  commit. A note without a new revision has no card.
 - Design cards on Home no longer carry an index number.
 
 - **The right pane is the Bench's chapter for the mode, in one row grammar** (direction I, second part). Check lists

@@ -200,3 +200,40 @@ def hand_note(events: list[dict]) -> str:
     lines = ["- " + e["text"] + (f" (r{e['to']:02d})" if isinstance(e["to"], int) else "") for e in edits]
     return ("By hand since your last reply, the person changed the design in Form Studio:\n" + "\n".join(lines)
             + "\nRead the design again with Form Studio's tools before you change it; keep these edits.")
+
+
+_URL = re.compile(r"https?://[^\s<>\"'`)\]]+", re.I)
+
+
+def extra_rows(events: list[dict]) -> list[dict]:
+    """What the last turn's Sources say beyond the numbered rows, read from the log as the others are:
+
+    - a document, a part or a link the person gave with the message that no tool opened this turn: "opened earlier"
+      when a tool of an earlier turn opened it, else "not opened" (a picture goes to the model as it is, so it is
+      never listed);
+    - "model knowledge" when the reply states figures and no tool result of the turn is a source.
+    [{"title", "how"}], without a number: they are not something the reply can point at."""
+    last = max((i for i, e in enumerate(events) if e.get("t") == "user"), default=-1)
+    if last < 0:
+        return []
+    user, turn, before = events[last], events[last + 1:], events[:last]
+
+    def opened(evs):
+        return [str(e["source"].get("title", "")).lower() for e in evs if e.get("t") == "result" and (e.get("source") or {}).get("how") == "opened"]
+    now, earlier = opened(turn), opened(before)
+    given = [str(a.get("name") or "") for a in (user.get("attachments") or []) if a.get("kind") in ("pdf", "cad") and a.get("name")]
+    for u in _URL.findall(str(user.get("text", ""))):
+        host = urlparse(u.rstrip(".,;:!?")).netloc
+        if host and host not in given:
+            given.append(host)
+    rows = []
+    for name in given:
+        key = name.lower()
+        if any(t.startswith(key) for t in now):
+            continue
+        rows.append({"title": name, "how": "opened earlier" if any(t.startswith(key) for t in earlier) else "not opened"})
+    has_source = any(e.get("t") == "result" and e.get("source") for e in turn)
+    said = " ".join(str(e.get("text", "")) for e in turn if e.get("t") == "text")
+    if not has_source and figures(said):
+        rows.append({"title": "No tool result is behind this reply's figures", "how": "model knowledge"})
+    return rows

@@ -177,6 +177,7 @@ Item {
                         verticalAlignment: Text.AlignVCenter; lineHeight: 1.0
                         font.pixelSize: ta.font.pixelSize; font.letterSpacing: -0.2; color: Theme.ink3; wrapMode: Text.NoWrap; elide: Text.ElideRight
                         property int n: 0
+                        readonly property bool front: Window.active          // (the Timer below is no Item: it reads the window through this one)
                         readonly property var lines: !Store.chatReady && Store.studio ? ["No agent is connected. Start blank, or connect one in Settings › Agents & models."]
                             : ["Describe it, or drop a photo, a sketch, a part or a link…",
                                "A planetary gearbox for a NEMA 17 motor, about 1:16",
@@ -184,12 +185,21 @@ Item {
                                "An ergonomic handle shaped to the palm, with a soft taper",
                                "A knob like the one in my photo, with a 6 mm D-shaft"]
                         text: lines[n % lines.length]
-                        Timer { interval: 4200; repeat: true; running: ph.visible && ph.lines.length > 1 && !ta.activeFocus
+                        // The examples take turns. The change is stepped, not animated: a fade at sixty frames a second
+                        // redrew the whole window some forty times for every example (ten redraws a second on a Home
+                        // nobody touches, measured); seven steps do the same for the eye. Not while the window is in the
+                        // background.
+                        Timer { interval: 6000; repeat: true; running: ph.visible && ph.lines.length > 1 && !ta.activeFocus && ph.front
                             onTriggered: phSwap.start() }
                         SequentialAnimation { id: phSwap
-                            NumberAnimation { target: ph; property: "opacity"; to: 0; duration: 260; easing.type: Easing.InQuad }
+                            PropertyAction { target: ph; property: "opacity"; value: 0.6 } PauseAnimation { duration: 70 }
+                            PropertyAction { target: ph; property: "opacity"; value: 0.25 } PauseAnimation { duration: 70 }
+                            PropertyAction { target: ph; property: "opacity"; value: 0 } PauseAnimation { duration: 90 }
                             ScriptAction { script: ph.n++ }
-                            NumberAnimation { target: ph; property: "opacity"; to: 1; duration: 420; easing.type: Easing.OutCubic } } }
+                            PropertyAction { target: ph; property: "opacity"; value: 0.3 } PauseAnimation { duration: 70 }
+                            PropertyAction { target: ph; property: "opacity"; value: 0.6 } PauseAnimation { duration: 70 }
+                            PropertyAction { target: ph; property: "opacity"; value: 0.85 } PauseAnimation { duration: 70 }
+                            PropertyAction { target: ph; property: "opacity"; value: 1 } } }
                 }
 
                 // ── a link, typed or pasted ──

@@ -973,6 +973,13 @@ class Chat:
                 h1 = self._head(pid)
                 if pid and h1 is not None and h1 != job.head0:
                     ev["change"] = {"project": pid, "from": job.head0, "to": h1}
+                if job.conversation and not err:          # what the Sources say beyond the numbered rows (form/cite.py)
+                    try:
+                        rows = cite.extra_rows(self.store.events(job.conversation))
+                    except ConversationError:
+                        rows = []
+                    if rows:
+                        ev["cite_rows"] = rows
                 self._add(job, ev)
                 job.cost = job.events[-1].get("cost_usd")       # the run's own spend, worked out by the store
                 if err and _model_unavailable(str(err)):

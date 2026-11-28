@@ -36,10 +36,24 @@ class Cite(unittest.TestCase):
     def test_marks_only_numbers_that_stand_in_a_result(self):
         h = to_html("Peak 14.2 MPa against 276.0 MPa at 250 N; 14.2 again.", {"cites": [[1, ["14.2"]], [2, ["276.0"]]]})
         self.assertEqual(h.count("<sup>"), 2)
-        self.assertIn("14.2 MPa<sup>", h)
-        self.assertIn("276.0 MPa<sup>", h)
+        self.assertIn("14.2&nbsp;MPa&nbsp;</span><sup>", h)
+        self.assertIn("276.0&nbsp;MPa&nbsp;</span><sup>", h)
+        self.assertEqual(h.count("&nbsp;14.2&nbsp;MPa&nbsp;"), 1)          # the unit goes with the first only where it is written
+        self.assertEqual(h.count("background-color"), 3)                    # every figure of a source is set as one; 250 is not
         self.assertNotIn("250 N<sup>", h)
         self.assertNotIn("<sup>", to_html("Peak 14.2 MPa"))
+
+    def test_rows_without_a_number(self):
+        src = {"t": "result", "source": {"title": "nema17.pdf, page 4", "how": "opened", "figures": []}}
+        user = {"t": "user", "text": "see https://example.org/x and the drawing", "attachments": [
+            {"name": "nema17.pdf", "kind": "pdf"}, {"name": "photo.jpg", "kind": "image"}, {"name": "rail.step", "kind": "cad"}]}
+        rows = cite.extra_rows([user, src, {"t": "text", "text": "It is 31.0 mm."}])
+        self.assertEqual(rows, [{"title": "rail.step", "how": "not opened"}, {"title": "example.org", "how": "not opened"}])
+        again = dict(user, text="and now?")
+        rows = cite.extra_rows([user, src, {"t": "end"}, again, {"t": "text", "text": "Yield is 276.0 MPa."}])
+        self.assertEqual(rows, [{"title": "nema17.pdf", "how": "opened earlier"}, {"title": "rail.step", "how": "not opened"},
+                                {"title": "No tool result is behind this reply's figures", "how": "model knowledge"}])
+        self.assertEqual(cite.extra_rows([{"t": "user", "text": "hello"}, {"t": "text", "text": "Hello, what shall we make?"}]), [])
 
     def test_plan_and_hand_edits(self):
         self.assertEqual(cite.plan_steps(json.dumps({"steps": [{"label": "Base  plate"}, "Upright", {"x": 1}]})), ["Base plate", "Upright"])

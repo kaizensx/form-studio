@@ -6,9 +6,10 @@ import QtQuick
 TalkCard {
     id: src
     objectName: "sourcesCard"
-    property var list: []                    // [{ n, title, how }]
+    property var list: []                    // [{ n, title, how }]; n 0: a row the reply cannot point at (not opened, model knowledge)
+    property int count: list.length          // the numbered ones
     title: "Sources"
-    note: list.length + " · from the tool log"
+    note: count + " · from the tool log"
     Repeater {
         model: src.list
         Item {
@@ -16,7 +17,7 @@ TalkCard {
             required property var modelData
             readonly property string how: modelData.how
             width: parent.width; height: Math.max(26, name.implicitHeight + 8)
-            Txt { x: 0; anchors.baseline: name.baseline; width: 16; mono: true; font.pixelSize: 12; font.weight: Theme.wMedium; color: Theme.datum; text: row.modelData.n }
+            Txt { x: 0; anchors.baseline: name.baseline; width: 16; mono: true; font.pixelSize: 12; font.weight: Theme.wMedium; color: row.modelData.n ? Theme.datum : Theme.ink4; text: row.modelData.n ? row.modelData.n : "–" }
             Txt { id: name; x: 26; y: 4; width: parent.width - 26 - ev.implicitWidth - 10; tone: 2; font.pixelSize: 13; lineHeight: 1.3
                 wrapMode: Text.WordWrap; maximumLineCount: 2; elide: Text.ElideRight; text: row.modelData.title }
             Ev { id: ev; objectName: "sourceHow"; anchors.right: parent.right; anchors.baseline: name.baseline; text: row.modelData.how }
@@ -26,7 +27,10 @@ TalkCard {
                     specified: "Specified: from a standard, a datasheet or the material library.",
                     opened: "Opened this turn: the agent read this file or page.",
                     measured: "Measured: a number you measured and gave.",
-                    assumed: "Assumed: not measured and not specified." })[row.modelData.how] || "The tool result names this as how it is known." }
+                    assumed: "Assumed: not measured and not specified.",
+                    "opened earlier": "You gave this with your message. No tool opened it this turn; one did earlier in this conversation.",
+                    "not opened": "You gave this with your message. No tool opened it, so the reply does not rest on it.",
+                    "model knowledge": "The reply states figures, and no tool result of this turn is a source: they come from the model itself. Ask for them to be computed or looked up." })[row.modelData.how] || "The tool result names this as how it is known." }
         }
     }
 }
