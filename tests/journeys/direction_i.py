@@ -12,6 +12,14 @@ def _rect(ui, name):
     return (p.x(), p.y(), it.width(), it.height())
 
 
+def _lead(ui):
+    """The stage's left edge: the tool dock, or with the ribbon showing (no dock) the ribbon's left end."""
+    if ui.exists("toolDock"):
+        return _rect(ui, "toolDock")
+    r = _rect(ui, "toolRibbon")
+    return (r[0], r[1], 0, r[3])
+
+
 def run(ui):
     ui.wait_until(lambda: ui.store.get("screen") == "home", 30, "Home")
     phone_dock(ui)                                     # a design made for printing: it has a fit model
@@ -73,7 +81,7 @@ def run(ui):
     goto(ui, "shape")
     ui.settle(400)
     ui.check(not ui.exists("viewsCapsule"), "the view buttons at the foot are gone")
-    c, pane, dock = _rect(ui, "viewCube"), _rect(ui, "programPane"), _rect(ui, "toolDock")
+    c, pane, dock = _rect(ui, "viewCube"), _rect(ui, "programPane"), _lead(ui)
     ui.check(c[0] + c[2] <= pane[0] - 8 and c[0] > dock[0] + dock[2] and abs(c[1] - pane[1]) <= 1, f"the cube stands at the stage's top right: {c} beside {pane}")
     for fx, fy, name in ((0.5, 0.36, "top"), (0.38, 0.62, "front"), (0.62, 0.58, "side"), (0.5, 0.94, "iso")):
         ui.wait(450)                                   # not a double click
@@ -98,7 +106,7 @@ def run(ui):
     ui.wait_until(lambda: ui.js("!!Store.analysis && Store.analysis.map === 'thickness' && !Store.analysisBusy"), 120, "the thickness map")
     ui.settle(600)
     r = _rect(ui, "resultStrip")
-    pane, dock = _rect(ui, "programPane"), _rect(ui, "toolDock")
+    pane, dock = _rect(ui, "programPane"), _lead(ui)
     ui.check(r[0] >= dock[0] + dock[2] and r[0] + r[2] <= pane[0], f"the strip lies under the part, between the dock and the pane: {r}")
     ui.check(ui.sees("Wall thickness", within=ui.item("resultStrip")), "it names the result")
     ui.check("computed" in str(ui.item("stripEvidence").property("text")).lower(), "it says how the result is known")

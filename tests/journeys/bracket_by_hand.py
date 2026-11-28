@@ -256,7 +256,7 @@ def journey_bracket(ui):
     ui.eq(ids, ["extrude_1", "cut_1", "hole_1", "fillet_1"], "four features, each one method in the code")
     ui.check(elapsed < LIMIT_S, f"made in {elapsed:.1f} s, under {LIMIT_S:.0f} s")
     wait_job(ui, S["pid"])
-    ui.click(ui.item("railSelect"))
+    tool(ui, "select")
     toasts_gone(ui)
     ui.settle(900)
     ui.shot("bracket-3-made")

@@ -154,7 +154,8 @@ DOCK_MODE = {"Analyze": ("prove", "analyze"), "History": ("prove", "history"), "
 RAIL = {"sketch": "railSketch", "extrude": "railExtrude", "cut": "railCut", "revolve": "railRevolve", "fillet": "railRound",
         "chamfer": "railChamfer", "hole": "railHole", "pattern": "railPattern", "shell": "railShell", "part": "railPart",
         "analyze": "railAnalyze", "mass": "railMass", "assembly": "railAssembly", "history": "railHistory",
-        "slice": "railSimulate", "plates": "railPlates", "game": "railGame", "views": "railViews", "dims": "railDims"}
+        "slice": "railSimulate", "plates": "railPlates", "game": "railGame", "views": "railViews", "dims": "railDims",
+        "select": "railSelect", "measure": "railMeasure", "section": "railSection", "annotate": "railAnnotate"}
 
 
 def ribbon_on(ui):

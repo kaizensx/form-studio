@@ -60,7 +60,8 @@ def run(ui):
     ui.shot("lightdesk-workspace")
 
     # the panes: all there, inside the window, none over another
-    names = ["titleCapsule", "stageTabs", "toolsCapsule", "toolDock", "viewCube", "programPane", "talk"]
+    # (with the ribbon showing there is no tool dock: the ribbon holds the four)
+    names = ["titleCapsule", "stageTabs", "toolsCapsule", "toolDock" if ui.exists("toolDock") else "toolRibbon", "viewCube", "programPane", "talk"]
     rects = {n: _rect(ui, n) for n in names}
     w, h = ui.win.width(), ui.win.height()
     for n, r in rects.items():
@@ -118,8 +119,10 @@ def run(ui):
     rail = 44 + 8 if ui.exists("projectRail") and ui._shown(ui.item("projectRail")) else 0     # the folded project rail stands at the edge
     ui.check(abs(t[0] - gut - rail) <= 1 and abs(t[1] - pc[1]) <= 1 and abs(t[1] + t[3] - (ui.win.height() - gut)) <= 1,
              f"the conversation is a column on the left, with the gutters of the panes on the right ({gut}): {t}")
-    ui.check(_rect(ui, "toolDock")[0] >= t[0] + t[2] + 8, f"the tool dock stands right of it: {_rect(ui, 'toolDock')}")
-    ui.check(float(ui.item("viewport").property("insetLeft")) >= t[0] + t[2] + 40, "the part is framed right of the column (the tool dock floats at the stage's edge)")
+    lead = "toolDock" if ui.exists("toolDock") else "toolRibbon"
+    ui.check(_rect(ui, lead)[0] >= t[0] + t[2] + 8, f"the tools stand right of it: {_rect(ui, lead)}")
+    # (the dock floats at the stage's edge and takes 60 px more; with the ribbon there is no dock)
+    ui.check(float(ui.item("viewport").property("insetLeft")) >= t[0] + t[2] + (40 if lead == "toolDock" else 12), "the part is framed right of the column")
     ui.check(_apart(t, _rect(ui, "viewCube")), "it stays clear of the view cube")
     if ui.win.width() >= 1200:
         ui.check(_apart(t, _rect(ui, "programPane")), "and of the panes on the right")

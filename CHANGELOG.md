@@ -4,6 +4,17 @@
 
 ### Added
 
+- **The stage gives the part more room.** Select, Measure, Section and Annotate are the first group of the ribbon,
+  as icons; while the ribbon shows there is no tool dock inside the stage (Hide brings the dock back with all its
+  tools). The options of a tool are one compact line sized to what they say, at the ribbon's right end when the line
+  has room for them, and they are not shown while the tool has nothing to say: a map's Analyze goes when the map does,
+  and Check's tools are put down when you leave Check. The part is framed by its box at about three quarters of the
+  free stage's binding side, a little above its middle. The conversation column's composer is one line until you
+  click into it. Tabs have short names (CNC check, Strength, Drawing, Report) with the full name in their tooltip.
+  Counts in a sentence ("0 rules fail", "fail 0") are set with plain lining figures, not the mono font's slashed
+  zero. An opened Bench card taller than the pane keeps its buttons at the pane's foot. With the column open the free
+  stage is 60 px wider (688 × 685 at 1440 × 900, 528 × 585 at 1280 × 800); the scale cue no longer sits under the
+  legend strip.
 - **The tools, labelled.** The mode's tools stand in a slim band of glass at the head of the stage, each with its
   icon and its name, in groups with a caption: Create, Modify, Reference and Insert in Design; Inspect, Studies and
   Review in Check; Print, Machine and Output in Make; Sheets, Lists and Picture in Document. The dock keeps Select,
