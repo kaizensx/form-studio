@@ -32,6 +32,8 @@ Prefer the MCP server (`form-mcp`). Without MCP, the `form` CLI does the same an
 | Offer next steps | `suggest_replies` (up to three buttons under the reply) | — |
 | Mass, centre of mass, inertia (per part, assembled at a pose) and the sourced materials library | `mass_properties` | `form mass <p> --pose '{"lid_hinge": 90}'`, `form materials AL-6061` |
 | Put text on a flat face (a feature in the source) | `add_text`, `remove_text` | `form engrave <p> TEXT --at x,y,z --normal x,y,z` |
+| Will it hold: stress, displacement and a safety factor with a stated error; frequencies; buckling | `strength_study` → `get_strength_study` | `form strength static <p> --fix x,y,z --force x,y,z:Fx,Fy,Fz --material AL-6061` |
+| Size a snap fit, living hinge, spring, bolted joint, gear pair, cam or fit from a standard's equations, and write it as a design | `calculate` (`build=True` writes the design; every number is computed, specified or assumed, with its equation and source) | `form calc spring wire_d=1.6 mean_d=14 active=6 force=40 wire=music --build`, `form calc list` |
 | Work the feature tree: suppress, restore, move, rename; see the part up to one feature | `edit_design` ops `suppress`/`restore`/`move`/`rename`, `render(upto=)`, `get_design_source` (`tree`) | `form tree <p> [suppress\|restore\|move\|rename F]`, `form tree <p> --upto F` |
 | Fillet, chamfer, hole (ISO 273, tap drill, ISO 286), pattern or shell on picked geometry (one feature in the source) | `add_feature` kinds `fillet`, `chamfer`, `hole`, `pattern`, `shell` (`preview=True` saves nothing) | `form model <p> fillet --at x,y,z --radius 2` |
 | Read or change a feature's sketch (constraints, dimensions as parameters); extrude, cut or revolve one | `get_sketch`, `edit_sketch`; `add_feature` kinds `extrude`, `cut`, `revolve` | `form sketch <p> F`, `form model <p> extrude --sketch s.json` |
@@ -71,7 +73,7 @@ To write a new built-in one, see `docs/RECIPES.md`.
 Form Studio's design and print-engineering practice is written as skills in `plugins/form/skills/<name>/SKILL.md`
 (intake, parametric-design, industrial-design, design-review, explore-variants, fdm-engineering, fit-calibration,
 hardware-integration, assemblies-and-mechanisms, modular-storage, verify-print, print-feedback, release, cad-core,
-staged-design, surfacing-organic, texture, remodel-from-mesh, game-asset). Each says when to use it and which MCP tools
+staged-design, surfacing-organic, texture, remodel-from-mesh, game-asset, strength-studies). Each says when to use it and which MCP tools
 to call; longer texts sit in its `references/`. Claude Code installs them as a plugin (`claude plugin marketplace add
 kaizensx/form-studio`, then `claude plugin install form@form-studio`); other agents: read the matching `SKILL.md`
 before that kind of task.

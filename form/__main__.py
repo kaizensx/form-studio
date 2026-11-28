@@ -26,7 +26,12 @@
   form lighter <project> [--apply c1]                  lighter walls, pockets, infill; every passing check kept
   form replace --photo broken.jpg [--name X]           a replacement for a broken part, from a photo, in a chat
   form feature <project> boss --at x,y,z --normal ...  a screw boss or snap-fit hook in the code
+  form strength static <project> --fix X,Y,Z --force X,Y,Z:FX,FY,FZ --material AL-6061
+                                     a strength study with a stated error (also modal, buckling, list, show, verify;
+                                     `form study strength ...` is the same); JSON
   form study list|run|show <project> [id] [--force]   the Bench: every study, route and document, with its state
+  form calc <calculator> key=value ... [--build]   size a snap fit, hinge, spring, bolted joint, gear pair, cam or fit
+                                     from a standard's equations; every number with its source (form calc list); JSON
   form tree <project> [suppress|restore|move|rename FEATURE] [--upto FEATURE]   the feature tree, by hand
   form model <project> fillet|chamfer|hole|pattern|shell --at x,y,z ... [--preview]   a picked feature as code
   form model <project> extrude|cut|revolve --sketch F.json [--at x,y,z] [--depth D]    a feature from a sketch
@@ -254,6 +259,12 @@ def main(argv=None):
     if argv[:1] == ["secrets"]:                    # agent keys (Gemini); values never on the command line
         from .secrets import main as secrets_main
         return secrets_main(argv[1:])
+    if argv[:1] == ["strength"] or (argv[:1] == ["study"] and argv[1:2] and argv[1] in ("strength", "static", "modal", "buckling", "thermal", "thermal_stress", "verify")):
+        from .fea.cli import main as strength_main  # strength studies with a stated error (form/fea)
+        return strength_main(argv[1:] if argv[0] == "strength" else argv[2:] if argv[1] == "strength" else argv[1:])
+    if argv[:1] == ["calc"]:                       # engineering calculators that write geometry (form/calc)
+        from .calc.cli import main as calc_main
+        return calc_main(argv[1:])
     if argv[:1] == ["study"]:                      # the Bench: every study, route and document with its state (form/studies.py)
         from .studies import main_cli as study_main
         return study_main(argv[1:])
@@ -350,6 +361,7 @@ def main(argv=None):
     g.add_argument("--maximize")
     o.add_argument("--require", action="append", default=[], help='constraint, e.g. "statics.safety_factor>=3"')
     o.add_argument("--budget", type=int, default=40)
+    o.add_argument("--study", default="", help='the static strength study a "fea.safety_factor>=2" constraint is read from')
     an = sub.add_parser("animate", help="turntable or revision-morph GIF")
     an.add_argument("project")
     an.add_argument("--morph", help="from:to revision numbers, e.g. 1:4")
@@ -366,6 +378,8 @@ def main(argv=None):
     lt.add_argument("--builds", type=int, default=4, help="how many geometry candidates go through the full checks")
     lt.add_argument("--apply", metavar="ID", help="keep candidate ID (c1, c2, ...) from the search")
     lt.add_argument("--expect-head", type=int)
+    lt.add_argument("--require", action="append", default=[], help='a strength constraint to keep, e.g. "fea.safety_factor>=2"')
+    lt.add_argument("--study", default="", help="the static strength study the constraint is read from")
     so = sub.add_parser("slicer-open", help="slice with settings chosen for this part on this printer and open the project in the slicer")
     so.add_argument("project")
     so.add_argument("--printer", metavar="ID", help="a printer id from `form printers` (default: the design's printer)")
@@ -712,7 +726,7 @@ def main(argv=None):
                 k, lo, hi = item.split(":")
                 vary.append({"key": k, "min": float(lo), "max": float(hi)})
             obj = {"minimize": a.minimize} if a.minimize else {"maximize": a.maximize}
-            _print(opt.run(st, st.load(a.project), vary, obj, a.require, a.budget))
+            _print(opt.run(st, st.load(a.project), vary, obj, a.require, a.budget, study=a.study))
         elif a.cmd == "animate":
             from . import animate
             p = st.load(a.project)
@@ -746,7 +760,7 @@ def main(argv=None):
                     out["job"] = st.run_sync(a.project)["state"]
                 _print(out)
             else:
-                _print(lighten.search(st, p, builds=a.builds))
+                _print(lighten.search(st, p, builds=a.builds, require=a.require or None, study=a.study))
         elif a.cmd == "slicer-open":
             from . import slicer_open
             r = slicer_open.run(st, st.load(a.project), a.printer, open_app=not a.no_open, copies=a.copies)

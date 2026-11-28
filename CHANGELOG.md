@@ -4,6 +4,21 @@
 
 ### New
 
+- **Engineering calculators that write the part.** Seven calculators size a part from what it has to do, by a named
+  standard's equations, and write it as a design with parameters: snap joints (cantilever and annular, Bayer's
+  snap-fit guide), living hinges (elastic by strain, or moulded PP and PE from cited practice), springs
+  (compression, extension and torsion to EN 13906, with a printed-spring mode), bolted joints (VDI 2230 Part 1,
+  simplified: size from the load, preload, tightening torque, thread stripping; bosses with heat-set inserts),
+  involute gears (spur and helical with profile shift, internal pairs, rack and pinion; contact ratio, backlash, Lewis
+  bending), plate cams from a motion law, and ISO 286 fits over a temperature span. Every number is labelled
+  computed, specified or assumed, with its equation and its source; a material value with no source leaves its
+  result out instead of being guessed. The calculation stays in the design and runs again on every revision. Checked
+  against 72 published quantities; a snap hook is also checked by finite elements where the strength engine is
+  installed. [docs/CALCULATORS.md](docs/CALCULATORS.md).
+- **`calculate`** (MCP) and **`form calc <calculator> key=value ... [--build]`** (terminal, JSON), and the Bench
+  entry **Engineering calculation**. 106 MCP tools.
+- ISO 286 tables and published fastener dimensions moved to modules with no CAD kernel behind them
+  (`form/iso286.py`, `form/hardware_tables.py`); `form.craft.fits` and `form.parts` read the same copy.
 - **The Bench.** Every study, route and document of a design in one listing: at the top of the Review pane the
   studies (checks, assembly and joints, requirements, analysis maps, fit, critique, slice, print simulation,
   orientation, every printer, cost, make it lighter), at the top of the Make pane the routes (exports, 3MF with
@@ -64,6 +79,55 @@
 
 - Filament and engineering densities are now the cited datasheet values (for example PETG 1.28, PA-CF 1.09, stainless
   304 8.00 g/cm³); woods keep the bd_materials catalogue density, labelled typical. "Oak" is red oak.
+- **Strength studies with a stated error.** Pick the faces that are held and the faces that are loaded, and get
+  stress, displacement and a safety factor against the material's yield; also natural frequencies (modal) and the
+  load at which a slender part buckles. Supports are fixed, roller and pin; loads are force, pressure, a bolt's
+  preload and gravity. A design of several parts is solved assembled, bonded where its parts touch, with a material
+  for each. Netgen meshes the B-rep into quadratic tetrahedra, finer on fillets and holes, and the solid is meshed
+  and solved again until the answer stops changing. Every result says how it is known:
+  `simulated (FEA, linear static, converged to 1.1 %)`, with the convergence of every refinement kept. A study that
+  does not reach its tolerance says so and gives no safety factor.
+- **Singularities are named, never reported as strength.** At a sharp inside corner the elastic stress has no finite
+  value. The study finds such edges, leaves the stress within a stated radius of them out of the peak and the safety
+  factor, and lists each with where it is, why, and how the stress there grew with refinement. The edge of a fixed
+  face and the edge of a loaded face are treated the same way when the stress there keeps growing.
+- **Material numbers with their sources.** A study takes Young's modulus, Poisson's ratio, yield strength and
+  density from the materials library, each with its document, or from values given with the study and their source.
+  Nothing is defaulted: a missing modulus stops the study, a missing yield strength means no safety factor. A
+  printed filament is solved solid and isotropic, judged against its weakest sourced strength, and says so.
+- **A verification suite, published.** Textbook and published cases, each quantity with its reference and tolerance:
+  a cantilever against Timoshenko and Euler-Bernoulli, a plate with a hole against Peterson's chart, Lamé's thick
+  cylinder, self weight, two bonded solids, a bolt preload, the frequencies of a clamped and a free beam, Euler's
+  column, and a sharp corner that must be named. [docs/STRENGTH.md](docs/STRENGTH.md) has the table;
+  `form strength verify` runs it.
+- **Headless and in the background.** `strength_study` and `get_strength_study` over MCP, and `form strength
+  static|modal|buckling|thermal|thermal_stress|run|list|show|verify` (also as `form study strength ...`) with JSON
+  output. A study runs
+  as a job with progress and cancel. Its result is stored beside the revision under a key of the geometry, the
+  loads, the material's numbers and the engine, so it goes stale after any change and says which revision it
+  describes. A typical bracket converges in about 10 s.
+- **Field data for the viewport.** Each result has a compact surface field: per-vertex displacement, von Mises
+  stress, safety factor and a mask of the singular zones; mode shapes for modal and buckling studies.
+- **Curved elements.** The quadratic tetrahedra are isoparametric: every mid-side node lies on the geometry, so a
+  fillet or a bore is a curved surface in the model. Lamé's cylinder comes out within 0.1 %, and the bracket's fillet
+  stress settles in three refinements.
+- **NAFEMS LE1 and LE10** are in the verification suite with their published targets (92.7 MPa and −5.38 MPa).
+- **A hand estimate beside the result.** Where a part reads as a bar fixed at one end, a static result carries the
+  beam-theory stress and deflection from section properties measured on the solid (evidence: computed, closed
+  form). Any other shape says why no formula fits.
+- **Strength as a constraint in a search.** `optimize` and `make_lighter` take `fea.safety_factor >= 2` (the lower
+  value, with the stated error applied). The study is solved on real candidates, best first, within 8 solves and
+  300 s; only candidates that were solved and passed count, and the result lists each one.
+- **Heat and thermal stress.** `thermal` studies solve steady conduction with temperature, convection, heat and
+  heat-flux conditions on picked faces, and report the temperature range, the heat through each condition and the
+  heat balance. `thermal_stress` adds the expansion of that temperature field to a static study. Checked against a
+  wall with convection, a pipe wall, a held bar and Timoshenko's thick cylinder.
+- **A `hold` support** stops single directions of a face, and a support along a line is named as singular.
+- **Guidance for agents.** A `strength-studies` skill and `design_guide(topic="strength")`: loads on picked faces,
+  sourced materials, reading convergence, and never quoting the stress at a singularity.
+- **The solver is an optional engine.** "Strength studies (FEA)" in Settings, Engines & software installs Netgen
+  (LGPL-2.1, unmodified wheels), scikit-fem and SciPy (BSD-3-Clause) and PyAMG (MIT) into a Python of their own,
+  about 190 MB. Without it a study computes nothing and says how to get it.
 
 ### Fixed
 

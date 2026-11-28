@@ -5,7 +5,7 @@ description: Design multi-part FORM assemblies and moving parts — hinges, slid
 
 # Assemblies and mechanisms
 
-FORM tools: `design_guide()`, `create_design()`, `update_design()`, `render()`, `animate()`, `explore_alternatives()`,
+FORM tools: `design_guide()`, `create_design()`, `update_design()`, `render()`, `animate()`, `explore_alternatives()`, `calculate()`,
 `slice_test_piece()`.
 
 Read `references/mechanisms.md` (the same text as `design_guide(topic="mechanisms")`): the form.craft helpers for
@@ -17,6 +17,11 @@ Modelling
 - Define motion first: travel, range of angle, speed, load, ratio. Then shafts, bearing surfaces, axial retention,
   backlash convention and fastener access.
 - Print the smallest mechanism first (one hinge knuckle, one gear pair) before the full assembly.
+- Size it before you draw it: `calculate` runs a standard's equations for a snap fit, a living hinge, a spring, a
+  bolted joint, a gear pair, a cam or a fit at temperature (`calculate()` lists them with every input). Each number
+  comes back as computed, specified or assumed with its source; report those words as they are. `not_computed` names
+  what a missing material value left out: ask for it or say it is missing, never fill it in. `build=True` writes the
+  part as a design; `project=` with `at=` and `normal=` puts a snap hook or an insert boss on a face.
 
 Declaring the assembly (`design_guide()`, section ASSEMBLIES)
 - Parts form a tree. Give every part at most one parent: a part with `attach="arm"` for a part fixed to another (a bolt,

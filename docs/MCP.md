@@ -71,6 +71,9 @@ Rules:
 - One request makes one design. Several files of one product: one design, several parts (reconstruct files=[...],
   create_design relation="part_of"). A second create_design in a conversation says its relation: replaces, part_of,
   alternative or new.
+- "Will it hold?": strength_study with supports and loads on picked faces and a material, then get_strength_study
+  (design_guide(topic="strength")). Quote its evidence class and the lower safety factor. A study that did not converge
+  has no safety factor; stress at a singularity it names is never the part's stress. Stale after any change: run again.
 - Complex designs (mechanisms, organic or styled forms, textures, several parts) are staged: design_brief ->
   design_guide(topic=...), design_examples -> plan_design -> create_design(plan=...) -> look at the sheet -> critique
   -> update_design. The design_guide topics and this server's skills hold each workflow.
@@ -116,7 +119,7 @@ instead.
 
 ## Tools at a glance
 
-103 tools. Read-only tools never change a project.
+106 tools. Read-only tools never change a project.
 
 | Tool | Access | What it does |
 |---|---|---|
@@ -223,6 +226,9 @@ instead.
 | [`list_studies`](#list_studies) | read-only | List every study, route and document of a design with its state: the Bench. |
 | [`run_study`](#run_study) | changes | Run one Bench entry for the head revision (ids from list_studies). |
 | [`get_study`](#get_study) | read-only | Read one Bench entry: its state, the revision it describes, its headline with evidence, its files and stored numbers, and the log of its runs. |
+| [`strength_study`](#strength_study) | changes | Run a strength study on the design: will it hold? |
+| [`get_strength_study`](#get_strength_study) | read-only | Read a strength study: its state (never, running with progress, current, stale with the revision the stored result describes, failed with why), and the result. |
+| [`calculate`](#calculate) | changes | Size a part from requirements with a standard's equations, and write it as a design. |
 
 ## Tools
 
@@ -276,7 +282,8 @@ mechanisms, organic, texture, aesthetics, dfm (design for printing; not applicab
 reference_parts (meshes to rebuild as clean editable CAD: analyze, plan, write, compare, refine),
 hybrid (a construction route per feature: kernel, subd_cage, sculpt_recon or procedural, and when to model a
 cage in Blender with model_mesh), game (purpose "game": budgets, LODs, UVs, bakes, collision and engine
-presets, built with game_asset).
+presets, built with game_asset), strength (strength studies: supports and loads on picked faces, reading
+convergence, singularities and the safety factor).
 They document form.craft, the helper library for lofts, shells, hinges, snaps, gears, organic bodies and
 textures. Then design_examples for a close exemplar, and create_design.
 
@@ -995,11 +1002,17 @@ interface dimension is dropped), building a ladder of values in the kernel, then
 through the real checks and slicer. Also slices lower infill and one wall fewer over the slicer's process. Returns
 the baseline and candidates (id, changes and/or settings, computed mass_g, slicer slice_g, every check before and
 after) and what was rejected and why. Nothing is committed: keep one with apply_lighter.
+require: strength constraints a lighter design must still meet, e.g. ["fea.safety_factor >= 2"], read from the
+design's static strength_study (study="<id>" when it has several): the study is solved on each geometry
+candidate that kept its checks, and one that fails is rejected with its numbers. With a strength requirement
+the print-setting candidates (less infill, fewer walls) are not offered: the study is of a solid part.
 
 | Argument | Type | Required |
 |---|---|---|
 | `project` | string | yes |
 | `builds` | integer |  |
+| `require` | array \| null |  |
+| `study` | string |  |
 
 ### `apply_lighter`
 
@@ -1116,6 +1129,11 @@ objective: {"minimize": "solid_mass_g"} or {"maximize": "statics.safety_factor"}
 constraints: ["statics.safety_factor >= 3", "overhang_mm2 <= 1", "derived.usable_depth >= 30", "fit_yield >= 0.9"].
 Metrics: volume_cm3, solid_mass_g, width, depth, height, overhang_mm2, contact_mm2, min_wall_mm, fit_yield,
 derived.<key>, statics.<key>. Nothing is saved: preview_change/render the best, then commit_change.
+A strength study as a constraint: "fea.safety_factor >= 2" (also fea.peak_von_mises_MPa, fea.max_displacement_mm)
+reads the design's static strength_study (study="<id>" when it has several). Each value is a full solve, so
+the search runs first and the study is then solved on its candidates, best first, within 8 solves and 300 s:
+"strength" in the result lists every candidate solved with its numbers and evidence, and only those count as
+feasible. fea.safety_factor is the lower value (stated error applied); not an objective.
 
 | Argument | Type | Required |
 |---|---|---|
@@ -1124,6 +1142,7 @@ derived.<key>, statics.<key>. Nothing is saved: preview_change/render the best, 
 | `objective` | object | yes |
 | `constraints` | array \| null |  |
 | `budget` | integer |  |
+| `study` | string |  |
 
 ### `slice_test_piece`
 
@@ -2056,6 +2075,118 @@ stored numbers, and the log of its runs. Reads only.
 |---|---|---|
 | `project` | string | yes |
 | `id` | string | yes |
+
+### `strength_study`
+
+Run a strength study on the design: will it hold? Finite elements on the B-rep (quadratic tetrahedra, Netgen
+mesh), refined until the answer stops changing, with the discretisation error stated. kind: "static" (stress,
+displacement, safety factor against the material's yield), "modal" (natural frequencies; no supports = free
+body; loads ignored), "buckling" (the factor on the loads at which it buckles), "thermal" (steady heat conduction:
+temperatures and the heat through the part) or "thermal_stress" (the stress from that temperature field, with
+any loads; reference_C is the temperature at which the part is stress free).
+thermal: [{"type": "temperature", "faces": [...], "value_C": 80}, {"type": "convection", "faces": [...],
+"h_W_m2K": 10, "ambient_C": 20}, {"type": "heat", "faces": [...], "value_W": 5}, {"type": "heat_flux", "faces":
+[...], "value_W_m2": 2000}]; a face with none is insulated. A heat study needs the material's conductivity
+("k_W_mK"), thermal stress also its expansion ("cte_per_K").
+Faces are picked as points on the part, [x, y, z] in design millimetres, each part as printed (as for
+analyze_selection, which shows the face a point lands on).
+fixtures: [{"type": "fixed" | "roller" | "pin" | "hold", "faces": [[x, y, z], ...]}]. fixed: no movement. roller: slides
+in the face, cannot leave it (a symmetry plane). pin: a cylindrical face that may turn about its axis. hold:
+no movement along "directions": [[x, y, z], ...], free in the others.
+loads: [{"type": "force", "faces": [...], "vector": [Fx, Fy, Fz]}] newtons, spread over the faces (or
+"magnitude" and "direction"); {"type": "pressure", "faces": [...], "value_MPa": p}; {"type": "preload",
+"faces": [under the head], "faces_b": [under the nut], "force_N": N} a bolt's clamping force as a modelled
+connector; {"type": "gravity", "g": 1, "direction": [0, 0, -1]}.
+material: a key of the materials library ("AL-6061", "PETG": E, Poisson's ratio, yield and density with their
+sources), or values with where they are from: {"name", "E_GPa", "poisson", "yield_MPa", "density_kg_m3",
+"source"}; left out: the design's material (set_appearance). materials: {part id: material} for several parts,
+which are solved assembled and bonded where they touch. Nothing is assumed: without E or Poisson's ratio the
+study is refused; without a yield strength there is no safety factor.
+mesh: optional {"h0" start size mm, "levels_max", "dof_max", "budget_s", "tol_stress" 0.05, "tol_disp" 0.01,
+"singular_radius" mm}. The study is saved in the project and runs in the background: read it with
+get_strength_study(project, study, wait_s). study="<id>" alone runs a saved study again (after a change it is
+stale); with a definition it replaces that study; remove=True deletes it. No arguments but project: the
+design's studies with their states. Evidence class: simulated (FEA, <kind>, converged to N %), or "not
+converged", which gives no safety factor. Stress at a sharp inside corner is named as singular and left out.
+Linear elastic, small strain; a printed part is solved solid and isotropic. Needs the optional strength engine
+(setup_status); without it nothing is computed and the call says so.
+
+| Argument | Type | Required |
+|---|---|---|
+| `project` | string | yes |
+| `kind` | string |  |
+| `fixtures` | array \| null |  |
+| `loads` | array \| null |  |
+| `material` | string \| object \| null |  |
+| `materials` | object \| null |  |
+| `modes` | integer \| null |  |
+| `mesh` | object \| null |  |
+| `name` | string |  |
+| `study` | string |  |
+| `run_now` | boolean |  |
+| `force` | boolean |  |
+| `remove` | boolean |  |
+| `thermal` | array \| null |  |
+| `reference_C` | number |  |
+
+### `get_strength_study`
+
+*Read-only.*
+
+Read a strength study: its state (never, running with progress, current, stale with the revision the
+stored result describes, failed with why), and the result. Waits up to wait_s seconds for a running study.
+The result gives the headline, the evidence class, the safety factor with its lower value under the stated
+error and the source of the strength it is against, peak von Mises stress and where, largest displacement,
+natural frequencies or the buckling load factor, the discretisation error, every singularity that was left
+out (where, why, how the stress there grew with refinement), the balance of reactions and loads, the mesh, the
+material's numbers with their sources and the assumptions. converged=false means the tolerance was not
+reached: the numbers are reported with why, and no safety factor is given. full=True adds every refinement
+level's record. field_file is the path of the field data for a viewer (per-vertex displacement, von Mises
+stress and safety factor on the surface mesh; docs/STRENGTH.md); field=True returns it inline (large).
+cancel=True stops a running study; nothing is stored for a cancelled run.
+
+| Argument | Type | Required |
+|---|---|---|
+| `project` | string | yes |
+| `study` | string | yes |
+| `wait_s` | number |  |
+| `full` | boolean |  |
+| `field` | boolean |  |
+| `cancel` | boolean |  |
+
+### `calculate`
+
+Size a part from requirements with a standard's equations, and write it as a design. calculator: "snapfit"
+(cantilever or annular snap joints by permissible strain; Bayer's snap-fit guide), "hinge" (living hinge:
+elastic by strain, or moulded PP/PE from cited practice), "spring" (compression, extension, torsion; EN
+13906-1/-2/-3, with a printed-spring mode), "fastener" (screw size from the load, preload, tightening torque,
+thread stripping, or a boss with a heat-set insert; VDI 2230 Part 1 simplified), "gear" (involute spur and
+helical pairs with profile shift, internal pairs, rack and pinion; contact ratio, backlash, Lewis bending),
+"cam" (plate cam from a motion law; pressure angle, undercut), "fit" (an ISO 286 fit over a temperature span
+from the materials' sourced expansion). No calculator: the list, with every input and its unit.
+inputs: plain numbers and words in mm, N, N·mm, degrees, MPa, °C; materials are keys of the materials library
+(mass_properties library=True lists them). The result is a sheet: values (each with unit, evidence = computed,
+specified or assumed, its equation and its source), checks (PASS, WARN, FAIL with why), equations (text and
+source), sources (title, url), caveats, and not_computed (what was left out because an input has no source,
+and what to give). Nothing is assumed silently: a missing material value leaves its result out.
+build=True writes the geometry as a new design with a parameter per sized dimension (name= names it); every
+later revision runs the calculation again on its values. project= with at=[x, y, z] and normal=[x, y, z] puts
+a snap hook or an insert boss on that face of an existing design instead. project= alone (no calculator):
+the sheet of a design a calculator wrote, for its head revision. fea=True with build=True also defines a
+strength study that checks a cantilever hook's deflection by finite elements (needs the strength engine).
+
+| Argument | Type | Required |
+|---|---|---|
+| `calculator` | string |  |
+| `inputs` | object \| null |  |
+| `build` | boolean |  |
+| `name` | string |  |
+| `project` | string |  |
+| `at` | array \| null |  |
+| `normal` | array \| null |  |
+| `expect_head` | integer \| null |  |
+| `purpose` | string \| null |  |
+| `fea` | boolean |  |
 
 ## Prompts
 

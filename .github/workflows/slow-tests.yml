@@ -57,3 +57,22 @@ jobs:
           FORM_SLOW: "1"
         run: '"$GITHUB_WORKSPACE/.venv/bin/python" -X faulthandler -m unittest -v test_design_bench test_meshprep test_meshbody'
         working-directory: tests
+      # The strength solver is an optional engine with its own environment (form/engines.py "fea"): the same pins,
+      # made here with uv, then real studies through the kernel and the verification suite (docs/STRENGTH.md).
+      - name: Strength solver environment
+        env:
+          UV_HTTP_TIMEOUT: "120"
+          UV_LINK_MODE: copy
+        run: |
+          export UV_CACHE_DIR="$HOME/.cache/uv"
+          uv venv --python 3.12 "$RUNNER_TEMP/fea"
+          pins=$(.venv/bin/python -c "from form import engines; print(' '.join(engines.SPECS['fea']['pins']))")
+          # shellcheck disable=SC2086
+          uv pip install --python "$RUNNER_TEMP/fea/bin/python" $pins
+      - name: Strength studies and their verification suite
+        env:
+          FORM_CONFIG: ${{ github.workspace }}/.github/ci-studio.toml
+          FORM_FEA_PYTHON: ${{ runner.temp }}/fea/bin/python
+          FORM_FEA_BRACKET_S: "300"
+        run: '"$GITHUB_WORKSPACE/.venv/bin/python" -X faulthandler -m unittest -v test_fea test_fea_verification'
+        working-directory: tests

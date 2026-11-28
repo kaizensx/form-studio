@@ -11,6 +11,8 @@ as an MCP tool ([MCP reference](MCP.md)), unless noted. 3D printing is optional 
 - [Optimisation and alternatives](#optimisation-and-alternatives)
 - [Parts you already have](#parts-you-already-have)
 - [Checks and evidence](#checks-and-evidence)
+- [Strength studies](#strength-studies)
+- [Engineering calculators](#engineering-calculators)
 - [Analysis, measurement and annotations](#analysis-measurement-and-annotations)
 - [Revisions, branches and variants](#revisions-branches-and-variants)
 - [Colours and materials](#colours-and-materials)
@@ -489,6 +491,72 @@ shown as a pass.
 resting in its nut is not a 0 mm wall, and only faces within 30° of parallel count, so a tapered edge is not a wall
 either. A real thin fin still fails.
 
+## Strength studies
+
+"Will it hold?" on any design, with the error stated. Pick the faces that are held and the faces that are loaded;
+the solid is meshed into quadratic tetrahedra, finer on fillets and holes, and solved again and again until the
+answer stops changing. The full method and the verification table are in [STRENGTH.md](STRENGTH.md).
+
+| Study | Result |
+|---|---|
+| Linear static | Safety factor against the material's yield, peak von Mises stress ± its error, largest displacement |
+| Modal | Natural frequencies and mode shapes, held or as a free body |
+| Linear buckling | The factor on the loads at which the perfect elastic part buckles |
+| Steady heat | Temperature range, the heat through each condition, the heat balance |
+| Thermal stress | The static result of a temperature field, with any loads |
+
+- **Supports and loads on picked faces:** fixed, roller, pin and hold; force, pressure, a bolt's preload and gravity;
+  temperature, convection and heat for thermal studies. A
+  design of several parts is solved assembled, bonded where the parts touch, with a material for each.
+- **Evidence:** `simulated (FEA, linear static, converged to 1.1 %)`. The convergence of every refinement is kept,
+  the reactions are balanced against the loads, and a study that does not converge says so and gives no safety
+  factor.
+- **Singularities are named.** Stress at a sharp inside corner, or at the edge of a rigid support where it keeps
+  growing, is listed with its location and growth and left out of the verdict.
+- **Sourced materials.** Young's modulus, Poisson's ratio, yield and density come with their documents; nothing is
+  defaulted.
+- **Verified.** Sixteen cases, each quantity within its tolerance: beams, a plate with a hole, a thick cylinder,
+  NAFEMS LE1 and LE10, frequencies, Euler buckling, heat through a wall and a pipe, thermal stress.
+- **Curved elements.** Mid-side nodes lie on the geometry, so fillets and bores are curved in the model.
+- **A hand estimate** from beam theory sits beside the result where the part is a bar fixed at one end.
+- **As a constraint:** `optimize` and `make_lighter` keep `fea.safety_factor >= 2` on candidates they solve, and say
+  which ones those were.
+- **Stored with the revision.** A result goes stale after any change to the geometry, the loads, the material or
+  the engine, and says which revision it describes.
+- **Headless:** `strength_study`, `get_strength_study`; `form strength
+  static|modal|buckling|thermal|thermal_stress|run|list|show|verify`. Runs in the background with progress and
+  cancel; a typical bracket converges in about 10 s.
+- **Optional engine:** Netgen, scikit-fem, SciPy and PyAMG in a Python of their own (about 190 MB), installed from
+  Settings.
+
+## Engineering calculators
+
+A part sized from what it has to do, by a named standard's equations, and written as a design with parameters. The
+equations, the sources and the verification table are in [CALCULATORS.md](CALCULATORS.md).
+
+| Calculator | Sizes | Follows |
+|---|---|---|
+| Snap joint | Cantilever hooks (three arm designs) and annular snaps by permissible strain; deflection, mating and separation force | Bayer, *Snap-Fit Joints for Plastics* |
+| Living hinge | Elastic by strain for printed parts; moulded polypropylene and polyethylene from cited practice | Pure bending; Protolabs and moulders' guides |
+| Spring | Compression, extension and torsion: rate, corrected stress, solid length, buckling, natural frequency; a printed-spring mode | EN 13906-1, -2, -3 |
+| Bolted joint | Screw size from the load, preload, tightening torque, working stress, thread stripping; a boss with a heat-set insert | VDI 2230 Part 1 (simplified), ISO 898-1 |
+| Gears | Spur and helical pairs with profile shift, internal pairs, rack and pinion: contact ratio, undercut, backlash, bending | ISO 21771; Lewis bending |
+| Cam | A plate cam from a motion law: velocity and acceleration peaks, pressure angle, undercut | Norton, *Design of Machinery* |
+| Fit at temperature | An ISO 286 fit's clearance or interference over a temperature span | ISO 286, ISO 1, sourced expansion |
+
+- **Every number says how it is known:** computed (with its equation), specified (with its source) or assumed (with
+  why). A material value with no source is not guessed: the result that needs it is left out, and the sheet says what
+  to give.
+- **It writes the part.** One parameter per sized dimension, one feature per solid step. A snap hook or an insert
+  boss can also go onto a face of another design.
+- **The calculation stays with the design.** Every revision runs it again on its own values, so a dragged dimension
+  changes the verdict. The Bench entry *Engineering calculation* shows it.
+- **Verified.** 72 quantities from published worked examples and reference tables, each within its accepted error;
+  the solids are measured against their sheets, a gear's tooth against the exact involute to 0.002 mm, and meshed pairs share no volume.
+- **Simplifications are stated on the sheet:** the VDI 2230 core, Lewis bending with no ISO 6336 factors, printed
+  springs and hinges with their caveats.
+- **Headless:** `calculate`; `form calc <calculator> key=value ... [--build]`, `form calc list|show|verify`.
+
 ## Analysis, measurement and annotations
 
 | | |
@@ -637,7 +705,7 @@ either. A real thin fin still fails.
 | OpenSCAD | Builds `.scad` designs; Customizer ranges become parameters |
 | Blender | Photoreal renders; its 3D-Print Toolbox checks when the add-on is installed |
 | Your slicer | Slices, and opens the 3MF or G-code in it |
-| Any MCP client | The full engine over 103 tools ([MCP reference](MCP.md)) |
+| Any MCP client | The full engine over 106 tools ([MCP reference](MCP.md)) |
 
 When a program's version outside the supported range is why something failed, the error names the supported versions
 and what to do.

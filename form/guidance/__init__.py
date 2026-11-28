@@ -27,6 +27,7 @@ TOPICS = {
     "reference_parts": ("remodel-from-mesh", "references/reference-parts.md"),
     "hybrid": ("remodel-from-mesh", "references/hybrid.md"),
     "game": ("game-asset", "references/game.md"),
+    "strength": ("strength-studies", "references/strength.md"),
 }
 
 # cad-core's worked examples: Python sources in a fenced block, so they read as Markdown
