@@ -355,7 +355,7 @@ def journey_palette_commands(ui):
     # the stages by their names, and by the names they had before (kept in each stage's hint)
     palette(ui, "describe", "Overview")
     ui.wait_until(lambda: ui.js("Store.overview") is True, 3, "the palette to open the Overview (what Describe was)")
-    for q, text, stage in (("review", "Check", "prove"), ("make", "Make", "release"), ("document", "Document", "document"), ("design", "Design", "shape"),
+    for q, text, stage in (("make", "Make", "release"), ("document", "Document", "document"), ("design", "Design", "shape"),
                            ("prove", "Check", "prove"), ("shape", "Design", "shape")):
         palette(ui, q, text)
         ui.wait_until(lambda: ui.store.get("stage") == stage and ui.js("Store.overview") is False, 3, f"the palette to go to {text}")

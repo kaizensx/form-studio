@@ -20,6 +20,8 @@ Column {
         Txt { x: 12; anchors.verticalCenter: parent.verticalCenter; font.weight: Theme.wSemi; text: "Document" }
         Txt { anchors.right: parent.right; anchors.rightMargin: 10; anchors.verticalCenter: parent.verticalCenter; kind: "fine"; tone: 3
             text: root.p ? F.pad(root.p.head) + " · " + (Store.documentCount ? F.plural(Store.documentCount, "document") : "none made yet") : "" } }
+    // the engine's own documents of this design, with their states (form/studies.py)
+    Bench { objectName: "benchDocuments"; x: 0; width: parent.width; groups: ["document"] }
     BenchRow { objectName: "docDrawing"; name: "Drawing sheet"; dim: true; need: "not built yet" }
     BenchRow { objectName: "docInstructions"; name: "Assembly instructions"; state: root.ins ? "ok" : "none"
         dim: !root.asm; need: root.asm ? "" : "needs an assembly"

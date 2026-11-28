@@ -69,6 +69,16 @@ of the accent. Shadows, glows, glass and the room are dithered, so no gradient s
 purpose (for 3D printing, or just a 3D model and how it will be made), the dimensions you measured with their
 provenance, reference photos and imported parts, and the revisions with who made each. It was the Describe stage.
 
+**The Bench.** The top of the Check pane lists every study of the design, and the top of the Make pane every
+route out of Form Studio and every document, in the Program's style: a state mark on the gutter, the name, the
+headline number in mono with the evidence it rests on, and the state on the right (current · r03, stale · r02,
+never run, failed, running, needs, n/a). A line that is not current runs on click (or from its run mark, on the
+activity bar); a current one opens what it made (the map on the part, the simulation, the sheet, or its file). The
+engine decides every state from keys: an entry is current only when a result exists for the head revision's inputs,
+and a stale one names the revision it describes. The agent runs the same entries with `list_studies`, `run_study`
+and `get_study`, and the terminal with `form study list|run|show <project> [id]`. The command palette finds every
+entry. Studies only the agent can do (the design critique) ask the agent; the release is only ever yours.
+
 Ctrl/⌘ 1 to 4 go to Design, Check, Make and Document. The CLI, MCP and `--stage` keep the engine's ids (`shape`,
 `prove`, `release`, `document`; `brief` opens the Overview and `fit` the Fit study), and the names the places had
 before (Describe, Review, Brief, Shape, Prove, Release) still find them in the command palette.

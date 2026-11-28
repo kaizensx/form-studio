@@ -124,7 +124,7 @@ Rectangle {
             if (ev.t === "suggest") { out.push({ t: "suggest", k: "g" + i, options: ev.options || [] }); continue }
             if (ev.t === "user") out.push({ t: "user", k: "u" + i, text: ev.text, attachments: ev.attachments || [], local: !!ev.local, n: ev.n === undefined ? -1 : ev.n })
             else if (ev.t === "text") out.push({ t: "text", k: "t" + i, text: ev.text, n: ev.n === undefined ? -1 : ev.n })
-            else if (ev.t === "act") out.push({ t: "act", k: "a" + i, by: ev.by, text: ev.text })
+            else if (ev.t === "act") out.push({ t: "act", k: "a" + i, by: ev.by, text: ev.text, change: ev.change || null })
             else if (ev.t === "end") out.push({ t: "end", k: "e" + i, cost: ev.cost_usd, steps: ev.steps, seconds: ev.seconds, stopped: !!ev.stopped,
                                                 model: Store.modelName(ev) || model, agent: ev.agent || agent, change: ev.change || null,
                                                 usage: ev.usage || null })
@@ -461,9 +461,12 @@ Rectangle {
                                     Txt { visible: tile.picked; kind: "fine"; color: Theme.datum; text: "Picked" } }
                                 Tip { show: th2.hovered && !!tile.modelData.rationale; text: tile.modelData.title + ". " + (tile.modelData.rationale || "") } } } }
                 } } }
-            Component { id: cAct; Row { spacing: 6
-                Icon { name: "zap"; size: 12; color: Theme.blueprint; anchors.verticalCenter: parent.verticalCenter }
-                Txt { kind: "fine"; width: body.width - 20; text: it.m.by + "  " + it.m.text; color: Theme.ink2 } } }
+            Component { id: cAct; Column { spacing: 8
+              Row { spacing: 6
+                Icon { name: it.m.change ? "pencil_ruler" : "zap"; size: 12; color: Theme.blueprint; anchors.verticalCenter: parent.verticalCenter }
+                Txt { kind: "fine"; width: body.width - 20; text: it.m.by + "  " + it.m.text; color: Theme.ink2 } }
+              // a change made by hand (form/modelling.py): the same revision card an agent's reply gets
+              TalkChange { visible: !!it.m.change; width: body.width; change: it.m.change } } }
             Component { id: cEnd; Column { spacing: 8
               // the revision this reply made: what changed, compare it, or go back
               TalkChange { visible: !!it.m.change; width: body.width; change: it.m.change }

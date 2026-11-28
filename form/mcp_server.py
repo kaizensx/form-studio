@@ -994,6 +994,10 @@ def build() -> MCPServer:
         "label": "Rib thickness", "default": 2, "min": 1, "max": 4}}; {"op": "delete", "feature" | "def" | "param": name};
         {"op": "set_param", "param": "wall", "value": 2.4}  this revision's value; with default, min, max, step,
         label or doc it changes the declaration too (a new default is also the value).
+        The feature tree: {"op": "suppress" | "restore", "feature": "ribs"} (kept in the source, not built);
+        {"op": "move", "feature": "ribs", "after" | "before": "body"} (refused when a feature would come before one it
+        reads); {"op": "rename", "feature": "ribs", "label": "Stiffeners", "id": "stiffeners"} (a new id is carried
+        to every place the source names it).
         A design written as a plain Recipe is edited in its canonical form: its build() is lifted into one method
         per Stage, built once and accepted only when volume, face count and bounding box are unchanged (computed);
         get_design_source returns that form, and its feature ids are what ops name.
@@ -1130,7 +1134,8 @@ def build() -> MCPServer:
         (form: "features" when its build() split into feature methods, "skeleton" when it is one feature, "none"
         with the reason when it stays as written), kernel-checked to be the same solid. features lists the ids
         edit_design addresses; source_sha names this text. feature="holes" returns only that method (and the
-        parameters it reads). canonical=False, or a rev, returns the stored text."""
+        parameters it reads). canonical=False, or a rev, returns the stored text. tree: per feature its place in the build order,
+        whether it is suppressed, and what it depends on (parameters it reads, features it names, helpers, members)."""
         st = studio()
         def go():
             p = st.load(project)
@@ -1143,6 +1148,10 @@ def build() -> MCPServer:
                    "features": c["features"], "source_sha": c["rid"].split(":", 1)[-1], "source": c["source"]}
             if c.get("why"):
                 out["why"] = c["why"]
+            from . import modelling
+            tree = modelling.tree_of(c["source"])
+            if tree:                                  # build order, suppressed, and what each feature depends on
+                out["tree"] = [{k: r[k] for k in ("id", "label", "suppressed", "after", "reads", "used_by")} for r in tree]
             if feature:
                 spans = featureprog.method_spans(c["source"])
                 if feature not in spans:
@@ -1243,11 +1252,13 @@ def build() -> MCPServer:
 
     @mcp.tool(annotations=RO, structured_output=False, meta=ALWAYS)
     async def render(project: str, view: str = "iso", highlight: str | None = None, rev: int | None = None,
-                     values: dict[str, float] | None = None, ctx: Context = None) -> list:
+                     values: dict[str, float] | None = None, upto: str = "", ctx: Context = None) -> list:
         """Render the part as an image. Look at the part. Returns a PNG rendered from the real kernel geometry, coloured by feature.
         view: iso, iso_back, front, back, left, right, top, bottom, "sheet" (four views at once), or for a design with
         several parts "assembled" (put together) and "exploded" (pulled apart along its explode offsets).
-        highlight: a feature id to pick out. values: render an uncommitted candidate (same as preview_change)."""
+        highlight: a feature id to pick out. values: render an uncommitted candidate (same as preview_change).
+        upto: a feature id: the head as it stood after that feature (the rollback bar; the features up to it load from
+        their checkpoints, nothing is saved)."""
         st = studio()
         def go():
             p = st.load(project)
@@ -1256,7 +1267,13 @@ def build() -> MCPServer:
             if highlight and highlight not in [f["id"] for f in feats]:
                 raise StudioError(f"Unknown feature “{highlight}”.", "Features: " + ", ".join(f["id"] for f in feats))
             # the picture's name first: a render made before needs no view (no kernel call at all)
-            if values:
+            if upto:
+                from . import modelling
+                uv = modelling.view_upto(st, p, upto)
+                lab = next((f["label"] for f in feats if f["id"] == upto), upto)
+                title = f"{p['name']} - r{p['head']:02d} up to {lab} (rollback, not saved)"
+                key = "upto-" + H(st.rid(p), upto)
+            elif values:
                 draft = {**st.rev(p)["values"], **{k: float(x) for k, x in values.items()}}
                 title, key = f"{p['name']} - r{p['head']:02d} + DRAFT (not saved)", "pv-" + H(st.rid(p), draft)
             else:
@@ -1268,7 +1285,7 @@ def build() -> MCPServer:
             said = f.with_suffix(".caption.txt")
             if f.exists() and said.is_file():
                 return f, said.read_text(encoding="utf-8")
-            v = st.preview(p, values) if values else st.view(p, n)
+            v = uv if upto else st.preview(p, values) if values else st.view(p, n)
             if view in rendering.POSES:
                 try:
                     v = rendering.posed(v, view)
@@ -1383,7 +1400,13 @@ def build() -> MCPServer:
                           thickness: float | None = None, width: float | None = None, lip: float | None = None,
                           lip_height: float | None = None, up: list[float] | None = None, allow_strain: float | None = None,
                           expect_head: int | None = None, feature: str = "", code: str = "", label: str = "",
-                          role: str = "structure", after: str = "", partial: bool = False, ctx: Context = None):
+                          role: str = "structure", after: str = "", partial: bool = False,
+                          picks: list[dict] | None = None, radius: float | None = None, standard: str = "",
+                          fit: str = "", nominal: float | None = None, d: float | None = None, style: str = "",
+                          depth: float | None = None, of: str = "", mode: str = "", count: int | None = None,
+                          pitch: float | None = None, angle: float | None = None, axis: Any = None,
+                          origin: list[float] | None = None, preview: bool = False, sketch: dict | None = None,
+                          axis_entity: int | None = None, ctx: Context = None):
         """Add a feature to a Python design as a new revision. kind="code" (a FeatureDesign): feature = its id, code = one
         method `def <feature>(self, v, body): return body_after`, label/role for the feature list, after = the feature
         it goes after (default: last). Only it is built: the features before it load from their checkpoints, and the
@@ -1398,8 +1421,59 @@ def build() -> MCPServer:
         a cantilever snap-fit hook (length, thickness, width, lip = undercut, lip_height; up = the lip's direction).
         at / normal: a point on the face and its outward normal (analyze_selection gives them). Returns the new head, the
         features and check rows: boss wall vs the nozzle; hook strain 1.5·t·y/L² vs allow_strain (a rule of thumb when
-        not given). Remove one with remove_feature."""
+        not given). Remove one with remove_feature.
+        Picked features (written as one named method plus its parameters, through the edit protocol; previewed in the
+        kernel first and refused with the reason when a feature would be left out; the checks then run again):
+        kind="fillet" (picks near edges, radius), "chamfer" (picks near edges, length), "hole" (one pick on a flat face;
+        standard clearance (size M2..M6, fit close|normal|loose: ISO 273), tapped (size: tap drill), iso286 (nominal and
+        fit such as H7: ISO 286, modelled at mid-tolerance) or plain (d); style plain|counterbore|countersink; depth
+        0 = through), "pattern" (of = a feature id; mode linear: axis x|y|z or [x,y,z], count, pitch mm; polar: axis,
+        origin, count, angle step degrees), "shell" (thickness; one pick on the face to leave open, or none).
+        picks: [{"at": [x, y, z]}] in design mm (analyze_selection gives points on edges and faces). Edges and faces
+        are kept as stable queries (the features that made them, their class, direction and place), not indexes;
+        a rebuild that cannot find one leaves the feature out and says which. preview=True builds and reports
+        (volume, box, faces, build log) and saves nothing. A pattern's direction can come from a picked edge (picks:
+        a line gives linear along it; a circle, polar about its axis).
+        From a sketch: kind="extrude" | "cut" | "revolve" with sketch = {plane, points, entities, constraints}
+        (get_sketch shows the form; plane {"datum": "XY"|"XZ"|"YZ", "offset"} or a picked face: give picks=[{"at": ...}]
+        on it), depth (mm; a cut with depth 0 goes through), angle and axis_entity (a line of the sketch) for revolve.
+        Named dimensions become parameters "<feature>_<name>"; the sketch must solve and close."""
         st = studio()
+        from . import modelling
+        if kind in modelling.KINDS:
+            o = {k: x for k, x in dict(radius=radius, length=length, thickness=thickness, standard=standard or None,
+                                        size=size if kind == "hole" else None, fit=fit or None, nominal=nominal, d=d,
+                                        style=style or None, depth=depth, of=of or None, mode=mode or None, count=count,
+                                        pitch=pitch, angle=angle, axis=axis, origin=origin, after=after or None,
+                                        feature_id=feature or None, sketch=sketch, axis_entity=axis_entity,
+                                        label=label or None).items() if x is not None}
+            draft = "draft-" + uuid.uuid4().hex[:10]
+
+            def go_pick():
+                p = st.load(project)
+                pl = modelling.plan(st, p, kind, picks or [], **o)
+                if preview:
+                    pv = modelling.preview(st, p, pl["ops"])
+                    pv.pop("rid", None)
+                    return {"saved": False, "feature": pl["feature"], "summary": pl["summary"], "ops": pl["ops"],
+                            "picked": pl["picked"], "preview": pv}
+                r = modelling.commit(st, p, pl["ops"], expect_head, _origin(ctx), planned=pl)
+                return {"saved": True, "head": r["head"], "feature": pl["feature"], "summary": r["said"],
+                        "picked": pl["picked"], "preview": r["preview"], "changed": r["changed"],
+                        "reused": len(r["reused"])}
+            if not preview:
+                act(project, "design", f"Adding {kind}", ctx, draft=draft)
+            out = await _run(go_pick)
+            if not out["saved"]:
+                return [json.dumps(out, indent=1, default=str)]
+            act(project, "commit", f"r{out['head']:02d}: {out['summary']}", ctx, draft=draft)
+            jid = st.run(project)
+            out["pipeline"] = job_digest(await _wait_job(st, jid, 45))
+            dg = await _run(digest, st, project)
+            bad = [c for c in dg.get("checks", []) if c.startswith(("FAIL", "WARN"))]
+            if bad:
+                out["checks_to_look_at"] = bad
+            return await _with_views(st, project, out)
         if kind == "code":
             if not feature or not code:
                 raise ToolError('kind="code" needs feature (its id) and code (one method).')
@@ -1440,6 +1514,54 @@ def build() -> MCPServer:
         if rf and isinstance(out, dict):
             out["refinement"] = rf
         return out
+
+    @mcp.tool(annotations=RO)
+    async def get_sketch(project: str, feature: str) -> dict:
+        """Get the sketch of a feature made from one (extrude, cut, revolve): its plane, points, entities (line, circle,
+        arc) and constraints, solved by form.sketch2d: point positions, the profile, degrees of freedom left, and the
+        named dimensions with their values (each is a parameter "<feature>_<name>"). Change it with edit_sketch."""
+        st = studio()
+
+        def go():
+            from . import modelling
+            return modelling.get_sketch(st, st.load(project), feature)
+        return await _run(go)
+
+    @mcp.tool(annotations=RW, structured_output=False)
+    async def edit_sketch(project: str, feature: str, ops: list[dict] | None = None, sketch: dict | None = None,
+                          expect_head: int | None = None, preview: bool = False, ctx: Context = None) -> list:
+        """Edit a feature's sketch with ops (or send the whole sketch), as one revision. Ops, in order:
+        {"op": "add_point", "at": [x, y]}; {"op": "add_line", "from": i | [x, y], "to": ...};
+        {"op": "add_polyline", "points": [...], "close": true} (lines within 2 degrees of horizontal or vertical get that
+        constraint); {"op": "add_rect", "at": [x, y], "size": [w, h]}; {"op": "add_circle", "center": i | [x, y], "r": 5};
+        {"op": "add_arc", "center", "start", "end"}; {"op": "constrain", "kind": coincident|horizontal|vertical|parallel|
+        perpendicular|tangent|equal|midpoint|on|symmetric|fix, "entities": [...], "points": [...]};
+        {"op": "dimension", "kind": length|distance|hdist|vdist|radius|diameter|angle, "entities"|"points", "value",
+        "name"} (a name makes it a parameter; "" keeps it fixed); {"op": "set", "name": "w", "value": 70};
+        {"op": "move", "point": i, "to": [x, y]}; {"op": "delete", "constraint" | "entity": i};
+        {"op": "construction", "entity": i}. "Make it symmetric" is a symmetric constraint about a construction line.
+        Refused with the reason when the sketch would not solve (over-constrained, out of reach) or not close; nothing
+        is saved then. preview=True builds and reports. The checks run again on the saved revision."""
+        st = studio()
+
+        def go():
+            from . import handsketch, modelling
+            p = st.load(project)
+            eops, new = modelling.sketch_edit_ops(st, p, feature, ops, sketch)
+            if preview:
+                pv = modelling.preview(st, p, eops)
+                pv.pop("rid", None)
+                return {"saved": False, "ops": eops, "preview": pv}
+            r = modelling.commit(st, p, eops, expect_head, _origin(ctx), note=f"Changed the sketch of {feature}")
+            return {"saved": True, "head": r["head"], "summary": r["said"], "preview": r["preview"],
+                    "solved": handsketch.solve(new, st.rev(st.load(project))["values"], feature + "_")}
+        out = await _run(go)
+        if not out["saved"]:
+            return [json.dumps(out, indent=1, default=str)]
+        act(project, "commit", f"r{out['head']:02d}: {out['summary']}", ctx)
+        jid = st.run(project)
+        out["pipeline"] = job_digest(await _wait_job(st, jid, 45))
+        return await _with_views(st, project, out)
 
     @mcp.tool(annotations=RW)
     async def remove_feature(project: str, feature_id: str, expect_head: int | None = None) -> dict:
@@ -2050,6 +2172,30 @@ def build() -> MCPServer:
             return analysis.measure(st, p, from_point, to_point, rev)
         return await _run(go)
 
+    @mcp.tool(annotations=RO)
+    async def mass_properties(project: str, part: str = "", pose: dict | None = None, material: str | None = None,
+                              frame: str | None = None, rev: int | None = None, library: bool = False) -> dict:
+        """Mass, centre of mass, inertia tensor and principal axes, computed on the B-rep (OCCT), per part and for the
+        whole. Units: mm, g, g·mm² (also kg·m²); inertia is about the centre of mass in the design's axes, and about the
+        origin. A design that declares an assembly is reported assembled; pose={joint id: value} (degrees for a hinge,
+        mm for a slide) moves its joints; frame="as_built" gives the solids where the design builds them. Each part's
+        density comes from its material (set_appearance; the design's code may declare one per Part), with the
+        document it was read from; a part without a material has no mass (the volume centroid is given instead).
+        material= is a what-if for every part (or for `part`), nothing saved. library=True adds the full sourced
+        record of each material used (E, Poisson's ratio, yield, UTS, thermal, a printed filament's X-Y and Z values
+        and its Z knock-down; a value no source gives is listed as unsourced). Evidence class: computed (B-rep), or
+        computed (closed mesh) for a mesh design; a printed part is taken solid (100 % infill)."""
+        st = studio()
+        def go():
+            from . import material_library as ml, massprops
+            p = st.load(project)
+            r = massprops.compute(st, p, part=part, pose=pose, material=material, frame=frame, rev=rev)
+            r["headline"] = massprops.headline(r)
+            if library:
+                r["library"] = {k: ml.record(k) for k in r["materials"]}
+            return r
+        return await _run(go)
+
     # ── selections, annotations, colours and materials (form/selection.py, form/materials.py) ──
     @mcp.tool(annotations=RO)
     async def analyze_selection(project: str, items: list[dict], rev: int | None = None) -> dict:
@@ -2098,8 +2244,9 @@ def build() -> MCPServer:
         get_project / render). Filaments (a print design): PLA, PETG, ABS, ASA, TPU, PA (nylon), PC, PLA-CF, PETG-CF, PA-CF; Form Studio
         adds their notes to the checks (heat, sunlight, warping, flexible, fibre-filled) and the slicer picks the matching filament.
         Engineering materials (a model design: CNC, casting, rendering): AL-6061, AL-7075, STEEL, STAINLESS, BRASS, COPPER, TITANIUM,
-        OAK, WALNUT, MAPLE, PINE, POM, PTFE, PEEK, PMMA ("aluminium 7075", "delrin" also work), with bd_materials' typical density and
-        look; get_project then reports the computed mass (volume x typical density). The colour is drawn and written into the 3MF;
+        STEEL-4140, OAK, OAK-WHITE, WALNUT, MAPLE, PINE, POM, PTFE, PEEK, PMMA, NYLON-PA6 ("aluminium 7075", "delrin" also work), with
+        their datasheet density (bd_materials' typical one where none is sourced) and look; mass_properties then gives mass, centre
+        of mass and inertia. The colour is drawn and written into the 3MF;
         stored in the project's material fields (parts.<id>.material). Leave an argument out to keep it; clear=True removes both."""
         st = studio()
         from . import materials
@@ -2529,12 +2676,15 @@ def build() -> MCPServer:
                                run: bool = True, ctx: Context = None) -> dict:
         """Propose concepts. For a new idea: build 2-4 genuinely different concepts as real designs, so the person can pick one.
         concepts: [{"title": short name, "rationale": one line on the approach, "source": design code as for
-        create_design (see design_guide), "language": "python", "values": {...} or null}]. Make them different
+        create_design (see design_guide), "language": "python", "values": {...} or null, "material": "PETG" | "AL-6061" | ...
+        (optional; set_appearance's keys)}]. Give each concept the material it would be made in: its card shows the mass
+        (computed on the B-rep in that material; without one a print concept is shown in PLA, marked assumed). Make them different
         structural approaches (how it holds, mounts, opens), not size variants. Each becomes its own project
         ("<name> · A", "· B", ...). A concept that fails to build comes back in "failed" with its error; the others are
         kept. group: an open group's id to add concepts to (at most 6 in a group), e.g. one mixed concept when the
         person asks for "the base of A with the hook of C". With run=True each is exported and checked.
-        Returns the board: {id, name, state, members: [{project, letter, title, rationale, numbers}], failed}."""
+        Returns the board: {id, name, state, members: [{project, letter, title, rationale, numbers}], failed};
+        numbers: size, volume, mass_g with its material and how it is known."""
         from . import concepts as concepts_mod
         st = studio()
         by = _origin(ctx).replace("agent:", "") or "agent"
@@ -2691,6 +2841,8 @@ def build() -> MCPServer:
     from . import game
     blender_model.register(mcp, studio, _run)
     game.register(mcp, studio, _run)
+    from . import studies                     # the Bench: list_studies, run_study, get_study (form/studies.py)
+    studies.register_mcp(mcp, studio, _run)
     return mcp
 
 

@@ -249,6 +249,8 @@ Item {
                                   : "Draw it, bring a part you have, or start from a block you shape with sliders. Connect an agent in Settings › Agents & models to describe it in words." }
         Item { width: 1; height: 4 }
         Row { anchors.horizontalCenter: parent.horizontalCenter; spacing: 8
+            Btn { objectName: "blankByHand"; kind: "primary"; icon: "cuboid"; text: "Model it by hand"; tip: "Draw a profile, dimension it and extrude it: a design in code, no agent needed"
+                onClicked: Store.openSheet("handsketch", { mode: "new", plane: { datum: "XY", offset: 0 } }) }
             Btn { objectName: "blankSketch"; icon: "pen_tool"; text: "Sketch it"; onClicked: Store.openSheet("sketch") }
             Btn { objectName: "blankImport"; icon: "import"; text: "Import a part or project"; onClicked: Store.openSheet("import") }
             Btn { objectName: "blankBlock"; icon: "cuboid"; text: "Start from a block"; tip: "A rounded block with its width, depth, height and corners as sliders, no agent needed"

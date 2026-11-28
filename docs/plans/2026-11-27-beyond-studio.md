@@ -558,3 +558,15 @@ Decided by the owner's standing instruction ("the best at all of it"):
 
 Order after this addition: A; O and M beside B1; B2 with N; C; D; F; then E, G, H, I, J, K, L, with P, Q, R, S, T, U,
 V, W and D2 placed where they unblock the most.
+
+## Added on 2026-11-28 from the toolbox teardown
+
+`docs/research/2026-11-28-toolbox-teardown.md` read the reference's 35 tools and about 155k lines of their skills.
+It adds about 69 agent-days: A+ (Bench row details), D+ (strength honesty), E+ (five printing technologies, proven
+fixes, parting line, side actions, clamp tonnage), F+ (drawing check with sheet crops), H+ (cut-file checker, bend
+order), X (engineering calculators: snaps, living hinges, springs to EN 13906-1, fasteners to VDI 2230, gears and
+cams, fits at temperature), Y (assembly sequence), Z (tolerance stack-up), AA (print physics: orientation,
+layer-aware FEA, warp risk), AB (inverse design and Pareto variants), AC (cost per process with sourced rates), AD
+(topology optimisation written back as features), AE (lattices and TPMS), AF (photo plus scale to a profile,
+four-bar synthesis). Results are always drawn on the part and every number carries its evidence and error, the two
+places the reference is weakest.

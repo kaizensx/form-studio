@@ -24,7 +24,7 @@ Item {
     objectName: "palette"
     readonly property string selText: rows[picks[sel]] ? rows[picks[sel]].text : ""     // the highlighted command
     property alias query: q.text
-    readonly property var groups: ["Recent", "Go to", "Tools", "Designs", "Conversations", "Settings"]
+    readonly property var groups: ["Recent", "Go to", "Tools", "Bench", "Designs", "Conversations", "Settings"]
     function updates() { Store.checkUpdates(true).then(function (u) {
         if (u && u.available) { Store.updateHidden = false; Store.openSheet("update") }
         else if (u && !u.enabled) Store.toast("Update checks are off", "[updates] check = false or FORM_NO_UPDATE_CHECK=1")
@@ -48,6 +48,11 @@ Item {
             add("Tools", "dims", "ruler", (Store.dims ? "Hide" : "Show") + " overall dimensions", "Viewport", function () { Store.toggleDims() })
             add("Tools", "measure", "ruler", Store.measuring ? "Stop measuring" : "Measure", "Distance, angle, radius on the solid", function () { Store.setMeasuring(!Store.measuring) }, "M")
             add("Tools", "annotate", "map_pin", Store.selecting ? "Stop annotating" : "Annotate", "Pick or paint on the part, keep a note, ask the agent", function () { Store.setSelecting(!Store.selecting) }, "N")
+            // modelling by hand (form/modelling.py): the same as the tool dock's group; each becomes a feature in the code
+            if (!Store.hasDraft) add("Tools", "hand.sketch", "pen_tool", "Sketch on a plane", "Extrude, cut or revolve a profile you draw", function () { Store.openSheet("handsketch", { mode: "add", plane: { datum: "XY", offset: 0 } }) })
+            add("Tools", "hand.round", "radius", "Fillet or chamfer edges", "Pick the edges to round or bevel", function () { if (!Store.selecting) Store.setSelecting(true); Store.selMode = "edge" })
+            add("Tools", "hand.face", "circle_dot", "Hole, shell or sketch on a face", "Pick a flat face", function () { if (!Store.selecting) Store.setSelecting(true); Store.selMode = "face" })
+            add("Tools", "hand.tree", "list_filter", "Feature tree", "Roll back, suppress, rename or reorder features", function () { Store.setStage("shape") })
             Store.analysisMaps.forEach(function (m) { if (m.value) add("Tools", "map." + m.value, "layers", "Analysis map: " + m.text, Store.analysisMap === m.value ? "Showing now" : "Colour the part by " + m.text.toLowerCase(), function () { Store.setAnalysis(m.value) }) })
             if (Store.analysisMap) add("Tools", "map.off", "layers", "Hide the analysis map", Store.analysisLabel(Store.analysisMap), function () { Store.setAnalysis("") })
             add("Tools", "orient", "move_3d", "Find a print orientation", "Ranks the ways it can sit on the plate", function () { Store.setStage("prove"); Store.findOrientation() })
@@ -71,6 +76,16 @@ Item {
             add("Tools", "freecad", "external_link", "Open the STEP in FreeCAD", "Release · working files", function () { Store.openIn("step", "freecad") })
             if (Store.canAskReview) add("Tools", "review", "eye", "Ask for a design review", "Silhouette, relationships, details", function () { Store.askReview() })
         }
+        // the Bench: every study, route and document of this design with its state (form/studies.py); a current one
+        // opens what it made, any other runs
+        if (w && Store.bench && Store.bench.project === Store.pid) Store.bench.entries.forEach(function (e) {
+            if (e.state === "n/a") return
+            var st = e.state === "current" ? "Current" + (e.headline ? " · " + e.headline : "") : e.state === "stale" ? "Stale: describes " + F.pad(e.rev)
+                   : e.state === "never" ? "Never run" : e.state === "unavailable" ? (e.why || "Cannot run here") : e.state === "failed" ? "Failed" : "Running"
+            add("Bench", "bench." + e.id, e.group === "study" ? "list_checks" : e.group === "route" ? "external_link" : "file_text",
+                (e.state === "current" || e.state === "running" ? "" : e.by === "agent" ? "Ask for: " : e.by === "person" ? "" : "Run: ") + e.label, st,
+                function () { if (e.state === "current" && e.by === "engine") Store.openStudy(e); else if (e.state !== "running") Store.runStudy(e.id) })
+        })
         add("Tools", "new", "plus", "New design", "Describe it, or drop a photo, a sketch, a part or a link", function () { Store.startNew() }, "Ctrl+N")
         add("Tools", "sketch", "pen_tool", "Sketch a new design", "Lines, circles, arcs and dimensions in mm", function () { if (Store.screen !== "home") Store.home(); Store.openSheet("sketch") })
         add("Tools", "replace", "wrench", "Replace a broken part", "From a photo: estimated, measured, designed", function () { if (Store.screen !== "home") Store.home(); Store.openSheet("replace") })
@@ -153,6 +168,9 @@ Item {
         return out
     }
     readonly property var picks: { var p = []; for (var i = 0; i < rows.length; i++) if (!rows[i].head) p.push(i); return p }
+    // what typing highlights: the closest match, wherever its group is listed (the rows stay in group order)
+    readonly property int best: { var b = 0, s = -1e9; for (var i = 0; i < picks.length; i++) { var r = rows[picks[i]]; if (r.score !== undefined && r.score > s) { s = r.score; b = i } } return b }
+    function pickBest() { sel = best; if (picks.length) list.positionViewAtIndex(picks[sel], ListView.Contain) }
     function lit(text, at) {
         if (!at || !at.length) return text.replace(/&/g, "&amp;").replace(/</g, "&lt;")
         var s = "", set = {}
@@ -180,7 +198,7 @@ Item {
         Text { x: 22; y: 7; height: 44; verticalAlignment: Text.AlignVCenter; text: "›"; color: Theme.datum
             font.family: Theme.mono; font.pixelSize: 20; font.weight: Theme.wMedium; renderType: Theme.textRender }
         Field { id: q; x: 40; y: 14; width: parent.width - 62; height: 32; bare: true; placeholder: "Search commands, designs and conversations"
-            onEdited: { pal.sel = 0; list.positionViewAtBeginning() }
+            onEdited: { pal.sel = 0; list.positionViewAtBeginning(); Qt.callLater(pal.pickBest) }     // once the rows follow the text
             input.font.pixelSize: 15
             input.Keys.onPressed: function (e) {
                 if (e.key === Qt.Key_Down || (e.key === Qt.Key_N && (e.modifiers & Qt.ControlModifier))) { pal.move(1); e.accepted = true }

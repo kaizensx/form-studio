@@ -22,10 +22,15 @@ Rectangle {
             if ((x.kind === "face" || x.kind === "point") && x.on && x.normal && x.curvature && x.curvature.kind === "flat") return x }
         return null
     }
+    // picked edges and a flat face: what a fillet, a chamfer, a hole or a shell is made on (ModelPanel.qml)
+    readonly property var edgePicks: items.filter(function (x) { return x.kind === "edge" && x.edge && x.edge.midpoint })
+                                          .map(function (x) { return { at: x.edge.midpoint } })
+    property string modelling: ""            // "edges" | "face" while the picked-feature panel is open
     width: 300; radius: Theme.rMd
-    height: collapsed ? 36 : Math.min(maxHeight, 36 + col.implicitHeight + 12)
+    readonly property real footH: !!modelling && !collapsed && !keeping ? actFoot.implicitHeight + 18 : 0
+    height: collapsed ? 36 : Math.min(maxHeight, 36 + col.implicitHeight + 12 + footH)
     color: Theme.alpha(Theme.plate1, 0.96); border.color: Theme.rule
-    onItemsChanged: if (!items.length) keeping = false
+    onItemsChanged: { if (!items.length) { keeping = false; modelling = "" } }
 
     function featLabel(id) { var f = Store.featureById(id); return f ? f.label : id || "" }
     function partLabel(id) {
@@ -70,7 +75,7 @@ Rectangle {
 
     Flickable {
         visible: !sp.collapsed
-        y: 36; width: parent.width; height: parent.height - 36 - 2
+        y: 36; width: parent.width; height: parent.height - 36 - 2 - sp.footH
         contentHeight: col.implicitHeight + 10; clip: true; boundsBehavior: Flickable.StopAtBounds
         ScrollBar.vertical: ScrollBar { width: 5 }
         Column {
@@ -122,7 +127,23 @@ Rectangle {
                 Btn { objectName: "featureHere"; small: true; icon: "wrench"; text: "Feature here…"; visible: !!sp.flat
                     tip: "A screw boss or a snap-fit hook on this flat face, as a feature of the design"
                     onClicked: Store.openSheet("feature", { item: sp.flat }) }
+                Btn { objectName: "roundEdges"; small: true; icon: "radius"; text: "Fillet or chamfer…"; visible: sp.edgePicks.length > 0 && !sp.modelling
+                    tip: "Round or bevel the picked edges, as a feature of the design"; onClicked: sp.modelling = "edges" }
+                Btn { objectName: "holeHere"; small: true; icon: "circle_dot"; text: "Hole or shell…"; visible: !!sp.flat && !sp.modelling
+                    tip: "A hole into this face to a standard size, or the part hollowed out and open here"; onClicked: sp.modelling = "face" }
+                Btn { objectName: "sketchHere"; small: true; icon: "pen_tool"; text: "Sketch here…"; visible: !!sp.flat && !sp.modelling
+                    tip: "Draw a profile on this face and extrude it from it or cut it into the part"
+                    onClicked: Store.ppost("/sketch_plane", { at: sp.flat.on }).then(function (r) {
+                        Store.openSheet("handsketch", { mode: "add", plane: r.plane, outline: r.outline }) }, function (e) { Store.fail(e) }) }
                 Btn { small: true; kind: "quiet"; text: "Clear"; onClicked: Store.selClear() }
+            }
+            ModelPanel {
+                id: modelPanel
+                visible: !!sp.modelling && !sp.keeping; width: parent.width
+                kinds: sp.modelling === "edges" ? ["fillet", "chamfer"] : sp.modelling === "face" ? ["hole", "shell"] : []
+                picks: sp.modelling === "edges" ? sp.edgePicks : sp.flat ? [{ at: sp.flat.on }] : []
+                onDone: sp.modelling = ""
+                actionsHere: false
             }
             Column {
                 visible: sp.keeping; width: parent.width; spacing: 6
@@ -185,5 +206,12 @@ Rectangle {
             Txt { kind: "fine"; width: parent.width; visible: sp.items.length > 0 || sp.anns.length > 0
                 text: "Computed on the CAD solid: wall thickness along the surface normal, tilt and heights in the print orientation." }
         }
+    }
+    // Preview and Add to design, pinned at the foot while a picked feature is open (ModelPanel's actions)
+    Item {
+        objectName: "modelFoot"; visible: sp.footH > 0
+        anchors.bottom: parent.bottom; width: parent.width; height: sp.footH
+        Rectangle { x: 14; width: parent.width - 28; height: 1; color: Theme.rule }
+        Loader { id: actFoot; x: 14; y: 9; width: parent.width - 28; sourceComponent: sp.modelling ? modelPanel.actionRow : null }
     }
 }

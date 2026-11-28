@@ -116,7 +116,7 @@ instead.
 
 ## Tools at a glance
 
-97 tools. Read-only tools never change a project.
+103 tools. Read-only tools never change a project.
 
 | Tool | Access | What it does |
 |---|---|---|
@@ -152,6 +152,8 @@ instead.
 | [`geometry_diff`](#geometry_diff) | changes | Diff the geometry of two revisions. |
 | [`add_text`](#add_text) | changes | Put raised (or, with sunk, cut-in) lettering on a flat face of a Python design, as a real feature of its source: a new revision whose build adds a stage text_N with Form Studio's bundled font. |
 | [`add_feature`](#add_feature) | changes | Add a feature to a Python design as a new revision. |
+| [`get_sketch`](#get_sketch) | read-only | Get the sketch of a feature made from one (extrude, cut, revolve): its plane, points, entities (line, circle, arc) and constraints, solved by form.sketch2d: point positions, the profile, degrees of freedom left, and the named dimensions with their values (each is a parameter "<feature>_<name>"). |
+| [`edit_sketch`](#edit_sketch) | changes | Edit a feature's sketch with ops (or send the whole sketch), as one revision. |
 | [`remove_feature`](#remove_feature) | changes | Remove a feature as a new revision: a standard feature added with add_feature ("boss_1", "hook_1"), or any feature of a FeatureDesign (its method goes; the features before it load from their checkpoints). |
 | [`compare_printers`](#compare_printers) | read-only | Slice the head revision's exported model for real on every printer set up in every installed slicer (the selected printers first, up to limit; or only the printer ids given, from list_printers) and return each one's simulated print time, filament grams and cost from the user's prices, with the fastest, least filament and cheapest. |
 | [`make_lighter`](#make_lighter) | read-only | Make it lighter: search changes that reduce mass while every check that passes now still passes. |
@@ -182,6 +184,7 @@ instead.
 | [`freecad_macro`](#freecad_macro) | read-only | Write a FreeCAD macro (.FCMacro) next to the current STEP export. |
 | [`analyze`](#analyze) | read-only | Analyze the part as a map. An analysis map of the part, computed from the real geometry: a picture with its legend, and the statistics. |
 | [`measure`](#measure) | read-only | Measure distances and features of the part. |
+| [`mass_properties`](#mass_properties) | read-only | Mass, centre of mass, inertia tensor and principal axes, computed on the B-rep (OCCT), per part and for the whole. |
 | [`analyze_selection`](#analyze_selection) | read-only | Analyse a selection on the CAD solid without saving it. |
 | [`list_annotations`](#list_annotations) | read-only | List annotations. The selections the person named and kept on this design (annotations): name, note, the revision they were made on, the picked items and their computed analysis, and `text` describing each. |
 | [`annotate`](#annotate) | changes | Keep a selection on the head revision with a name and a note (for example a place you want the person to look at, or one you changed). |
@@ -217,6 +220,9 @@ instead.
 | [`export_conversation`](#export_conversation) | read-only | Export a conversation. A saved conversation as Markdown (format="md", to read or share) or JSON (format="json", to import again). |
 | [`model_mesh`](#model_mesh) | changes | Model a subdivision cage in Blender with declarative ops (never code), e.g. [{"op":"cage_new","primitive":"cube","size":[40,30,20]}, {"op":"name_region","name":"top", "faces":{"normal":[0,0,1],"within_deg":10}}, {"op":"extrude_region","faces":{"region":"top"},"offset":8}]. |
 | [`game_asset`](#game_asset) | changes | Make a design a game asset: LOD0-LOD3 at triangle budgets (from subdivision cage levels first; decimated LODs are automatic retopology), UVs (region seams or Smart UV, packed), materials from the design's zones, Cycles-baked base colour, normal, ORM and AO maps (texture_px 1024\|2048\|4096; bake fast\|quality), convex-hull collision per part (collision="coacd" when CoACD is installed), pivot and scale. |
+| [`list_studies`](#list_studies) | read-only | List every study, route and document of a design with its state: the Bench. |
+| [`run_study`](#run_study) | changes | Run one Bench entry for the head revision (ids from list_studies). |
+| [`get_study`](#get_study) | read-only | Read one Bench entry: its state, the revision it describes, its headline with evidence, its files and stored numbers, and the log of its runs. |
 
 ## Tools
 
@@ -575,6 +581,10 @@ derived, setup); {"op": "replace", "find": "exact text", "with": "new text"}  te
 "label": "Rib thickness", "default": 2, "min": 1, "max": 4}}; {"op": "delete", "feature" | "def" | "param": name};
 {"op": "set_param", "param": "wall", "value": 2.4}  this revision's value; with default, min, max, step,
 label or doc it changes the declaration too (a new default is also the value).
+The feature tree: {"op": "suppress" | "restore", "feature": "ribs"} (kept in the source, not built);
+{"op": "move", "feature": "ribs", "after" | "before": "body"} (refused when a feature would come before one it
+reads); {"op": "rename", "feature": "ribs", "label": "Stiffeners", "id": "stiffeners"} (a new id is carried
+to every place the source names it).
 A design written as a plain Recipe is edited in its canonical form: its build() is lifted into one method
 per Stage, built once and accepted only when volume, face count and bounding box are unchanged (computed);
 get_design_source returns that form, and its feature ids are what ops name.
@@ -660,7 +670,8 @@ The head comes in canonical form, one method per feature: a FeatureDesign as it 
 (form: "features" when its build() split into feature methods, "skeleton" when it is one feature, "none"
 with the reason when it stays as written), kernel-checked to be the same solid. features lists the ids
 edit_design addresses; source_sha names this text. feature="holes" returns only that method (and the
-parameters it reads). canonical=False, or a rev, returns the stored text.
+parameters it reads). canonical=False, or a rev, returns the stored text. tree: per feature its place in the build order,
+whether it is suppressed, and what it depends on (parameters it reads, features it names, helpers, members).
 
 | Argument | Type | Required |
 |---|---|---|
@@ -757,6 +768,8 @@ Render the part as an image. Look at the part. Returns a PNG rendered from the r
 view: iso, iso_back, front, back, left, right, top, bottom, "sheet" (four views at once), or for a design with
 several parts "assembled" (put together) and "exploded" (pulled apart along its explode offsets).
 highlight: a feature id to pick out. values: render an uncommitted candidate (same as preview_change).
+upto: a feature id: the head as it stood after that feature (the rollback bar; the features up to it load from
+their checkpoints, nothing is saved).
 
 | Argument | Type | Required |
 |---|---|---|
@@ -765,6 +778,7 @@ highlight: a feature id to pick out. values: render an uncommitted candidate (sa
 | `highlight` | string \| null |  |
 | `rev` | integer \| null |  |
 | `values` | object \| null |  |
+| `upto` | string |  |
 
 ### `animate`
 
@@ -845,6 +859,22 @@ a cantilever snap-fit hook (length, thickness, width, lip = undercut, lip_height
 at / normal: a point on the face and its outward normal (analyze_selection gives them). Returns the new head, the
 features and check rows: boss wall vs the nozzle; hook strain 1.5·t·y/L² vs allow_strain (a rule of thumb when
 not given). Remove one with remove_feature.
+Picked features (written as one named method plus its parameters, through the edit protocol; previewed in the
+kernel first and refused with the reason when a feature would be left out; the checks then run again):
+kind="fillet" (picks near edges, radius), "chamfer" (picks near edges, length), "hole" (one pick on a flat face;
+standard clearance (size M2..M6, fit close|normal|loose: ISO 273), tapped (size: tap drill), iso286 (nominal and
+fit such as H7: ISO 286, modelled at mid-tolerance) or plain (d); style plain|counterbore|countersink; depth
+0 = through), "pattern" (of = a feature id; mode linear: axis x|y|z or [x,y,z], count, pitch mm; polar: axis,
+origin, count, angle step degrees), "shell" (thickness; one pick on the face to leave open, or none).
+picks: [{"at": [x, y, z]}] in design mm (analyze_selection gives points on edges and faces). Edges and faces
+are kept as stable queries (the features that made them, their class, direction and place), not indexes;
+a rebuild that cannot find one leaves the feature out and says which. preview=True builds and reports
+(volume, box, faces, build log) and saves nothing. A pattern's direction can come from a picked edge (picks:
+a line gives linear along it; a circle, polar about its axis).
+From a sketch: kind="extrude" | "cut" | "revolve" with sketch = {plane, points, entities, constraints}
+(get_sketch shows the form; plane {"datum": "XY"|"XZ"|"YZ", "offset"} or a picked face: give picks=[{"at": ...}]
+on it), depth (mm; a cut with depth 0 goes through), angle and axis_entity (a line of the sketch) for revolve.
+Named dimensions become parameters "<feature>_<name>"; the sketch must solve and close.
 
 | Argument | Type | Required |
 |---|---|---|
@@ -872,6 +902,61 @@ not given). Remove one with remove_feature.
 | `role` | string |  |
 | `after` | string |  |
 | `partial` | boolean |  |
+| `picks` | array \| null |  |
+| `radius` | number \| null |  |
+| `standard` | string |  |
+| `fit` | string |  |
+| `nominal` | number \| null |  |
+| `d` | number \| null |  |
+| `style` | string |  |
+| `depth` | number \| null |  |
+| `of` | string |  |
+| `mode` | string |  |
+| `count` | integer \| null |  |
+| `pitch` | number \| null |  |
+| `angle` | number \| null |  |
+| `axis` |  |  |
+| `origin` | array \| null |  |
+| `preview` | boolean |  |
+| `sketch` | object \| null |  |
+| `axis_entity` | integer \| null |  |
+
+### `get_sketch`
+
+*Read-only.*
+
+Get the sketch of a feature made from one (extrude, cut, revolve): its plane, points, entities (line, circle,
+arc) and constraints, solved by form.sketch2d: point positions, the profile, degrees of freedom left, and the
+named dimensions with their values (each is a parameter "<feature>_<name>"). Change it with edit_sketch.
+
+| Argument | Type | Required |
+|---|---|---|
+| `project` | string | yes |
+| `feature` | string | yes |
+
+### `edit_sketch`
+
+Edit a feature's sketch with ops (or send the whole sketch), as one revision. Ops, in order:
+{"op": "add_point", "at": [x, y]}; {"op": "add_line", "from": i | [x, y], "to": ...};
+{"op": "add_polyline", "points": [...], "close": true} (lines within 2 degrees of horizontal or vertical get that
+constraint); {"op": "add_rect", "at": [x, y], "size": [w, h]}; {"op": "add_circle", "center": i | [x, y], "r": 5};
+{"op": "add_arc", "center", "start", "end"}; {"op": "constrain", "kind": coincident|horizontal|vertical|parallel|
+perpendicular|tangent|equal|midpoint|on|symmetric|fix, "entities": [...], "points": [...]};
+{"op": "dimension", "kind": length|distance|hdist|vdist|radius|diameter|angle, "entities"|"points", "value",
+"name"} (a name makes it a parameter; "" keeps it fixed); {"op": "set", "name": "w", "value": 70};
+{"op": "move", "point": i, "to": [x, y]}; {"op": "delete", "constraint" | "entity": i};
+{"op": "construction", "entity": i}. "Make it symmetric" is a symmetric constraint about a construction line.
+Refused with the reason when the sketch would not solve (over-constrained, out of reach) or not close; nothing
+is saved then. preview=True builds and reports. The checks run again on the saved revision.
+
+| Argument | Type | Required |
+|---|---|---|
+| `project` | string | yes |
+| `feature` | string | yes |
+| `ops` | array \| null |  |
+| `sketch` | object \| null |  |
+| `expect_head` | integer \| null |  |
+| `preview` | boolean |  |
 
 ### `remove_feature`
 
@@ -1365,6 +1450,31 @@ round boss the diameter: exact from the CAD solid, or "fitted" to mesh edges for
 | `at` | array \| null |  |
 | `rev` | integer \| null |  |
 
+### `mass_properties`
+
+*Read-only.*
+
+Mass, centre of mass, inertia tensor and principal axes, computed on the B-rep (OCCT), per part and for the
+whole. Units: mm, g, g·mm² (also kg·m²); inertia is about the centre of mass in the design's axes, and about the
+origin. A design that declares an assembly is reported assembled; pose={joint id: value} (degrees for a hinge,
+mm for a slide) moves its joints; frame="as_built" gives the solids where the design builds them. Each part's
+density comes from its material (set_appearance; the design's code may declare one per Part), with the
+document it was read from; a part without a material has no mass (the volume centroid is given instead).
+material= is a what-if for every part (or for `part`), nothing saved. library=True adds the full sourced
+record of each material used (E, Poisson's ratio, yield, UTS, thermal, a printed filament's X-Y and Z values
+and its Z knock-down; a value no source gives is listed as unsourced). Evidence class: computed (B-rep), or
+computed (closed mesh) for a mesh design; a printed part is taken solid (100 % infill).
+
+| Argument | Type | Required |
+|---|---|---|
+| `project` | string | yes |
+| `part` | string |  |
+| `pose` | object \| null |  |
+| `material` | string \| null |  |
+| `frame` | string \| null |  |
+| `rev` | integer \| null |  |
+| `library` | boolean |  |
+
 ### `analyze_selection`
 
 *Read-only.*
@@ -1414,8 +1524,9 @@ Set the colour and material of a design. Colour (#rrggbb) and material of the wh
 get_project / render). Filaments (a print design): PLA, PETG, ABS, ASA, TPU, PA (nylon), PC, PLA-CF, PETG-CF, PA-CF; Form Studio
 adds their notes to the checks (heat, sunlight, warping, flexible, fibre-filled) and the slicer picks the matching filament.
 Engineering materials (a model design: CNC, casting, rendering): AL-6061, AL-7075, STEEL, STAINLESS, BRASS, COPPER, TITANIUM,
-OAK, WALNUT, MAPLE, PINE, POM, PTFE, PEEK, PMMA ("aluminium 7075", "delrin" also work), with bd_materials' typical density and
-look; get_project then reports the computed mass (volume x typical density). The colour is drawn and written into the 3MF;
+STEEL-4140, OAK, OAK-WHITE, WALNUT, MAPLE, PINE, POM, PTFE, PEEK, PMMA, NYLON-PA6 ("aluminium 7075", "delrin" also work), with
+their datasheet density (bd_materials' typical one where none is sourced) and look; mass_properties then gives mass, centre
+of mass and inertia. The colour is drawn and written into the 3MF;
 stored in the project's material fields (parts.<id>.material). Leave an argument out to keep it; clear=True removes both.
 
 | Argument | Type | Required |
@@ -1711,12 +1822,15 @@ otherwise it tells you to ask in your own interface.
 
 Propose concepts. For a new idea: build 2-4 genuinely different concepts as real designs, so the person can pick one.
 concepts: [{"title": short name, "rationale": one line on the approach, "source": design code as for
-create_design (see design_guide), "language": "python", "values": {...} or null}]. Make them different
+create_design (see design_guide), "language": "python", "values": {...} or null, "material": "PETG" | "AL-6061" | ...
+(optional; set_appearance's keys)}]. Give each concept the material it would be made in: its card shows the mass
+(computed on the B-rep in that material; without one a print concept is shown in PLA, marked assumed). Make them different
 structural approaches (how it holds, mounts, opens), not size variants. Each becomes its own project
 ("<name> · A", "· B", ...). A concept that fails to build comes back in "failed" with its error; the others are
 kept. group: an open group's id to add concepts to (at most 6 in a group), e.g. one mixed concept when the
 person asks for "the base of A with the hook of C". With run=True each is exported and checked.
-Returns the board: {id, name, state, members: [{project, letter, title, rationale, numbers}], failed}.
+Returns the board: {id, name, state, members: [{project, letter, title, rationale, numbers}], failed};
+numbers: size, volume, mass_g with its material and how it is known.
 
 | Argument | Type | Required |
 |---|---|---|
@@ -1902,6 +2016,46 @@ Reads the project, never changes it. Every check is computed from the written GL
 | `retopo` | string |  |
 | `formats` | array \| null |  |
 | `materials` | object \| null |  |
+
+### `list_studies`
+
+*Read-only.*
+
+List every study, route and document of a design with its state: the Bench. group: study (Review), route
+or document (Make). Each entry: id, label, state (never, current, stale, failed, running, unavailable, n/a),
+rev (the revision its result describes; a stale entry names the revision its newest result was computed for),
+headline with evidence, needs, inputs, and by whom it runs (engine; agent: call `tool` yourself; person: only
+they do it, in Form Studio). Reads only; nothing is run.
+
+| Argument | Type | Required |
+|---|---|---|
+| `project` | string | yes |
+| `group` | string \| null |  |
+
+### `run_study`
+
+Run one Bench entry for the head revision (ids from list_studies). A current entry comes back as it is
+unless force=True. Waits up to wait_s, then returns a job to poll with get_job. An entry the agent must do
+(critique) returns the tool to call; one only a person does (release) is never done here.
+
+| Argument | Type | Required |
+|---|---|---|
+| `project` | string | yes |
+| `id` | string | yes |
+| `force` | boolean |  |
+| `wait_s` | number |  |
+
+### `get_study`
+
+*Read-only.*
+
+Read one Bench entry: its state, the revision it describes, its headline with evidence, its files and
+stored numbers, and the log of its runs. Reads only.
+
+| Argument | Type | Required |
+|---|---|---|
+| `project` | string | yes |
+| `id` | string | yes |
 
 ## Prompts
 
