@@ -29,7 +29,7 @@
   part: expected and measured, the tolerance it was judged by, PASS, FAIL or UNSURE, a crop of the sheet and a render
   with the measured feature lit. A PDF's text layer and DXF entities are read exactly; an image is read by the agent,
   row by row with its place on the sheet, and anything it is unsure of stays UNSURE. Form Studio runs no OCR.
-- MCP tools `drawing`, `export_pmi` and `check_drawing` (123 tools); `form drawing <project> [--sheet A3]
+- MCP tools `drawing`, `export_pmi` and `check_drawing` (126 tools); `form drawing <project> [--sheet A3]
   [--projection first] [--out part.pdf]`, `form drawing pmi|check|spec|set ...`; a Drawing section with "Drawing,
   A3", "STEP with PMI" in the app's documents.
 - **Engineering calculators that write the part.** Seven calculators size a part from what it has to do, by a named
@@ -44,7 +44,7 @@
   against 72 published quantities; a snap hook is also checked by finite elements where the strength engine is
   installed. [docs/CALCULATORS.md](docs/CALCULATORS.md).
 - **`calculate`** (MCP) and **`form calc <calculator> key=value ... [--build]`** (terminal, JSON), and the Bench
-  entry **Engineering calculation**. 123 MCP tools.
+  entry **Engineering calculation**. 126 MCP tools.
 - ISO 286 tables and published fastener dimensions moved to modules with no CAD kernel behind them
   (`form/iso286.py`, `form/hardware_tables.py`); `form.craft.fits` and `form.parts` read the same copy.
 - **Sheet metal and cut parts.** Design a bent part from a base flange, edge flanges, hems, jogs, relief cuts
@@ -63,7 +63,7 @@
   compensation. A SendCutSend preflight checks material, thickness, bending and limits from their pages, read
   2026-11-28; nothing is uploaded or ordered. Manufacturability's `sheet_metal` process now judges bent parts
   (flange length, holes to edge and bend, hems). `flat_pattern`, `cut_file_check`, `bend_order`,
-  `service_preflight` over MCP (123 tools), `form sheet`, three Bench entries, and docs/SHEET_METAL.md.
+  `service_preflight` over MCP (126 tools), `form sheet`, three Bench entries, and docs/SHEET_METAL.md.
 - **CNC, 3-axis: toolpaths with a stock simulation that measures gouge and leftover.** Plan the machining of a
   design on a mill or router: facing, adaptive clearing at constant engagement, finishing of floors and walls, the
   outline cut through with tabs, drilling with pecks, helical boring, chamfering, and 3D finishing in parallel
@@ -77,7 +77,7 @@
   current simulation (a new revision, another tool or an edited file makes it stale), nothing assumed and your
   approval, and it is labelled "simulated, not proven on a machine" until you record what it did on one. The
   viewport's data (toolpaths by operation, the stock with gouge and leftover marked) is written beside it.
-  `cam_plan`, `cam_post`, `cam_simulate` over MCP (123 tools), `form cam`, the Bench's "CNC, 3-axis", and
+  `cam_plan`, `cam_post`, `cam_simulate` over MCP (126 tools), `form cam`, the Bench's "CNC, 3-axis", and
   docs/CAM.md.
 - **Manufacturability, with fixes that are proved.** Check a design for CNC milling (3, 4 or 5 axes), injection
   moulding, or FDM, resin (SLA), SLS, MJF and metal (LPBF) printing. Every rule is measured on the exact solid and
@@ -88,7 +88,7 @@
   depth, tool reach and holes. Problems are drawn on the part. Draft, internal corners, escape holes and walls or
   holes set by a parameter can be fixed: the fix is written into the design as a parameter and a feature, checked
   before it is saved, saved as a revision and checked again; it is called fixed only when that check passes. A rule
-  that could not be checked is never a pass. `manufacturability` and `apply_fix` over MCP (123 tools), `form dfm`,
+  that could not be checked is never a pass. `manufacturability` and `apply_fix` over MCP (126 tools), `form dfm`,
   and docs/MANUFACTURABILITY.md.
 - **The Bench.** Every study, route and document of a design in one listing: at the top of the Review pane the
   studies (checks, assembly and joints, requirements, analysis maps, fit, critique, slice, print simulation,
@@ -100,7 +100,7 @@
   made. States come from keys of the head revision's inputs, never set by hand. The command palette finds every
   entry.
 - **`list_studies`, `run_study`, `get_study`** (MCP) and **`form study list|run|show <project> [id]`** (terminal): the
-  same Bench, headless. 123 MCP tools. Mass & inertia, Materials & sources (each value with its document) and Features
+  same Bench, headless. 126 MCP tools. Mass & inertia, Materials & sources (each value with its document) and Features
   (built, suppressed by hand, left out with the reason) are Bench studies too; a change made by hand is a new
   revision, so every study of the revision before it shows stale. The command palette also finds the hand tools:
   Sketch on a plane, Fillet or chamfer, Hole, shell or sketch on a face, Feature tree.
@@ -160,7 +160,7 @@
   else the B-rep volume times the sourced density, else none), and the made parts with their mass; CSV and a PDF
   page. Supplier numbers come only from you or a page at a link you give. An optional catalogue service is in
   Settings, off by default, and says before each search what is sent and to whom; no provider ships yet.
-- **`standard_part`, `bom`** (MCP) and **`form parts …`, `form bom …`** (terminal). 123 MCP tools.
+- **`standard_part`, `bom`** (MCP) and **`form parts …`, `form bom …`** (terminal). 126 MCP tools.
 - **Motion studies.** A mechanism played over time from its own declaration: drivers (a ramp, keyframes, a speed or a
   sine), couplings (gears, rack and pinion, lead screw, belt, cam) and closed loops solved per frame by Newton's method
   on the loop-closure equations, so a four-bar moves as one. Frames a linkage cannot reach (beyond its Grashof limit)
@@ -197,7 +197,7 @@
 - **Board fab files.** Gerbers, drill files, pick-and-place, BOM and the board STEP through your KiCad.
 - **`board_import`, `board_check`, `board_fab`** (MCP), **`form board read|import|check|fab|kicad`** (terminal) and the
   Bench's **Board and enclosure**, **Board checks** and **Board fab files**. docs/BOARDS.md, with the plan for
-  schematic capture and routing (K2). 108 MCP tools.
+  schematic capture and routing (K2). 126 MCP tools.
 
 ### Changed
 
@@ -208,7 +208,7 @@
   the evidence; with no material both stay empty. A new material makes a new sheet.
 - **The Bench lists every wave's entries:** strength, the engineering calculation, manufacturability, sheet metal,
   CNC, the drawing and STEP with PMI, standard parts and the parts list, motion, robot files and assembly steps,
-  beside mass, materials and features.
+  the board and its enclosure, beside mass, materials and features.
 - The packaged app paints drawings and reads PDF drawings (its executable runs the Qt painter, and QtPdf ships), the
   MuJoCo check finds its code, and CAM's speeds table ships with the rule and bend tables.
 - Filament and engineering densities are now the cited datasheet values (for example PETG 1.28, PA-CF 1.09, stainless

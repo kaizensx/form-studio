@@ -12,6 +12,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import os
 import shutil
 import subprocess
 import sys
@@ -51,41 +52,37 @@ Rules:
 - preview_change before commit_change; pass expect_head so a newer revision is never overwritten.
 - Provenance is evidence. Mark a value "measured" only when the user measured it and told you the number. Never invent
   physical results: record_physical_result is only for what the user reports.
-- Printing: a slice is a simulation, not a print, and fit yield is a model. Say so.
+- A slice is a simulation, not a print; fit yield is a model. Say so.
 - You cannot approve a release: request_release returns a link the user opens in Form Studio. Nothing here starts a
   print or sends files anywhere.
-- Every design has a purpose, "print" or "model" (just a 3D model): get_project reports it. For a model never ask about
-  a printer, slicer, filament or orientation. Pass purpose to create_project/create_design when the person says it. A
+- Every design has a purpose, "print" or "model" (just a 3D model; get_project says). For a model never ask about a
+  printer, slicer, filament or orientation. Pass purpose to create_project/create_design when the person says it; a
   "Purpose:" line in the message is binding.
 - Ask the person only what changes fit, load or safety and you cannot look up: ask_user, one question at a time, at
-  most three a task; ask_measurement for a dimension. If the person cannot be reached, the result says to ask in your
-  own interface.
-- A new idea that is not a precise specification: propose_concepts with 3-4 structurally different real designs, one
-  line of rationale each; then stop: the person picks. Do not offer recipes.
-- Anything the person brings (mesh, STEP, photo, sketch, PDF, link, words): triage(source) first. It classes the input,
-  chooses the route and names the calls in order. Take that route. Ask the person only when triage returns "ask", and
-  say what "cannot" lists.
+  most three a task; ask_measurement for a dimension. Unreachable: the result says to ask in your own interface.
+- A new idea, not a precise specification: propose_concepts with 3-4 structurally different real designs, a line of
+  rationale each; then stop: the person picks. Do not offer recipes.
+- Anything the person brings (mesh, STEP, photo, sketch, PDF, link, words): triage(source) first; it names the route
+  and the calls in order. Take it. Ask the person only when it returns "ask"; say what "cannot" lists.
 - A mesh to make editable: reconstruct(path). It triages, repairs what is safe and takes the route (a mechanical part:
   sketches, holes and fillets verified against the mesh; a sculpt or scan: a surface or mesh body,
   design_guide(topic="organic"); several bodies: one design, a part each). Report its headline as it is: the measured
-  distance, and what it is not.
+  distance and what it is not.
 - A refusal's hint names the next call. Never repeat a failed call with the same arguments. A design's exceptions are
   not a way to print: what a build says comes back in the result.
-- Rebuilding a mechanical mesh by hand: never embed the mesh as the design. design_guide(topic="reference_parts"):
-  analyze_reference (analyze_assembly for several parts) -> named features -> build123d with Params ->
-  compare_to_reference until within tolerance (default 0.1 mm).
-- Photos: scale from a reference object (bank card 85.60 x 53.98 mm, coin, ruler); photo dimensions stay assumed until
-  measured. A Form Studio sketch's JSON overrides the picture. STEP: import_reference. PDF drawings: read_document.
-  Their links: fetch_link, never a shell. Download only what they gave.
+- Rebuilding a mechanical mesh by hand: never embed the mesh. design_guide(topic="reference_parts"): analyze_reference
+  (analyze_assembly for several) -> named features -> build123d with Params -> compare_to_reference (0.1 mm by default).
+- Photos: scale from a reference (bank card 85.60 x 53.98 mm, coin, ruler); their sizes stay assumed until measured.
+  A Form Studio sketch's JSON overrides the picture. STEP: import_reference. PDFs: read_document. Links: fetch_link,
+  never a shell. Download only what they gave.
 - One request makes one design. Several files of one product: one design, several parts (reconstruct files=[...],
   create_design relation="part_of"). A second create_design in a conversation says its relation: replaces, part_of,
   alternative or new.
-- "Will it hold?": strength_study with supports and loads on picked faces and a material, then get_strength_study
-  (design_guide(topic="strength")). Quote its evidence class and the lower safety factor. A study that did not converge
-  has no safety factor; stress at a singularity it names is never the part's stress. Stale after any change: run again.
+- "Will it hold?": strength_study, then get_strength_study (design_guide(topic="strength")). Quote its evidence and
+  lower safety factor; not converged means none.
 - Complex designs (mechanisms, organic or styled forms, textures, several parts) are staged: design_brief ->
   design_guide(topic=...), design_examples -> plan_design -> create_design(plan=...) -> look at the sheet -> critique
-  -> update_design. The design_guide topics and this server's skills hold each workflow.
+  -> update_design. The design_guide topics and the skills hold each workflow.
 """
 
 S: dict[str, Any] = {"studio": None, "bench": {"url": None}, "lock": threading.Lock()}
@@ -105,10 +102,25 @@ def _measure_usage(from_point, to_point) -> str:
     return "measure needs a point: at=[x, y, z] (what is there), or from_point and to_point (the distance between them)."
 
 
+def _where() -> tuple:
+    """What the cached Studio was made from: the data folder and the config file the environment names."""
+    return os.environ.get("FORM_DATA"), os.environ.get("FORM_CONFIG")
+
+
 def studio() -> Studio:
+    """The server's one Studio. It is made again when FORM_DATA or FORM_CONFIG names another place than the one it
+    was made for (`form tool` and tests in one process point the same module at different data folders), so a call
+    never reaches a folder that is not the one configured, or one that was deleted."""
     with S["lock"]:
+        if S["studio"] is not None and S.get("where") != _where():
+            old, S["studio"] = S["studio"], None
+            try:
+                old.kernel.stop()
+            except Exception:  # noqa: BLE001  (a worker that already ended)
+                pass
         if S["studio"] is None:
             S["studio"] = Studio(config.load())
+            S["where"] = _where()
         return S["studio"]
 
 

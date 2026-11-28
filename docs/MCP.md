@@ -42,41 +42,37 @@ Rules:
 - preview_change before commit_change; pass expect_head so a newer revision is never overwritten.
 - Provenance is evidence. Mark a value "measured" only when the user measured it and told you the number. Never invent
   physical results: record_physical_result is only for what the user reports.
-- Printing: a slice is a simulation, not a print, and fit yield is a model. Say so.
+- A slice is a simulation, not a print; fit yield is a model. Say so.
 - You cannot approve a release: request_release returns a link the user opens in Form Studio. Nothing here starts a
   print or sends files anywhere.
-- Every design has a purpose, "print" or "model" (just a 3D model): get_project reports it. For a model never ask about
-  a printer, slicer, filament or orientation. Pass purpose to create_project/create_design when the person says it. A
+- Every design has a purpose, "print" or "model" (just a 3D model; get_project says). For a model never ask about a
+  printer, slicer, filament or orientation. Pass purpose to create_project/create_design when the person says it; a
   "Purpose:" line in the message is binding.
 - Ask the person only what changes fit, load or safety and you cannot look up: ask_user, one question at a time, at
-  most three a task; ask_measurement for a dimension. If the person cannot be reached, the result says to ask in your
-  own interface.
-- A new idea that is not a precise specification: propose_concepts with 3-4 structurally different real designs, one
-  line of rationale each; then stop: the person picks. Do not offer recipes.
-- Anything the person brings (mesh, STEP, photo, sketch, PDF, link, words): triage(source) first. It classes the input,
-  chooses the route and names the calls in order. Take that route. Ask the person only when triage returns "ask", and
-  say what "cannot" lists.
+  most three a task; ask_measurement for a dimension. Unreachable: the result says to ask in your own interface.
+- A new idea, not a precise specification: propose_concepts with 3-4 structurally different real designs, a line of
+  rationale each; then stop: the person picks. Do not offer recipes.
+- Anything the person brings (mesh, STEP, photo, sketch, PDF, link, words): triage(source) first; it names the route
+  and the calls in order. Take it. Ask the person only when it returns "ask"; say what "cannot" lists.
 - A mesh to make editable: reconstruct(path). It triages, repairs what is safe and takes the route (a mechanical part:
   sketches, holes and fillets verified against the mesh; a sculpt or scan: a surface or mesh body,
   design_guide(topic="organic"); several bodies: one design, a part each). Report its headline as it is: the measured
-  distance, and what it is not.
+  distance and what it is not.
 - A refusal's hint names the next call. Never repeat a failed call with the same arguments. A design's exceptions are
   not a way to print: what a build says comes back in the result.
-- Rebuilding a mechanical mesh by hand: never embed the mesh as the design. design_guide(topic="reference_parts"):
-  analyze_reference (analyze_assembly for several parts) -> named features -> build123d with Params ->
-  compare_to_reference until within tolerance (default 0.1 mm).
-- Photos: scale from a reference object (bank card 85.60 x 53.98 mm, coin, ruler); photo dimensions stay assumed until
-  measured. A Form Studio sketch's JSON overrides the picture. STEP: import_reference. PDF drawings: read_document.
-  Their links: fetch_link, never a shell. Download only what they gave.
+- Rebuilding a mechanical mesh by hand: never embed the mesh. design_guide(topic="reference_parts"): analyze_reference
+  (analyze_assembly for several) -> named features -> build123d with Params -> compare_to_reference (0.1 mm by default).
+- Photos: scale from a reference (bank card 85.60 x 53.98 mm, coin, ruler); their sizes stay assumed until measured.
+  A Form Studio sketch's JSON overrides the picture. STEP: import_reference. PDFs: read_document. Links: fetch_link,
+  never a shell. Download only what they gave.
 - One request makes one design. Several files of one product: one design, several parts (reconstruct files=[...],
   create_design relation="part_of"). A second create_design in a conversation says its relation: replaces, part_of,
   alternative or new.
-- "Will it hold?": strength_study with supports and loads on picked faces and a material, then get_strength_study
-  (design_guide(topic="strength")). Quote its evidence class and the lower safety factor. A study that did not converge
-  has no safety factor; stress at a singularity it names is never the part's stress. Stale after any change: run again.
+- "Will it hold?": strength_study, then get_strength_study (design_guide(topic="strength")). Quote its evidence and
+  lower safety factor; not converged means none.
 - Complex designs (mechanisms, organic or styled forms, textures, several parts) are staged: design_brief ->
   design_guide(topic=...), design_examples -> plan_design -> create_design(plan=...) -> look at the sheet -> critique
-  -> update_design. The design_guide topics and this server's skills hold each workflow.
+  -> update_design. The design_guide topics and the skills hold each workflow.
 ```
 
 ## Skills
@@ -119,7 +115,7 @@ instead.
 
 ## Tools at a glance
 
-123 tools. Read-only tools never change a project.
+126 tools. Read-only tools never change a project.
 
 | Tool | Access | What it does |
 |---|---|---|
@@ -168,6 +164,9 @@ instead.
 | [`edit_sketch`](#edit_sketch) | changes | Edit a feature's sketch with ops (or send the whole sketch), as one revision. |
 | [`standard_part`](#standard_part) | changes | Standard parts to buy (screws, nuts, washers, inserts, bearings, dowels, collars, shafts, LM bushings, GT2 pulleys and belts, NEMA motors, V-Slot extrusion and T-nuts, magnets, O-rings), generated from published tables: every dimension names its standard and table, or the maker's datasheet. |
 | [`bom`](#bom) | changes | The parts list a buyer orders from: purchased items grouped by standard designation (e.g. "ISO 4762 M5×12 A2-70") with quantity, material and mass (the maker's catalogue value, else the modelled volume on the B-rep times the sourced density, else none), the made parts with their mass (mass_properties), and supplier numbers. |
+| [`board_import`](#board_import) | changes | Bring a circuit board in and get an enclosure that is checked against it. |
+| [`board_check`](#board_check) | read-only | Check a design's board and its enclosure. |
+| [`board_fab`](#board_fab) | changes | Fab files for a design's board through the person's KiCad (kicad-cli): kinds from gerbers, drill, pos (pick-and-place), bom (from the schematic beside the board) and step (the board STEP); default all. |
 | [`remove_feature`](#remove_feature) | changes | Remove a feature as a new revision: a standard feature added with add_feature ("boss_1", "hook_1"), or any feature of a FeatureDesign (its method goes; the features before it load from their checkpoints). |
 | [`compare_printers`](#compare_printers) | read-only | Slice the head revision's exported model for real on every printer set up in every installed slicer (the selected printers first, up to limit; or only the printer ids given, from list_printers) and return each one's simulated print time, filament grams and cost from the user's prices, with the fastest, least filament and cheapest. |
 | [`make_lighter`](#make_lighter) | read-only | Make it lighter: search changes that reduce mass while every check that passes now still passes. |
@@ -1233,6 +1232,68 @@ only with confirm=True after the person agreed. No provider ships, so the state 
 | `query` | string |  |
 | `confirm` | boolean |  |
 | `from_person` | boolean |  |
+
+### `board_import`
+
+Bring a circuit board in and get an enclosure that is checked against it. file: a KiCad .kicad_pcb (read
+by Form Studio's own parser, no KiCad needed; its .kicad_pro and .kicad_sch are copied with it) or an IDF 3.0
+.emn (with its .emp). Read: outline and holes, thickness, each part's courtyard and the height the footprint
+states, connectors and the board edge they mate through, mounting holes (with the screw that fits), keep-outs.
+Without project: a new design is made around the board, as editable features (shell with corner lugs,
+cavity, standoffs under the mounting holes with heat-set inserts, openings sized from each plug's envelope
+and aligned to its connector's face, a lid printed beside the box with a lip, vents, the inserts and screws
+from the standard-parts tables). With project: the board replaces that design's board and the enclosure is
+kept (regenerate=True makes it again), so board_check says what no longer fits; "changes" lists what moved.
+Heights are never guessed: step= a board STEP KiCad exported (heights measured over each courtyard),
+use_kicad_step=True to have the person's KiCad export it, or heights={"C1": 10.5} from the person; parts
+without one are "not checked". connectors={"J2": {"side": "+x", "plug": [w, h]}} overrides a mating side
+(-x, +x, -y, +y, up) or gives a plug's size.
+
+| Argument | Type | Required |
+|---|---|---|
+| `file` | string | yes |
+| `project` | string |  |
+| `name` | string |  |
+| `step` | string |  |
+| `heights` | object \| null |  |
+| `connectors` | object \| null |  |
+| `regenerate` | boolean |  |
+| `use_kicad_step` | boolean |  |
+| `lid_screw` | number |  |
+| `purpose` | string \| null |  |
+| `expect_head` | integer \| null |  |
+
+### `board_check`
+
+*Read-only.*
+
+Check a design's board and its enclosure. what="fit": the board as it is now against the head revision's
+enclosure, measured on the solids (computed): board to wall gap, a standoff under each mounting hole, each
+connector's plug envelope swept out through its wall, every part of known height against the box and the
+lid as assembled, a screwdriver's way to each board screw. what="board": KiCad's own DRC and ERC through the
+person's kicad-cli (KiCad's report, read as it is; when KiCad is not installed this says so and gives the
+install route, and nothing is run in its place), and the board's track width, spacing, drills, annular
+rings, size and thickness against the published limits of fabs (jlcpcb, pcbway, oshpark; each limit quoted
+with its page and the date it was read). what="all": both. No findings is not a manufacturability approval.
+
+| Argument | Type | Required |
+|---|---|---|
+| `project` | string | yes |
+| `what` | string |  |
+| `fabs` | array \| null |  |
+| `kicad` | boolean |  |
+
+### `board_fab`
+
+Fab files for a design's board through the person's KiCad (kicad-cli): kinds from gerbers, drill, pos
+(pick-and-place), bom (from the schematic beside the board) and step (the board STEP); default all. Written
+under <project>/board/fab/<board hash>/; nothing is uploaded or sent to a fab. Without KiCad only "step" is
+made, from Form Studio's plain board model (slab and part boxes), and said so; the rest name the install route.
+
+| Argument | Type | Required |
+|---|---|---|
+| `project` | string | yes |
+| `kinds` | array \| null |  |
 
 ### `remove_feature`
 

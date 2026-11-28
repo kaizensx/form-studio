@@ -47,8 +47,9 @@ computed change impact, checks with evidence classes, the fit model, printer cal
 | Engineering calculators | `form/calc/` | Snap fits, hinges, springs, bolted joints, gears, cams and fits at temperature by a named standard's equations, written as a design that keeps its calculation |
 | Drawings | `form/drawing/`, `form/iso286.py` | Hidden-line views, sections and details, dimensions bound to parameters, ISO 286 fits (the one ISO 286 module), GD&T, AP242 PMI, the drawing check |
 | Motion and robot files | `form/motion.py`, `form/robot.py`, `form/sequence.py` | Mechanisms played over time, URDF/SRDF/MJCF with inertia from the B-rep, assembly order and insertion directions |
+| Boards and enclosures | `form/board/` | KiCad and IDF boards read by Form Studio's own parsers, the enclosure made around them, the fit proved on the solids; KiCad's DRC/ERC and fab files through the person's own KiCad |
 | The Bench | `form/studies.py` | Every study, route and document of a design with its state from the head revision's keys; each wave registers through `PROVIDERS` |
-| MCP server | `form/mcp_server.py` | 123 tools over stdio |
+| MCP server | `form/mcp_server.py` | 126 tools over stdio |
 | CLI | `form/__main__.py` | Every capability as a JSON-printing command |
 | Archives | `form/bundle.py` | `.formstudio` files: a project, its conversations and the code it was built from, checked before anything is written |
 | Installer | `form/installer.py`, `form/setup.py` | Finds and installs slicers, agents and libraries, with consent; hands-free on first start |
