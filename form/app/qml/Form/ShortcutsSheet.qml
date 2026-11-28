@@ -48,7 +48,7 @@ Column {
             ["Ctrl+Shift+H", "All designs"],
             ["Ctrl+[", "Back to all designs"],
             ["Ctrl+,", "Settings"],
-            ["Ctrl+1", "Design"], ["Ctrl+2", "Check"], ["Ctrl+3", "Make"], ["Ctrl+4", "Document"], ["Ctrl+I", "Overview of the design"],
+            [Theme.modeMod + "+1", "Design"], [Theme.modeMod + "+2", "Check"], [Theme.modeMod + "+3", "Make"], [Theme.modeMod + "+4", "Document"], [Theme.tabMod + "+1", "The model tab; 2 to 9 the next tabs"], ["Ctrl+I", "Overview of the design"],
             ["Ctrl+Return", "Commit the draft"],
             ["?", "This sheet"]] }]]
     // flat list, for the tests and anything else that wants every row

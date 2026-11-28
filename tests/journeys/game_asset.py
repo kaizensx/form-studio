@@ -11,6 +11,8 @@ Run in both appearances (FORM_APPEARANCE=dark, light); screenshots go to $FORM_U
 import json
 import zipfile
 
+from _lib import tool
+
 DATA = "fresh"
 S = {}
 
@@ -39,7 +41,9 @@ def journey_pick_game_asset_and_describe_it(ui):
 
 
 def journey_build_switch_lods_and_look(ui):
-    ui.click("railGame")
+    ui.click("stage-release")                        # Game asset is a tool of Make
+    ui.wait_until(lambda: ui.js("Store.mode") == "release", 3, "Make")
+    tool(ui, "game")
     ui.wait_until(lambda: ui.exists("gameSheet"), 5, "the Game asset sheet")
     ui.wait_until(lambda: ui.js("!!Store.game"), 30, "what the engine says about the game asset")
     if not ui.js("Store.game.software.blender"):

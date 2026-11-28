@@ -14,7 +14,7 @@ import json
 import os
 import time
 
-from _lib import toasts_gone, wait_job
+from _lib import toasts_gone, tool, wait_job
 
 DATA = "fresh"
 S = {}
@@ -176,7 +176,7 @@ def journey_bracket(ui):
     ui.settle(1200)
     S["idle0"] = frames(ui, 2000)
     # a pocket: Cut, the base's top face picked on the part, a rectangle drawn on it, 2 mm deep
-    ui.click(ui.item("railCut"))
+    tool(ui, "cut")
     ui.wait_until(lambda: ui.js("Store.sketchHost.picking") is True, 3, "Cut waits for a face")
     crop(ui, "sketchCapsule", "sketch-pick")
     top = hits(ui, lambda h: h["normal"][2] > 0.95 and abs(h["at"][2] - 5) < 1e-3 and 10 < h["at"][0] < 30 and -30 < h["at"][1] < -10)
@@ -188,7 +188,10 @@ def journey_bracket(ui):
     ui.check("face" in sketch(ui)["plane"], "the plane is the picked face, kept as a query")
     ui.check(ui.js("Store.sketchHost.vp.el") > 85, "the camera looks straight down on the face")
     ui.key("R")
-    a, b = px(ui, 8 - ox, -26 - oy), px(ui, 24 - ox, -14 - oy)
+    # its corners on whole millimetres of the sketch (the picked origin is wherever the pixel landed, and the sketch
+    # snaps to its own grid): 16 x 12 mm wherever the stage frames the part
+    x0, y0 = round(8 - ox), round(-26 - oy)
+    a, b = px(ui, x0, y0), px(ui, x0 + 16, y0 + 12)
     area = ui.item("sketchArea")
     ui.drag("sketchArea", ((b[0] - a[0]) * area.width(), (b[1] - a[1]) * area.height()), a[0], a[1])
     ui.wait_until(lambda: solved(ui).get("closed") and len(sketch(ui)["entities"]) == 4, 10, "a closed rectangle on the face")
@@ -216,7 +219,7 @@ def journey_bracket(ui):
     ui.settle(900)
 
     # an M4 clearance hole into the base, picked on its top face
-    ui.click(ui.item("railHole"))
+    tool(ui, "hole")
     ui.wait_until(lambda: ui.js("Ws.tool") == "annotate" and ui.store.get("selMode") == "face" and ui.js("Ws.want") == "hole", 3, "face picking for a hole")
     ui.settle(500)
     top = hits(ui, lambda h: h["normal"][2] > 0.95 and abs(h["at"][2] - 5) < 1e-3 and 35 < h["at"][0] < 50
@@ -228,7 +231,7 @@ def journey_bracket(ui):
     ui.click_text("M4", within=ui.item("modelPanel"))
     add_from_panel(ui, "hole")
     # a 2 mm fillet on the end edge of the base, picked
-    ui.click(ui.item("railRound"))
+    tool(ui, "fillet")
     ui.wait_until(lambda: ui.store.get("selMode") == "edge" and ui.js("Ws.want") == "fillet", 3, "edge picking for a fillet")
     ui.settle(500)
     end = hits(ui, lambda h: h["normal"][2] > 0.95 and abs(h["at"][2] - 5) < 1e-3 and h["at"][0] > 56)
@@ -267,7 +270,7 @@ def journey_bracket(ui):
         ui.settle(900)
         ui.key("S")
         ui.wait_until(lambda: ui.js("Store.sketchHost.picking") is True, 3, "Sketch waits for a face or a plane")
-        crop(ui, "toolDock", "dock-design")
+        crop(ui, "toolRibbon", "ribbon-design")
         ui.click(ui.item("sketchPlane-XZ"))
         sketching(ui, "a sketch on XZ with the column open")
         ui.key("C")

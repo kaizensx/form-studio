@@ -85,7 +85,7 @@ Item {
             Item { width: 5; height: 1; visible: stateTag.visible }
             // "unreleased" is how every design starts: it is said where there is room (1400 px and wider); a draft,
             // a release and a superseded release are always said
-            Tag { id: stateTag; visible: bar.work && !!Store.project && text !== "" && (text !== "unreleased" || bar.width >= 1400); anchors.verticalCenter: parent.verticalCenter
+            Tag { id: stateTag; visible: bar.work && !!Store.project && text !== "" && (text !== "unreleased" || (bar.width >= 1400 && !Frame.tabs.length)); anchors.verticalCenter: parent.verticalCenter
                 kind: Store.hasDraft ? "draft" : bar.ap && bar.ap.state === "approved" ? "PASS" : bar.ap && bar.ap.state === "superseded" ? "WARN" : ""
                 text: !Store.project || !bar.ap ? "" : Store.hasDraft ? "draft" : bar.ap.state === "approved" ? "released"
                     : bar.ap.state === "superseded" ? F.pad(bar.ap.rev) + " released" : "unreleased"
@@ -125,6 +125,18 @@ Item {
         }
     }
 
+    // ── left, after the design: its open things as tabs (Frame.qml). They take the room left of the modes; the
+    //    modes leave the centre line only when the tabs need more than that, and fold to a count before the modes shrink ──
+    DocTabStrip {
+        id: docTabs
+        source: Store.backdrop; arrive: 0
+        x: left.x + left.width + 8; y: bar.capY
+        readonly property real spare: right.x - 24 - x - stages.natural
+        room: bar.work && !!Store.data ? Math.max(0, spare >= 140 ? spare : right.x - 24 - x - 330) : 0
+        visible: bar.work && !!Store.data && on && room >= 120
+    }
+    readonly property real leftEnd: docTabs.visible ? docTabs.x + docTabs.width : left.x + left.width
+
     // ── centre: the stages ──
     StageTabs {
         id: stages
@@ -133,10 +145,11 @@ Item {
         y: bar.capY - 4
         // on the window's centre line whenever its words fit there between the two capsules; only when they do not
         // does it take all the room between them, off the centre
-        readonly property real onLine: 2 * Math.min(bar.width / 2 - (left.x + left.width + 12), right.x - 12 - bar.width / 2)
+        readonly property real onLine: 2 * Math.min(bar.width / 2 - (bar.leftEnd + 12), right.x - 12 - bar.width / 2)
         readonly property bool centred: onLine >= natural
-        room: centred ? onLine : Math.max(330, right.x - (left.x + left.width) - 24)
-        x: Math.round(centred ? (bar.width - width) / 2 : Math.max(left.x + left.width + 12, Math.min((bar.width - width) / 2, right.x - 12 - width)))
+        room: centred ? onLine : Math.max(330, right.x - bar.leftEnd - 24)
+        x: Math.round(centred ? (bar.width - width) / 2 : Math.max(bar.leftEnd + 12, Math.min((bar.width - width) / 2, right.x - 12 - width)))
+        Behavior on x { enabled: stages.visible && Store.screen === "work"; NumberAnimation { duration: Theme.move(Theme.base); easing.type: Easing.BezierSpline; easing.bezierCurve: Theme.easeOut } }
     }
 
     // ── right: the printer, notices, search, settings ──

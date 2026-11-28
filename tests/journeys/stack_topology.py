@@ -17,7 +17,7 @@ import sys
 from pathlib import Path
 
 import _results as R
-from _lib import open_project
+from _lib import open_project, mode_key
 
 DATA = "fresh"
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
@@ -58,7 +58,7 @@ def journey_stack(ui):
     pid = st.create_design("Box lid screw", BOX_LID_SCREW, purpose="model")["id"]
     r = tools.call(st, pid, a=TIP, b=FLOOR, save=True, name="Tip to floor", tolerances=HAND, samples=20000)
     open_project(ui, pid)
-    ui.key("Ctrl+2")
+    ui.key(mode_key(2))
     ui.wait_until(lambda: ui.find(name="bench-stack"), 15, "the stack-up row")
     row = ui.item("bench-stack")
     val = ui.find(name="benchValue", within=row)
@@ -93,7 +93,7 @@ def journey_topology(ui):
     pid = R.design(st, "Bracket", R.BRACKET)
     if not R.fea_ready(st):
         open_project(ui, pid)
-        ui.key("Ctrl+1")
+        ui.key(mode_key(1))
         ui.settle(300)
         ui.run_js("Store.benchSheetSel = 'topology'")
         e = ui.api("/projects/" + pid + "/result?id=topology")
@@ -104,7 +104,7 @@ def journey_topology(ui):
     R.strength(st, pid, R.STATIC)
     T.run(st, pid, {"volfrac": 0.55, "max_iter": 24})
     open_project(ui, pid)
-    ui.key("Ctrl+1")
+    ui.key(mode_key(1))
     ui.wait_until(lambda: ui.find(name="bench-topology"), 15, "the topology row")
     ui.click("bench-topology", 0.3, 0.5)
     ui.wait_until(lambda: res(ui) == "topology", 20, "the density drawn")

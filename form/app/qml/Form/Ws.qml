@@ -8,12 +8,14 @@ QtObject {
     // select | measure | section | analyze | assembly | history. One at a time; its options show next to the rail.
     property string tool: "select"
     // what the active tool is for, when a dock tool is a way into another one: sketch | extrude | cut | revolve (a
-    // profile drawn on the part), fillet | chamfer | hole | shell | part (picked with Annotate), pattern. "" otherwise.
+    // profile drawn on the part), fillet | chamfer | hole | shell | part | text (picked with Annotate), pattern, or a
+    // feature kind the engine has just learnt (the ribbon, ToolSet.js). "" otherwise.
     property string want: ""
     property bool dockCollapsed: false      // the legend / measurement dock, folded to its header by the user
     property bool dockTouched: false        // the user has folded or opened it; until then a narrow viewport folds it
     property int refineWant: -1             // Refinement in the dock: -1 as the stage has it (open in Design), 0 folded, 1 opened by hand
-    property bool tipWarm: false            // a rail tooltip was just showing: the next one appears at once
+    property bool tipWarm: false
+    property bool legendOpen: false         // the legend under the part, unfolded: its method, the stated error, what it does not tell            // a rail tooltip was just showing: the next one appears at once
     property var folds: ({})                // section key → open
     function isOpen(key, byDefault) { return folds[key] === undefined ? !!byDefault : folds[key] }
     function setOpen(key, on) { var f = Object.assign({}, folds); f[key] = !!on; folds = f }
