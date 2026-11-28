@@ -1,0 +1,108 @@
+# The cut-file check for waterjet: what a DXF must be before a shop can cut it. Same format as the
+# manufacturability tables (form/dfm/rules.py). Read on 2026-11-28. Limits that scale with the sheet use
+# per = "t" (the thickness, an option: without it they are not checked).
+
+[process]
+id = "cut_waterjet"
+label = "Cut file: waterjet"
+evidence = "computed (2D), rules with sources"
+options = ["t", "units", "tol"]
+needs = []
+not_judged = "Taper, stream lag, pierce marks, the bridge between holes and the shop's nesting are not judged."
+
+[[source]]
+id = "scs-guidelines"
+title = "How to prepare your file for sheet cutting (Sheet Cutting Guidelines)"
+publisher = "SendCutSend"
+url = "https://sendcutsend.com/laser-cutting-guidelines"
+published = "undated"
+read = "2026-11-28"
+
+[[rule]]
+id = "cut.closed"
+title = "Every cut contour is closed"
+measure = "open_contours"
+op = "<="
+fail = 0
+unit = "mm gap"
+source = "scs-guidelines"
+quote = "Every cut path must form a closed shape. If your shape stops, so does the cutter."
+
+[[rule]]
+id = "cut.duplicates"
+title = "No duplicate or overlapping lines"
+measure = "duplicate_lines"
+op = "<="
+fail = 0
+unit = "mm overlap"
+source = "scs-guidelines"
+quote = "All stray points, duplicate lines, empty objects and text areas have been removed."
+
+[[rule]]
+id = "cut.crossing"
+title = "Contours do not cross or touch each other"
+measure = "crossings"
+op = "<="
+fail = 0
+unit = "crossings"
+source = "scs-guidelines"
+quote = "Two parts sharing a line, or overlapping lines inside one part, won't cut correctly."
+
+[[rule]]
+id = "cut.tiny"
+title = "No tiny segments"
+measure = "segment_mm"
+op = ">="
+warn = 0.05
+unit = "mm"
+source = "unsourced"
+why = "Segments shorter than 0.05 mm are usually export debris; the threshold is Form Studio's (no shop publishes one)."
+
+[[rule]]
+id = "cut.text"
+title = "Text converted to outlines"
+measure = "text_entities"
+op = "<="
+fail = 0
+unit = "text entities"
+source = "scs-guidelines"
+quote = "Convert all text to outlines. Active text boxes won't cut."
+
+[[rule]]
+id = "cut.layers"
+title = "Cut geometry on one layer"
+measure = "cut_layers"
+op = "<="
+warn = 1
+unit = "layers"
+source = "scs-guidelines"
+quote = "All cut-path geometry should be on the same layer."
+
+[[rule]]
+id = "cut.units"
+title = "Units a shop accepts (inch or mm)"
+measure = "units_ok"
+op = "fits"
+unit = ""
+source = "scs-guidelines"
+quote = "We don't support cm or meter units."
+
+[[rule]]
+id = "waterjet.hole"
+title = "Smallest hole or slot"
+measure = "hole_width_mm"
+op = ">="
+fail = 1.778
+unit = "mm"
+source = "scs-guidelines"
+quote = "Minimum hole/cutout size (waterjet): .070″ for most materials (varies by material, check material specs)"
+
+[[rule]]
+id = "waterjet.corner"
+title = "Inside corner radius (the stream)"
+measure = "corner_r_mm"
+op = ">="
+fail = 0.8128
+unit = "mm"
+source = "scs-guidelines"
+quote = "Minimum internal corner radius (waterjet): .032″ (stream diameter)"

@@ -13,6 +13,13 @@ class PackagedData(unittest.TestCase):
         from form import exemplars
         self.assertGreaterEqual(len(exemplars.catalogue()), 56)
 
+    def test_rule_and_bend_tables_ship_as_files(self):
+        # manufacturability and sheet metal read their limits from TOML tables at run time
+        spec = (ROOT / "packaging" / "form.spec").read_text(encoding="utf-8")
+        for rel in ("form/dfm/rules", "form/sheet/rules", "form/sheet/tables", "form/sheet/services"):
+            self.assertIn(f'"{rel}"', spec)
+            self.assertTrue(list((ROOT / rel).glob("*.toml")), rel)
+
     def test_the_packaged_app_serves_every_exemplar(self):
         """Run packaging/form.spec with PyInstaller's build steps stubbed, lay out its datas the way the bundle does
         (only files listed as data exist; modules are bytecode), and read the exemplar catalogue from that layout:

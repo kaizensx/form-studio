@@ -1,0 +1,78 @@
+# SendCutSend's published materials, thicknesses and limits, as read from their pages on 2026-11-28. Form Studio
+# checks a part against this table before a person sends it anywhere; it never uploads or orders. The pages carry
+# no publication date; a table read more than 90 days ago says so on every result. Values the pages contradict are
+# not used (see max_flat below).
+
+[service]
+id = "sendcutsend"
+label = "SendCutSend"
+url = "https://sendcutsend.com"
+read = "2026-11-28"
+note = "Laser cutting and bending. Per-material minimum hole-to-edge and bridge values are listed on their material pages in a spec table those pages load on demand; it was not read, so those rules are not checked."
+
+[[source]]
+id = "scs-guidelines"
+title = "How to prepare your file for sheet cutting (Sheet Cutting Guidelines)"
+publisher = "SendCutSend"
+url = "https://sendcutsend.com/laser-cutting-guidelines"
+published = "undated"
+read = "2026-11-28"
+
+[[source]]
+id = "scs-bending"
+title = "Sheet Metal Bending Services"
+publisher = "SendCutSend"
+url = "https://sendcutsend.com/guidelines/bending/"
+published = "undated (reviews on the page dated to 2026-11-11)"
+read = "2026-11-28"
+
+[[source]]
+id = "scs-5052"
+title = "5052 H32 Aluminum Sheet Metal"
+publisher = "SendCutSend"
+url = "https://sendcutsend.com/materials/5052-aluminum/"
+published = "undated"
+read = "2026-11-28"
+
+[[source]]
+id = "scs-mild-steel"
+title = "Mild Steel"
+publisher = "SendCutSend"
+url = "https://sendcutsend.com/materials/mild-steel/"
+published = "undated (images on the page dated 2026-07)"
+read = "2026-11-28"
+
+[[material]]
+id = "al_5052_h32"
+label = "5052 H32 aluminum"
+aliases = ["5052", "aluminium 5052", "aluminum 5052", "al5052", "5052-h32"]
+thicknesses_in = [0.040, 0.063, 0.080, 0.090, 0.100, 0.125, 0.187, 0.250, 0.313, 0.375, 0.500]
+bend_max_in = 0.250
+tolerance = "±0.005 in (laser cut)"
+source = "scs-5052"
+
+[[material]]
+id = "steel_mild"
+label = "Mild steel (A1008 cold rolled to 0.135 in, HRPO A36 from 0.187 in)"
+aliases = ["mild steel", "steel", "a36", "1008", "cold rolled steel", "crs"]
+thicknesses_in = [0.030, 0.048, 0.059, 0.074, 0.104, 0.119, 0.135, 0.187, 0.250, 0.313, 0.375, 0.500]
+bend_max_in = 0.250
+tolerance = "±0.005 in"
+source = "scs-mild-steel"
+
+[limits]
+thickness_match_mm = 0.02          # a thickness matches a listed one within this (Form Studio's tolerance, unsourced)
+laser_min_hole = 0.5               # × t
+laser_min_hole_source = "scs-guidelines"
+laser_min_hole_quote = "Minimum hole/cutout size (laser): At least 50% of material thickness"
+bend_min_flat_in = [0.375, 1.5]
+bend_max_flat_in = [30.0, 44.0]
+bend_flat_source = "scs-bending"
+bend_flat_quote = "Min flat part size: .375″ x 1.5″ ... Max flat part size: 30″ x 44″"
+bend_max_angle = 130.0
+bend_angle_source = "scs-bending"
+bend_angle_quote = "Max Bend Angle 130°"
+radius_note = "Bend radius and K factor are set per material thickness ... we don't offer custom bend radii"
+radius_source = "scs-bending"
+box_note = "we're unable to form boxes that close in on themselves"
+max_flat_note = "The 5052 page gives 44 × 68 in (instant) and 59 × 119 in (custom) in its spec section and 30 × 44 in (instant) and 30 × 56 in (custom) in its FAQ; the limit for flat parts is not checked until the pages agree."

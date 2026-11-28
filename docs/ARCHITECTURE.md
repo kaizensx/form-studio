@@ -39,7 +39,8 @@ computed change impact, checks with evidence classes, the fit model, printer cal
 | Print simulation | `form/toolpath.py`, `form/simulate.py` | Per-layer toolpaths by line type, timed by the slicer's estimate |
 | Agents | `form/agents/`, `form/chat.py`, `form/ask.py` | Run an agent CLI, or talk to a model API, a local model or a provider added by URL with Form Studio's tools (`form/agents/mcp_client.py`); questions and measurements the agent asks wait for the person's answer |
 | Blender modelling bridge | `form/adapters/blender_model.py`, `form/adapters/blender_ops.py`, `form/meshsource.py` | An agent's declarative op list, schema-checked, run in Blender by a fixed runner; streams a preview per op; returns cage data (points, quads, creases, named regions) for a design's source |
-| MCP server | `form/mcp_server.py` | 99 tools over stdio |
+| Sheet metal | `form/sheet/` | Sheet-metal features, the B-rep unfold proved by folding back, flat pattern DXF, the cut-file checker, bend order on a press-brake model, flat profiles with kerf, service preflight |
+| MCP server | `form/mcp_server.py` | 103 tools over stdio |
 | CLI | `form/__main__.py` | Every capability as a JSON-printing command |
 | Archives | `form/bundle.py` | `.formstudio` files: a project, its conversations and the code it was built from, checked before anything is written |
 | Installer | `form/installer.py`, `form/setup.py` | Finds and installs slicers, agents and libraries, with consent; hands-free on first start |

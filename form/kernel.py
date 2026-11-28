@@ -1393,3 +1393,5 @@ from .candidates import KERNEL_OPS as _CANDIDATE_OPS  # noqa: E402  (several can
 OPS.update(_CANDIDATE_OPS)
 from .dfm.measure import KERNEL_OPS as _DFM_OPS  # noqa: E402  (manufacturability, measured on the B-rep)
 OPS.update(_DFM_OPS)
+from .sheet.ops import KERNEL_OPS as _SHEET_OPS  # noqa: E402  (sheet metal: unfold, flat profiles)
+OPS.update(_SHEET_OPS)

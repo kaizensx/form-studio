@@ -1,0 +1,129 @@
+# The cut-file check for laser cutting: what a DXF must be before a shop can cut it. Same format as the
+# manufacturability tables (form/dfm/rules.py). Read on 2026-11-28. Limits that scale with the sheet use
+# per = "t" (the thickness, an option: without it they are not checked).
+
+[process]
+id = "cut_laser"
+label = "Cut file: laser"
+evidence = "computed (2D), rules with sources"
+options = ["t", "units", "tol"]
+needs = []
+not_judged = "Kerf, heat distortion, pierce marks, dross, the bridge between holes (SendCutSend lists it per material on material pages that were not read) and the shop's own nesting are not judged."
+
+[[source]]
+id = "scs-guidelines"
+title = "How to prepare your file for sheet cutting (Sheet Cutting Guidelines)"
+publisher = "SendCutSend"
+url = "https://sendcutsend.com/laser-cutting-guidelines"
+published = "undated"
+read = "2026-11-28"
+
+[[source]]
+id = "protolabs-sheet"
+title = "Sheet Metal Fabrication: Design Guidelines"
+publisher = "Protolabs"
+url = "https://www.protolabs.com/services/sheet-metal-fabrication/design-guidelines/"
+published = "undated"
+read = "2026-11-28"
+
+[[rule]]
+id = "cut.closed"
+title = "Every cut contour is closed"
+measure = "open_contours"
+op = "<="
+fail = 0
+unit = "mm gap"
+source = "scs-guidelines"
+quote = "Every cut path must form a closed shape. If your shape stops, so does the cutter."
+
+[[rule]]
+id = "cut.duplicates"
+title = "No duplicate or overlapping lines"
+measure = "duplicate_lines"
+op = "<="
+fail = 0
+unit = "mm overlap"
+source = "scs-guidelines"
+quote = "All stray points, duplicate lines, empty objects and text areas have been removed."
+
+[[rule]]
+id = "cut.crossing"
+title = "Contours do not cross or touch each other"
+measure = "crossings"
+op = "<="
+fail = 0
+unit = "crossings"
+source = "scs-guidelines"
+quote = "Two parts sharing a line, or overlapping lines inside one part, won't cut correctly."
+
+[[rule]]
+id = "cut.tiny"
+title = "No tiny segments"
+measure = "segment_mm"
+op = ">="
+warn = 0.05
+unit = "mm"
+source = "unsourced"
+why = "Segments shorter than 0.05 mm are usually export debris; the threshold is Form Studio's (no shop publishes one)."
+
+[[rule]]
+id = "cut.text"
+title = "Text converted to outlines"
+measure = "text_entities"
+op = "<="
+fail = 0
+unit = "text entities"
+source = "scs-guidelines"
+quote = "Convert all text to outlines. Active text boxes won't cut."
+
+[[rule]]
+id = "cut.layers"
+title = "Cut geometry on one layer"
+measure = "cut_layers"
+op = "<="
+warn = 1
+unit = "layers"
+source = "scs-guidelines"
+quote = "All cut-path geometry should be on the same layer."
+
+[[rule]]
+id = "cut.units"
+title = "Units a shop accepts (inch or mm)"
+measure = "units_ok"
+op = "fits"
+unit = ""
+source = "scs-guidelines"
+quote = "We don't support cm or meter units."
+
+[[rule]]
+id = "laser.hole"
+title = "Smallest hole or slot: half the thickness"
+measure = "hole_width_mm"
+op = ">="
+fail = 0.5
+per = "t"
+unit = "mm"
+source = "scs-guidelines"
+quote = "Minimum hole/cutout size (laser): At least 50% of material thickness"
+
+[[rule]]
+id = "laser.hole_edge"
+title = "Hole to edge"
+measure = "hole_edge_mm"
+op = ">="
+by = "t_band"
+warn = { thin = 1.574, thick = 3.175 }
+unit = "mm"
+source = "protolabs-sheet"
+quote = "If a material is 0.036 in. (0.914mm) or thinner, the hole should be 0.062 in. (1.574mm) from the material edge … the hole should be at least 0.125 in. (3.175mm) from the material edge to avoid distortion"
+
+[[rule]]
+id = "laser.hole_bend"
+title = "Hole to bend line: 4 × thickness"
+measure = "hole_bend_mm"
+op = ">="
+warn = 4.0
+per = "t"
+unit = "mm"
+source = "protolabs-sheet"
+quote = "typically within 4x material thickness of the bend"

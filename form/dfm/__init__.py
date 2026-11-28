@@ -11,7 +11,7 @@ Processes (one rule table each, form/dfm/rules/<id>.toml, every limit with its s
     fdm sla sls mjf lpbf
                  printing: thinnest wall, overhangs from level (not for powder beds), smallest hole, enclosed
                  voids with escape holes, the machine's build volume
-    sheet_metal  routed to its own tool (wave H); says so and passes nothing
+    sheet_metal  measured by form/sheet (the unfold, folded back), judged here with the same rule format
 
     from form import dfm
     r = dfm.check(st, p, "cnc", {"tool_d": 6, "material": "metal"})   # rows, findings, verdict, overlay file
@@ -233,6 +233,9 @@ def check(st, p: dict, process: str | None = None, options: dict | None = None, 
         return {"project": p["id"], "rev": r["n"], "process": process, "label": t["process"]["label"],
                 "verdict": "not proven", "rows": [], "findings": [], "fixes": [], "evidence": "not checked",
                 "headline": f"{t['process']['label']}: not checked (a mesh design has no exact solid)"}
+    if t["process"].get("measured_by") == "form.sheet":
+        from .. import sheet
+        return sheet.dfm_check(st, p, options, r["n"])
     o = options_for(st, p, process, options)
     gk = st.keys(p, r["n"])["geometry"]
     path = _dir(st, p) / f"{process}-{result_key(gk, process, o)}.json"

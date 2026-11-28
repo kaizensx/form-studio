@@ -116,7 +116,7 @@ instead.
 
 ## Tools at a glance
 
-99 tools. Read-only tools never change a project.
+103 tools. Read-only tools never change a project.
 
 | Tool | Access | What it does |
 |---|---|---|
@@ -152,6 +152,10 @@ instead.
 | [`geometry_diff`](#geometry_diff) | changes | Diff the geometry of two revisions. |
 | [`manufacturability`](#manufacturability) | changes | Check a design for a manufacturing process. |
 | [`apply_fix`](#apply_fix) | changes | Fix a manufacturability finding and prove it. |
+| [`flat_pattern`](#flat_pattern) | changes | Lay a part flat for cutting and write the DXF. |
+| [`cut_file_check`](#cut_file_check) | read-only | Check a DXF before a shop cuts it, or a design's own flat pattern or profile (written to DXF and read back). |
+| [`bend_order`](#bend_order) | changes | Find an order in which a press brake can form every bend of a sheet-metal part, with a stated tool model: a V-die of 8 × t (Bystronic's rule, cited), an 88° groove, a gooseneck punch of stated dimensions sectioned to the bend's length, the part air-bent and checked at 25, 50, 75 and 100 % of each bend against punch, ram, die and bed, turned end for end when that helps. |
+| [`service_preflight`](#service_preflight) | read-only | Check a part against a cutting and bending service's published materials, thicknesses and limits before a person sends it: material offered, thickness on the service's list, bending offered at that thickness, bend angle, flat size of a bent part, smallest laser hole, and the cut-file rules. |
 | [`add_text`](#add_text) | changes | Put raised (or, with sunk, cut-in) lettering on a flat face of a Python design, as a real feature of its source: a new revision whose build adds a stage text_N with Form Studio's bundled font. |
 | [`add_feature`](#add_feature) | changes | Add a feature to a Python design as a new revision. |
 | [`remove_feature`](#remove_feature) | changes | Remove a feature as a new revision: a standard feature added with add_feature ("boss_1", "hook_1"), or any feature of a FeatureDesign (its method goes; the features before it load from their checkpoints). |
@@ -818,10 +822,11 @@ is geometry: process cnc (3/4/5-axis access for a flat end mill, internal corner
 cavity depth, tool reach, thin walls, holes, setups), injection (a proposed pull direction and parting line,
 undercuts with the side action or lifter each needs, draft per face, wall range per resin, projected area,
 clamp tonnage), fdm, sla, sls, mjf, lpbf (walls, overhangs, holes, enclosed voids, build volume), sheet_metal
-(routed to its own tool; not checked here). Default process: the design's own (purpose print: fdm).
+(the part unfolded and folded back, flange length, holes to edge and bend, hems; flat_pattern has the rest).
+Default process: the design's own (purpose print: fdm).
 options: cnc {tool_d (mm, needed), material: metal|plastic, axes: 3|4|5, flute_l, holder_d, rotary_axis};
 injection {resin: abs|pc|pp|nylon|..., pull: [x,y,z] or "auto", cavities, textured}; printing {up: [x,y,z],
-machine: [x,y,z] mm, alloy for lpbf}; any process {overrides: {rule_id: {fail, warn}}} for a shop's limits
+machine: [x,y,z] mm, alloy for lpbf}; sheet_metal {material, k, method: table|din6935, forming}; any process {overrides: {rule_id: {fail, warn}}} for a shop's limits
 (recorded as specified). A rule whose input is missing is not checked, and the verdict is then "not proven",
 never a pass. Returns rows (one per rule), findings (where, value, limit), the proposed fixes (apply_fix),
 the overlay file the viewport draws (form-dfm-overlay/1) and, with view (iso, top, ...), a picture.
@@ -854,6 +859,84 @@ after the preview. Pass the same options as manufacturability and expect_head.
 | `apply` | boolean |  |
 | `accept_trades` | boolean |  |
 | `expect_head` | integer \| null |  |
+
+### `flat_pattern`
+
+Lay a part flat for cutting and write the DXF. kind "flat" (a bent sheet-metal part): the solid's skin
+recognised (flat faces and cylindrical bends of one thickness), unfolded with a bend allowance θ·(r + K·t)
+whose K-factor comes from a sourced table (options: material al_5052_h32|al_6061_t6|steel_mild|steel_304|
+copper, method table|din6935, forming air|bottoming|coining, or k for your shop's own value, recorded as
+specified), then folded back from the flat pattern's own numbers and compared with the solid (verify.max_mm
+against 0.01 mm). The DXF has CUT (closed contours), BEND_UP and BEND_DOWN (centre lines), ETCH (label as
+outlines: options.label) and NOTES (angle, radius, K, allowance per bend). What cannot be unfolded is named
+with the face and why (a louvre, an edge round, two thicknesses). kind "profile" (any flat part for laser,
+waterjet or router): the outline of its largest flat face, with kerf (mm) offsetting the cutter's path half
+the kerf away from the material. "auto": flat when the part has bends, else profile. Returns the summary,
+the bends, the verification, dxf and png paths. out: write the DXF there too.
+
+| Argument | Type | Required |
+|---|---|---|
+| `project` | string | yes |
+| `kind` | string |  |
+| `options` | object \| null |  |
+| `kerf` | number |  |
+| `rev` | integer \| null |  |
+| `out` | string |  |
+
+### `cut_file_check`
+
+*Read-only.*
+
+Check a DXF before a shop cuts it, or a design's own flat pattern or profile (written to DXF and read
+back). process laser|waterjet|router. Layers are read by intent from their names (cut, bend, etch, ignore;
+an unknown layer is taken as cut and listed). Rules, each with the fabricator page it came from (SendCutSend,
+Protolabs) or marked unsourced: closed contours, duplicate and overlapping lines, crossing contours, tiny
+segments, text not converted to outlines, cut geometry on one layer, units, the smallest hole or slot (per
+process; laser 50 % of t), hole to edge, hole to bend line, inside corner radius (waterjet, router), part
+size (router). options: t (thickness, mm; needed for the rules in multiples of t), units (mm|in, overrides
+the file), material (router size limit). Returns rows, findings with places, and the layers it read.
+
+| Argument | Type | Required |
+|---|---|---|
+| `path` | string |  |
+| `project` | string |  |
+| `process` | string |  |
+| `options` | object \| null |  |
+
+### `bend_order`
+
+Find an order in which a press brake can form every bend of a sheet-metal part, with a stated tool model:
+a V-die of 8 × t (Bystronic's rule, cited), an 88° groove, a gooseneck punch of stated dimensions sectioned to
+the bend's length, the part air-bent and checked at 25, 50, 75 and 100 % of each bend against punch, ram,
+die and bed, turned end for end when that helps. Returns the sequence (or that none exists with these
+tools, or that the search budget ran out), each bend's collisions alone and after all others, the model with
+its dimensions and evidence, and its limits (2D cross-section, no springback, hems need other tools).
+options: punch gooseneck|straight, die_v (mm), and the flat_pattern K-factor options.
+
+| Argument | Type | Required |
+|---|---|---|
+| `project` | string | yes |
+| `options` | object \| null |  |
+| `rev` | integer \| null |  |
+
+### `service_preflight`
+
+*Read-only.*
+
+Check a part against a cutting and bending service's published materials, thicknesses and limits before
+a person sends it: material offered, thickness on the service's list, bending offered at that thickness,
+bend angle, flat size of a bent part, smallest laser hole, and the cut-file rules. Every limit names the page
+and the date it was read; a table read more than 90 days ago says so. Nothing is uploaded and nothing is
+ordered. project (its flat pattern or profile) or path (a DXF; give thickness in mm). service: sendcutsend.
+material: al_5052_h32 or steel_mild (or their names).
+
+| Argument | Type | Required |
+|---|---|---|
+| `project` | string |  |
+| `path` | string |  |
+| `service` | string |  |
+| `material` | string |  |
+| `thickness` | number \| null |  |
 
 ### `add_text`
 

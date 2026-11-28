@@ -27,6 +27,11 @@ datas = [(str(ROOT / "form" / "app" / "qml"), "form/app/qml"),
          (str(ROOT / "form" / "adapters" / "blender_lod.py"), "form/adapters")]
 # the game pipeline as files too (form/game): its runner path is resolved from them on disk
 datas += [(str(p), "form/game") for p in sorted((ROOT / "form" / "game").glob("*.py"))]
+# rule and bend tables read as TOML at run time: manufacturability (form/dfm/rules), sheet metal (form/sheet)
+datas += [(str(ROOT / "form" / "dfm" / "rules"), "form/dfm/rules"),
+          (str(ROOT / "form" / "sheet" / "rules"), "form/sheet/rules"),
+          (str(ROOT / "form" / "sheet" / "tables"), "form/sheet/tables"),
+          (str(ROOT / "form" / "sheet" / "services"), "form/sheet/services")]
 binaries, hidden = [], []
 for pkg in ("OCP", "build123d", "ocp_gordon", "ocpsvg", "lib3mf", "mcp", "pypdfium2", "pypdfium2_raw",
             "bd_warehouse", "bd_materials", "py_gearworks", "manifold3d"):   # parts libraries, materials, mesh booleans
