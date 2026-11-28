@@ -13,7 +13,8 @@
   document is the engine's own entry (`form/studies.py`). Fit is the engine's *Fit under uncertainty* row.
 - **The Bench opens as a sheet: Ctrl/⌘ B.** All four chapters as columns over the stage, with filters by state, a
   find field (`/`) and the selected row's request at the foot. Each entry now says which chapter it is in
-  (`chapter` in `list_studies`): the features, the requirements, the materials and *Make it lighter* are Design.
+  (`chapter` in `list_studies`): the features, the requirements, the materials and *Make it lighter* are Design;
+  the slice, the print simulation and CNC are Make, with the routes.
 - **The tree shows each feature's value and who made it**, in place of its role word, and a selected feature opens
   under the tree, which stays. **Values | Source** puts the design's code under the tree with the open feature's
   lines lit (`GET /tree` returns the source, each feature's lines and the first revision that built it). The

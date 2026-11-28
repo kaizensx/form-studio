@@ -773,7 +773,13 @@ Item {
                 BenchCard { id: opened; x: 6 - body.x; width: insp.width - 12
                     readonly property var pick: chap.visible ? Store.benchSelected(chap.chapter) : null
                     readonly property bool home: !pick || pick.id === Store.benchHome[chap.chapter]
-                    e: home ? null : pick }
+                    e: home ? null : pick
+                    // a long chapter: the opened row comes into view under the last rows of the list
+                    readonly property string shownId: e ? e.id : ""
+                    onShownIdChanged: if (shownId !== "") reveal.restart()
+                    Timer { id: reveal; interval: 80       // once the card has its height
+                        onTriggered: if (opened.e && opened.y + Math.min(opened.height, 200) > scroll.contentY + scroll.height)
+                            scroll.contentY = Math.max(0, Math.min(scroll.contentHeight - scroll.height, opened.y - 104)) } }
                 BenchRow { objectName: "studyBack"; x: 6 - body.x; width: insp.width - 12; visible: Store.stage === "fit"; chevron: true; selected: true
                     name: "Fit"; value: ws.d && ws.d.fit ? Math.round(ws.d.fit.yield * 100) + " %" : ""; evidence: ws.d && ws.d.fit ? "modelled" : ""
                     onClicked: Store.setStage("prove") }
