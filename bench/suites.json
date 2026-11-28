@@ -268,10 +268,10 @@
      "group": "Euler buckling of a column",
      "item": "buckling load factor",
      "expected": 10.794879813691484,
-     "got": 10.814791598587616,
+     "got": 10.814791598689563,
      "unit": "",
      "tolerance": 0.02,
-     "error": 0.0018445582757556785,
+     "error": 0.0018445582851996834,
      "relative": true,
      "pass": true,
      "source": "Euler: pi^2 E I/(4 L^2) / P",
@@ -533,11 +533,11 @@
     "netgen-mesher": "6.2.2608"
    },
    "cases": 18,
-   "seconds": 68.53,
+   "seconds": 70.06,
    "python": "3.12.16",
    "passed": 40,
    "failed": 0,
-   "commit": "e07e77e31523311e55786fad6fe2f86d1dc44302",
+   "commit": "92406f276333b330d5d29c32f02f03e7f18fb0ec",
    "branch": "dev",
    "dirty": false,
    "machine": "x86_64, Linux 6.8.0-1073-azure, 4 cores",
@@ -1797,11 +1797,11 @@
      "note": ""
     }
    ],
-   "seconds": 33.32,
+   "seconds": 34.73,
    "python": "3.12.16",
    "passed": 96,
    "failed": 0,
-   "commit": "e07e77e31523311e55786fad6fe2f86d1dc44302",
+   "commit": "92406f276333b330d5d29c32f02f03e7f18fb0ec",
    "branch": "dev",
    "dirty": false,
    "machine": "x86_64, Linux 6.8.0-1073-azure, 4 cores",
@@ -3686,7 +3686,7 @@
    "python": "3.12.16",
    "passed": 138,
    "failed": 5,
-   "commit": "e07e77e31523311e55786fad6fe2f86d1dc44302",
+   "commit": "92406f276333b330d5d29c32f02f03e7f18fb0ec",
    "branch": "dev",
    "dirty": false,
    "machine": "x86_64, Linux 6.8.0-1073-azure, 4 cores",
@@ -6550,7 +6550,7 @@
    "python": "3.12.16",
    "passed": 219,
    "failed": 0,
-   "commit": "e07e77e31523311e55786fad6fe2f86d1dc44302",
+   "commit": "92406f276333b330d5d29c32f02f03e7f18fb0ec",
    "branch": "dev",
    "dirty": false,
    "machine": "x86_64, Linux 6.8.0-1073-azure, 4 cores",
@@ -6572,7 +6572,7 @@
      "relative": false,
      "pass": true,
      "source": "the input mesh",
-     "note": "B-rep 87.66 %, editable 100.0 %, gates pass, 96.8 s"
+     "note": "B-rep 87.66 %, editable 100.0 %, gates pass, 97.2 s"
     },
     {
      "group": "bracket: stepped_bracket",
@@ -6585,7 +6585,7 @@
      "relative": false,
      "pass": true,
      "source": "the input mesh",
-     "note": "B-rep 0.0 %, editable 0.0 %, gates pass, 199.9 s"
+     "note": "B-rep 0.0 %, editable 0.0 %, gates pass, 200.0 s"
     },
     {
      "group": "flange: bolt_flange",
@@ -6598,7 +6598,7 @@
      "relative": false,
      "pass": true,
      "source": "the input mesh",
-     "note": "B-rep 100.0 %, editable 100.0 %, gates pass, 41.9 s"
+     "note": "B-rep 100.0 %, editable 100.0 %, gates pass, 42.6 s"
     },
     {
      "group": "turned shaft: turned_shaft",
@@ -6611,7 +6611,7 @@
      "relative": false,
      "pass": true,
      "source": "the input mesh",
-     "note": "B-rep 13.18 %, editable 100.0 %, gates pass, 204.0 s"
+     "note": "B-rep 13.18 %, editable 100.0 %, gates pass, 205.0 s"
     },
     {
      "group": "turned shaft: flanged_shaft",
@@ -6624,7 +6624,7 @@
      "relative": false,
      "pass": true,
      "source": "the input mesh",
-     "note": "B-rep 0.0 %, editable 0.0 %, gates pass, 208.6 s"
+     "note": "B-rep 0.0 %, editable 0.0 %, gates pass, 208.4 s"
     },
     {
      "group": "enclosure with holes: enclosure_with_holes",
@@ -6637,7 +6637,7 @@
      "relative": false,
      "pass": true,
      "source": "the input mesh",
-     "note": "B-rep 94.33 %, editable 100.0 %, gates pass, 192.5 s"
+     "note": "B-rep 94.33 %, editable 100.0 %, gates pass, 191.7 s"
     },
     {
      "group": "filleted block: filleted_block",
@@ -6650,7 +6650,7 @@
      "relative": false,
      "pass": true,
      "source": "the input mesh",
-     "note": "B-rep 75.55 %, editable 100.0 %, gates pass, 204.9 s"
+     "note": "B-rep 75.55 %, editable 100.0 %, gates pass, 207.4 s"
     },
     {
      "group": "scan artifacts: bolt_flange+noise",
@@ -6663,7 +6663,7 @@
      "relative": false,
      "pass": true,
      "source": "the input mesh",
-     "note": "B-rep 100.0 %, editable 100.0 %, gates pass, 66.9 s"
+     "note": "B-rep 100.0 %, editable 100.0 %, gates pass, 68.7 s"
     },
     {
      "group": "scan artifacts: bolt_flange+quantised",
@@ -6676,7 +6676,7 @@
      "relative": false,
      "pass": true,
      "source": "the input mesh",
-     "note": "B-rep 100.0 %, editable 100.0 %, gates pass, 37.0 s"
+     "note": "B-rep 100.0 %, editable 100.0 %, gates pass, 37.7 s"
     },
     {
      "group": "scan artifacts: bolt_flange+dropout",
@@ -6689,14 +6689,14 @@
      "relative": false,
      "pass": true,
      "source": "the input mesh",
-     "note": "B-rep 100.0 %, editable 100.0 %, gates pass, 35.9 s"
+     "note": "B-rep 100.0 %, editable 100.0 %, gates pass, 36.5 s"
     }
    ],
-   "seconds": 1328.39,
+   "seconds": 1336.2,
    "python": "3.12.16",
    "passed": 10,
    "failed": 0,
-   "commit": "e07e77e31523311e55786fad6fe2f86d1dc44302",
+   "commit": "92406f276333b330d5d29c32f02f03e7f18fb0ec",
    "branch": "dev",
    "dirty": false,
    "machine": "x86_64, Linux 6.8.0-1073-azure, 4 cores",
