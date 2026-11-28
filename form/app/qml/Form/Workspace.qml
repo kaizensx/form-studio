@@ -415,6 +415,14 @@ Item {
                     active: ws.tool === "assembly" && !ws.sim; marked: Store.asmMode !== "print"; onClicked: ws.setTool("assembly") }
                 RailBtn { icon: "history"; label: "History"; keys: "T"; hint: "Scrub through the revisions. Looking changes nothing."
                     active: ws.tool === "history" && !ws.sim; marked: !!Store.scrub; onClicked: ws.setTool("history") }
+                // modelling by hand (form/modelling.py): each becomes a feature in the design's code
+                Item { width: 36; height: 9; Rectangle { x: 8; y: 4; width: 20; height: 1; color: Theme.rule } }
+                RailBtn { objectName: "railSketch"; icon: "pen_tool"; label: "Sketch"; hint: "Draw a profile on a plane and extrude, cut or revolve it. On a face: pick it with Annotate, then Sketch here…"
+                    enabled: !ws.sim && !Store.hasDraft; onClicked: Store.openSheet("handsketch", { mode: "add", plane: { datum: "XY", offset: 0 } }) }
+                RailBtn { objectName: "railRound"; icon: "radius"; label: "Fillet or chamfer"; hint: "Pick the edges to round or bevel."
+                    enabled: !ws.sim; active: ws.tool === "annotate" && Store.selMode === "edge"; onClicked: { if (ws.tool !== "annotate") ws.setTool("annotate"); Store.selMode = "edge" } }
+                RailBtn { objectName: "railHole"; icon: "circle_dot"; label: "Hole, shell or sketch on a face"; hint: "Pick a flat face: a hole to a standard size, a shell open there, or a sketch on it."
+                    enabled: !ws.sim; active: ws.tool === "annotate" && Store.selMode === "face"; onClicked: { if (ws.tool !== "annotate") ws.setTool("annotate"); Store.selMode = "face" } }
                 Item { width: 36; height: 9; Rectangle { x: 8; y: 4; width: 20; height: 1; color: Theme.rule } }
                 RailBtn { icon: "layers"; label: "Simulate the print"; hint: ws.d && ws.d.slice ? "Play the slicer’s toolpaths. Simulated, not a print." : "Needs a current slice of this revision."
                     enabled: !!ws.d && !!ws.d.slice; active: ws.sim
@@ -624,8 +632,9 @@ Item {
                 Row { id: sn; x: 10; anchors.verticalCenter: parent.verticalCenter; spacing: 8
                     Txt { mono: true; font.pixelSize: 12; color: Theme.blueprint; text: Store.scrub ? F.pad(Store.scrub.rev) : ""; anchors.verticalCenter: parent.verticalCenter }
                     Txt { font.pixelSize: 12; tone: 2; anchors.verticalCenter: parent.verticalCenter; wrapMode: Text.NoWrap
-                        text: Store.morphing ? "Playing the history · head is " + (Store.project ? F.pad(Store.project.head) : "") : "Viewing only · head is still " + (Store.project ? F.pad(Store.project.head) : "") }
-                    Btn { small: true; kind: "quiet"; text: "Back to head"; anchors.verticalCenter: parent.verticalCenter; onClicked: Store.endScrub() } } }
+                        text: Store.scrub && Store.scrub.upto ? "Rolled back to " + (Store.featureById(Store.scrub.upto) || { label: Store.scrub.upto }).label + " · viewing only"
+                              : Store.morphing ? "Playing the history · head is " + (Store.project ? F.pad(Store.project.head) : "") : "Viewing only · head is still " + (Store.project ? F.pad(Store.project.head) : "") }
+                    Btn { objectName: "backToHead"; small: true; kind: "quiet"; text: Store.scrub && Store.scrub.upto ? "Show every feature" : "Back to head"; anchors.verticalCenter: parent.verticalCenter; onClicked: Store.endScrub() } } }
             Rectangle { visible: Store.hasDraft && !!Store.preview && !Store.scrub; width: b1.implicitWidth + 20; height: 26; radius: Theme.rSm
                 color: Theme.alpha(Theme.blueprint, 0.14); border.color: Theme.alpha(Theme.blueprint, 0.3)
                 Txt { id: b1; anchors.centerIn: parent; font.pixelSize: 12; color: Theme.strong(Theme.blueprint); wrapMode: Text.NoWrap

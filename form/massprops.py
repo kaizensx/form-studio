@@ -409,3 +409,89 @@ BENCH = {"id": "mass", "group": "studies", "label": "Mass & inertia", "stage": "
          "needs": ["geometry"], "inputs": ["part", "pose", "material", "frame"],
          "evidence": EVIDENCE_BREP, "key": study_key, "run": run_study, "headline": headline,
          "mcp": "mass_properties", "cli": "form mass <project>"}
+
+
+def _bench_headline(res: dict) -> str:
+    """The Bench line's number: the grams and what they were weighed in (its evidence class is shown beside it)."""
+    t = res.get("total")
+    if not t:
+        return "no material chosen"
+    mats = {x["material"]["id"]: x["material"] for x in res["parts"] if x.get("material")}
+    if len(mats) == 1:
+        m = next(iter(mats.values()))
+        return f"{t['mass_g']:.4g} g · {m['id']}, {m['density_kg_m3']:g} kg/m³"
+    return f"{t['mass_g']:.4g} g · {len(mats)} materials"
+
+
+def _bench_result(res: dict) -> dict:
+    t = res.get("total")
+    return {"headline": _bench_headline(res), "evidence": res.get("evidence") or EVIDENCE_BREP,
+            "detail": res.get("text") or "",
+            "data": {"total": t, "volume_mm3": res.get("volume_mm3"), "frame": res.get("frame"),
+                     "missing_material": res.get("missing_material"), "materials": res.get("materials"),
+                     "parts": [{k: x.get(k) for k in ("id", "label", "mass_g", "volume_mm3", "material")}
+                               for x in res.get("parts") or []]}}
+
+
+def _bench_run(ctx) -> dict:
+    """The Bench's run: the design as built (assembled, if it declares an assembly) in its own materials."""
+    return _bench_result(run_study(ctx.st, ctx.p))
+
+
+def _bench_probe(ctx):
+    """Already measured for the head (the size line asked for it): plain Python from the stored geometry, no kernel."""
+    if not stored(ctx.st, ctx.p):
+        return None
+    return _bench_result(run_study(ctx.st, ctx.p))
+
+
+def _design_materials(p: dict) -> list:
+    """The materials the person chose (the design's and each part's), as stored keys, without the kernel."""
+    from . import materials
+    keys = [materials._key(p.get("material"))]
+    keys += [materials._key((v or {}).get("material")) for v in (p.get("parts") or {}).values() if isinstance(v, dict)]
+    out = []
+    for k in keys:
+        if k and k not in out:
+            out.append(k)
+    return out
+
+
+def _materials_live(ctx) -> dict:
+    """Which materials the design is given and where each number comes from (form/material_library.py)."""
+    from . import material_library as ml
+    rows = []
+    for k in _design_materials(ctx.p):
+        try:
+            r = ml.record(k)
+        except KeyError:
+            rows.append({"id": k, "label": k, "unknown": True})
+            continue
+        rows.append({"id": r["id"], "label": r["label"], "grade": r.get("grade"), "density_kg_m3": r["density"]["value"],
+                     "density_source": r["density"].get("source"), "density_evidence": r["density"].get("evidence"),
+                     "unsourced": r.get("unsourced") or []})
+    if not rows:
+        return {"headline": "no material chosen", "evidence": "specified (datasheet)",
+                "detail": "Choose one with set_appearance (or the Colour & material pane); the mass needs it.", "data": {"materials": []}}
+    names = ", ".join(x["label"] for x in rows)
+    gaps = sum(len(x.get("unsourced") or []) for x in rows)
+    return {"headline": names + (f" · {gaps} value{'s' if gaps != 1 else ''} unsourced" if gaps else " · every value sourced"),
+            "evidence": "specified (datasheet)",
+            "detail": " ".join(f"{x['label']}: {x.get('density_kg_m3', '?'):g} kg/m³ ({x.get('density_source') or 'typical'})."
+                               for x in rows if not x.get("unknown")),
+            "data": {"materials": rows}}
+
+
+def register_studies(register) -> None:
+    """Wave C's entries on the Bench (form/studies.py PROVIDERS): mass and inertia, and the materials with sources."""
+    from .studies import Study
+    b = BENCH                                      # the entry this module declares; the Bench's own fields from it
+    register(Study(b["id"], "study", b["label"], "Mass, centre of mass, inertia tensor and principal axes on the "
+                   "B-rep, per part and assembled, in each part's material.", b["evidence"],
+                   run=_bench_run, probe=_bench_probe, key=lambda ctx: b["key"](ctx.st, ctx.p),
+                   inputs=("geometry", "materials", "densities"), app="mass", tool=b["mcp"], order=16,
+                   extra={"cli": b["cli"], "options": list(b["inputs"])}))
+    register(Study("materials", "study", "Materials & sources", "The materials the design is given, each density and "
+                   "property with the document it was read from, and which values no source gives.",
+                   "specified (datasheet)", run=_materials_live, live=True, inputs=("materials",), app="materials",
+                   tool="set_appearance", order=17))

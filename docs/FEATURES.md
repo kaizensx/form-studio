@@ -491,8 +491,10 @@ current, stale, failed, running, unavailable with why, n/a with why), the revisi
 with its evidence class, and a run action wired to the same code as its own tool. Results are stored beside the
 revision under a key of its inputs, so a new revision makes them stale by construction and nothing is ever marked
 current by hand. The same listing is `list_studies` / `run_study` / `get_study` over MCP and `form study` in the
-terminal; later studies (mass properties, strength, manufacturability, drawings) register into it and appear
-everywhere at once.
+terminal; later studies register into it (`studies.PROVIDERS`) and appear everywhere at once. Mass and inertia, the
+materials with the document each value comes from (`form/massprops.py`) and the feature tree's state (`Features`:
+built, suppressed by hand, left out with the reason; `form/modelling.py`) are registered this way. A change made by
+hand is one revision of the design's code, so the studies of the revision before it show stale.
 
 ## Checks and evidence
 
@@ -557,6 +559,23 @@ either. A real thin fin still fails.
   boss (M2 to M5, with the ISO tap drill, a heat-set insert hole or the ISO 273 clearance) or a cantilever snap-fit
   hook, checked against your nozzle and written into the design's code. `form feature`; MCP `add_feature`,
   `remove_feature`.
+- **Fillet, chamfer, hole, pattern and shell by picking.** In Annotate, **Fillet or chamfer…** on picked edges, or
+  **Hole or shell…** on a flat face (hole sizes from ISO 273, the tap drill table or an ISO 286 fit; plain,
+  counterbore or countersink); in the Program, a line's **Pattern…** repeats it in a line or around an axis.
+  **Preview** builds the draft in the kernel with its change in volume; **Add to design** writes one feature method
+  and its parameters into the design's code, so the agent, `optimize` and `geometry_diff` work on it like any other.
+  Picked edges and faces are stable queries (the features that made them, their kind, direction and place), not
+  indexes. `form model`; MCP `add_feature` (kinds `fillet`, `chamfer`, `hole`, `pattern`, `shell`).
+- **Sketch on a plane or a face, then extrude, cut or revolve.** **Model it by hand** on the blank canvas, **Sketch
+  here…** on a picked flat face, or the dock's **Sketch**: lines, rectangles and circles that snap horizontal and
+  vertical, dimensions solved live by form.sketch2d with the degrees of freedom left, each dimension a parameter of
+  the design. The sketch is data inside its feature's method, so `get_sketch` and `edit_sketch` (MCP) and `form
+  sketch` read and change exactly what the editor shows.
+- **The feature tree by hand.** The Program's rollback bar shows the part as it stood after any feature, from the
+  checkpoints and without saving; each line's menu suppresses, restores, renames and moves it and says what it
+  depends on; a line dragged by its number moves it. A move that empties a feature, or puts one before a feature it
+  reads, is refused with the reason. `form tree`, `form render --upto`; MCP `edit_design` ops `suppress`, `restore`,
+  `move`, `rename`, `render(upto=)`, `get_design_source` (`tree`).
 - **Section (X):** a clipping plane through the solid with filled cut faces.
 - **Orientation finder:** ranks print orientations by overhang area, support, contact and height, with the numbers
   behind the ranking, and applies the one you choose.
@@ -664,7 +683,7 @@ either. A real thin fin still fails.
 | OpenSCAD | Builds `.scad` designs; Customizer ranges become parameters |
 | Blender | Photoreal renders; its 3D-Print Toolbox checks when the add-on is installed |
 | Your slicer | Slices, and opens the 3MF or G-code in it |
-| Any MCP client | The full engine over 106 tools ([MCP reference](MCP.md)) |
+| Any MCP client | The full engine over 108 tools ([MCP reference](MCP.md)) |
 
 When a program's version outside the supported range is why something failed, the error names the supported versions
 and what to do.

@@ -1391,6 +1391,8 @@ from .appearance import KERNEL_OPS as _APPEARANCE_OPS  # noqa: E402  (material z
 OPS.update(_APPEARANCE_OPS)
 from .candidates import KERNEL_OPS as _CANDIDATE_OPS  # noqa: E402  (several candidates built and scored)
 OPS.update(_CANDIDATE_OPS)
+from .handfeat import KERNEL_OPS as _HAND_OPS  # noqa: E402  (picked edges and faces as stable queries)
+OPS.update(_HAND_OPS)
 from .massprops import KERNEL_OPS as _MASS_OPS  # noqa: E402  (mass, centre of mass and inertia from the B-rep)
 OPS.update(_MASS_OPS)
 from .catalog import KERNEL_OPS as _CATALOG_OPS  # noqa: E402  (standard parts: build and measure one part)
