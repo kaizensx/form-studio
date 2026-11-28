@@ -179,7 +179,7 @@ def main() -> int:
     if OUT.exists():
         shutil.rmtree(OUT)
     OUT.mkdir(parents=True)
-    urls = ["", "docs/", "measure/"]
+    urls = ["", "docs/", "measure/", "benchmarks.html"]
     for slug, source, title, desc in PAGES:
         text = (ROOT / source).read_text(encoding="utf-8")
         body = rewrite(render(text), source)

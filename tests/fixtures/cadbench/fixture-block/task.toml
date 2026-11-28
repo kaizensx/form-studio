@@ -1,0 +1,14 @@
+# A test fixture with the layout of a Harbor task, written for tests/test_bench.py. It is NOT a Parametric CAD
+# Bench task and is never scored or published under its name.
+schema_version = "1.3"
+artifacts = ["/app/answer.py", "/app/answer.FCStd"]
+
+[task]
+name = "form-studio/fixture-block"
+description = "A test fixture: one block."
+
+[verifier]
+timeout_sec = 60.0
+
+[agent]
+timeout_sec = 300

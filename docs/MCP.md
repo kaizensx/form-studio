@@ -115,7 +115,7 @@ instead.
 
 ## Tools at a glance
 
-126 tools. Read-only tools never change a project.
+127 tools. Read-only tools never change a project.
 
 | Tool | Access | What it does |
 |---|---|---|
@@ -198,6 +198,7 @@ instead.
 | [`reference_residual`](#reference_residual) | read-only | List what remains of a remodel. |
 | [`fit_params`](#fit_params) | changes | Tune the design's declared Params so it lies closer to an imported mesh: bounded least squares over those Params only (each inside its own min and max and at most max_change mm from its value), every evaluation a real build. |
 | [`freecad_macro`](#freecad_macro) | read-only | Write a FreeCAD macro (.FCMacro) next to the current STEP export. |
+| [`freecad_partdesign`](#freecad_partdesign) | changes | The design as a native FreeCAD PartDesign feature tree (.FCStd) with editable history, built and checked in FreeCAD's command line (freecadcmd). |
 | [`analyze`](#analyze) | read-only | Analyze the part as a map. An analysis map of the part, computed from the real geometry: a picture with its legend, and the statistics. |
 | [`measure`](#measure) | read-only | Measure distances and features of the part. |
 | [`mass_properties`](#mass_properties) | read-only | Mass, centre of mass, inertia tensor and principal axes, computed on the B-rep (OCCT), per part and for the whole. |
@@ -1818,6 +1819,26 @@ from the STEP (hash-checked) with a spreadsheet of FORM's parameters and their p
 | Argument | Type | Required |
 |---|---|---|
 | `project` | string | yes |
+
+### `freecad_partdesign`
+
+The design as a native FreeCAD PartDesign feature tree (.FCStd) with editable history, built and checked in
+FreeCAD's command line (freecadcmd). Sketches (Sketcher constraints, named dimensions), Pad, Pocket,
+Revolution, Groove, Fillet, Chamfer, Hole (ISO size when it matches), LinearPattern, PolarPattern and
+Thickness; a "Params" spreadsheet holds every parameter and the feature sizes are expressions on its cells.
+A feature of free code is decomposed into sketch + Pad/Pocket where it is a prism, else it is a frozen solid.
+out: the .FCStd path or a folder (default: the project's partdesign folder); the FreeCAD script that made it
+(<name>.py) and the step solids (<name>_steps/) are written next to it. edit: {parameter: value} also sets
+those cells in FreeCAD, recomputes, and compares with Form Studio's build at those values (the file keeps the
+exported values). Returns per feature: native | decomposed | frozen | failed, editable only when FreeCAD
+recomputed it to Form Studio's solid; the parameters bound to cells; volume, bounding box and face count
+parity. FreeCAD's topological naming is still fragile (read the toponaming note).
+
+| Argument | Type | Required |
+|---|---|---|
+| `project` | string | yes |
+| `out` | string |  |
+| `edit` | object \| null |  |
 
 ### `analyze`
 

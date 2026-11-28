@@ -30,6 +30,7 @@
                                      a strength study with a stated error (also modal, buckling, list, show, verify;
                                      `form study strength ...` is the same); JSON
   form study list|run|show <project> [id] [--force]   the Bench: every study, route and document, with its state
+  form bench list|run|publish|cadbench|oracle          benchmarks: own suites and Parametric CAD Bench v3, published
   form calc <calculator> key=value ... [--build]   size a snap fit, hinge, spring, bolted joint, gear pair, cam or fit
                                      from a standard's equations; every number with its source (form calc list); JSON
   form tree <project> [suppress|restore|move|rename FEATURE] [--upto FEATURE]   the feature tree, by hand
@@ -68,6 +69,9 @@
   form duplicate <project> [--name N]                   copy a project under a new id; the copy is not approved
   form delete <project> --yes                           move a project to .trash inside the projects folder
   form export <project> [--out f.formstudio] [--no-conversations]   project + conversations + design code, one file
+  form export fcstd <project> [--out f.FCStd] [--edit key=value ...]   a FreeCAD PartDesign feature tree (sketches,
+                                     pads, holes, fillets, patterns, a Params spreadsheet), recomputed in FreeCAD and
+                                     compared with Form Studio's solid (JSON)
   form import <file.formstudio | file.formproj | conversation.json>   import; a clashing id gets a new one
   form formats                                          every file format Form Studio reads (kind, units), as JSON
   form import-reference <project> FILE [--name N]       keep a part, mesh, scan or zip of them as a reference
@@ -235,6 +239,9 @@ def main(argv=None):
         from .concepts import main as concepts_main
         return concepts_main(argv[1:])
     # -- home workstream: archives, conversation export, learned starters, recipe library (each prints JSON) --
+    if argv[:2] == ["export", "fcstd"]:           # a FreeCAD PartDesign feature tree, checked in FreeCAD (JSON)
+        from .partdesign import main as fcstd_main
+        return fcstd_main(argv[2:])
     if argv[:1] in (["export"], ["import"], ["export-conversation"]):
         from . import bundle
         return {"export": bundle.main_export, "import": bundle.main_import,
@@ -264,6 +271,9 @@ def main(argv=None):
     if argv[:1] == ["secrets"]:                    # agent keys (Gemini); values never on the command line
         from .secrets import main as secrets_main
         return secrets_main(argv[1:])
+    if argv[:1] == ["bench"]:                      # benchmarks in public: own suites, Parametric CAD Bench v3
+        from .bench import main_cli as bench_main
+        return bench_main(argv[1:])
     if argv[:1] == ["strength"] or (argv[:1] == ["study"] and argv[1:2] and argv[1] in ("strength", "static", "modal", "buckling", "thermal", "thermal_stress", "verify")):
         from .fea.cli import main as strength_main  # strength studies with a stated error (form/fea)
         return strength_main(argv[1:] if argv[0] == "strength" else argv[2:] if argv[1] == "strength" else argv[1:])

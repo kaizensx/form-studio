@@ -4,6 +4,41 @@
 
 ### New
 
+- **FreeCAD PartDesign export with editable history.** **`freecad_partdesign`** (MCP, 127 tools) and **`form export
+  fcstd <project> [--out f.FCStd] [--edit key=value]`** (terminal, JSON) write the design as a native PartDesign
+  Body, not a baked solid: sketches with Sketcher constraints and named dimensions, Pad, Pocket, Revolution, Groove,
+  Fillet and Chamfer on the edges they were picked on, Hole (ISO size and fit when FreeCAD's table gives the same
+  diameter), LinearPattern, PolarPattern, and Thickness for a shell. A "Params" spreadsheet holds every parameter and
+  the feature sizes are expressions on its cells, so editing a cell in FreeCAD edits the model as the parameter does
+  in Form Studio. Free code is decomposed where it is a prism (a sketch of its cap and a Pad or Pocket, sizes not bound
+  to the parameters); what is not recognised goes in as a frozen solid, and the report lists those features as
+  non-parametric. FreeCAD's command line builds the file, recomputes it and checks every feature against Form
+  Studio's solid (symmetric difference per feature; volume, bounding box and face count of the result): only a
+  feature that recomputes to that solid is reported editable. Measured with FreeCAD 1.1.4: a bracket made by hand
+  (sketch, pad, ISO 273 holes, counterbore, fillet, chamfer, linear pattern), a revolve, and a tray (shell, cut, polar
+  pattern) come back fully native at 0 % volume deviation, equal face counts, and a width edited in the spreadsheet
+  gives exactly Form Studio's solid at that width; all 14 built-in building blocks come back at volume parity
+  (≤ 0.00005 %, bounding box exact), their free-code stages decomposed (24 stages) or frozen (32, parts included), with
+  equal face counts on 12 of 14 (gridfinity_bin 134 in Form Studio against 135 in FreeCAD, battery_holder 74 against
+  86; the same solid, cut into more faces).
+  Designs of several solids are one frozen Body per part. FreeCAD's topological naming is still fragile: a fillet,
+  chamfer or thickness names edges and faces of the solid before it, found by geometry on FreeCAD's own solid, and an
+  edit that changes the topology before it can move or break it. The export writes element names in full (the
+  document's string hasher off): with the hasher, FreeCAD 1.1.4 lost a scripted fillet's edges on the first edit.
+  Parametric CAD Bench runs now write their answer with this export (answer.FCStd and the answer.py that made it);
+  the agent's own FreeCAD script stays the fallback.
+- **Fixed: a sketch with a construction line could not build.** The sketch literal in the design's source was JSON
+  (`"construction": true`); it is Python now (`True`), so a revolve about a construction line builds.
+- **Benchmarks in public.** `form bench list|run|publish` runs Form Studio's own verification suites and publishes
+  every row, failures included, with the commit, machine and date: strength studies against textbook and NAFEMS cases,
+  calculators against published worked examples, ISO 286 limits against the ISO 286-2 tables, every manufacturability
+  rule probed on both sides of its threshold, and mesh to editable CAD against tolerance. The results are
+  `docs/BENCHMARKS.md` and the site's benchmarks page; the Benchmark suites workflow regenerates them on dev, so they
+  are never edited by hand. **`form bench cadbench`** runs Parametric CAD Bench v3 (100 public FreeCAD tasks,
+  Apache-2.0) through Form Studio: each task's prompt to the agent with Form Studio's MCP server attached, in a data
+  folder of its own, scored by the task's own verifier image with no network; `form bench oracle` checks that a
+  task's reference scores 1.0 through the same path. The stand-in agent proves the plumbing; the score is pending a
+  run with a real model.
 - **Engineering drawings from the solid.** A shop drawing of any design on A4 to A0 or ANSI A to E: the views
   projected by OCCT's hidden-line removal on the B-rep (first or third angle, ISO 5456-2), a full section through the
   bores with hatching and its cutting plane, a detail view of a chamfer too small to read at the sheet's scale, an

@@ -47,6 +47,7 @@ Prefer the MCP server (`form-mcp`). Without MCP, the `form` CLI does the same an
 | Assess anything the person brings (mesh, STEP, photo, PDF, link, words) and get the route | `triage` | `form triage scan.stl` |
 | Turn an STL, OBJ or 3MF into a design by the route its triage chooses (parametric CAD, a surface body, a mesh body, parts) | `reconstruct` | `form reconstruct part.stl --tolerance 0.02` |
 | Rebuild a mesh by hand: what is left to add or cut, then tune the sizes | `reference_residual`, `fit_params`, `compare_to_reference` | — |
+| The design as a FreeCAD PartDesign feature tree (sketches, pads, holes, fillets, patterns, a Params spreadsheet), recomputed and checked in FreeCAD | `freecad_partdesign` | `form export fcstd <p> --out part.FCStd --edit w=80` |
 | Assembly instructions as a PDF | `assembly_instructions` | `form instructions <p> --out steps.pdf` |
 | An engineering drawing from the solid (dimensions bound to parameters, fits, GD&T only where declared) | `drawing` | `form drawing <p> --sheet A3 --out part.pdf` |
 | STEP AP242 with PMI, read back | `export_pmi` | `form drawing pmi <p>` |

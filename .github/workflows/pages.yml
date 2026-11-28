@@ -14,7 +14,7 @@ on:
       - "README.md"
       - ".github/workflows/pages.yml"
   workflow_run:
-    workflows: ["Compatibility matrix", "Benchmarks"]
+    workflows: ["Compatibility matrix", "Benchmarks", "Benchmark suites"]
     types: [completed]
   workflow_dispatch:
 
@@ -38,6 +38,14 @@ jobs:
       - uses: actions/setup-python@6d4fd22b20465ccc0f7354476588e8df7c9ca0e0 # v7.1.0
         with:
           python-version: "3.12"
+      - name: Benchmark suites from CI (benchmarks.yml), then /benchmarks.html from them
+        run: |
+          if git fetch -q --depth=1 origin ci-assets 2>/dev/null && git show FETCH_HEAD:bench/suites.json > "$RUNNER_TEMP/suites.json" 2>/dev/null; then
+            cp "$RUNNER_TEMP/suites.json" docs/benchmarks/suites.json
+            python -c "from form.bench.publish import publish; print(publish())"
+          else
+            echo "No suite results on ci-assets yet; /benchmarks.html is the committed one."
+          fi
       - name: Build the docs pages
         run: |
           python -m pip install --disable-pip-version-check "markdown>=3.6,<4"

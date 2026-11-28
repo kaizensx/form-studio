@@ -24,7 +24,9 @@ datas = [(str(ROOT / "form" / "app" / "qml"), "form/app/qml"),
          (str(ROOT / "form" / "adapters" / "blender_model.py"), "form/adapters"),
          (str(ROOT / "form" / "adapters" / "blender_game.py"), "form/adapters"),
          # the game runner's LOD decimation, imported by it from its own folder
-         (str(ROOT / "form" / "adapters" / "blender_lod.py"), "form/adapters")]
+         (str(ROOT / "form" / "adapters" / "blender_lod.py"), "form/adapters"),
+         # the FreeCAD side of the PartDesign export: read as text and written into the script FreeCAD runs
+         (str(ROOT / "form" / "partdesign_fc.py"), "form")]
 # the game pipeline as files too (form/game): its runner path is resolved from them on disk
 datas += [(str(p), "form/game") for p in sorted((ROOT / "form" / "game").glob("*.py"))]
 # tables read as TOML at run time: manufacturability (form/dfm/rules), sheet metal (form/sheet), CAM (form/cam)

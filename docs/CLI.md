@@ -177,6 +177,20 @@ message, with what the design is for.
 | `form drawing spec <project> '<json>'` | Declare datums, GD&T, fits, surface texture, general tolerance and notes for the drawing |
 | `form drawing set <project> <dimension id> <value> [--expect-head N]` | Change a dimension: commits its parameter |
 
+## Benchmarks
+
+Results are kept in `docs/benchmarks/` and published as [BENCHMARKS.md](BENCHMARKS.md) and the site's benchmarks page.
+Every command prints JSON.
+
+| Command | Does |
+|---|---|
+| `form bench list` | The own suites (strength, calculators, ISO 286, manufacturability rules, mesh to CAD) with their saved results, and Parametric CAD Bench v3 with its runs |
+| `form bench run [--suite S ...] [--skip S] [--source DIR] [--commit SHA] [--branch B] [--save]` | Run suites, each in its own process with a data folder of its own, on this checkout or another source tree; `--save` merges the rows into `docs/benchmarks/suites.json`. Exit 1 when a row fails |
+| `form bench publish` | Write `docs/BENCHMARKS.md` and `site/benchmarks.html` from the saved results, every row with its commit, machine and date |
+| `form bench cadbench --download DIR` | Fetch the pinned Parametric CAD Bench v3 task set with Harbor (`harbor download`) |
+| `form bench cadbench --tasks DIR --agent claude-code --model M [--effort E] [--task ID ...] [--limit N] [--budget-usd 10] [--out DIR] [--no-publish]` | Each task's prompt to the agent with Form Studio's MCP server attached, scored by the task's own verifier in Docker; saves the run and publishes. `--agent standin` is the deterministic stand-in (no model) that proves the plumbing |
+| `form bench oracle --tasks DIR [--task ID ...]` | Score each task's held-back reference through the harness: the scorer parity check, every reward 1.0 |
+
 ## Any MCP tool
 
 | Command | Does |

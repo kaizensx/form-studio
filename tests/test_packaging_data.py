@@ -188,7 +188,8 @@ class PackagedData(unittest.TestCase):
         shipped = {(Path(src).name, dest) for src, dest in got["datas"]}
         for f in ("blender_scene.py", "blender_ops.py", "blender_model.py", "blender_game.py"):
             self.assertIn((f, "form/adapters"), shipped)
-        game = sorted(p.name for p in (ROOT / "form" / "game").glob("*.py"))
+        self.assertIn(("partdesign_fc.py", "form"), shipped)          # read as text into FreeCAD's export script
+        game =sorted(p.name for p in (ROOT / "form" / "game").glob("*.py"))
         self.assertIn("lod.py", game)
         for f in game:
             self.assertIn((f, "form/game"), shipped)
