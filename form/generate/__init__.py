@@ -18,8 +18,8 @@ Generators are opt-in, and there is no default:
   hunyuan    Listed, not wired: the hosted Hunyuan 3D API is not implemented, and the Hunyuan 3D community licence
              does not apply in the EU, the UK and South Korea (its Territory clause). It says so and never runs.
 
-A hosted generator runs only when the person has stored its key (Settings > Agents, or `form secrets set
-meshy_api_key`) AND turned it on (`form generate enable meshy`, Settings > Engines). Before every run Form Studio
+A hosted generator runs only when the person has stored its key (Settings › Agents & models, or `form secrets set
+meshy_api_key`) AND turned it on (`form generate enable meshy`, Settings › General › Engines). Before every run Form Studio
 states what is sent, to which host, what comes back and that it is billed to their account (disclose()); the run
 needs that statement's consent token, which the app's dialog, the CLI's question and the MCP tool's confirmation
 card hand over only on the person's yes. Tests use a fixture provider (register()); no test calls a hosted API.
@@ -211,9 +211,9 @@ def status(cfg, pid: str) -> dict:
         from .. import secrets
         key, _where = secrets.value(p.secret)
         if not key:
-            out["why"] = f"No {p.title} API key. Store yours in Settings > Agents (or `form secrets set {p.secret}`)."
+            out["why"] = f"No {p.title} API key. Store yours in Settings › Agents & models (or `form secrets set {p.secret}`)."
         elif not out["enabled"]:
-            out["why"] = f"Off. Turn it on in Settings > Engines, or `form generate enable {pid}`."
+            out["why"] = f"Off. Turn it on in Settings › General › Engines, or `form generate enable {pid}`."
         else:
             out.update(ready=True, why=f"On, with your key. Each run is billed to your {p.title} account.")
         return out
@@ -227,7 +227,7 @@ def status(cfg, pid: str) -> dict:
     elif not _gpu():
         out["why"] = "No NVIDIA GPU found (nvidia-smi). TRELLIS.2 needs one with at least 24 GB."
     elif not out["enabled"]:
-        out["why"] = "Installed and checked (MIT). Off: turn it on in Settings > Engines, or `form generate enable trellis2`."
+        out["why"] = "Installed and checked (MIT). Off: turn it on in Settings › General › Engines, or `form generate enable trellis2`."
     else:
         out.update(ready=True, why=f"On: {t['folder']}, licence MIT (SHA-256 {t['licence_sha256'][:12]}…), GPU {_gpu()}.")
     out["installed"] = t or None
@@ -238,7 +238,7 @@ def providers(cfg) -> dict:
     rows = [status(cfg, pid) for pid in PROVIDERS]
     ready = [r["id"] for r in rows if r["ready"]]
     return {"providers": rows, "ready": ready, "default": None,
-            "note": ("No mesh generator is set up. There is no default: set one up in Settings > Engines (TRELLIS.2 on "
+            "note": ("No mesh generator is set up. There is no default: set one up in Settings › General › Engines (TRELLIS.2 on "
                      "this computer, or Meshy or Tripo with your own key).") if not ready else ""}
 
 

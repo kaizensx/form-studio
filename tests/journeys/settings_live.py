@@ -102,10 +102,10 @@ def journey_just_design_from_settings(ui):
 
 
 def journey_appearance(ui):
-    """Settings › General › Appearance switches between the dark and the light bench at once."""
+    """Settings › Appearance switches between the dark and the light bench at once."""
     if ui.js("Bridge.appearanceOverride"):          # FORM_APPEARANCE forces one for this run: the control says so and is off
         return
-    ui.run_js("Store.openSettings('general')")
+    ui.run_js("Store.openSettings('appearance')")
     open_sheet_wait(ui, "settings")
     seg = ui.item("appearanceSeg")
     ui.check(ui.js("Theme.dark") is True, "Form Studio starts dark")

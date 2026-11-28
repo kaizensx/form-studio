@@ -18,7 +18,7 @@ def run(ui):
     ui.run_js("Store.loadConfig()")
     ui.run_js("Store.openSettings('backups')")
     open_sheet_wait(ui, "settings")
-    ui.wait_until(lambda: ui.item("settingsTitle").property("text") == "Backups", 10, "the Backups page")
+    ui.wait_until(lambda: ui.item("settingsSheet").property("pageTitle") == "Backups", 10, "the Backups page")
     ui.wait_until(lambda: ui.sees("No backup yet"), 15, "the status card")
     ui.click("backupNow")
     ui.wait_until(lambda: ui.sees("every file verified"), 120, "the backup to finish and verify")
@@ -30,7 +30,7 @@ def run(ui):
     # a deleted design is listed with its 30 days and the backup that holds it, and comes back with one press
     ui.api(f"/projects/{pid}/delete", {})
     ui.run_js("Store.openSettings('general')")
-    ui.wait_until(lambda: ui.item("settingsTitle").property("text") == "General", 10, "another page")
+    ui.wait_until(lambda: ui.item("settingsSheet").property("pageTitle") == "General", 10, "another page")
     ui.click("settingsNav_backups")
     ui.wait_until(lambda: ui.sees("Backup box") and ui.sees("30 days left"), 15, "the deleted design in Recently deleted")
     ui.check(ui.sees("in " + files[0].name), "it says which backup holds it")

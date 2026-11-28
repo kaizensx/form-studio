@@ -3,8 +3,8 @@ import QtQuick.Dialogs
 
 // Generate: words or a picture to a mesh, then the mesh to an editable design (form/generate, wave Q).
 //   Store.openSheet("generate")
-// The generators the person set up are listed with what each needs; there is no default. Turning a hosted generator
-// on is a switch here (its key is stored under Settings > Agents). Before every run the sheet shows what is sent, to
+// The generators the person set up are listed with what each needs; there is no default. A generator is turned
+// on in Settings › General › Engines (a hosted one's key is stored under Settings › Agents & models). Before every run the sheet shows what is sent, to
 // which host and that it is billed to their account; Send posts the consent token of exactly that statement.
 Column {
     id: gs
@@ -21,7 +21,6 @@ Column {
     readonly property var rows: info ? info.providers : []
     Component.onCompleted: load()
     function load() { Store.get("/generate/providers").then(function (r) { gs.info = r; if (!gs.provider && r.ready.length) gs.provider = r.ready[0] }, Store.fail) }
-    function toggle(p, on) { Store.post("/generate/enable", { provider: p, on: on }).then(function () { gs.load() }, Store.fail) }
     function check() {
         gs.disclosure = null
         Store.post("/generate/disclose", { provider: gs.provider, text: words.text, image: gs.image }).then(function (d) { gs.disclosure = d }, Store.fail)
@@ -39,18 +38,38 @@ Column {
         onAccepted: { gs.image = decodeURIComponent(String(selectedFile).replace(/^file:\/\/\/([A-Za-z]:)/, "$1").replace(/^file:\/\//, "")); gs.disclosure = null } }
 
     Note { visible: !!gs.info && gs.info.ready.length === 0; width: parent.width; kind: "amber"; title: "No mesh generator is set up"
-        text: "There is no default. Turn one on below: TRELLIS.2 runs on this computer (Linux, an NVIDIA GPU with 24 GB); Meshy and Tripo run on your own API key, stored under Settings > Agents." }
-    Repeater { model: gs.rows
-        Rectangle { required property var modelData; width: gs.width; height: rc.height + 20; radius: Theme.rMd; color: gs.provider === modelData.id ? Theme.glass2 : Theme.glass; border.color: Theme.rule
-            Column { id: rc; x: 12; y: 10; width: parent.width - 24; spacing: 4
-                Row { spacing: 10
-                    Txt { kind: "h3"; text: modelData.title }
-                    Txt { kind: "fine"; tone: 3; text: modelData.kind === "local" ? "on this computer" : "hosted, your key"; anchors.verticalCenter: parent.verticalCenter } }
-                Txt { kind: "fine"; tone: 2; width: parent.width; text: modelData.why }
-                Txt { kind: "fine"; tone: 3; width: parent.width; text: "Licence: " + modelData.licence }
-                Row { spacing: 8
-                    Btn { small: true; visible: modelData.implemented; text: modelData.enabled ? "Turn off" : "Turn on"; onClicked: gs.toggle(modelData.id, !modelData.enabled) }
-                    Btn { small: true; kind: "quiet"; visible: modelData.ready; text: gs.provider === modelData.id ? "Selected" : "Use this"; onClicked: { gs.provider = modelData.id; gs.disclosure = null } } } } } }
+        text: "There is no default. Turn one on in Settings › General › Engines: TRELLIS.2 runs on this computer (Linux, an NVIDIA GPU with 24 GB); Meshy and Tripo run on your own API key, stored under Settings › Agents & models." }
+    // the generators as one list on glass (direction I's row: a state, a name, one line, the facts in mono, one
+    // action). A generator that is ready is picked by a click on its row.
+    Rectangle { objectName: "generateList"; visible: gs.rows.length > 0; width: gs.width; height: gl.implicitHeight + 8; radius: 16; color: Theme.glass
+        border.width: Theme.dark ? 0 : 1; border.color: Theme.rule
+        Column { id: gl; y: 4; width: parent.width
+            Repeater { model: gs.rows
+                Rectangle { id: gr; required property var modelData; required property int index
+                    readonly property var g: modelData
+                    readonly property bool on: gs.provider === g.id
+                    objectName: "generateRow"; readonly property string sid: g.id
+                    x: 4; width: gl.width - 8; height: 56; radius: 12
+                    color: on ? Theme.glass2 : grm.containsMouse && g.ready ? Theme.washHover : "transparent"
+                    Behavior on color { Tint {} }
+                    Rectangle { x: 14; width: 7; height: 7; radius: 3.5; anchors.verticalCenter: parent.verticalCenter
+                        color: gr.g.ready ? Theme.pass : "transparent"; border.width: gr.g.ready ? 0 : 1.5; border.color: Theme.ink3 }
+                    Column { x: 36; anchors.verticalCenter: parent.verticalCenter; width: parent.width - 36 - acts.width - 24; spacing: 3
+                        Row { spacing: 10; width: parent.width
+                            Txt { text: String(gr.g.title).replace(/\s*\([^)]*\)\s*$/, ""); font.weight: Theme.wSemi; lineHeight: 1.0; wrapMode: Text.NoWrap }
+                            Txt { mono: true; font.pixelSize: 11; tone: 3; lineHeight: 1.0; wrapMode: Text.NoWrap; anchors.verticalCenter: parent.verticalCenter
+                                text: (gr.g.kind === "local" ? "on this computer" : "hosted · your key") + (/terms of service|licen[cs]e/i.test(String(gr.g.licence).split(/[;(:]/)[0]) ? "" : " · " + String(gr.g.licence).split(/[;(:]/)[0].trim()) } }
+                        Txt { width: parent.width; font.pixelSize: 12; tone: 2; elide: Text.ElideRight; wrapMode: Text.NoWrap; lineHeight: 1.0; text: gr.g.why } }
+                    MouseArea { id: grm; anchors.fill: parent; hoverEnabled: true; cursorShape: gr.g.ready ? Qt.PointingHandCursor : Qt.ArrowCursor
+                        onClicked: if (gr.g.ready) { gs.provider = gr.g.id; gs.disclosure = null } }
+                    Tip { show: grm.containsMouse; text: gr.g.why + "\nLicence: " + gr.g.licence }
+                    Row { id: acts; anchors.right: parent.right; anchors.rightMargin: 12; anchors.verticalCenter: parent.verticalCenter; spacing: 8
+                        Txt { visible: !gr.g.implemented; kind: "fine"; tone: 3; text: "Not available"; anchors.verticalCenter: parent.verticalCenter }
+                        Btn { objectName: "generateSetUp"; small: true; kind: "quiet"; visible: gr.g.implemented && !gr.g.ready; icon: "sliders_horizontal"
+                            text: gr.g.enabled ? "Finish setting up…" : "Turn on…"; anchors.verticalCenter: parent.verticalCenter
+                            tip: "Its switch is in Settings › General › Engines"; onClicked: Store.openSettings("general") }
+                        Btn { small: true; kind: gr.on ? "primary" : "quiet"; visible: gr.g.ready; icon: gr.on ? "check" : ""; text: gr.on ? "Selected" : "Use this"
+                            anchors.verticalCenter: parent.verticalCenter; onClicked: { gs.provider = gr.g.id; gs.disclosure = null } } } } } } }
     Column { width: parent.width; spacing: 8; visible: gs.provider !== ""
         Field { id: words; width: parent.width; placeholder: "Describe it, e.g. a desk lamp with a round shade"; onTextChanged: gs.disclosure = null }
         Row { spacing: 8

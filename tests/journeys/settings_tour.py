@@ -1,12 +1,12 @@
-"""Settings, page by page: the rail opens every page, each page has its title and its cards, the search finds rows on
-every page, and Engines & software shows “Use in Form Studio” for what is installed. A picture of each page is kept
+"""Settings, page by page: the nav opens every page (the sheet names the page in front: pageTitle), each page has its
+groups, General has its tiles and its list of engines, the search finds rows on every page, and Engines & software shows “Use in Form Studio” for what is installed. A picture of each page is kept
 (settings-<page>-<dark|light>.png).
 
 Environment (tests/test_ui_journeys.py test_settings_tour): FORM_APPEARANCE picks the appearance for the run."""
 from _lib import open_sheet_wait
 
 PAGES = (("general", "General"), ("chat", "Agents & models"), ("software", "Engines & software"), ("costs", "Costs"),
-         ("apps", "Other apps"), ("backups", "Backups"), ("updates", "Updates"), ("advanced", "Advanced"))
+         ("apps", "Other apps"), ("appearance", "Appearance"), ("backups", "Backups"), ("updates", "Updates"), ("advanced", "Advanced"))
 
 
 def _row(ui, name, sid):
@@ -23,7 +23,41 @@ def run(ui):
     open_sheet_wait(ui, "settings")
     ui.wait_until(lambda: ui.store.get("config") is not None and ui.store.get("software") is not None, 90, "the settings and the software list")
     card = ui.item("sheetCard")
-    # Reduce Motion: the person's own switch; it takes effect at once and movement is dropped (Theme.move returns 0)
+    # the sheet draws its own head: the word over a bare nav, no title bar and no action bar while nothing is unsaved
+    ui.eq(ui.item("settingsSheet").property("pageTitle"), "General", "General is in front")
+    ui.check(not ui.exists("settingsSaveBar"), "no Save bar while nothing is changed")
+    # General: what it is set up for as tiles with a switch, then every engine with its licence, size and state
+    ui.wait_until(lambda: ui.exists("capCard_core") and len(ui.find_all(name="engineRow")) > 0, 30, "the tiles and the engines")
+    engines = {r.property("sid") for r in ui.find_all(name="engineRow", shown=False)}
+    ui.check("kernel" in engines and "data" not in engines, f"the kernel is an engine, the project folder is not: {sorted(engines)[:6]}")
+    group = {i: g["id"] for g in ui.js("Store.software.groups") for i in g["items"]}
+    ui.check(not any(group.get(e) in ("ai", "agents") for e in engines), "agents are not listed with the engines")
+    ui.check({"fea", "robot.mujoco", "kicad", "freerouting"} <= engines, f"FEA, MuJoCo, KiCad and Freerouting are engines: {sorted(engines)}")
+    # a row says it in a few words: the licence without its notes, the size as a number, a program as your copy
+    meta = {r.property("sid"): " ".join(ui.texts(r)) for r in ui.find_all(name="engineRow", shown=False)}
+    ui.check("LGPL-2.1, BSD-3, MIT" in meta["fea"] and "190 MB" in meta["fea"], f"the FEA row: {meta['fea']}")
+    ui.check("your copy" in meta["kicad"], f"KiCad is the person's own program: {meta['kicad']}")
+    # the mesh generators stand in the same list with their switch (off until turned on; a switch sends nothing)
+    gens = ui.wait_until(lambda: ui.find_all(name="generatorUse", shown=False), 10, "the mesh generators' switches")
+    ui.check("trellis2" in {g.property("sid") for g in gens}, f"TRELLIS is listed: {[g.property('sid') for g in gens]}")
+    ui.check(all(g.property("checked") is False for g in gens), "every mesh generator is off to begin with")
+
+    def on():
+        return next(p["enabled"] for p in ui.api("/generate/providers")["providers"] if p["id"] == "trellis2")
+    ui.scroll_to(next(g for g in gens if g.property("sid") == "trellis2"))
+    ui.click(next(g for g in ui.find_all(name="generatorUse") if g.property("sid") == "trellis2"))
+    ui.wait_until(lambda: on() is True, 5, "the switch to turn TRELLIS on")
+    ui.settle(300)
+    ui.shot(f"settings-general-engines-{theme}")
+    ui.click(next(g for g in ui.find_all(name="generatorUse") if g.property("sid") == "trellis2"))
+    ui.wait_until(lambda: on() is False, 5, "and off again")
+    pane = ui.item("settingsScroll")
+    pane.setProperty("contentY", 0)
+    ui.settle(400)
+    ui.shot(f"settings-general-top-{theme}")
+    # Reduce Motion (Appearance): the person's own switch; it takes effect at once and movement is dropped (Theme.move returns 0)
+    ui.click("settingsNav_appearance")
+    ui.wait_until(lambda: ui.exists("reduceMotionToggle"), 5, "the Appearance page")
     ui.eq(ui.js("Theme.reduced"), False, "motion is on to begin with")
     ui.scroll_to("reduceMotionToggle")
     ui.click("reduceMotionToggle")
@@ -34,7 +68,7 @@ def run(ui):
     printing = ui.js("Store.printOn") is True
     for value, text in PAGES + ((("printer", "Printing"),) if printing else ()):
         ui.click("settingsNav_" + value)
-        ui.wait_until(lambda: ui.item("settingsTitle").property("text") == text, 5, f"the {text} page")
+        ui.wait_until(lambda: ui.item("settingsSheet").property("pageTitle") == text, 5, f"the {text} page")
         ui.settle(500)
         ui.shot(f"settings-{value}-{theme}")
     ui.eq("Printing" in ui.texts(card), printing, "the Printing page is there only with 3D printing on")
@@ -79,9 +113,10 @@ def run(ui):
     ui.click("settingsSearch")
     ui.type("spending cap")
     ui.wait_until(lambda: ui.sees("Spending cap per message"), 5, "the search to find a row of another page")
-    ui.eq(ui.item("settingsTitle").property("text"), "Search", "the page says it is a search")
+    ui.eq(ui.item("settingsSheet").property("pageTitle"), "Search", "the page says it is a search")
+    ui.expect("Search", within=ui.item("settingsScroll"))
     ui.settle(300)
     ui.shot(f"settings-search-{theme}")
     ui.click("settingsNav_updates")
-    ui.wait_until(lambda: ui.item("settingsTitle").property("text") == "Updates", 5, "a page to end the search")
+    ui.wait_until(lambda: ui.item("settingsSheet").property("pageTitle") == "Updates", 5, "a page to end the search")
     ui.key("Escape")
