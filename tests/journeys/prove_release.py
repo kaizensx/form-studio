@@ -4,7 +4,7 @@ import zipfile
 
 from PySide6.QtCore import QPointF
 
-from _lib import fold, goto, head, phone_dock, toasts_gone, wait_job
+from _lib import fold, goto, head, phone_dock, toasts_gone, wait_job, mode_key
 
 DATA = "fresh"
 S = {}
@@ -21,7 +21,7 @@ def journey_setup(ui):
 
 def journey_companion(ui):
     # the phone is four times taller than the dock: its outline stops a little above the part, with a note
-    ui.key("Ctrl+1")
+    ui.key(mode_key(1))
     ui.wait_until(lambda: ui.store.get("stage") == "shape", 3, "Design")
     vp = ui.item("viewport")
     h = ui.js("Store.values.device_height")
@@ -127,7 +127,7 @@ def journey_prove(ui):
 
 
 def journey_release(ui):
-    ui.key("Ctrl+3")
+    ui.key(mode_key(3))
     ui.wait_until(lambda: ui.store.get("stage") == "release", 3, "Make with Ctrl+3")
     ui.settle(500)
     g = data(ui)["gate"]

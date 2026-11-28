@@ -1,7 +1,7 @@
 """Direction I (docs/design/directions/i/IA.md), as a person meets it: four modes at the top, the Overview from the
 design capsule, Fit as a study in Check, the view cube and the shading chip at the stage's top right, and the legend
 strip under the part while a result is shown on it."""
-from _lib import goto, phone_dock, plate_toggle, toasts_gone
+from _lib import goto, phone_dock, plate_toggle, toasts_gone, mode_key
 
 DATA = "fresh"
 
@@ -22,11 +22,11 @@ def run(ui):
     ui.eq(ui.js("Store.stages.map(function (s) { return s.title }).join(' ')"), "Design Check Make Document", "the four modes")
     for gone in ("stage-brief", "stage-fit"):
         ui.check(not ui.exists(gone), f"{gone} is no longer a tab")
-    for sid, key in (("prove", "Ctrl+2"), ("release", "Ctrl+3"), ("document", "Ctrl+4"), ("shape", "Ctrl+1")):
+    for sid, key in (("prove", mode_key(2)), ("release", mode_key(3)), ("document", mode_key(4)), ("shape", mode_key(1))):
         goto(ui, sid)
         ui.eq(ui.js("Store.mode"), sid, f"the mode after a click on {sid}")
         ui.check(len(ui.texts(ui.item("stage-" + sid))) >= 2 and ui.texts(ui.item("stage-" + sid))[1] != "", f"{sid} carries its one line of state: {ui.texts(ui.item('stage-' + sid))}")
-    for sid, key in (("prove", "Ctrl+2"), ("release", "Ctrl+3"), ("document", "Ctrl+4"), ("shape", "Ctrl+1")):
+    for sid, key in (("prove", mode_key(2)), ("release", mode_key(3)), ("document", mode_key(4)), ("shape", mode_key(1))):
         ui.key(key)
         ui.wait_until(lambda: ui.store.get("stage") == sid, 3, f"{key} to go to {sid}")
     ui.check(ui.find(name="printerChip") is None, "the printer is not named in Design")
@@ -85,7 +85,7 @@ def run(ui):
     ui.key("1")
     ui.wait_until(lambda: ui.store.get("viewName") == "iso", 3, "key 1")
     s = _rect(ui, "shadeChip")
-    ui.check(abs(s[0] + s[2] - (c[0] + c[2])) <= 1 and s[1] >= c[1] + c[3], f"the shading chip stands under the cube: {s}")
+    ui.check(abs(s[0] + s[2] / 2 - (c[0] + c[2] / 2)) <= 1 and s[1] >= c[1] + c[3] and s[2] <= 34, f"the shading chip, a small round button, stands under the cube: {s}")
     was = ui.js("Store.viewer.plateShown")
     plate_toggle(ui)
     ui.wait_until(lambda: ui.js("Store.viewer.plateShown") is not was, 3, "the chip's menu to switch the build plate")
@@ -102,7 +102,12 @@ def run(ui):
     ui.check(r[0] >= dock[0] + dock[2] and r[0] + r[2] <= pane[0], f"the strip lies under the part, between the dock and the pane: {r}")
     ui.check(ui.sees("Wall thickness", within=ui.item("resultStrip")), "it names the result")
     ui.check("computed" in str(ui.item("stripEvidence").property("text")).lower(), "it says how the result is known")
+    ui.check(not ui.exists("stripLimits") and r[3] <= 90, f"folded, it is the title and the scale alone: {r}")
+    ui.click("legendDetail")                           # unfolded: what it does not tell
+    ui.wait_until(lambda: ui.exists("stripLimits"), 3, "the strip unfolded")
     ui.check(len(str(ui.item("stripLimits").property("text"))) > 20, "and what it does not tell")
+    ui.click("legendDetail")
+    ui.wait_until(lambda: not ui.exists("stripLimits"), 3, "folded again")
     ui.check(not ui.exists("analysisLegend"), "the legend is no longer a panel in the right column")
     ui.shot("direction-i-strip")
     ui.run_js('Store.setAnalysis("")')

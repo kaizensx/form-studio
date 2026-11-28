@@ -211,6 +211,10 @@ QtObject {
     // tooltips: the moment the last one closed, so the next one opens without a delay (see Tip.qml)
     property real tipSeen: 0
     readonly property bool mac: Bridge.platform === "darwin"
+    // the number keys: the document tabs are ⌘1..9 on macOS, the four modes ⌃1..4 ("Meta" is Control to Qt there).
+    // Elsewhere the modes keep Ctrl+1..4 and the tabs are Alt+1..9.
+    readonly property string modeMod: mac ? "Meta" : "Ctrl"
+    readonly property string tabMod: mac ? "Ctrl" : "Alt"
     // "Ctrl+Shift+O" → ["⇧", "⌘", "O"] on macOS, ["Ctrl", "Shift", "O"] elsewhere. Shortcuts are written the Qt way everywhere.
     function keyCaps(seq) {
         var parts = String(seq).split("+"), out = []

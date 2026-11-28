@@ -27,14 +27,19 @@ Rectangle {
     // made); in a workspace it opens into the column instead, and upward only for the list of conversations
     property bool drawer: true
     readonly property bool expanded: !bar || (((drawer && Store.talkOpen && !empty) || list.opened) && !cueing)
-    readonly property bool slim: bar && !expanded && (!empty || cueing)          // just the prompt, on one line
-    readonly property bool suggOn: bar && empty && !cueing && Store.chat.available && !!Store.project && forProject.length > 0
-    readonly property int leadH: bar && !cueing ? 32 : 0      // while a build plays the cue says what is happening
+    // the bar takes as little of the stage as it can (the stage is the hero): while nothing is being written it is one
+    // line, 52 px. The suggestions, the agent and model and the hints come when the prompt is taken up.
+    readonly property bool typing: ta.activeFocus || ta.text !== "" || Store.chatAttach.length > 0 || Store.chatLinks.length > 0
+    readonly property bool slim: bar && !expanded && (!empty || cueing || !typing)          // just the prompt, on one line
+    readonly property bool suggOn: bar && empty && !cueing && typing && Store.chat.available && !!Store.project && forProject.length > 0
+    // the status line says what the agent is doing, or that none is connected; "Ask about this design" is what the
+    // empty prompt already says, so with nothing going on there is no line over the bar
+    readonly property bool leadOn: !(empty && !Store.chatBusy && !Store.chatAsking && Store.chat.available)
+    readonly property int leadH: bar && !cueing && leadOn ? 32 : 0      // while a build plays the cue says what is happening
     readonly property real barHeight: leadH + foot.height                          // folded
     // how tall the folded bar is once no build plays (while one plays it is one line): the camera frames a part
     // mid-build over this, so nothing moves when the build is in
-    readonly property real restHeight: 32 + (!empty ? 64 : 102 + (Store.chat.available && !!Store.project && forProject.length > 0
-                                             ? Math.ceil(forProject.length / (width - 16 > 440 ? 2 : 1)) * 34 + 8 : 0))
+    readonly property real restHeight: (empty && Store.chat.available ? 0 : 32) + 64
     readonly property real popRoom: bar ? roomAbove : height
     // what the open transcript wants above the prompt: its header, the strips under it, and what was said
     readonly property real bodyWant: head.height + 8 + (rsteps.visible ? rsteps.height : 0) + (strip.visible ? strip.height : 0) + feed.contentHeight + feed.topMargin + feed.bottomMargin + 6
@@ -584,7 +589,7 @@ Rectangle {
 
     // ── the bar's status line: what the agent is doing, or what you can do; click it to open or fold the transcript ──
     Item {
-        id: lead; objectName: "talkLead"; visible: talk.bar && !talk.cueing; width: parent.width; height: 22; z: 3; opacity: talk.veil
+        id: lead; objectName: "talkLead"; visible: talk.bar && !talk.cueing && talk.leadOn; width: parent.width; height: 22; z: 3; opacity: talk.veil
         readonly property string say: Store.chatAsking ? (Store.chatAsking.kind === "measure" ? "The agent is waiting for a measurement" : "The agent is waiting for your answer")
             : Store.chatBusy ? talk.liveText()
             : !Store.chat.available && !!Store.studio ? "No agent is connected. Everything can still be edited by hand."
@@ -743,10 +748,13 @@ Rectangle {
                 Item { width: parent.width; height: talk.slim ? 0 : 46
                   Item { id: ctl; parent: comp; z: 2; width: comp.width; height: talk.slim ? 52 : 46; y: comp.height - height
                     Row { id: footRow; x: talk.slim ? parent.width - width - 52 : 8; anchors.verticalCenter: parent.verticalCenter; spacing: 2
+                        // the conversations, here while there is no status line over the bar to hold them
+                        Btn { objectName: "barConversations"; visible: talk.bar && !lead.visible && !talk.expanded; small: true; kind: "quiet"; icon: "history"
+                            iconSize: 16; width: 30; height: 30; anchors.verticalCenter: parent.verticalCenter; tip: "Conversations"; onClicked: talk.showList() }
                         Btn { small: true; kind: "quiet"; icon: "paperclip"; iconSize: 16; width: 30; height: 30; anchors.verticalCenter: parent.verticalCenter; tip: "Attach a photo, a PDF drawing, or a STEP, STL, 3MF or OBJ part. You can also drop files here, or paste a link."
                             enabled: Store.chat.available; onClicked: Store.ask(pick) }
                         // agent and model for this conversation
-                        Item { id: mchip; objectName: "modelChip"; width: ml.width + (talk.slim ? 42 : 55); height: 30; anchors.verticalCenter: parent.verticalCenter
+                        Item { id: mchip; objectName: "modelChip"; visible: !talk.slim || ta.activeFocus || mpop.opened; width: ml.width + (talk.slim ? 42 : 55); height: 30; anchors.verticalCenter: parent.verticalCenter
                             Rectangle { anchors.fill: parent; radius: height / 2; color: mcm.pressed ? Theme.washPress : mcm.containsMouse || mpop.opened ? Theme.washHover : "transparent"; Behavior on color { Tint {} } }
                             Icon { x: 9; name: "sparkles"; size: 15; color: Theme.ink2; anchors.verticalCenter: parent.verticalCenter }
                             Txt { id: ml; x: 31; font.pixelSize: 12; tone: 2; wrapMode: Text.NoWrap; anchors.verticalCenter: parent.verticalCenter

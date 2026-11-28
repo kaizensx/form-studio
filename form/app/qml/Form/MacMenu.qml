@@ -42,10 +42,10 @@ P.MenuBar {
         P.MenuItem { text: Store.timelineOpen ? "Hide the Revision Timeline" : "Show the Revision Timeline"; enabled: mb.work
             onTriggered: { Store.timelineOpen = !Store.timelineOpen; if (!Store.timelineOpen) Store.endScrub() } }
         P.MenuSeparator {}
-        P.MenuItem { text: "Design"; shortcut: "Ctrl+1"; enabled: mb.work; onTriggered: Store.setStage("shape") }
-        P.MenuItem { text: "Check"; shortcut: "Ctrl+2"; enabled: mb.work; onTriggered: Store.setStage("prove") }
-        P.MenuItem { text: "Make"; shortcut: "Ctrl+3"; enabled: mb.work; onTriggered: Store.setStage("release") }
-        P.MenuItem { text: "Document"; shortcut: "Ctrl+4"; enabled: mb.work; onTriggered: Store.setStage("document") }
+        P.MenuItem { text: "Design"; shortcut: Theme.modeMod + "+1"; enabled: mb.work; onTriggered: Store.setStage("shape") }
+        P.MenuItem { text: "Check"; shortcut: Theme.modeMod + "+2"; enabled: mb.work; onTriggered: Store.setStage("prove") }
+        P.MenuItem { text: "Make"; shortcut: Theme.modeMod + "+3"; enabled: mb.work; onTriggered: Store.setStage("release") }
+        P.MenuItem { text: "Document"; shortcut: Theme.modeMod + "+4"; enabled: mb.work; onTriggered: Store.setStage("document") }
         P.MenuSeparator {}
         P.MenuItem { text: Store.overview ? "Close the Overview" : "Overview of the Design"; shortcut: "Ctrl+I"; enabled: mb.work; onTriggered: Store.toggleOverview() }
         P.MenuItem { text: Store.benchOpen ? "Close the Bench" : "The Bench"; shortcut: "Ctrl+B"; enabled: mb.work; onTriggered: Store.toggleBench() }

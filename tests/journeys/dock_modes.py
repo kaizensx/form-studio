@@ -61,6 +61,21 @@ def run(ui):
     toasts_gone(ui)
     goto(ui, "shape")
     ui.settle(500)
+    # ── with the ribbon (the default) the dock keeps the four; the mode's tools are labelled in the ribbon ──
+    ui.check(ui._shown(ui.item("toolRibbon")), "the ribbon shows by default")
+    ui.check(not ui.exists("railSep") and not ui.exists("railSketch"), "the dock keeps the four alone")
+    for mode, first in (("prove", "analyze"), ("release", "render"), ("document", "views"), ("shape", "sketch")):
+        ui.click("stage-" + mode)
+        ui.wait_until(lambda: ui.exists("ribbon-" + first), 3, f"{mode}: {first} in the ribbon")
+        ui.settle(250)
+        d = rect(ui, "toolDock")
+        ui.check(d[1] >= rect(ui, "toolRibbon")[1] + 38, f"{mode}: the dock stands under the ribbon")
+    # the rest of this journey is the dock as it is with the ribbon folded away (its Hide, remembered)
+    ui.hover("ribbonHide")                           # the pointer arrives first: a mode's tooltip just above is gone
+    ui.settle(200)
+    ui.click("ribbonHide")
+    ui.wait_until(lambda: ui._shown(ui.item("railSep")), 3, "the dock with its mode's tools again")
+    ui.settle(900)
     stage = (rect(ui, "viewCube"), rect(ui, "programPane")[0], ui.js("Store.viewer.insetLeft"))
     four = [rect(ui, n) for n in FOUR]
     ui.check(rect(ui, "railSep")[1] > four[-1][1] + four[-1][3], "a thin rule under the four")
@@ -162,4 +177,6 @@ def run(ui):
     print(f"DOCK IDLE: {n} frames in 2 s with the Measure capsule open", flush=True)
     ui.check(n <= 2, f"idle redraws with the capsule open: {n} frames in 2 s")
     ui.click("railSelect")
+    ui.click("railRibbon")
+    ui.wait_until(lambda: ui.exists("toolRibbon") and ui._shown(ui.item("toolRibbon")), 3, "the ribbon back")
 

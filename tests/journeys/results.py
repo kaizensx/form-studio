@@ -12,7 +12,7 @@ import os
 from pathlib import Path
 
 import _results as R
-from _lib import open_project
+from _lib import open_project, mode_key
 
 DATA = "fresh"
 S = {}
@@ -70,14 +70,14 @@ def journey_setup(ui):
 
 def journey_strength(ui):
     if not S["fea"]:
-        show(ui, S["bracket"], "Ctrl+2", "strength", "")
+        show(ui, S["bracket"], mode_key(2), "strength", "")
         ui.eq(res(ui), "", "without the engine nothing is drawn on the part")
         ui.check(ui.find(name="legendStrip") is None or not ui.find(name="legendStrip").isVisible(), "and there is no legend")
         return
     from form.fea import study
     p = ui.studio.load(S["bracket"])
     want = study.result(ui.studio, p, S["static"])["result"]
-    show(ui, S["bracket"], "Ctrl+2", "strength", "field")
+    show(ui, S["bracket"], mode_key(2), "strength", "field")
     ui.eq(res(ui, "Results.r.study"), S["static"], "the static study is the one drawn")
     ui.eq(res(ui, "Results.developed"), 1, "the result developed on the part, once")
     ui.check(res(ui, "Results.develop") == 1 and res(ui, "Results.settle") == 1, "and the moment has ended")
@@ -91,6 +91,10 @@ def journey_strength(ui):
     ui.check("MPa" in str(ui.item("legendSub").property("text")), "its unit")
     ev = str(ui.item("legendEvidence").property("text")).lower()
     ui.check("simulated" in ev and "linear static" in ev, f"how it is known: {ev!r}")
+    # folded, the strip is one slim line; its chevron unfolds the stated error and the limits (it stays unfolded)
+    if not ui.exists("legendLimits"):
+        ui.click("legendMore")
+        ui.wait_until(lambda: ui.exists("legendLimits"), 3, "the strip unfolded")
     lim = str(ui.item("legendLimits").property("text"))
     pct = "%.1f" % (100 * want["discretisation_error"]["stress"])
     ui.check(("± " + pct.rstrip("0").rstrip(".") + " %") in lim, f"the stated error: {lim[:120]!r}")
@@ -165,13 +169,16 @@ def journey_strength(ui):
 
 def journey_dfm(ui):
     from form import dfm
-    show(ui, S["bracket"], "Ctrl+2", "dfm_injection", "dfm")
+    show(ui, S["bracket"], mode_key(2), "dfm_injection", "dfm")
     want = dfm.check(ui.studio, ui.studio.load(S["bracket"]), "injection", {})
     lay = "Store.viewer.resultLayer"
     ui.eq(res(ui, "Results.r.verdict"), want["verdict"], "the verdict is the engine's")
     ui.eq(len(res(ui, "Results.r.rows")), len(want["rows"]), "one row per rule")
     ui.check(res(ui, lay + ".isDfm && " + lay + ".covers"), "the overlay stands in for the clay part")
     strip = ui.item("legendStrip")
+    if not ui.exists("legendLimits"):                  # folded by default: its chevron unfolds what it does not judge
+        ui.click("legendMore")
+        ui.wait_until(lambda: ui.exists("legendLimits"), 3, "the strip unfolded")
     lim = str(ui.item("legendLimits").property("text"))
     ui.check("Not told here" in lim, "the strip says what the check does not judge")
     ui.check(ui.sees("parting line", within=strip) if want["data"].get("parting_line") else True, "the parting line is in the legend")
@@ -189,13 +196,13 @@ def journey_dfm(ui):
     ui.hover(strip, 0.5, 0.2)
     ui.wait_until(lambda: res(ui, "Results.litRule") == "", 3, "the light to go with the pointer")
     crop(ui, "dfm-injection")
-    show(ui, S["bracket"], "Ctrl+2", "dfm_cnc", "dfm")
+    show(ui, S["bracket"], mode_key(2), "dfm_cnc", "dfm")
     ui.eq(res(ui, "Results.r.process"), "cnc", "the CNC check draws its own overlay")
     crop(ui, "dfm-cnc")
 
 
     # the bracket's draft fix does not pass in its preview: the window says why, and nothing is saved
-    show(ui, S["bracket"], "Ctrl+2", "dfm_injection", "dfm")
+    show(ui, S["bracket"], mode_key(2), "dfm_injection", "dfm")
     head = ui.studio.load(S["bracket"])["head"]
     row = ui.item("rule-injection.draft")
     ui.scroll_to(row, 0.5)
@@ -208,7 +215,7 @@ def journey_dfm(ui):
 
 
 def journey_fix(ui):
-    show(ui, S["cup"], "Ctrl+2", "dfm_injection", "dfm")
+    show(ui, S["cup"], mode_key(2), "dfm_injection", "dfm")
     card = ui.item("benchCard")
     row = ui.item("rule-injection.draft")
     ui.scroll_to(row, 0.5)
@@ -234,7 +241,7 @@ def journey_fix(ui):
 
 
 def journey_cam(ui):
-    show(ui, S["pocket"], "Ctrl+3", "cam_3axis", "cam")
+    show(ui, S["pocket"], mode_key(3), "cam_3axis", "cam")
     lay = "Store.viewer.resultLayer"
     dur = res(ui, "Results.duration")
     ui.check(dur > 1 and abs(dur - res(ui, "Results.r.summary.cycle_time_s")) < 1.0, f"the timeline is the program's cycle time ({dur})")
@@ -266,7 +273,7 @@ def journey_cam(ui):
 
 
 def journey_flat(ui):
-    show(ui, S["tray"], "Ctrl+3", "sheet_flat", "flat")
+    show(ui, S["tray"], mode_key(3), "sheet_flat", "flat")
     lay = "Store.viewer.resultLayer"
     ui.eq(len(res(ui, "Results.r.bends")), 4, "four bends, as the engine unfolded them")
     ui.eq(len(ui.find_all(name="bendNote")), 4, "each bend carries its angle on the part")
@@ -282,7 +289,7 @@ def journey_flat(ui):
 
 
 def journey_motion(ui):
-    show(ui, S["fourbar"], "Ctrl+2", "motion", "motion")
+    show(ui, S["fourbar"], mode_key(2), "motion", "motion")
     dur = res(ui, "Results.duration")
     ui.check(dur > 0, "the cycle has a duration")
     ui.wait_until(lambda: ui.find(name="gapLabel") is not None, 5, "the smallest gap of the frame shown, on the part")
@@ -304,7 +311,7 @@ def journey_motion(ui):
 
 
 def journey_drawing(ui):
-    show(ui, S["bracket"], "Ctrl+4", "drawing", "drawing")
+    show(ui, S["bracket"], mode_key(4), "drawing", "drawing")
     pane = ui.item("drawingPane")
     ui.wait_until(lambda: pane.property("k") >= 1, 3, "the sheet to have unfolded")
     ui.check(not res(ui, "Results.onPart"), "the sheet is a pane, not a map on the part")
@@ -345,7 +352,7 @@ def journey_drawing(ui):
     crop(ui, "drawing-after-edit", what=("drawingPane",))
     # the strength study now describes the revision before: nothing of it is drawn
     if S["fea"]:
-        show(ui, S["bracket"], "Ctrl+2", "strength", "")
+        show(ui, S["bracket"], mode_key(2), "strength", "")
         ui.eq(res(ui), "", "a stale field is not drawn")
         ui.check(ui.sees("Stale", within=ui.item("resultNone")) or ui.sees("Not run", within=ui.item("resultNone")), "the card says so")
 
@@ -388,13 +395,13 @@ def journey_perf(ui):
     fr = Frames(ui)
     out = {}
     open_project(ui, S["bracket"])
-    ui.key("Ctrl+1")
+    ui.key(mode_key(1))
     ui.settle(600)
     out["part"] = (fr.idle(), *fr.orbit())
-    rows = [("dfm", S["bracket"], "Ctrl+2", "dfm_injection", "dfm"), ("cam", S["pocket"], "Ctrl+3", "cam_3axis", "cam"),
-            ("flat", S["tray"], "Ctrl+3", "sheet_flat", "flat")]
+    rows = [("dfm", S["bracket"], mode_key(2), "dfm_injection", "dfm"), ("cam", S["pocket"], mode_key(3), "cam_3axis", "cam"),
+            ("flat", S["tray"], mode_key(3), "sheet_flat", "flat")]
     if S["fea"] and ui.studio.load(S["bracket"])["head"] == 1:
-        rows.insert(0, ("strength", S["bracket"], "Ctrl+2", "strength", "field"))
+        rows.insert(0, ("strength", S["bracket"], mode_key(2), "strength", "field"))
     for name, pid, key, row, kind in rows:
         show(ui, pid, key, row, kind)
         out[name] = (fr.idle(), *fr.orbit())

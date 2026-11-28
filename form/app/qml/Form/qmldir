@@ -98,3 +98,6 @@ TreeExtras 1.0 TreeExtras.qml
 TreeSketch 1.0 TreeSketch.qml
 TreeEye 1.0 TreeEye.qml
 StudyVerdict 1.0 StudyVerdict.qml
+# the pro frame: document tabs, the project rail, the ribbon
+singleton Frame 1.0 Frame.qml
+ProjectRail 1.0 ProjectRail.qml

@@ -6,21 +6,24 @@ import QtQuick
 Glass {
     id: sc
     objectName: "shadeChip"
-    height: 32; radius: 16; width: row.implicitWidth + 19
+    // a small round chip under the cube, the clay ball alone (the stage is the hero); its name is in the tooltip
+    // and at the head of its menu. `compact: false` gives the pill with the name, as it was.
+    property bool compact: true
+    height: 32; radius: 16; width: compact ? 32 : row.implicitWidth + 19
     readonly property bool plate: Store.stageMode === "plate"
     // a design made for printing shows the plate in Check and Make anyway; in Design and Document it is a choice
     readonly property bool plateChoice: Store.printUi && Store.mode !== "prove" && Store.mode !== "release"
     readonly property alias menu: menu
     Rectangle { anchors.fill: parent; anchors.margins: 3; radius: height / 2; color: sm.pressed ? Theme.washPress : sm.containsMouse || menu.opened ? Theme.washHover : "transparent"
         Behavior on color { Tint {} } }
-    Row { id: row; x: 9; anchors.verticalCenter: parent.verticalCenter; spacing: 7
+    Row { id: row; x: sc.compact ? 9 : 9; anchors.verticalCenter: parent.verticalCenter; spacing: 7
         // the clay ball: the part's own material under the key light
         Rectangle { width: 14; height: 14; radius: 7; anchors.verticalCenter: parent.verticalCenter
             gradient: Gradient { GradientStop { position: 0; color: "#f1ece2" } GradientStop { position: 0.7; color: "#a39d92" } GradientStop { position: 1; color: "#5e5a54" } } }
-        Txt { objectName: "shadeName"; font.pixelSize: 12; tone: 2; text: sc.plate ? "Plate" : "Studio"; anchors.verticalCenter: parent.verticalCenter; wrapMode: Text.NoWrap }
-        Icon { name: "chevron_down"; size: 12; color: Theme.ink3; anchors.verticalCenter: parent.verticalCenter } }
+        Txt { objectName: "shadeName"; visible: !sc.compact; font.pixelSize: 12; tone: 2; text: sc.plate ? "Plate" : "Studio"; anchors.verticalCenter: parent.verticalCenter; wrapMode: Text.NoWrap }
+        Icon { visible: !sc.compact; name: "chevron_down"; size: 12; color: Theme.ink3; anchors.verticalCenter: parent.verticalCenter } }
     MouseArea { id: sm; anchors.fill: parent; hoverEnabled: true; onClicked: menu.opened ? menu.close() : menu.open() }
-    Tip { show: sm.containsMouse && !menu.opened; below: true; text: sc.plate ? "On the build plate" : "On the studio floor" }
+    Tip { show: sm.containsMouse && !menu.opened; below: true; text: (sc.plate ? "On the build plate" : "On the studio floor") + ": the grid and the dimensions" }
     PopMenu { id: menu; y: parent.height + 8; x: parent.width - width; width: 252
         model: [
             { name: "showPlate", icon: "printer", text: "Build plate" + (Store.printing.available ? ": " + Store.printing.presets.machine.name : ""),

@@ -1,5 +1,6 @@
 """Shared steps for the UI journeys (tests/journeys/*.py). Setup goes through the engine API; the thing under
 test goes through the window."""
+import sys
 
 
 def wait_job(ui, pid, timeout=300):
@@ -134,22 +135,73 @@ def plate_toggle(ui):
     ui.wait_until(lambda: not ui.exists("showPlate"), 3, "the menu to close")
 
 
-# the dock holds four tools everywhere and, under them, the tools of the mode (docs/design/directions/i/IA.md)
-DOCK_MODE = {"Analyze": "prove", "History": "prove", "Assembly": "prove", "Simulate the print": "release",
-             "Photo render": "release", "Hide overall dimensions": "document", "Show overall dimensions": "document"}
+# the four modes answer to Ctrl+1..4 (⌃ on macOS, where ⌘1..9 switch the document tabs: Theme.modeMod, tabMod)
+MODE_KEY = "Meta" if sys.platform == "darwin" else "Ctrl"
+TAB_KEY = "Ctrl" if sys.platform == "darwin" else "Alt"
+
+
+def mode_key(n):
+    """The key chord that switches to mode n (1 Design, 2 Check, 3 Make, 4 Document)."""
+    return f"{MODE_KEY}+{n}"
+
+
+# the dock holds four tools everywhere; the tools of the mode stand in the ribbon at the head of the stage
+# (ToolRibbon.qml, ToolSet.js), or under the four in the dock when the ribbon is hidden
+DOCK_MODE = {"Analyze": ("prove", "analyze"), "History": ("prove", "history"), "Assembly": ("prove", "assembly"),
+             "Simulate the print": ("release", "slice"), "Photo render": ("release", "render"),
+             "Hide overall dimensions": ("document", "dims"), "Show overall dimensions": ("document", "dims")}
+# the dock's own buttons for the same tools, when the ribbon is hidden
+RAIL = {"sketch": "railSketch", "extrude": "railExtrude", "cut": "railCut", "revolve": "railRevolve", "fillet": "railRound",
+        "chamfer": "railChamfer", "hole": "railHole", "pattern": "railPattern", "shell": "railShell", "part": "railPart",
+        "analyze": "railAnalyze", "mass": "railMass", "assembly": "railAssembly", "history": "railHistory",
+        "slice": "railSimulate", "plates": "railPlates", "game": "railGame", "views": "railViews", "dims": "railDims"}
+
+
+def ribbon_on(ui):
+    return ui.exists("toolRibbon") and ui._shown(ui.item("toolRibbon"))
+
+
+def tool(ui, tid):
+    """Click a tool of the mode in front by its id (ToolSet.js): in the ribbon, behind its More when the stage is
+    narrow, or in the dock when the ribbon is hidden."""
+    if ribbon_on(ui):
+        name = "ribbon-" + tid
+        if ui.exists(name) and ui._shown(ui.item(name)):
+            # the pointer arrives first, as a hand does: a mode's tooltip just above the band is gone by the press
+            ui.hover(name)
+            ui.settle(200)
+            ui.click(name)
+            return
+        ui.hover("ribbonMore")
+        ui.settle(200)
+        ui.click("ribbonMore")
+        ui.wait_until(lambda: ui.exists("ribbonMore-" + tid), 3, f"{tid} in More")
+        ui.settle(150)
+        ui.click("ribbonMore-" + tid)
+        return
+    ui.click(RAIL.get(tid, tid))
+
+
+def tool_item(ui, tid):
+    """The button of a tool, where it stands now: the ribbon's, or the dock's."""
+    if ribbon_on(ui) and ui.exists("ribbon-" + tid):
+        return ui.item("ribbon-" + tid)
+    return ui.item(RAIL.get(tid, tid))
 
 
 def dock(ui, label):
-    """Click a tool of the dock by its label, as a person does: in the mode whose group holds it, then back to the
-    mode the journey was in (a tool stays active, a toggle stays set, whatever the mode; a sheet stays open)."""
-    was, mode = ui.store.get("stage"), DOCK_MODE.get(label)
-    there = mode and ui.js("Store.mode") != mode
+    """Click a tool of the mode by its label, as a person does: in the mode that holds it, then back to the mode the
+    journey was in (a tool stays active, a toggle stays set, whatever the mode; a sheet stays open)."""
+    was, (mode, tid) = ui.store.get("stage"), DOCK_MODE[label]
+    there = ui.js("Store.mode") != mode
     if there:
         ui.click("stage-" + mode)
         ui.wait_until(lambda: ui.js("Store.mode") == mode, 3, mode)
         ui.settle(260)
-    ui.click_text(label)
+    tool(ui, tid)
     if there and not ui.store.get("sheet") and not ui.js("!!Store.layers"):      # a sheet or the print simulation is where it leads
         ui.settle(120)
         ui.click("stage-" + ("shape" if was == "brief" else "prove" if was == "fit" else was))
         ui.settle(260)
+
+

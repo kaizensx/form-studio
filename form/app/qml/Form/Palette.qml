@@ -65,7 +65,7 @@ Item {
         if (w) {
             // a mode also answers to what it was called and to what it holds (`also`: words that find it, never shown)
             var also = { shape: "shape tree program features model", prove: "review prove studies checks", release: "release routes export print", document: "documents drawings report" }
-            Store.stages.forEach(function (s, i) { add("Go to", "stage." + s.id, "arrow_right", s.title, s.hint, function () { Store.setStage(s.id) }, "Ctrl+" + Store.stageKey[s.id]); c[c.length - 1].also = also[s.id] || "" })
+            Store.stages.forEach(function (s, i) { add("Go to", "stage." + s.id, "arrow_right", s.title, s.hint, function () { Store.setStage(s.id) }, Theme.modeMod + "+" + Store.stageKey[s.id]); c[c.length - 1].also = also[s.id] || "" })
             add("Go to", "bench.sheet", "list_checks", "Bench", "Every study, route and document on one sheet", function () { Store.toggleBench() }, "Ctrl+B")
             add("Go to", "stage.brief", "file_text", "Overview", "Describe: the brief, what is known about the object, the revisions", function () { Store.setStage("brief") }, "Ctrl+I")
             if (Store.printUi) add("Go to", "stage.fit", "arrow_right", "Fit study", "Check: clearance under uncertainty, a model", function () { Store.setStage("fit") })

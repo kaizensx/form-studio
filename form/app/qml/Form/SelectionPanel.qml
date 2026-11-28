@@ -33,6 +33,7 @@ Rectangle {
         if (modelling || !want) return
         if ((want === "fillet" || want === "chamfer") && edgePicks.length) modelling = "edges"
         else if ((want === "hole" || want === "shell") && flat) modelling = "face"
+        else if (want === "text" && flat) Store.openSheet("text", { item: flat })
         else if (want === "part" && items.some(function (x) { return !!x.on })) Store.openSheet("parts", { item: items.filter(function (x) { return !!x.on })[0] })
         if (modelling) Qt.callLater(function () { if (modelPanel.kinds.indexOf(Ws.want) >= 0) modelPanel.kind = Ws.want })
     }
