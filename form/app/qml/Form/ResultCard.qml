@@ -14,8 +14,10 @@ Column {
     readonly property var r: mine ? Results.r : null
     readonly property string kind: r && r.state === "current" ? r.kind : ""
     visible: mine
+    function count(status) { var n = 0, rows = kind === "dfm" ? r.rows : []; for (var i = 0; i < rows.length; i++) if (rows[i].status === status) n++; return n }
     // the number that stands large in the card, and the words beside it: the first line of the result
-    readonly property var lead: kind === "field" && r.lines.length && r.lines[0].v !== "" ? [r.lines[0].v, r.lines[0].k.toLowerCase() + (r.study_kind === "static" && r.lines[0].note ? ", " + r.lines[0].note : "")]
+    readonly property var lead: kind === "field" && r.lines.length && r.lines[0].v !== "" ? [r.lines[0].v, r.lines[0].k.toLowerCase()]
+        : kind === "dfm" ? [String(count("fail")), (count("fail") === 1 ? "rule fails" : "rules fail") + (count("warn") ? ", " + count("warn") + " warn" : "") + (count("not_checked") ? ", " + count("not_checked") + " not checked" : "")]
         : kind === "cam" ? [r.summary.cycle_time || "", "cycle time, " + r.summary.verdict] : kind === "flat" && r.size_mm ? [F.fmt(r.size_mm[0], 1) + " × " + F.fmt(r.size_mm[1], 1), "mm flat, " + r.bends.length + " bends"]
         : kind === "drawing" ? [r.name || "Sheet", r.dims.length + " dimensions, " + r.dims.filter(function (d) { return d.editable }).length + " bound to a parameter"]
         : kind === "motion" && r.clearance && r.clearance.min ? [Results.fmt(r.clearance.min.clearance_mm, ""), "mm smallest gap, at " + Results.fmt(r.clearance.min.t, "s")] : null
@@ -38,6 +40,8 @@ Column {
         text: !rc.r ? "" : (rc.r.state === "stale" ? "Stale: nothing is drawn on the part. " : rc.r.state === "current" ? "" : "Not run: nothing is drawn on the part. ") + (rc.r.why || "") }
 
     // ── strength ──
+    Txt { visible: text !== ""; width: parent.width; kind: "fine"; tone: 2
+        text: rc.kind === "field" && rc.lead && rc.r.lines[0].note ? rc.r.lines[0].note : "" }
     Seg { objectName: "studySeg"; visible: rc.mine && !!rc.r.studies && rc.r.studies.length > 1; height: 26; width: Math.min(implicitWidth, parent.width)
         model: rc.mine && rc.r.studies ? rc.r.studies.map(function (s) { return { value: s.id, text: s.name } }) : []
         value: rc.mine ? rc.r.study || "" : ""; onPicked: function (v) { Results.setStudy(v) } }
@@ -90,7 +94,7 @@ Column {
                 Rectangle { anchors.fill: parent; anchors.leftMargin: -6; anchors.rightMargin: -6; radius: 7; color: rule.lit ? Theme.washOn : hh.hovered ? Theme.washHover : "transparent" }
                 Rectangle { x: 1; y: 10; width: 6; height: 6; radius: 3; color: rule.modelData.status === "not_checked" || rule.modelData.status === "n/a" || rule.modelData.status === "info" ? "transparent" : rule.c; border.width: 1; border.color: rule.c }
                 Txt { id: rt; x: 16; y: 5; width: parent.width - 16 - rv.width - 8; font.pixelSize: 12; tone: rule.modelData.status === "n/a" ? 3 : 1; text: rule.modelData.title }
-                Txt { id: rv; anchors.right: parent.right; y: 5; mono: true; font.pixelSize: 12; tone: 2; wrapMode: Text.NoWrap
+                Txt { id: rv; anchors.right: parent.right; y: 5; mono: true; font.pixelSize: 12; tone: 2; wrapMode: Text.NoWrap; opacity: fb.visible ? 0 : 1
                     text: rule.modelData.status === "not_checked" ? "not checked" : rule.modelData.status === "n/a" ? "n/a"
                         : rule.modelData.value !== null && rule.modelData.value !== undefined ? Results.fmt(Number(rule.modelData.value), rule.modelData.unit) : rule.modelData.status }
                 HoverHandler { id: hh; onHoveredChanged: { if (hovered && rule.modelData.faces.length) Results.litRule = rule.modelData.id; else if (!hovered && Results.litRule === rule.modelData.id) Results.litRule = "" } }
@@ -132,8 +136,10 @@ Column {
     Column { width: parent.width; spacing: 2; visible: rc.kind === "flat"
         Repeater { model: rc.kind === "flat" ? rc.r.bends : []
             Line { required property var modelData; required property int index; objectName: "bendLine"
-                k: "Bend " + (index + 1); v: Math.round(modelData.angle * 10) / 10 + "° " + modelData.direction + " · R " + Math.round(modelData.r * 100) / 100 + " · K " + Math.round(modelData.K * 100) / 100; ev: "specified"
-                note: index === 0 ? modelData.k_source : "" } }
+                k: "Bend " + (index + 1); v: Math.round(modelData.angle * 10) / 10 + "° " + modelData.direction + " · R " + Math.round(modelData.r * 100) / 100; ev: "computed"
+                note: "" } }
+        Line { objectName: "kFactor"; k: "K-factor"; v: rc.kind === "flat" && rc.r.bends.length ? String(Math.round(rc.r.bends[0].K * 100) / 100) : ""; ev: "specified"
+            note: rc.kind === "flat" && rc.r.bends.length ? rc.r.bends[0].k_source : "" }
         Line { k: "Flat size"; v: rc.kind === "flat" && rc.r.size_mm ? F.fmt(rc.r.size_mm[0], 1) + " × " + F.fmt(rc.r.size_mm[1], 1) + " mm" : ""; ev: "computed" }
     }
 

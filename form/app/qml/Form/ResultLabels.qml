@@ -15,7 +15,8 @@ Item {
     readonly property string kind: r ? r.kind : ""
     property int tick: 0
     function bump() { tick++ }
-    Connections { target: root.camera; function onScenePositionChanged() { root.bump() } function onSceneRotationChanged() { root.bump() } function onFieldOfViewChanged() { root.bump() } }
+    function later() { Qt.callLater(bump) }       // the camera's position and rotation change together: project once
+    Connections { target: root.camera; function onScenePositionChanged() { root.later() } function onSceneRotationChanged() { root.later() } function onFieldOfViewChanged() { root.later() } }
     Connections { target: root.port; function onShiftChanged() { root.bump() } function onTouched() { Results.cut() } }
     onWidthChanged: bump(); onHeightChanged: bump()
     function at(p) {                        // a design-frame point → view pixels, or null
