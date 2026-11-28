@@ -527,3 +527,34 @@ Decided by the owner on 2026-11-27: Form Studio is to be the best open-source ap
    (wave J).
 4. **Pace: three tracks at once.** Agents work in separate worktrees in the order of this plan. Each wave is tested,
    reviewed and installed on the Mac before it merges into `dev`.
+
+## Added on 2026-11-28 from the niche sweep
+
+The sweep of the whole niche (`docs/research/2026-11-28-niche-sweep.md`) adds these waves, about 44 agent-days.
+Each has its detail, sources and acceptance in that document.
+
+| Wave | Days | Outcome |
+|---|---|---|
+| M | 5 | Viewport craft: matcap and studio shading presets, zebra, curvature and draft maps, X-ray, a view cube, a picker for overlapping selections, a before/after toggle |
+| N | 4 | Direct manipulation: gizmos with typed values, edge drag handles, edit dimensions on the model, draggable numbers |
+| O | 4 | A chat that proves itself: sources under each reply, live status, notes of hand edits, author marks, a plan card to approve, saved prompts, commands on the selection |
+| P | 4 | Project knowledge: overview, templates, search across everything, local search by description, 30-day recently deleted |
+| Q | 7 | Image or words to a mesh, split into parts, rebuilt as features with a deviation map |
+| R | 3 | Competing mesh-to-CAD results shown side by side; concept cards with mass and checks |
+| S | 3 | One-click print-ready generators (tags, reliefs, trays, knobs) as editable recipes |
+| T | 2 | First run with three parts to try and a short tour |
+| U | 4 | A code pane that follows the feature list and the viewport |
+| V | 3 | Parametric CAD Bench v3 and our own suites run and published |
+| W | 2 | A theme from three colour settings with high contrast, and a polish pass every release |
+| D2 | 3 | Thermal and natural-frequency studies after strength |
+
+Decided by the owner's standing instruction ("the best at all of it"):
+
+5. **Mesh generators: both.** TRELLIS.2 running locally, and hosted generators (Meshy, Tripo, Hunyuan) on the
+   person's own key as an opt-in that says what is sent before each run.
+6. **Code pane: read-only by default, editable by a switch.** Edits go through the same edit protocol and proof as
+   every other change.
+7. **Benchmark: published in full, failures included,** with the commit, the model and how to reproduce it.
+
+Order after this addition: A; O and M beside B1; B2 with N; C; D; F; then E, G, H, I, J, K, L, with P, Q, R, S, T, U,
+V, W and D2 placed where they unblock the most.
