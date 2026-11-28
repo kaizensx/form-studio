@@ -322,6 +322,9 @@ def make_handler(st: Studio):
             if rest == "/bom":
                 from . import bom
                 return self._json(bom.build(st, p, made=q.get("made") != "0"))
+            if rest == "/result":                          # what the window draws of a Bench entry's result (form/resultview.py)
+                from . import resultview
+                return self._json(resultview.describe(st, p, q.get("id") or "", {k: q[k] for k in ("study", "setup") if q.get(k)}))
             if rest == "/bench" or rest.startswith("/bench/"):     # the Bench: every study, route and document (form/studies.py)
                 from . import studies
                 sid = rest[len("/bench/"):] if rest.startswith("/bench/") else ""
@@ -893,6 +896,15 @@ def make_handler(st: Studio):
                                                prove=body.get("prove", True) is not False))
                 except dr.DrawingError as e:
                     raise StudioError(str(e), e.hint)
+            if action == "fix_preview":                    # a manufacturability fix built and checked, not saved: its ghost
+                from . import resultview
+                return self._json(resultview.fix_preview(st, p, str(body.get("process") or ""), str(body.get("fix") or ""), body.get("options")))
+            if action == "fix_apply":
+                from .dfm import fixes
+                out = fixes.apply_fix(st, p, str(body.get("process") or ""), str(body.get("fix") or "") or None,
+                                      body.get("options") or None, expect_head=body.get("expect_head"))
+                out.pop("pictures", None)
+                return self._json({**out, "job": auto(st.load(p["id"])) if out.get("applied") else None})
             if action == "preview":
                 return self._json(st.preview(p, body.get("values", {})))
             if action == "commit":

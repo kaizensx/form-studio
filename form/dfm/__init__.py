@@ -276,6 +276,7 @@ def overlay(res: dict, meas: dict) -> dict:
     {"format": "form-dfm-overlay/1", "process", "rev", "geometry_key", "map": "draft" | "reach" | "overhang" | None,
      "positions", "indices", "values", "colors" (base64 float32 xyz, uint32, float32, uint8 RGBA; as analysis maps),
      "status" (base64 uint8 per vertex: 0 pass, 1 warn, 2 fail, 3 not checked),
+     "face" (base64 uint32 per triangle: the B-rep face it samples, so the window can light a rule's faces),
      "faces": [{"face", "feature", "status", "rules"}], "markers": [{"at", "status", "rule", "label"}],
      "lines": base64 float32 (n, 6) parting line segments or "", "legend": {...}}"""
     ov = meas.get("overlay") or {}
@@ -314,6 +315,7 @@ def overlay(res: dict, meas: dict) -> dict:
            "indices": _b64(np.arange(3 * n, dtype=np.uint32)),
            "values": _b64(np.repeat(vals, 3).astype(np.float32)) if len(vals) == n else "",
            "colors": _b64(np.repeat(col, 3, axis=0)), "status": _b64(np.repeat(st, 3)),
+           "face": _b64(F.astype(np.uint32)),
            "faces": [{"face": int(fi), "feature": (meas.get("features") or [None] * (fi + 1))[fi] if fi < len(meas.get("features") or []) else None,
                       "status": s, "rules": sorted(face_rules.get(fi, ()))} for fi, s in sorted(face_status.items())],
            "markers": [{"at": f["at"], "status": f["status"], "rule": f["rule"], "finding": f["id"],

@@ -2,6 +2,7 @@ module Form
 singleton Theme 1.0 Theme.qml
 singleton Icons 1.0 Icons.qml
 singleton Store 1.0 Store.qml
+singleton Results 1.0 Results.qml
 Txt 1.0 Txt.qml
 Glass 1.0 Glass.qml
 Fade 1.0 Fade.qml
@@ -81,3 +82,9 @@ MorphFrame 1.0 MorphFrame.qml
 DesignCard 1.0 DesignCard.qml
 GameSheet 1.0 GameSheet.qml
 LodBar 1.0 LodBar.qml
+ResultLayer 1.0 ResultLayer.qml
+ResultLabels 1.0 ResultLabels.qml
+LegendStrip 1.0 LegendStrip.qml
+ResultCard 1.0 ResultCard.qml
+DrawingPane 1.0 DrawingPane.qml
+OverLine 1.0 OverLine.qml

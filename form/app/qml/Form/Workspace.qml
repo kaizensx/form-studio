@@ -216,7 +216,7 @@ Item {
             // top), lifted so the last features end above the cue's first line. When the cue leaves the camera
             // settles down by that lift; it never re-frames and nothing changes size.
             readonly property bool cueing: cue.shown || ws.cueRoom
-            readonly property real floorY: cueing ? Math.min(Store.barRestY, Store.barY, status.restY, cue.rest + 100) : Math.min(Store.barY, status.y, strip.on ? strip.y - 8 : 1e9)
+            readonly property real floorY: cueing ? Math.min(Store.barRestY, Store.barY, status.restY, cue.rest + 100) : Math.min(Store.barY, status.y, strip.on ? strip.y - 8 : 1e9, rstrip.on ? rstrip.y - 8 : 1e9)
             readonly property real cueLift: cueing ? Math.round(centre.height * 0.045) : 0
             readonly property real top: Theme.paneTop + 4 - cueLift
             readonly property real bottom: centre.height - Math.max(60, centre.height - floorY + 26 + cueLift)
@@ -230,6 +230,7 @@ Item {
             slack: 0.98
             scaleLeft: status.x; scaleFoot: status.y - 12
             floorGrid: Store.floorGrid
+            results: true                // results of the later engines are drawn on the part here (Results.qml)
             anchors.fill: parent
             visible: !Store.layers
             asmMode: Store.asmMode; explode: Store.explode; pose: Store.pose
@@ -548,6 +549,15 @@ Item {
             x: Math.round(Math.max(lay.freeL, Math.min(lay.freeR - width, (ws.col ? (lay.freeL + lay.freeR) / 2 : lay.mid) - width / 2)))
             y: Math.round((ws.col ? centre.height - Theme.edge : Math.min(centre.height - Theme.edge, Store.barY - Theme.gap)) - height) }
 
+        // the same strip for a result of the later engines (strength, manufacturability, CNC, flat pattern, motion)
+        LegendStrip { id: rstrip; source: studio; z: 5
+            width: strip.width; x: strip.x
+            y: Math.round((ws.col ? centre.height - Theme.edge : Math.min(centre.height - Theme.edge, Store.barY - Theme.gap)) - height) }
+        // Document: the drawing's sheet takes the stage
+        Loader { id: sheetPane; z: 4; active: Results.kind === "drawing" && Results.on && !ws.sim
+            x: Math.round(lay.freeL - 28); y: Theme.paneTop; width: Math.round(lay.freeR - x); height: Math.round(Math.min(centre.height - Theme.edge, Store.barY - Theme.gap) - y)
+            sourceComponent: DrawingPane { } }
+
         // an agent is working on another design than this one: named, never jumped to once you are working here
         Rectangle {
             id: elsewhere; objectName: "agentElsewhere"; z: 6
@@ -642,7 +652,7 @@ Item {
             // the size line: W × D × H and the volume of what is on screen, and under it which arrangement that is.
             // While an agent's build streams in it is the size of what is built so far (the stage's own bounds, the
             // same numbers as the dimension lines on the part), and there is no volume yet.
-            Column { id: ro; objectName: "readout"; spacing: 3; visible: !strip.on      // a result's legend takes the foot of the stage
+            Column { id: ro; objectName: "readout"; spacing: 3; visible: !strip.on && !rstrip.on      // a result's legend takes the foot of the stage
                 readonly property bool asm: !!Store.assembly && Store.asmMode !== "print"
                 readonly property bool mass: !sofar && Store.massShown && !!Store.mass.total
                 // a streamed stage carries its own bounds; a build-up playing here is measured by the view (the bounds of
