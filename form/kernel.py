@@ -1403,3 +1403,7 @@ from .massprops import KERNEL_OPS as _MASS_OPS  # noqa: E402  (mass, centre of m
 OPS.update(_MASS_OPS)
 from .drawing.kernel_ops import KERNEL_OPS as _DRAWING_OPS  # noqa: E402  (drawing views, sections, PMI)
 OPS.update(_DRAWING_OPS)
+from .catalog import KERNEL_OPS as _CATALOG_OPS  # noqa: E402  (standard parts: build and measure one part)
+OPS.update(_CATALOG_OPS)
+from .placement import KERNEL_OPS as _PLACEMENT_OPS  # noqa: E402  (standard parts placed: snap and fit)
+OPS.update(_PLACEMENT_OPS)

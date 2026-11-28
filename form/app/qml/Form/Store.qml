@@ -2558,6 +2558,7 @@ QtObject {
         if (a === "exportProject") { exportProject(pid); return }
         if (a === "review") { runStudy(e.id); return }
         if (["lighter", "share", "turntable", "render", "game"].indexOf(a) >= 0) { openSheet(a); return }
+        if (a === "parts") { openSheet("parts", { item: (selection && selection.items || []).filter(function (x) { return !!x.on })[0] || null }); return }
         if (a === "fit") { setStage("fit"); return }
         if (a === "mass") { massOn = true; return }                                  // the readout and the centre of mass
         if (a === "materials" || a === "tree") { if (stage !== "shape") setStage("shape"); return }   // Colour and material; the Program

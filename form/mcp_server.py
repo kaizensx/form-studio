@@ -1705,6 +1705,105 @@ def build() -> MCPServer:
         return await _with_views(st, project, out)
 
     @mcp.tool(annotations=RW)
+    async def standard_part(action: str = "search", query: str = "", spec: dict | None = None, project: str = "",
+                            at: list[float] | None = None, normal: list[float] | None = None, depth: float | None = None,
+                            qty: int = 1, cut: bool = True, snap: bool = True, part_id: str = "", step: bool = False,
+                            expect_head: int | None = None) -> dict:
+        """Standard parts to buy (screws, nuts, washers, inserts, bearings, dowels, collars, shafts, LM bushings, GT2
+        pulleys and belts, NEMA motors, V-Slot extrusion and T-nuts, magnets, O-rings), generated from published
+        tables: every dimension names its standard and table, or the maker's datasheet. Threads are cosmetic.
+        action="search": query such as "m5 socket 12", "608", "lm8uu", "nema 17", "o-ring 010" -> candidates with
+        spec and designation (local tables; nothing is sent anywhere). "families": every family, its sizes and
+        options. "describe": spec={family, size, ...} -> designation, dimensions with sources, the mating cut, the
+        material; step=True also builds it (real CAD, measured on the B-rep), gives its mass with the evidence and
+        writes a STEP. "din": query "DIN 912" -> what it is ordered as today.
+        On a Python design (project): "snap" (at) -> what is there: a hole (snapped to its axis and opening) or a flat
+        face, and the host's thickness. "place" (spec, at, optional normal, depth, qty, cut) -> one action: snaps to
+        the hole or face, cuts the matching clearance hole and counterbore, insert pocket, bearing seat, nut trap or
+        motor mount into the host as a feature of the source (a new revision), records the part as purchased with
+        its designation (in assembly() when the design has one), picks a screw's stock length from the host's
+        thickness when none is given, and checks the fit: interference on the B-rep and the clearance per side from
+        the tables (computed). "list", "fit", "remove" (part_id like "std_1")."""
+        st = studio()
+        def go():
+            from . import catalog, placement
+            a = (action or "search").strip().lower()
+            if a == "search":
+                return {"results": catalog.search(query), "note": "Local tables only; nothing was sent anywhere."}
+            if a == "families":
+                return {"families": catalog.families()}
+            if a == "din":
+                return catalog.din(query)
+            if a == "describe":
+                if not spec:
+                    raise StudioError("describe needs spec={family, size, ...} (search finds one).")
+                if not step:
+                    return catalog.describe(spec)
+                out_dir = st.root / ".catalog" / "step"
+                out_dir.mkdir(parents=True, exist_ok=True)
+                it = catalog.resolve(spec)
+                import hashlib
+                name = hashlib.sha256(json.dumps(it, sort_keys=True).encode()).hexdigest()[:12]
+                return catalog.part_info(st, it, step_path=str(out_dir / f"{it['family']}-{name}.step"))
+            if not project:
+                raise StudioError(f'action "{a}" works on a design: give project.')
+            p = st.load(project)
+            if a == "list":
+                return {"placements": placement.list_parts(st, p)}
+            if a == "fit":
+                return placement.fit(st, p)
+            if a == "snap":
+                if at is None:
+                    raise StudioError("snap needs at (a point on the part).")
+                return placement.snap(st, p, at, normal)
+            if a == "remove":
+                return placement.remove(st, p, part_id, expect_head, origin="agent")
+            if a == "place":
+                if not spec or at is None:
+                    raise StudioError("place needs spec={family, size, ...} and at (a point on a hole or a flat face).")
+                return placement.place(st, p, spec, at, normal, depth, qty, cut, snap, None, expect_head, origin="agent")
+            raise StudioError(f"Unknown action “{action}”.", "search, families, describe, din, snap, place, list, fit, remove.")
+        return await _run(go)
+
+    @mcp.tool(annotations=RW)
+    async def bom(project: str, action: str = "list", format: str = "json", designation: str = "", supplier: str = "",
+                  part_number: str = "", url: str = "", note: str = "", query: str = "", confirm: bool = False,
+                  from_person: bool = False) -> dict:
+        """The parts list a buyer orders from: purchased items grouped by standard designation (e.g. "ISO 4762
+        M5×12 A2-70") with quantity, material and mass (the maker's catalogue value, else the modelled volume on the
+        B-rep times the sourced density, else none), the made parts with their mass (mass_properties), and supplier
+        numbers. action="list": format json (default), csv or pdf (a page for the drawing set; returns the path).
+        Supplier numbers are taken only from the person or from a page at a link the person gave:
+        action="add_supplier" (designation, supplier, part_number, and url: the page the person linked, read with
+        fetch_link; or from_person=True when the person typed the number to you) or "remove_supplier"; never make
+        one up or look one up unasked. action="catalogue": the optional catalogue
+        service (Settings, off by default) - its state, and with query what would be sent and to whom; it searches
+        only with confirm=True after the person agreed. No provider ships, so the state says "no provider configured"."""
+        st = studio()
+        def go():
+            from . import bom as bm
+            p = st.load(project)
+            a = (action or "list").strip().lower()
+            if a == "add_supplier":
+                return bm.add_supplier(st, p, designation, supplier, part_number, url, note,
+                                       by="person" if from_person else "agent", relayed=from_person)
+            if a == "remove_supplier":
+                return bm.remove_supplier(st, p, designation, supplier, part_number)
+            if a == "catalogue":
+                return bm.catalogue_search(st.cfg, query, confirm) if query else bm.catalogue_status(st.cfg)
+            if a != "list":
+                raise StudioError(f"Unknown action “{action}”.", "list, add_supplier, remove_supplier, catalogue.")
+            b = bm.build(st, p)
+            fmt = (format or "json").lower()
+            if fmt == "csv":
+                f = bm.write_csv(st, p, b)
+                return {"csv": str(f), "text": f.read_text(encoding="utf-8"), "totals": b["totals"]}
+            if fmt == "pdf":
+                return {"pdf": str(bm.pdf(st, p, b)), "totals": b["totals"]}
+            return b
+        return await _run(go)
+
+    @mcp.tool(annotations=RW)
     async def remove_feature(project: str, feature_id: str, expect_head: int | None = None) -> dict:
         """Remove a feature as a new revision: a standard feature added with add_feature ("boss_1", "hook_1"), or any
         feature of a FeatureDesign (its method goes; the features before it load from their checkpoints)."""

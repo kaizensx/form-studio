@@ -34,7 +34,16 @@ def _inputs(st, p) -> dict:
     return {"p": p, "rev": rev, "keys": keys, "recipe": recipe, "status": status, "checks": cur("checks"),
             "slice": cur("slice"), "exports": cur("exports"), "view": view, "asm": view.get("assembly"),
             "kernel": st.kernel_id(), "recipe_sha": st.recipe_sha(st.rid(p)), "rid": st.rid(p),
-            "key": docs_key(keys, status)}
+            "key": docs_key(keys, status), "placed": _placed(st, p)}
+
+
+def _placed(st, p) -> list:
+    """Standard parts placed on the design, grouped by designation (form/bom.py), or [] when there are none."""
+    from . import placement
+    if not placement.list_parts(st, p):
+        return []
+    from . import bom
+    return [g for g in bom.build(st, p, made=False)["purchased"] if g.get("family")]
 
 
 def docs_key(keys: dict, status: dict) -> str:
@@ -86,12 +95,22 @@ def bom(d) -> str:
         w.writerow([x["label"], "printed", 1, f"{size[0]:.1f} x {size[1]:.1f} x {size[2]:.1f} mm as printed",
                     f"{name}.stl" + (f", solid {x['solid'] + 1} of {len(parts)}" if len(parts) > 1 else ""),
                     x.get("material") or material or "not set: no current slice", g, ev, "", "no", ""])
+    from .placement import NOTE as _placed_note
     for h in (asm["hardware"] if asm else []):
+        if str(h.get("note", "")).startswith(_placed_note):
+            continue                                  # standard parts placed on the design: listed below, once
         each = h.get("grams")
         g = f"{each * h['qty']:.2f}" if isinstance(each, (int, float)) else ""
         ev = (f"computed: {h['qty']} x {each:g} g, modelled volume x typical density" if g else "")
         w.writerow([h["name"], "purchased", h["qty"], h["size"], h["source"], h.get("material", ""), g, ev,
                     h.get("url", ""), "no: check against the printed part", h["note"]])
+    for g in d.get("placed") or []:                   # standard parts placed on the design (form/bom.py)
+        u = g.get("unit_grams")
+        sup = g.get("suppliers") or []
+        w.writerow([g["designation"], "purchased", g["quantity"], g["designation"], g["standard"], g["material"],
+                    f"{u * g['quantity']:.2f}" if u is not None else "", g["unit"].get("evidence", "") if u is not None else "",
+                    sup[0].get("url", "") if sup else "", "yes: from the standard's table (" + g["source_table"] + ")",
+                    "placed as " + " ".join(g["placed_as"])])
     return out.getvalue()
 
 

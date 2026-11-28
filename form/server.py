@@ -309,6 +309,19 @@ def make_handler(st: Studio):
                                        "width", "lip", "lip_height") if q.get(k) not in (None, "")}
                 return self._json(feature_helpers.preview(q.get("kind") or "boss", nozzle=st.slicer_info(p=p).get("nozzle_mm"),
                                                           allow_strain=float(q["allow_strain"]) if q.get("allow_strain") else None, **o))
+            # -- standard parts and the parts list (form/catalog.py, form/placement.py, form/bom.py) --
+            if rest == "/parts":
+                from . import placement
+                return self._json({"placements": placement.list_parts(st, p)})
+            if rest == "/parts/search":
+                from . import catalog
+                return self._json({"results": catalog.search(q.get("q") or "")})
+            if rest == "/parts/fit":
+                from . import placement
+                return self._json(placement.fit(st, p))
+            if rest == "/bom":
+                from . import bom
+                return self._json(bom.build(st, p, made=q.get("made") != "0"))
             if rest == "/bench" or rest.startswith("/bench/"):     # the Bench: every study, route and document (form/studies.py)
                 from . import studies
                 sid = rest[len("/bench/"):] if rest.startswith("/bench/") else ""
@@ -809,6 +822,26 @@ def make_handler(st: Studio):
                 st.activity(pid, "design", f"Standard feature: r{out['head']:02d}.", by="you")
                 out["job"] = auto(st.load(pid))
                 return self._json(out)
+            if action in ("part_place", "part_remove"):
+                from . import placement
+                eh = int(body["expect_head"]) if body.get("expect_head") is not None else None
+                if action == "part_remove":
+                    out = placement.remove(st, p, str(body.get("id", "")), eh)
+                else:
+                    out = placement.place(st, p, body.get("spec") or {}, body.get("at"), body.get("normal"),
+                                          float(body["depth"]) if body.get("depth") else None, int(body.get("qty") or 1),
+                                          body.get("cut", True) is not False, body.get("snap", True) is not False, None, eh)
+                st.activity(pid, "design", f"Standard part: r{out['head']:02d}.", by="you")
+                out["job"] = auto(st.load(pid))
+                return self._json(out)
+            if action in ("supplier_add", "supplier_remove"):
+                from . import bom
+                if action == "supplier_remove":
+                    return self._json(bom.remove_supplier(st, p, str(body.get("designation", "")), str(body.get("supplier", "")),
+                                                          str(body.get("part_number", ""))))
+                return self._json(bom.add_supplier(st, p, str(body.get("designation", "")), str(body.get("supplier", "")),
+                                                   str(body.get("part_number", "")), str(body.get("url", "")),
+                                                   str(body.get("note", "")), by="person"))
             if action == "lighten":
                 from . import lighten
                 return self._json(lighten.search(st, p, builds=int(body.get("builds") or 4)))
