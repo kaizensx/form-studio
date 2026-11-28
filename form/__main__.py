@@ -29,6 +29,7 @@
   form strength static <project> --fix X,Y,Z --force X,Y,Z:FX,FY,FZ --material AL-6061
                                      a strength study with a stated error (also modal, buckling, list, show, verify;
                                      `form study strength ...` is the same); JSON
+  form study list|run|show <project> [id] [--force]   the Bench: every study, route and document, with its state
   form verify <project> <release>    re-hash a release against its manifest
   form chat "message" [--project ID] [--conversation ID] [--agent claude|codex] [--model X] [--attach FILE] [--json]
                                      one message to an agent with FORM's tools; streams the reply, saves the conversation
@@ -255,6 +256,9 @@ def main(argv=None):
     if argv[:1] == ["strength"] or (argv[:1] == ["study"] and argv[1:2] and argv[1] in ("strength", "static", "modal", "buckling", "thermal", "thermal_stress", "verify")):
         from .fea.cli import main as strength_main  # strength studies with a stated error (form/fea)
         return strength_main(argv[1:] if argv[0] == "strength" else argv[2:] if argv[1] == "strength" else argv[1:])
+    if argv[:1] == ["study"]:                      # the Bench: every study, route and document with its state (form/studies.py)
+        from .studies import main_cli as study_main
+        return study_main(argv[1:])
     if argv[:1] == ["tool"]:                       # any MCP tool, headless, with the same arguments and rules
         return _tool(argv[1:])
     if argv[:1] == ["capabilities"]:

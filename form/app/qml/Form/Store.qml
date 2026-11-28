@@ -435,6 +435,7 @@ QtObject {
         return pget().then(function (d) {
             if (pid !== at) return
             data = d
+            loadBench()                                    // the Bench follows the head (form/studies.py)
             if (d.recovered) toast("Project recovered", d.recovered)
             loadRefine()                                   // the head's refine changes follow the head
             if (withView || !view || view.rev !== d.project.head) {
@@ -566,7 +567,7 @@ QtObject {
             for (var k = 0; k < j.steps.length; k++) if (j.steps[k].state === "failed" || j.steps[k].state === "blocked") { bad = j.steps[k]; break }
             if (!bad && j.error) bad = { label: "Pipeline", error: j.error }
             if (bad) toast(bad.label + ": " + (bad.error && bad.error.message || "stopped"), bad.error && bad.error.hint, true)
-            else if (!_jobQuiet && Date.now() - _jobT0 > 1500 && j.steps.some(function (x) { return x.state === "done" }))
+            else if (!_jobQuiet && j.kind !== "study" && Date.now() - _jobT0 > 1500 && j.steps.some(function (x) { return x.state === "done" }))
                 toast("Outputs are current", F.plural(j.steps.filter(function (x) { return x.state === "done" }).length, "step") + " rebuilt in " + ((Date.now() - _jobT0) / 1000).toFixed(1) + " s.")
             var t = Object.assign({}, thumbTick); t[pid] = (t[pid] || 0) + 1; thumbTick = t
             refresh(true)
@@ -2494,4 +2495,44 @@ QtObject {
         get("/whatsnew?version=" + encodeURIComponent(version || Bridge.version)).then(function (r) { whatsNew = r; openSheet("whatsnew") }, fail)
     }
     function closeWhatsNew() { openSheet(null) }
+
+    // ── the Bench (form/studies.py): every study, route and document of the open design, with its state ──
+    // The engine says what is current; nothing here decides it. Bench.qml lists it, the palette finds every entry.
+    property var bench: null
+    property int _bseq: 0
+    function loadBench() {
+        if (!pid) { bench = null; return }
+        var at = pid, seq = ++_bseq
+        pget("/bench").then(function (r) { if (pid === at && seq === s._bseq) bench = r }, function () {})
+    }
+    function benchEntry(id) {
+        var es = bench ? bench.entries : []
+        for (var i = 0; i < es.length; i++) if (es[i].id === id) return es[i]
+        return null
+    }
+    property var _benchPoll: Timer { interval: 1200; repeat: true; running: !!s.bench && !!s.bench.counts && s.bench.counts.running > 0; onTriggered: s.loadBench() }
+    function runStudy(id, force) {
+        var e = benchEntry(id)
+        if (e && e.by === "agent") { if (canAskReview) askReview(); else toast("Your agent does this one", "Open a conversation and ask for a design review: it looks, then records the critique."); return }
+        if (e && e.by === "person") { if (stage !== "release") setStage("release"); toast("Only you can release", "Review the gate below, acknowledge each warning, then Approve."); return }
+        ppost("/study", { id: id, force: !!force }).then(function (r) {
+            if (r && typeof r.job === "string" && r.job) track(r.job)
+            loadBench()
+        }, function (e2) { fail(e2); loadBench() })
+    }
+    // what a current entry opens: its own surface in the window, or its file
+    function openStudy(e) {
+        if (!e) return
+        var a = e.app || ""
+        if (a.indexOf("map.") === 0) { if (stage !== "prove") setStage("prove"); setAnalysis(a.slice(4)); return }
+        if (a === "simulate") { simulate(); return }
+        if (a === "orient") { if (stage !== "prove") setStage("prove"); findOrientation(); return }
+        if (a === "slicerOpen") { openInSlicer(); return }
+        if (a === "exportProject") { exportProject(pid); return }
+        if (a === "review") { runStudy(e.id); return }
+        if (["lighter", "share", "turntable", "render", "game"].indexOf(a) >= 0) { openSheet(a); return }
+        if (a === "fit") { setStage("fit"); return }
+        if (e.files && e.files.length) { Bridge.reveal(Bridge.fileUrl(e.files[0])); return }
+        if (e.stage && stage !== e.stage) setStage(e.stage)
+    }
 }

@@ -1137,6 +1137,23 @@ def _cached(st, p, name: str, key: str, make):
     return out
 
 
+def map_key(st, p: dict, map: str, rev: int | None = None) -> str:
+    """The key a map of revision rev is cached under (the Bench reads it without computing: form/studies.py)."""
+    from .studio import H
+    gk = st.keys(p, rev)["geometry"]
+    return H("analysis", ANALYSIS_VERSION, gk, map, _nozzle(st, p)[0], p["orientation"] if map in ("overhang", "section") else None)
+
+
+def cached_map(st, p: dict, map: str) -> dict | None:
+    """The head's map when it was computed already, else None (nothing is computed)."""
+    import json
+    path = st.dir(p["id"]) / "artifacts" / "analysis" / f"{map}-{map_key(st, p, map)}.json"
+    try:
+        return json.loads(path.read_text(encoding="utf-8")) if path.is_file() else None
+    except (OSError, ValueError):
+        return None
+
+
 def run_map(st, p: dict, map: str = "thickness", rev: int | None = None) -> dict:
     """One analysis map of a revision (head by default), cached by geometry like every other artifact."""
     from .studio import H, StudioError
@@ -1146,7 +1163,7 @@ def run_map(st, p: dict, map: str = "thickness", rev: int | None = None) -> dict
     gk = st.keys(p, r["n"])["geometry"]
     nozzle, assumed = _nozzle(st, p)
     orientation = p["orientation"]
-    key = H("analysis", ANALYSIS_VERSION, gk, map, nozzle, orientation if map in ("overhang", "section") else None)
+    key = map_key(st, p, map, r["n"])
     out = _cached(st, p, map, key, lambda: st._k("analysis", timeout=300, key=gk, recipe_id=st.rid(p, r["n"]), values=r["values"],
                                                   map=map, nozzle=nozzle, orientation=orientation, p=p))
     out.update({"rev": r["n"], "project": p["id"], "nozzle_assumed": assumed})
@@ -1189,6 +1206,14 @@ def measure(st, p: dict, a, b, rev: int | None = None, a_on=None, b_on=None) -> 
     return out
 
 
+def orient_key(st, p: dict) -> str:
+    """The key the head's ranked orientations are cached under (read by the Bench: form/studies.py)."""
+    from .studio import H
+    pe = st.printer_env(p)
+    cur = p["orientation"]
+    return H("orient", ANALYSIS_VERSION, st.keys(p)["geometry"], list(pe["envelope"]), pe["margin"], cur if cur not in NAMED else None)
+
+
 def orientations(st, p: dict) -> dict:
     """Every way the head revision can rest on the plate, ranked. Cached by geometry and printer."""
     from .studio import H
@@ -1197,7 +1222,7 @@ def orientations(st, p: dict) -> dict:
     pe = st.printer_env(p)                                       # the design's printer bed (form/printers.py)
     env, margin = list(pe["envelope"]), pe["margin"]
     cur = p["orientation"]
-    key = H("orient", ANALYSIS_VERSION, gk, env, margin, cur if cur not in NAMED else None)
+    key = orient_key(st, p)
     out = _cached(st, p, "orient", key, lambda: st._k("orient", timeout=300, key=gk, recipe_id=st.rid(p), values=r["values"],
                                                        envelope=env, margin=margin, current=cur, p=p))
     dn = orientation_down(cur)

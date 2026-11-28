@@ -24,7 +24,7 @@ Item {
     objectName: "palette"
     readonly property string selText: rows[picks[sel]] ? rows[picks[sel]].text : ""     // the highlighted command
     property alias query: q.text
-    readonly property var groups: ["Recent", "Go to", "Tools", "Designs", "Conversations", "Settings"]
+    readonly property var groups: ["Recent", "Go to", "Tools", "Bench", "Designs", "Conversations", "Settings"]
     function updates() { Store.checkUpdates(true).then(function (u) {
         if (u && u.available) { Store.updateHidden = false; Store.openSheet("update") }
         else if (u && !u.enabled) Store.toast("Update checks are off", "[updates] check = false or FORM_NO_UPDATE_CHECK=1")
@@ -69,6 +69,16 @@ Item {
             add("Tools", "freecad", "external_link", "Open the STEP in FreeCAD", "Release · working files", function () { Store.openIn("step", "freecad") })
             if (Store.canAskReview) add("Tools", "review", "eye", "Ask for a design review", "Silhouette, relationships, details", function () { Store.askReview() })
         }
+        // the Bench: every study, route and document of this design with its state (form/studies.py); a current one
+        // opens what it made, any other runs
+        if (w && Store.bench && Store.bench.project === Store.pid) Store.bench.entries.forEach(function (e) {
+            if (e.state === "n/a") return
+            var st = e.state === "current" ? "Current" + (e.headline ? " · " + e.headline : "") : e.state === "stale" ? "Stale: describes " + F.pad(e.rev)
+                   : e.state === "never" ? "Never run" : e.state === "unavailable" ? (e.why || "Cannot run here") : e.state === "failed" ? "Failed" : "Running"
+            add("Bench", "bench." + e.id, e.group === "study" ? "list_checks" : e.group === "route" ? "external_link" : "file_text",
+                (e.state === "current" || e.state === "running" ? "" : e.by === "agent" ? "Ask for: " : e.by === "person" ? "" : "Run: ") + e.label, st,
+                function () { if (e.state === "current" && e.by === "engine") Store.openStudy(e); else if (e.state !== "running") Store.runStudy(e.id) })
+        })
         add("Tools", "new", "plus", "New design", "Describe it, or drop a photo, a sketch, a part or a link", function () { Store.startNew() }, "Ctrl+N")
         add("Tools", "sketch", "pen_tool", "Sketch a new design", "Lines, circles, arcs and dimensions in mm", function () { if (Store.screen !== "home") Store.home(); Store.openSheet("sketch") })
         add("Tools", "replace", "wrench", "Replace a broken part", "From a photo: estimated, measured, designed", function () { if (Store.screen !== "home") Store.home(); Store.openSheet("replace") })

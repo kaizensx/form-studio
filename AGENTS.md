@@ -19,6 +19,7 @@ Prefer the MCP server (`form-mcp`). Without MCP, the `form` CLI does the same an
 | Look at it | `render` (`view="sheet"` for four views) | `form render <project> --view sheet` |
 | Keep a change | `commit_change` with `expect_head` | `form commit <project> lean=18 --expect-head 3` |
 | Regenerate outputs | `run_pipeline` / `get_job` | `form run <project>` |
+| Every study, route and document with its state (the Bench) | `list_studies` → `run_study`, `get_study` | `form study list <project>`, `form study run <project> map.thickness` |
 | Ask for release | `request_release` (the user approves in the app) | — |
 | Design from your own code (the usual case) | `design_guide` → `create_design` → `edit_design` (ops, not the file) | — |
 | Say what must be true, and read what was measured | `design_brief` (contract and audit) → `get_project` (`proof`) | — |

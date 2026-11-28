@@ -331,7 +331,8 @@ Two MCP tools, and the same from the terminal with JSON output.
 | | `form strength verify` | The verification suite |
 
 `form study strength ...`, `form study static ...`, `form study modal ...`, `form study buckling ...` and
-`form study thermal ...` are the same commands.
+`form study thermal ...` are the same commands; `form study list|run|show` is the Bench, which lists Strength among
+every study of the design.
 
 ```bash
 form strength static bracket --fix 33,20,3 --fix 65,20,3 --force 3,20,45:300,0,-200 --material AL-6061
@@ -429,7 +430,8 @@ Lanczos on a factorisation made once.
 
 ## The Bench entry
 
-`form/fea/bench.py` registers one entry, **Strength**, for the Bench: current only when every study of the design is
-current for the head revision, stale when any is, with the lowest safety factor as its headline and a run action
-that solves every study that is not current. It plugs into the Bench's hook for later waves, a module listed in
-`studies.PROVIDERS` that exposes `register_studies(register)`.
+The Bench lists one entry, **Strength**: current only when every study of the design is current for the head
+revision, stale when any is, with the lowest safety factor as its headline and a run action that solves every study
+that is not current. `form study list <project>` and `list_studies` show it with every other study, route and
+document; `form study run <project> strength` solves what is stale. It is registered by `form/fea/bench.py` through
+the Bench's hook for later waves (`studies.PROVIDERS`).

@@ -166,13 +166,29 @@ def _frame(parts):
     return pts.min(0), pts.max(0)
 
 
+def out_dir(st, p: dict, n: int | None = None):
+    """Where the instructions of revision n are written (keyed by its solid and the design's name)."""
+    from .studio import H
+    gk = st.keys(p, n)["geometry"]
+    return st.dir(p["id"]) / "artifacts" / "side" / ("instructions-" + H("instructions", VERSION, gk, p["name"])[:16])
+
+
+def cached(st, p: dict) -> dict | None:
+    """The head's instructions when they were written already, else None (nothing is drawn)."""
+    meta = out_dir(st, p) / "instructions.json"
+    try:
+        return json.loads(meta.read_text(encoding="utf-8")) if meta.is_file() else None
+    except (OSError, ValueError):
+        return None
+
+
 def build(st, p: dict, n: int | None = None) -> dict:
     """Write the instructions for revision n (default the head). Cached by the geometry key."""
     from . import render
     from .studio import H
     r = st.rev(p, n)
     gk = st.keys(p, r["n"])["geometry"]
-    out = st.dir(p["id"]) / "artifacts" / "side" / ("instructions-" + H("instructions", VERSION, gk, p["name"])[:16])
+    out = out_dir(st, p, r["n"])
     meta = out / "instructions.json"
     if meta.is_file():
         return json.loads(meta.read_text(encoding="utf-8"))

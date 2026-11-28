@@ -347,6 +347,12 @@ class EngineRegistration(unittest.TestCase):
                            env={**os.environ, "PYTHONPATH": str(ROOT)})
         self.assertEqual(r.stdout.strip(), "ok", r.stderr[-800:])
 
+    def test_the_bench_lists_strength(self):
+        from form import studies
+        s = studies.get("strength")
+        self.assertEqual((s.group, s.label, s.tool, s.by), ("study", "Strength", "strength_study", "engine"))
+        self.assertIn("form.fea.bench", studies.PROVIDERS)
+
     def test_the_tools_are_registered(self):
         from form import mcp_server
         names = {t.name for t in asyncio.run(mcp_server.build().list_tools())}
@@ -503,6 +509,14 @@ class RealStudies(WithStudio):
         b = bench.summary(self.st, self.load())
         self.assertEqual(b["state"], "current")
         self.assertIn("safety factor", b["headline"])
+        from form import studies                                       # the Bench's own listing and `form study`
+        row = next(e for e in studies.listing(self.st, self.load())["entries"] if e["id"] == "strength")
+        self.assertEqual((row["state"], row["group"]), ("current", "study"))
+        self.assertIn("safety factor", row["headline"])
+        self.assertRegex(row["evidence"], r"converged to")
+        r = subprocess.run([sys.executable, "-m", "form", "study", "show", self.p["id"], "strength"], capture_output=True,
+                           text=True, env=env, cwd=str(ROOT))
+        self.assertEqual(json.loads(r.stdout)["state"], "current", r.stderr[-400:])
 
     def test_6_a_new_revision_makes_it_stale_and_a_rerun_makes_it_current(self):
         p = self.load()
@@ -516,6 +530,9 @@ class RealStudies(WithStudio):
         with self.assertRaises(StudioError):
             study.field(self.st, self.load(), self.d["id"])           # a stale field is never drawn
         self.assertEqual(bench.summary(self.st, self.load())["state"], "stale")
+        from form import studies
+        row = next(e for e in studies.listing(self.st, self.load())["entries"] if e["id"] == "strength")
+        self.assertEqual(row["state"], "stale")                          # a commit makes the Bench's entry stale too
         new = study.run(self.st, self.p["id"], self.d["id"])
         self.assertEqual((new["state"]["state"], new["result"]["rev"]), ("current", 2))
         self.assertLess(new["result"]["max_displacement_mm"], old["max_displacement_mm"])    # thicker is stiffer

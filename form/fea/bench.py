@@ -1,9 +1,8 @@
-"""The Bench entry of the strength studies (the Bench is form/studies.py, wave A of the plan).
+"""The Bench entry of the strength studies (the Bench is form/studies.py).
 
 The Bench lists every study of a design with its state. Strength registers one entry, "strength", through the hook
-the Bench gives later waves: a module named in `studies.PROVIDERS` with `register_studies(register)`. To wire it,
-add "form.fea.bench" to PROVIDERS in form/studies.py; nothing else changes, and the entry then appears in the Bench,
-the palette, `form study list` and list_studies.
+the Bench gives later waves: this module is named in `studies.PROVIDERS` and has `register_studies(register)`, so the
+entry appears in the Bench, the palette, `form study list` and list_studies.
 
 A design can hold several strength studies (form/fea/study.py), each with its own key and stored result, so the entry
 keeps its own record (`state_fn`): it is current only when every defined study is current for the head revision,

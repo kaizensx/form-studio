@@ -2,6 +2,17 @@
 
 ## Unreleased
 
+- **The Bench.** Every study, route and document of a design in one listing: at the top of the Review pane the
+  studies (checks, assembly and joints, requirements, analysis maps, fit, critique, slice, print simulation,
+  orientation, every printer, cost, make it lighter), at the top of the Make pane the routes (exports, 3MF with
+  colours, slicer project, FreeCAD macro, project archive, game asset, release) and the documents (parts list, assembly
+  notes, motion checks, print report, measurement plan, instructions, four-view sheet, photoreal render, turntable,
+  share card). Each line shows its state (current, stale with the revision it describes, never run, failed, running,
+  or why it cannot run here), its headline number with its evidence, and runs on click; a current one opens what it
+  made. States come from keys of the head revision's inputs, never set by hand. The command palette finds every
+  entry.
+- **`list_studies`, `run_study`, `get_study`** (MCP) and **`form study list|run|show <project> [id]`** (terminal):
+  the same Bench, headless. 100 MCP tools.
 ### New
 
 - **Mass properties from the B-rep.** Mass, centre of mass, inertia tensor and principal axes of every part and of
