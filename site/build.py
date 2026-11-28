@@ -42,6 +42,8 @@ PAGES = [
     ("optimisation", "docs/OPTIMISATION.md", "Inverse design and topology", "A Pareto front of variants each built and solved, and topology optimisation written back as features, with the verification."),
     ("cost", "docs/COST.md", "Cost per process", "Printing, CNC, moulding, sheet metal and bought parts from sourced, dated rates, with quantity curves and crossovers."),
     ("tolerances", "docs/TOLERANCES.md", "Tolerance stack-up", "The loop found through the mates; worst case, RSS, Monte Carlo and temperature, each tolerance with its source."),
+    ("lattices", "docs/LATTICES.md", "Lattices and TPMS", "Strut lattices and TPMS infill in a region with a skin: B-rep or mesh and why, density, stiffness by scaling law, printability."),
+    ("photo-and-linkages", "docs/PHOTO_AND_LINKAGES.md", "Photo and linkage starts", "A dimensioned profile from a photo with a reference object, and four-bar synthesis checked by simulation."),
     ("verification", "docs/VERIFICATION.md", "Compatibility", "Platforms, agents, programs and slicers, and what CI exercises."),
     ("changelog", "CHANGELOG.md", "Changelog", "What changed in each version."),
     ("releasing", "docs/RELEASING.md", "Releases", "Stable, preview and patch releases, and how versions are numbered."),

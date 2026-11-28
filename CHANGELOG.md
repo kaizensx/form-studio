@@ -283,6 +283,36 @@
   **`form optimize pareto`**, **`form optimize topology`** (terminal, JSON), with the Bench entries **Inverse
   design** and **Topology optimisation** in the Design chapter. Both run in the background with progress and cancel.
   The stored records hold the Pareto chart data and the density field of every iteration. 142 MCP tools.
+- **Lattices and TPMS infill.** Fill a design, or a box inside it, with a strut lattice (BCC, FCC, octet, Kelvin) or
+  a TPMS (gyroid, Schwarz P, Schwarz D / diamond, Neovius; as a sheet or a network), leaving a skin of the thickness
+  you give. It is one feature in the design's source. Struts are an exact B-rep, real cylinders and node spheres
+  fused in OCCT and written to STEP, up to about 900 struts; above that they are a mesh body. A TPMS has no exact
+  B-rep: it is meshed by marching tetrahedra, kept as a faceted B-rep cut into the exact body while it is small and
+  as a mesh body when it is large. The result says which was produced and why. Density can be uniform, graded by
+  distance from the boundary, a point or a plane, or graded by the von Mises field of a strength study. Relative
+  density is computed on the unit cell and measured on the built solid; stiffness and strength come from
+  Gibson-Ashby scaling and are labelled *computed (scaling law)*; on request one periodic cell is solved by finite
+  elements (a frame for struts, voxels for a TPMS) and the law's difference from it is reported. Printability reads
+  the thinnest strut or wall against the process's sourced limit and the nozzle, counts the closed voids a skin
+  leaves for resin and powder processes, and compares the pores with the escape hole the table asks for.
+  [docs/LATTICES.md](docs/LATTICES.md).
+- **`lattice_properties`, `lattice_fill`** (MCP), **`form lattice list|props|fill|show|remove`** (terminal, JSON), and
+  the Bench entry **Lattice infill** in Check. 146 MCP tools.
+- **A photo with a reference object to a dimensioned profile.** From a photo of a flat part beside a bank card, a
+  coin or two ruler marks, Form Studio finds the part's outline at sub-pixel positions and fits it with lines, arcs
+  and circles as a `form.sketch2d` profile: horizontal, vertical and tangent where they are, and the dimensions that
+  drive it. A card's four corners give a homography, so perspective in its plane is removed. Every dimension carries
+  ± at k = 2 from the pixel size and the reference's own accuracy, and is marked *estimated from the photo*; a design
+  built from it has assumed parameters, never measured ones. Pillow and numpy only: no new dependency.
+  **`photo_profile`** (MCP), **`form photo-profile`** (terminal, JSON).
+- **Four-bar linkage synthesis.** Say what a linkage must do and get its link lengths: three poses of the coupler
+  (Burmester's three-position synthesis), three pairs of input and output angles (Freudenstein's equation), both
+  exact at the three positions, or a coupler curve through target points (differential evolution and a Nelder-Mead
+  polish; the RMS and largest error are returned). Every result is checked for Grashof's condition, the transmission
+  angle, and branch, order and circuit defects, then played by the motion solver, which knows nothing of the
+  synthesis, and compared with the targets. `build=True` writes the linkage as an assembly with its joints and plays
+  it again on the real parts. **`linkage_synthesis`** (MCP), **`form linkage motion|function|path`** (terminal, JSON).
+  [docs/PHOTO_AND_LINKAGES.md](docs/PHOTO_AND_LINKAGES.md).
 - **Tolerance stack-up from the assembly.** Pick the two faces of a gap and Form Studio finds the loop itself: a
   graph search over the declared mates keeps those that hold the parts along the gap (a seat, or a radial fit whose
   clearance is a float), and each part on the path adds the distance between the faces the loop enters and leaves by.

@@ -115,7 +115,7 @@ instead.
 
 ## Tools at a glance
 
-158 tools. Read-only tools never change a project.
+162 tools. Read-only tools never change a project.
 
 | Tool | Access | What it does |
 |---|---|---|
@@ -274,6 +274,10 @@ instead.
 | [`apply_topology`](#apply_topology) | changes | Keep a topology optimisation. Default: its lightening pockets become features of the design, as one revision (each can be suppressed, deleted or reshaped; topo_inset, topo_fillet and topo_web are parameters). |
 | [`tolerance_stack`](#tolerance_stack) | changes | Tolerance stack-up of a gap between two faces of an assembly. |
 | [`get_tolerance_stack`](#get_tolerance_stack) | read-only | Read the tolerance stacks kept with a design. |
+| [`lattice_properties`](#lattice_properties) | read-only | What a lattice or TPMS cell is worth, before anything is built. |
+| [`lattice_fill`](#lattice_fill) | changes | Fill a design (or a box inside it) with a lattice or TPMS, leaving a skin: one feature in the design's source, a new revision. |
+| [`linkage_synthesis`](#linkage_synthesis) | changes | Find a four-bar linkage from what it must do, check it and play it. |
+| [`photo_profile`](#photo_profile) | changes | A flat part's outline from a photo with a reference object, as a dimensioned sketch in millimetres. |
 | [`test_plan`](#test_plan) | changes | The physical test plan of a design's head revision, from what it claims: one test per brief requirement, per fit (ISO 286 holes and pairs, the fit window, assembly mates), per critical dimension (brief and interface parameters, measured or specified values, the overall size) and per strength-study load. |
 | [`results_report`](#results_report) | changes | The results report of a design's head revision: the design with its revision and hashes, every check and study with its evidence class and stated error, the physical results recorded against the test plan, open items and a verdict. |
 | [`backup`](#backup) | changes | Backups of every design and conversation, and Recently deleted. |
@@ -3359,6 +3363,141 @@ Reads only.
 |---|---|---|
 | `project` | string | yes |
 | `stack` | string |  |
+
+### `lattice_properties`
+
+*Read-only.*
+
+What a lattice or TPMS cell is worth, before anything is built. kind: gyroid, schwarz_p, schwarz_d
+(diamond), neovius (TPMS; form "sheet" = a wall about the surface, "network" = one channel system filled) or
+bcc, fcc, octet, kelvin (struts). cell: its size in mm. One of density (relative, 0.02 to 0.8), wall (mm, a
+sheet TPMS) or strut_d (mm). No kind: the list. Returns relative_density ("computed (unit cell)", with the
+first-order strut formula or the thin-wall estimate from the published surface area beside it), features
+(thinnest wall or strut, largest pore), stiffness and strength by Gibson-Ashby scaling, labelled "computed
+(scaling law)" with the class of the cell, its basis and source (E in MPa when material= names one from the
+library or gives E), and printability against process= (fdm, sla, sls, mjf, lpbf): thinnest feature against
+the table's sourced limit and the nozzle, and for resin and powder whether a skin traps it and whether the
+pores let it out. verify=True also solves one periodic cell by finite elements (a frame for struts, voxels
+for a TPMS, which needs SciPy) and reports the estimate's difference from it. Saves nothing.
+
+| Argument | Type | Required |
+|---|---|---|
+| `kind` | string |  |
+| `cell` | number |  |
+| `form` | string |  |
+| `density` | number \| null |  |
+| `wall` | number \| null |  |
+| `strut_d` | number \| null |  |
+| `node` | number |  |
+| `skin` | number |  |
+| `grading` | object \| null |  |
+| `material` | string \| object \| null |  |
+| `process` | string |  |
+| `nozzle` | number \| null |  |
+| `verify` | boolean |  |
+
+### `lattice_fill`
+
+Fill a design (or a box inside it) with a lattice or TPMS, leaving a skin: one feature in the design's
+source, a new revision. kind, cell, form, density | wall | strut_d as lattice_properties. skin: the solid
+wall left round the region, in mm (0: the lattice is open to the outside). region: {"min": [x, y, z], "max":
+[x, y, z]} to fill only that box of the body. grading: {"mode": "distance", "from": "boundary" | {"point":
+[...]} | {"plane": {"origin", "normal"}}, "over": mm, "density": [at the reference, far from it]} or {"mode":
+"stress", "density": [where there is no stress, at the peak], "exponent": 1} with study= a current static
+strength study of the body (its von Mises field, resampled to a grid kept in the source). output: "auto"
+decides and says why: struts are exact B-rep cylinders and node spheres up to about 900 struts, a mesh body
+above; a TPMS has no exact B-rep, so it is a faceted B-rep (planar triangles cut into the exact body) while
+small and a mesh body when large; "brep" or "mesh" forces one. A mesh body is not written to STEP. Returns
+the specification, plan (output and why), built (representation, relative density measured on the solid,
+facet deviation, closed voids), the cell's properties and printability as lattice_properties. No kind: reads
+the lattice the design carries. remove=True takes it out. Pass expect_head.
+
+| Argument | Type | Required |
+|---|---|---|
+| `project` | string | yes |
+| `kind` | string |  |
+| `cell` | number \| null |  |
+| `form` | string |  |
+| `density` | number \| null |  |
+| `wall` | number \| null |  |
+| `strut_d` | number \| null |  |
+| `skin` | number |  |
+| `node` | number |  |
+| `region` | object \| null |  |
+| `grading` | object \| null |  |
+| `study` | string |  |
+| `output` | string |  |
+| `resolution` | integer |  |
+| `remove` | boolean |  |
+| `expect_head` | integer \| null |  |
+| `material` | string \| object \| null |  |
+| `process` | string |  |
+| `nozzle` | number \| null |  |
+| `verify` | boolean |  |
+
+### `linkage_synthesis`
+
+Find a four-bar linkage from what it must do, check it and play it. mode "motion": three poses of the
+coupler, poses=[{"at": [x, y], "angle": deg}, ...] (Burmester's three-position synthesis in dyad form; the
+free choices are searched on a grid of `steps` per turn, links up to max_size times the poses' spread;
+require_crank=True keeps only linkages whose crank turns fully). mode "function": three pairs of input and
+output angles, pairs=[[phi, psi], ...] in degrees from the ground line, ground= its length (Freudenstein's
+equation). Both are exact at the three positions. mode "path": a coupler point through targets=[[x, y], ...]
+(4 to 60 points, in order; closed=True needs a crank that turns fully) by differential evolution and a
+Nelder-Mead polish, deterministic for seed: an approximation, its RMS and largest error in mm are returned.
+Units mm and degrees. Returns linkage (ground pivots, link lengths, coupler point), checks (Grashof and
+class, transmission angle against 40 degrees, branch and order defects), verification (the linkage played
+by Form Studio's motion solver through the targets: point and angle error, or distance to the path) and
+alternatives. build=True writes it as a design: four bars with an assembly of three hinges and a loop,
+played again on the real parts (motion_study). full=True adds the simulated path. No mode: the modes.
+
+| Argument | Type | Required |
+|---|---|---|
+| `mode` | string |  |
+| `poses` | array \| null |  |
+| `pairs` | array \| null |  |
+| `targets` | array \| null |  |
+| `ground` | number |  |
+| `closed` | boolean |  |
+| `seed` | integer |  |
+| `steps` | integer |  |
+| `max_size` | number |  |
+| `require_crank` | boolean |  |
+| `alternatives` | integer |  |
+| `build` | boolean |  |
+| `name` | string |  |
+| `purpose` | string |  |
+| `full` | boolean |  |
+
+### `photo_profile`
+
+A flat part's outline from a photo with a reference object, as a dimensioned sketch in millimetres. photo:
+the path of a picture the person gave (taken square on, the part beside the reference on a plain background).
+reference: {"kind": "card"} (default: a bank card, ISO/IEC 7810 ID-1, 85.60 x 53.98 mm; its four corners
+give a homography, so perspective in its plane is removed), {"kind": "coin", "coin": "eur_1"} (eur_0.01 to
+eur_2, usd_0.01 to usd_0.25) or {"kind": "coin", "diameter_mm": d}, or {"kind": "scale", "points": [[x, y],
+[x, y]], "length_mm": L} (two pixel points a known distance apart, such as two ruler marks); add "at": [x, y]
+(pixels) to point at the reference, and part_at=[x, y] to point at the part (default: the largest other
+object). The outline is found at sub-pixel positions (threshold between background and object, marching
+squares), simplified, and fitted with lines, arcs and circles within tolerance_mm (default 1.5 pixels).
+Returns scale (mm per pixel, its relative uncertainty and where the reference's size is from), dimensions
+(every length, radius, diameter and the overall size, each with ± uncertainty at k = 2 from the pixel size
+and the reference's accuracy, each marked "estimated from the photo"), sketch (form.sketch2d data: points,
+lines, arcs, circles, horizontal / vertical / tangent, the driving dimensions) and what the uncertainty
+leaves out (parallax, lens distortion, tilt without a card). build=True writes a design: the profile
+extruded by depth (assumed: a photo does not show it); its parameters are assumed, never measured.
+
+| Argument | Type | Required |
+|---|---|---|
+| `photo` | string | yes |
+| `reference` | object \| null |  |
+| `part_at` | array \| null |  |
+| `tolerance_mm` | number \| null |  |
+| `build` | boolean |  |
+| `name` | string |  |
+| `depth` | number |  |
+| `purpose` | string |  |
+| `full` | boolean |  |
 
 ### `test_plan`
 

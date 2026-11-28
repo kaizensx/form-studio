@@ -3585,6 +3585,12 @@ def build() -> MCPServer:
     topo_tools.register_tools(mcp, studio, _run, RO, RW, _origin)      # apply_topology (form/topo)
     from .stack import tools as stack_tools   # tolerance stack-up from the assembly: tolerance_stack, get_tolerance_stack
     stack_tools.register_tools(mcp, studio, _run, RO, RW, _origin)
+    from .lattice import tools as lattice_tools   # lattices and TPMS infill: lattice_properties, lattice_fill (form/lattice)
+    lattice_tools.register_tools(mcp, studio, _run, RO, RW, _origin)
+    from .linkage import tools as linkage_tools   # four-bar synthesis: linkage_synthesis (form/linkage)
+    linkage_tools.register_tools(mcp, studio, _run, RO, RW, _origin)
+    from . import phototrace                  # a photo with a reference to a dimensioned profile: photo_profile
+    phototrace.register_tools(mcp, studio, _run, RO, RW, _origin)
     from . import backup, reports
     reports.register_mcp(mcp, studio, _run)
     backup.register_mcp(mcp, studio, _run)

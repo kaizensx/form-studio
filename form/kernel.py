@@ -1419,3 +1419,5 @@ from .board.fit import KERNEL_OPS as _BOARD_OPS  # noqa: E402  (a circuit board 
 OPS.update(_BOARD_OPS)
 from .stack.kernel import KERNEL_OPS as _STACK_OPS  # noqa: E402  (tolerance stack-up: the loop and its sensitivities)
 OPS.update(_STACK_OPS)
+from .lattice.geom import KERNEL_OPS as _LATTICE_OPS  # noqa: E402  (lattice infill: the output decided, the build's report)
+OPS.update(_LATTICE_OPS)

@@ -31,7 +31,7 @@ class Wiring(unittest.TestCase):
         t = tools()
         self.assertIn("model_mesh", t)
         self.assertIn("game_asset", t)
-        self.assertEqual(len(t), 158)  # prepare_recipe_submission retired; the makers (11) and mesh generation (2); edit_design, triage, mass_properties, the Bench (3), sketches (2), strength_study, get_strength_study, calculate, manufacturability (2), sheet metal (4), drawing, export_pmi, check_drawing, standard_part, bom, motion_study, robot_files, assembly_sequence, cam_plan, cam_post, cam_simulate, board_import, board_check, board_fab and freecad_partdesign added; print physics (3); inverse design (2) and topology (3); cost_compare and cost_rates; tolerance_stack, get_tolerance_stack; test_plan, results_report and backup; board_schematic, board_place and board_route
+        self.assertEqual(len(t), 162)  # prepare_recipe_submission retired; the makers (11) and mesh generation (2); edit_design, triage, mass_properties, the Bench (3), sketches (2), strength_study, get_strength_study, calculate, manufacturability (2), sheet metal (4), drawing, export_pmi, check_drawing, standard_part, bom, motion_study, robot_files, assembly_sequence, cam_plan, cam_post, cam_simulate, board_import, board_check, board_fab and freecad_partdesign added; print physics (3); inverse design (2) and topology (3); cost_compare and cost_rates; tolerance_stack, get_tolerance_stack; test_plan, results_report and backup; board_schematic, board_place and board_route; lattice_properties, lattice_fill, linkage_synthesis and photo_profile
         self.assertIn("hybrid", t["design_guide"].description)
         self.assertIn("game", t["design_guide"].description)
         self.assertIn("route", t["plan_design"].description)
