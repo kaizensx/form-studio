@@ -20,6 +20,8 @@ The reference formulas and where they are from:
   beta L = 1.8751, 4.6941 (clamped-free) and 4.7300 (free-free); Blevins, Formulas for Natural Frequency and Mode
   Shape, table 8-1.
 * Euler buckling of a clamped-free column: P = pi^2 E I / (4 L^2).
+* NAFEMS LE1 and LE10: The Standard NAFEMS Benchmarks, NAFEMS (1990), linear elastic tests 1 and 10; the target
+  values are the published ones (92.7 MPa and -5.38 MPa for the direct stress yy at point D).
 """
 from __future__ import annotations
 
@@ -76,7 +78,12 @@ def cantilever():
         return [_row("tip deflection", tim, tip, 0.01, "mm", "Timoshenko beam: F L^3/(3 E I) + F L/(kappa G A)"),
                 _row("tip deflection (Euler-Bernoulli, no shear)", eb, tip, 0.015, "mm", "F L^3/(3 E I)"),
                 _row("bending stress near mid-span, top fibre", F * (L - x) * (z - h / 2) / I, float(keep["stress"][k, 0]),
-                     0.02, "MPa", "M c / I at that node")]
+                     0.02, "MPa", "M c / I at that node"),
+                _row("hand estimate: stress at the fixed end", F * L * (h / 2) / I,
+                     (res["hand_estimate"].get("stress_at_fixed_end_MPa") or 0.0), 0.005, "MPa",
+                     "M c / I; the estimate measures the section on the mesh"),
+                _row("hand estimate: deflection at the load", eb, (res["hand_estimate"].get("deflection_at_load_mm") or 0.0),
+                     0.005, "mm", "F L^3/(3 E I); the estimate measures the section on the mesh")]
     return shape, spec, check
 
 
@@ -239,6 +246,60 @@ def euler_column():
     return shape, spec, check
 
 
+def _nafems_ellipse(thickness: float, split: bool = False):
+    """The quarter of NAFEMS' elliptic plate: inner ellipse 2 x 1 m, outer 3.25 x 2.75 m (semi-axes), in millimetres.
+    split: as two solids glued at mid-height, so the outer face has an edge on the mid-plane."""
+    from netgen.occ import Axes, Glue, WorkPlane, X, Z
+
+    def face(z):
+        ax = Axes((0, 0, z), n=Z, h=X)
+        return (WorkPlane(ax).Ellipse(3250, 2750).Face() - WorkPlane(ax).Ellipse(2000, 1000).Face()) * \
+            WorkPlane(ax).Rectangle(4000, 4000).Face()
+    if not split:
+        return face(0).Extrude(thickness * Z)
+    return Glue([face(-thickness / 2).Extrude(thickness / 2 * Z), face(0).Extrude(thickness / 2 * Z)])
+
+
+_OUT = (3250 * math.cos(0.7), 2750 * math.sin(0.7))          # a point on the outer ellipse
+_IN = (2000 * math.cos(0.7), 1000 * math.sin(0.7))
+
+
+def nafems_le1():
+    """NAFEMS LE1, elliptic membrane: 0.1 m thick, 10 MPa outward on the outer edge, symmetry on both straight
+    edges, E = 210 GPa, nu = 0.3. Solved as a solid, half the thickness by symmetry."""
+    shape = _nafems_ellipse(50.0)
+    spec = {"kind": "static", "materials": _mat(), "mesh": {"tol_stress": 0.01, "h0": 400.0},
+            "fixtures": [{"type": "roller", "faces": [_face((0, 1800, 25))]}, {"type": "roller", "faces": [_face((2600, 0, 25))]},
+                         {"type": "roller", "faces": [_face((1532, 1381, 0))]}],
+            "loads": [{"type": "pressure", "faces": [_face((*_OUT, 25))], "value": -10.0}]}
+
+    def check(res, keep):
+        k = _probe(keep, (2000, 0, 0))
+        return [_row("stress yy at D (2, 0)", 92.7, float(keep["stress"][k, 1]), 0.02, "MPa",
+                     "NAFEMS, The Standard NAFEMS Benchmarks (1990), test LE1: 92.7 MPa (plane stress)")]
+    return shape, spec, check
+
+
+def nafems_le10():
+    """NAFEMS LE10, thick plate: 0.6 m thick, 1 MPa on the upper face, symmetry on both straight faces, the outer
+    face held in x and y and, on its mid-plane edge, in z. E = 210 GPa, nu = 0.3. The support along that edge is
+    a singular line: the study names it and leaves the stress within 300 mm of it out; point D is far from it."""
+    shape = _nafems_ellipse(600.0, split=True)
+    up, low = _face((*_OUT, 150)), _face((*_OUT, -150))
+    spec = {"kind": "static", "materials": _mat(), "mesh": {"tol_stress": 0.02, "h0": 200.0, "singular_radius": 300.0},
+            "fixtures": [{"type": "roller", "faces": [_face((0, 1800, 150)), _face((0, 1800, -150))]},
+                         {"type": "roller", "faces": [_face((2600, 0, 150)), _face((2600, 0, -150))]},
+                         {"type": "hold", "faces": [up, low], "directions": [[1, 0, 0], [0, 1, 0]]},
+                         {"type": "hold", "faces": [up], "faces_b": [low], "directions": [[0, 0, 1]]}],
+            "loads": [{"type": "pressure", "faces": [_face((1532, 1381, 300))], "value": 1.0}]}
+
+    def check(res, keep):
+        k = _probe(keep, (2000, 0, 300))
+        return [_row("stress yy at D (2, 0, top)", -5.38, float(keep["stress"][k, 1]), 0.03, "MPa",
+                     "NAFEMS, The Standard NAFEMS Benchmarks (1990), test LE10: -5.38 MPa")]
+    return shape, spec, check
+
+
 def sharp_corner():
     """An L-bracket with a sharp inside corner: the study must name the corner and leave its stress out."""
     from netgen.occ import Box, Pnt
@@ -260,11 +321,13 @@ def sharp_corner():
 
 CASES = {"cantilever": cantilever, "plate_with_hole": plate_with_hole, "thick_cylinder": thick_cylinder,
          "self_weight": self_weight, "bonded_bar": bonded_bar, "preload_block": preload_block,
+         "nafems_le1": nafems_le1, "nafems_le10": nafems_le10,
          "modal_cantilever": modal_cantilever, "modal_free": modal_free, "euler_column": euler_column,
          "sharp_corner": sharp_corner}
 TITLES = {"cantilever": "Cantilever beam, end load", "plate_with_hole": "Plate with a hole in tension",
           "thick_cylinder": "Thick cylinder under internal pressure", "self_weight": "Cantilever under its own weight",
           "bonded_bar": "Two bonded solids in series", "preload_block": "Block under a bolt preload",
+          "nafems_le1": "NAFEMS LE1: elliptic membrane", "nafems_le10": "NAFEMS LE10: thick plate under pressure",
           "modal_cantilever": "Natural frequencies of a cantilever", "modal_free": "Natural frequencies of a free beam",
           "euler_column": "Euler buckling of a column", "sharp_corner": "Sharp inside corner (singularity)"}
 

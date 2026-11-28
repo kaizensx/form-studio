@@ -2,7 +2,7 @@
 
 Units: mm, N, MPa (N/mm2), tonne (so that N = tonne x mm/s2), seconds, Hz. Density is tonne/mm3 (kg/m3 x 1e-12).
 
-    sp = Space(mesh)                               # 10-node (quadratic) shape functions on Netgen's tetrahedra
+    sp = Space(mesh)                               # 10-node (quadratic) tetrahedra, curved where the geometry is
     K = sp.stiffness(lam, mu)                      # per-element Lame constants
     f = sp.traction(tris, t) + sp.body(rho, g)
     con = Constraints(sp); con.fix(nodes); con.slide(nodes, normals)
@@ -10,8 +10,10 @@ Units: mm, N, MPa (N/mm2), tonne (so that N = tonne x mm/s2), seconds, Hz. Densi
     s = sp.stress(u, lam, mu)                      # smoothed nodal stress, element stress, error indicator
 
 The model is linear elastic and small strain: stress is proportional to load, a part that yields, buckles, slips or
-comes apart is not modelled here. Shape functions come from scikit-fem (ElementTetP2); the element matrices are
-assembled here from their gradients so stiffness, mass, geometric stiffness and the stress recovery share one code
+comes apart is not modelled here. Shape functions and the element mapping come from scikit-fem (ElementTetP2 on a
+quadratic mesh: isoparametric elements whose mid-side nodes lie on the geometry; an element a curved side would turn
+inside out makes the whole mesh fall back to straight sides, and the result says so). The element matrices are
+assembled here from the shape-function gradients so stiffness, mass, geometric stiffness and the stress recovery share one code
 path. Equations are solved with conjugate gradients preconditioned by smoothed-aggregation multigrid (PyAMG) with the
 six rigid-body modes as its near-null space, to a relative residual of SOLVE_TOL; a small system is solved directly.
 """
@@ -29,6 +31,29 @@ CHUNK = 20000                 # elements per assembly block
 # reference mass matrix of a 6-node triangle (3 corners, then mid-sides 01, 12, 20), times area: integral of Ni Nj
 _M6 = np.array([[6, -1, -1, 0, -4, 0], [-1, 6, -1, 0, 0, -4], [-1, -1, 6, -4, 0, 0],
                 [0, 0, -4, 32, 16, 16], [-4, 0, 0, 16, 32, 16], [0, -4, 0, 16, 16, 32]], dtype=float) / 180.0
+
+
+CURVED_ORDER = 5              # quadrature on elements with curved sides: 14 points, all weights positive
+
+
+def _tri6(pts: np.ndarray):
+    """Shape functions of the 6-node triangle (corners 0, 1, 2; mid-sides 01, 12, 20) and their derivatives at
+    points (q, 2) of the reference triangle: (N (6, q), dN/da (6, q), dN/db (6, q))."""
+    a, b = pts[:, 0], pts[:, 1]
+    c = 1 - a - b
+    N = np.array([c * (2 * c - 1), a * (2 * a - 1), b * (2 * b - 1), 4 * c * a, 4 * a * b, 4 * b * c])
+    dA = np.array([-(4 * c - 1), 4 * a - 1, 0 * a, 4 * (c - a), 4 * b, -4 * b])
+    dB = np.array([-(4 * c - 1), 0 * a, 4 * b - 1, -4 * a, 4 * a, 4 * (c - b)])
+    return N, dA, dB
+
+
+# a 7-point rule of degree 5 on the reference triangle (Radon 1948), weights sum to 1/2
+_s = np.sqrt(15.0)
+_a1, _a2 = (6 - _s) / 21, (6 + _s) / 21
+_TRI_Q = np.array([[1 / 3, 1 / 3], [_a1, _a1], [1 - 2 * _a1, _a1], [_a1, 1 - 2 * _a1], [_a2, _a2], [1 - 2 * _a2, _a2],
+                   [_a2, 1 - 2 * _a2]])
+_TRI_W = np.array([9 / 80] + [(155 - _s) / 2400] * 3 + [(155 + _s) / 2400] * 3)
+_TRI_NODES = np.array([[0, 0], [1, 0], [0, 1], [0.5, 0], [0.5, 0.5], [0, 0.5]], dtype=float)
 
 
 class SolveError(RuntimeError):
@@ -60,30 +85,51 @@ class Space:
     """Quadratic displacement on a tetrahedral mesh. Node k has unknowns 3k, 3k+1, 3k+2 (x, y, z)."""
 
     def __init__(self, mesh):
-        from skfem import Basis, ElementTetP2, MeshTet
+        from skfem import Basis, ElementTetP2, MeshTet, MeshTet2
         self.mesh = mesh
-        self.sk = MeshTet(np.ascontiguousarray(mesh.P.T), np.ascontiguousarray(mesh.T.T), validate=False) \
-            if _accepts_validate(MeshTet) else MeshTet(np.ascontiguousarray(mesh.P.T), np.ascontiguousarray(mesh.T.T))
-        el = ElementTetP2()
-        self.b2 = Basis(self.sk, el, intorder=2)
-        self.edofs = np.asarray(self.b2.element_dofs)            # (10, nel)
-        self.X = np.asarray(self.b2.doflocs).T.copy()            # (N, 3)
-        self.N = self.X.shape[0]
-        self.nel = self.edofs.shape[1]
-        self.ndof = 3 * self.N
         self.nv = mesh.P.shape[0]
-        self.dx = np.asarray(self.b2.dx)                         # (nel, nq)
-        self.dN = np.stack([np.asarray(self.b2.basis[a][0].grad) for a in range(10)])     # (10, 3, nel, nq)
+        p, t = np.ascontiguousarray(mesh.P.T), np.ascontiguousarray(mesh.T.T)
+        self.sk = MeshTet(p, t, validate=False)
+        el = ElementTetP2()
+        b = Basis(self.sk, el, intorder=2)
+        self._index(b)
+        self.curved, self.curved_note = False, ""
+        if getattr(mesh, "edge_mid", None) is not None:
+            X = np.asarray(b.doflocs).T.copy()
+            X[self.mid(mesh.edges[:, 0], mesh.edges[:, 1])] = mesh.edge_mid
+            try:
+                sk2 = MeshTet2(np.ascontiguousarray(X.T), t, validate=False)
+                b2 = Basis(sk2, el, intorder=CURVED_ORDER)
+                ok = np.allclose(np.asarray(b2.doflocs), X.T, atol=1e-9 * max(np.abs(X).max(), 1.0)) and \
+                    np.array_equal(np.asarray(b2.element_dofs), self.edofs)
+                bn = Basis(sk2, el, quadrature=(np.asarray(el.doflocs).T.copy(), np.full(10, 1.0 / 60.0)))
+                if ok and float(np.asarray(b2.dx).min()) > 0 and float(np.asarray(bn.dx).min()) > 0:
+                    self.sk, b, self.curved = sk2, b2, True
+                else:
+                    self.curved_note = ("an element would be turned inside out by its curved sides" if ok else
+                                        "the curved mesh's numbering did not match")
+            except Exception as e:               # noqa: BLE001 - straight sides are a valid, coarser model
+                self.curved_note = f"{type(e).__name__}: {e}"
+        self.b2 = b
+        self.X = np.asarray(b.doflocs).T.copy()                  # (N, 3)
+        self.dx = np.asarray(b.dx)                               # (nel, nq)
+        self.dN = np.stack([np.asarray(b.basis[a][0].grad) for a in range(10)])     # (10, 3, nel, nq)
         self.vol = self.dx.sum(axis=1)
         w = np.full(10, 1.0 / 60.0)
         self.bn = Basis(self.sk, el, quadrature=(np.asarray(el.doflocs).T.copy(), w))     # gradients at the 10 nodes
         self.dNn = np.stack([np.asarray(self.bn.basis[a][0].grad) for a in range(10)])    # (10, 3, nel, 10)
-        # mid-side node of every mesh edge, by its two vertices
+
+    def _index(self, b) -> None:
+        """Node numbering (the same for straight and curved sides): corners first, then one node per edge."""
+        self.edofs = np.asarray(b.element_dofs)                  # (10, nel)
+        self.N = int(np.asarray(b.doflocs).shape[1])
+        self.nel = self.edofs.shape[1]
+        self.ndof = 3 * self.N
         ed = np.sort(np.asarray(self.sk.edges), axis=0)
         code = ed[0].astype(np.int64) * self.nv + ed[1]
         order = np.argsort(code)
-        self._ecode, self._edof = code[order], np.asarray(self.b2.edge_dofs)[0][order]
-        self._vdof = np.asarray(self.b2.nodal_dofs)[0]
+        self._ecode, self._edof = code[order], np.asarray(b.edge_dofs)[0][order]
+        self._vdof = np.asarray(b.nodal_dofs)[0]
 
     # ---- nodes of boundary triangles -----------------------------------------------------------------------------
     def mid(self, a: np.ndarray, b: np.ndarray) -> np.ndarray:
@@ -131,7 +177,7 @@ class Space:
     def mass(self, rho: np.ndarray) -> sp_.csr_matrix:
         """Consistent mass matrix (tonne), density per element in tonne/mm3."""
         from skfem import Basis, ElementTetP2
-        b4 = Basis(self.sk, ElementTetP2(), intorder=4)
+        b4 = Basis(self.sk, ElementTetP2(), intorder=6 if self.curved else 4)
         Nq = np.stack([np.asarray(b4.basis[a][0].value) for a in range(10)])     # (10, nel, nq)
         Me = np.einsum("aeq,beq,eq->eab", Nq, Nq, np.asarray(b4.dx) * rho[:, None], optimize=True)
         return sp_.kron(self._scalar(Me), sp_.identity(3), format="csr")
@@ -150,24 +196,61 @@ class Space:
         return sp_.kron(self._scalar(Se), sp_.identity(3), format="csr")
 
     # ---- loads -----------------------------------------------------------------------------------------------------
-    def traction(self, tris: np.ndarray, t: np.ndarray) -> np.ndarray:
-        """Nodal forces of a traction t (N/mm2; (3,) or one row per triangle) on boundary triangles."""
+    def surface_quad(self, tris: np.ndarray, at_nodes: bool = False):
+        """Integration over boundary triangles as 6-node (curved) surfaces. Returns (nodes (n, 6), N (6, q),
+        w (q,), nJ (n, q, 3)): the nodes, the shape functions at the points, the weights, and the outward normal times
+        the area element at each point. at_nodes: the points are the six nodes themselves (weights are then None)."""
+        nodes = self.tri_nodes(tris)
+        Xn = self.X[nodes]                                        # (n, 6, 3)
+        pts, w = (_TRI_NODES, None) if at_nodes else (_TRI_Q, _TRI_W)
+        N, dNa, dNb = _tri6(pts)
+        ta = np.einsum("aq,naj->nqj", dNa, Xn)
+        tb = np.einsum("aq,naj->nqj", dNb, Xn)
+        nJ = np.cross(ta, tb)
+        flat = self._flat_normal(tris)
+        nJ *= np.sign(np.einsum("nqj,nj->n", nJ, flat))[:, None, None]
+        return nodes, N, w, nJ
+
+    def _flat_normal(self, tris):
+        """Outward normal of the flat triangle through the corners (away from the owning tetrahedron)."""
+        if getattr(self, "_surf", None) is None:
+            from . import mesh as mesh_mod
+            self._surf = mesh_mod.surface(self.mesh)
+        return self._surf["normal"][tris]
+
+    def tri_area(self, tris: np.ndarray) -> np.ndarray:
+        if len(tris) == 0:
+            return np.zeros(0)
+        _, _, w, nJ = self.surface_quad(tris)
+        return np.einsum("q,nq->n", w, np.linalg.norm(nJ, axis=2))
+
+    def traction(self, tris: np.ndarray, t=None, pressure: float | None = None) -> np.ndarray:
+        """Nodal forces on boundary triangles of a traction t (N/mm2, (3,)), or of a pressure (MPa, pushing on the
+        face along its own normal at every point of the curved surface)."""
         f = np.zeros(self.ndof)
         if len(tris) == 0:
             return f
-        nodes = self.tri_nodes(tris)
-        a, b, c = (self.mesh.P[self.mesh.S[tris][:, i]] for i in range(3))
-        area = np.linalg.norm(np.cross(b - a, c - a), axis=1) / 2
-        t = np.broadcast_to(np.asarray(t, float), (len(tris), 3))
-        w = (area / 3.0)[:, None] * t                             # a quadratic triangle: all of it on the mid-sides
-        for k in (3, 4, 5):
-            np.add.at(f, 3 * nodes[:, k][:, None] + np.arange(3), w)
+        nodes, N, w, nJ = self.surface_quad(tris)
+        if pressure is not None:
+            fa = -float(pressure) * np.einsum("aq,q,nqj->naj", N, w, nJ)
+        else:
+            fa = np.einsum("aq,q,nq->na", N, w, np.linalg.norm(nJ, axis=2))[:, :, None] * np.asarray(t, float)[None, None, :]
+        np.add.at(f, (3 * nodes[:, :, None] + np.arange(3)).reshape(-1), fa.reshape(-1))
         return f
+
+    def node_normals(self, tris: np.ndarray):
+        """Nodes of the triangles and the outward unit normal of the surface at each (mean over the triangles)."""
+        nodes, _, _, nJ = self.surface_quad(tris, at_nodes=True)
+        uniq, inv = np.unique(nodes.ravel(), return_inverse=True)
+        acc = np.zeros((len(uniq), 3))
+        np.add.at(acc, inv, nJ.reshape(-1, 3))
+        acc /= np.maximum(np.linalg.norm(acc, axis=1), 1e-300)[:, None]
+        return uniq, acc
 
     def body(self, rho: np.ndarray, g) -> np.ndarray:
         """Nodal forces of an acceleration field g (mm/s2) on the mass (density per element, tonne/mm3)."""
         from skfem import Basis, ElementTetP2
-        b = Basis(self.sk, ElementTetP2(), intorder=2)
+        b = Basis(self.sk, ElementTetP2(), intorder=5 if self.curved else 2)
         Nq = np.stack([np.asarray(b.basis[a][0].value) for a in range(10)])
         fe = np.einsum("aeq,eq->ea", Nq, np.asarray(b.dx) * rho[:, None])
         fs = np.zeros(self.N)
@@ -226,14 +309,6 @@ class Space:
         dens = ((1 + nu) / E)[:, None] * ss - (nu / E)[:, None] * trd ** 2
         eta2 = self.vol * np.maximum(dens, 0).mean(axis=1)
         return {"element": se, "nodal": nodal, "eta": np.sqrt(eta2)}
-
-
-def _accepts_validate(cls) -> bool:
-    try:
-        import inspect
-        return "validate" in inspect.signature(cls).parameters
-    except (TypeError, ValueError):
-        return False
 
 
 class Constraints:

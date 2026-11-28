@@ -912,11 +912,17 @@ interface dimension is dropped), building a ladder of values in the kernel, then
 through the real checks and slicer. Also slices lower infill and one wall fewer over the slicer's process. Returns
 the baseline and candidates (id, changes and/or settings, computed mass_g, slicer slice_g, every check before and
 after) and what was rejected and why. Nothing is committed: keep one with apply_lighter.
+require: strength constraints a lighter design must still meet, e.g. ["fea.safety_factor >= 2"], read from the
+design's static strength_study (study="<id>" when it has several): the study is solved on each geometry
+candidate that kept its checks, and one that fails is rejected with its numbers. With a strength requirement
+the print-setting candidates (less infill, fewer walls) are not offered: the study is of a solid part.
 
 | Argument | Type | Required |
 |---|---|---|
 | `project` | string | yes |
 | `builds` | integer |  |
+| `require` | array \| null |  |
+| `study` | string |  |
 
 ### `apply_lighter`
 
@@ -1033,6 +1039,11 @@ objective: {"minimize": "solid_mass_g"} or {"maximize": "statics.safety_factor"}
 constraints: ["statics.safety_factor >= 3", "overhang_mm2 <= 1", "derived.usable_depth >= 30", "fit_yield >= 0.9"].
 Metrics: volume_cm3, solid_mass_g, width, depth, height, overhang_mm2, contact_mm2, min_wall_mm, fit_yield,
 derived.<key>, statics.<key>. Nothing is saved: preview_change/render the best, then commit_change.
+A strength study as a constraint: "fea.safety_factor >= 2" (also fea.peak_von_mises_MPa, fea.max_displacement_mm)
+reads the design's static strength_study (study="<id>" when it has several). Each value is a full solve, so
+the search runs first and the study is then solved on its candidates, best first, within 8 solves and 300 s:
+"strength" in the result lists every candidate solved with its numbers and evidence, and only those count as
+feasible. fea.safety_factor is the lower value (stated error applied); not an objective.
 
 | Argument | Type | Required |
 |---|---|---|
@@ -1041,6 +1052,7 @@ derived.<key>, statics.<key>. Nothing is saved: preview_change/render the best, 
 | `objective` | object | yes |
 | `constraints` | array \| null |  |
 | `budget` | integer |  |
+| `study` | string |  |
 
 ### `slice_test_piece`
 
@@ -1900,8 +1912,9 @@ displacement, safety factor against the material's yield), "modal" (natural freq
 body; loads ignored) or "buckling" (the factor on the loads at which it buckles).
 Faces are picked as points on the part, [x, y, z] in design millimetres, each part as printed (as for
 analyze_selection, which shows the face a point lands on).
-fixtures: [{"type": "fixed" | "roller" | "pin", "faces": [[x, y, z], ...]}]. fixed: no movement. roller: slides
-in the face, cannot leave it (a symmetry plane). pin: a cylindrical face that may turn about its axis.
+fixtures: [{"type": "fixed" | "roller" | "pin" | "hold", "faces": [[x, y, z], ...]}]. fixed: no movement. roller: slides
+in the face, cannot leave it (a symmetry plane). pin: a cylindrical face that may turn about its axis. hold:
+no movement along "directions": [[x, y, z], ...], free in the others.
 loads: [{"type": "force", "faces": [...], "vector": [Fx, Fy, Fz]}] newtons, spread over the faces (or
 "magnitude" and "direction"); {"type": "pressure", "faces": [...], "value_MPa": p}; {"type": "preload",
 "faces": [under the head], "faces_b": [under the nut], "force_N": N} a bolt's clamping force as a modelled

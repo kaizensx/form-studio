@@ -21,7 +21,7 @@ def digest(r: dict, full: bool = False) -> dict:
     keep = ("id", "name", "kind", "rev", "headline", "evidence", "how_known", "converged", "not_converged_because",
             "stopped_because", "stale", "model", "assumptions", "frame", "seconds",
             "max_displacement_mm", "max_displacement_at", "peak_von_mises_MPa", "peak_at", "safety_factor",
-            "safety_factor_withheld", "discretisation_error", "singularities", "equilibrium", "loads",
+            "safety_factor_withheld", "discretisation_error", "singularities", "equilibrium", "loads", "hand_estimate",
             "frequencies_Hz", "modes", "free_body", "mass_g", "load_factor", "load_factor_extrapolated", "load_factors",
             "meaning", "mesh", "materials", "material_notes", "units", "faces", "versions")
     out = {k: r[k] for k in keep if k in r}
@@ -108,8 +108,9 @@ def register_tools(mcp, studio, run, RO, RW, origin) -> None:
         body; loads ignored) or "buckling" (the factor on the loads at which it buckles).
         Faces are picked as points on the part, [x, y, z] in design millimetres, each part as printed (as for
         analyze_selection, which shows the face a point lands on).
-        fixtures: [{"type": "fixed" | "roller" | "pin", "faces": [[x, y, z], ...]}]. fixed: no movement. roller: slides
-        in the face, cannot leave it (a symmetry plane). pin: a cylindrical face that may turn about its axis.
+        fixtures: [{"type": "fixed" | "roller" | "pin" | "hold", "faces": [[x, y, z], ...]}]. fixed: no movement. roller: slides
+        in the face, cannot leave it (a symmetry plane). pin: a cylindrical face that may turn about its axis. hold:
+        no movement along "directions": [[x, y, z], ...], free in the others.
         loads: [{"type": "force", "faces": [...], "vector": [Fx, Fy, Fz]}] newtons, spread over the faces (or
         "magnitude" and "direction"); {"type": "pressure", "faces": [...], "value_MPa": p}; {"type": "preload",
         "faces": [under the head], "faces_b": [under the nut], "force_N": N} a bolt's clamping force as a modelled

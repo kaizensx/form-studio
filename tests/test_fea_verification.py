@@ -20,6 +20,7 @@ from form import config, fea  # noqa: E402
 
 ENGINE = fea.python(config.load())
 CASES = ("cantilever", "plate_with_hole", "thick_cylinder", "self_weight", "bonded_bar", "preload_block",
+         "nafems_le1", "nafems_le10",
          "modal_cantilever", "modal_free", "euler_column", "sharp_corner")
 
 
@@ -105,7 +106,7 @@ class EngineFree(unittest.TestCase):
         doc = (ROOT / "docs" / "STRENGTH.md").read_text(encoding="utf-8")
         for cid in CASES:
             self.assertIn(f'"{cid}": {cid}', src)
-        for word in ("Timoshenko", "Peterson", "Lamé", "Euler", "Kirsch", "Williams"):
+        for word in ("Timoshenko", "Peterson", "Lamé", "Euler", "Kirsch", "Williams", "NAFEMS LE1", "NAFEMS LE10"):
             self.assertIn(word, doc)
 
 

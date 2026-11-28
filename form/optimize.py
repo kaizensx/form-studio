@@ -35,7 +35,10 @@ def parse_constraints(items: list) -> list[tuple]:
     return out
 
 
-def run(studio, p: dict, vary: list, objective: dict, constraints: list, budget: int = 40, seed: int = 7) -> dict:
+def run(studio, p: dict, vary: list, objective: dict, constraints: list, budget: int = 40, seed: int = 7,
+        study: str = "") -> dict:
+    """study: the static strength study that fea.* constraints are read from (form/fea/constraint.py); left out,
+    the design's only one."""
     recipe = studio.recipe(p)
     base = studio.rev(p)["values"]
     if not 1 <= len(vary) <= 4:
@@ -44,6 +47,18 @@ def run(studio, p: dict, vary: list, objective: dict, constraints: list, budget:
         raise OptimizeError('Objective must be {"minimize": metric} or {"maximize": metric}.')
     sense, target = next(iter(objective.items()))
     cons = parse_constraints(constraints)
+    # a strength study costs seconds per candidate: its constraints are checked after the search, on real candidates
+    # best first, within a stated number of solves (form/fea/constraint.py)
+    fea_cons = [c for c in cons if c[0].startswith("fea.")]
+    cons = [c for c in cons if not c[0].startswith("fea.")]
+    fea_sid = ""
+    if target.startswith("fea."):
+        raise OptimizeError("A strength metric (fea.*) can be a constraint, not the objective: every value of it is a "
+                            "full solve. Minimize mass with “fea.safety_factor >= 2” instead.")
+    if fea_cons:
+        from .fea import constraint as fea_con, study as fea_study
+        fea_con.check_names(fea_cons)
+        fea_sid = fea_study.pick_static(p, study)
     axes = []
     for ax in vary:
         sp = recipe.spec(ax["key"])
@@ -142,10 +157,37 @@ def run(studio, p: dict, vary: list, objective: dict, constraints: list, budget:
 
     win = best()
     feasible = sorted([r for r in evaluated if r["feasible"]], key=lambda r: r["score"], reverse=sense == "maximize")
+    fea = None
+    if fea_cons:
+        ranked = [{"values": {**base, **r["changes"]}, "changes": r["changes"]} for r in feasible]
+        fea = fea_con.verify_ranked(studio, p, fea_sid, ranked, fea_cons, OPS)
+        by = {v["index"]: v for v in fea["solved"]}
+        for i, r in enumerate(feasible):
+            if i in by:
+                r["metrics"].update({k: x for k, x in by[i]["metrics"].items() if x is not None})
+                r["fea"] = by[i]
+        win = feasible[fea["winner"]] if fea["winner"] is not None else None
+        # only candidates that were solved and met the constraint are feasible; the rest are not claimed
+        feasible = [r for i, r in enumerate(feasible) if i in by and by[i]["ok"]]
+        cons = cons + fea_cons
     cur = seen.get(tuple(snap(ax, base[ax["key"]]) for ax in axes))
     fmt = lambda r: {"values": r["changes"], target: round(r["score"], 4),
                      **{m: round(r["metrics"][m], 4) for m, _, _ in cons if r["metrics"].get(m) is not None}}
+    extra = {}
+    if fea is not None:
+        extra["strength"] = {
+            "study": fea_sid, "solved": fea["solved"], "solves": fea["runs"], "seconds": fea["seconds"],
+            "candidates_not_solved": max(0, fea["candidates"] - fea["runs"]), "stopped": fea["stopped"],
+            "how": "The search ran on the kernel's metrics; the strength study was then solved on its candidates, best "
+                   "first and by halving between one that failed and one that passed. Only candidates that were "
+                   "solved and met the constraint count as feasible; the search was not steered by the strength "
+                   "constraint, so a better design that meets it may exist. fea.safety_factor is the lower value, "
+                   "with the stated discretisation error applied."}
+        if win is None:
+            extra["strength"]["none_why"] = ("No candidate that was solved met the strength constraint."
+                                             + (f" Stopped because {fea['stopped']}." if fea["stopped"] else ""))
     return {
+        **extra,
         "objective": f"{sense} {target}", "constraints": [f"{m} {op} {v:g}" for m, op, v in cons],
         "evaluated": len(evaluated), "feasible": len(feasible),
         "infeasible_reasons": sorted({v for r in evaluated if not r["feasible"] for v in r["violations"]})[:6],

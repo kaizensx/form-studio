@@ -29,8 +29,9 @@ reach its tolerance reads `simulated (FEA, linear static, not converged)`, says 
 | `modal` | The frequencies the part rings at | Natural frequencies in Hz (a part with no supports is a free body) |
 | `buckling` | When a slender part gives way sideways | The factor on the loads at which the perfect elastic part buckles |
 
-The solid is the design's B-rep. Netgen meshes it into tetrahedra, with more elements on fillets and around holes; the
-solver uses quadratic (10-node) tetrahedra. A design that declares an assembly is solved assembled, with its parts
+The solid is the design's B-rep. Netgen meshes it into tetrahedra, with more elements on fillets and around holes.
+The elements are quadratic (10-node) and isoparametric: the mid-side node of every edge lies on the geometry, so a
+fillet or a bore is a curved surface in the model, not a row of flat facets. A design that declares an assembly is solved assembled, with its parts
 bonded where they touch and a material for each part.
 
 ## Supports and loads
@@ -43,6 +44,7 @@ A face is picked as a point on it, `[x, y, z]` in design millimetres on the part
 | `fixed` | No movement in any direction |
 | `roller` | Free to slide in the face, held across it: a part resting on a surface, or a symmetry plane |
 | `pin` | A cylindrical face that may turn about its axis and is held across and along it |
+| `hold` | No movement along the directions given (`"directions": [[0, 0, 1]]`), free in the others |
 
 | Load | Unit | Meaning |
 |---|---|---|
@@ -80,13 +82,16 @@ The mesh is refined until the answer stops changing.
 
 1. The solid is meshed and solved at least three times. For a static study each new mesh is finer where the error
    indicator of the last one is large (Zienkiewicz-Zhu stress recovery), so the elements go to the fillets, the holes
-   and the load path. The surface is meshed again from the B-rep at every level, so curved faces get closer to their
-   true shape each time. Each level has at least 1.5 times the elements of the one before.
+   and the load path. The surface is meshed again from the B-rep at every level, corners and mid-side nodes on the
+   geometry. Each level has at least 1.5 times the elements of the one before.
 2. Every level is kept in the result: unknowns, strain energy, largest displacement, peak von Mises stress and the
    error indicator in the energy norm.
-3. The stated error of a quantity is the larger of **twice the change over the last refinement** and the remaining
-   change by Aitken's extrapolation of the last three levels. It is an estimate with a margin, not a mathematical
-   bound. A sequence that is not shrinking has no basis for an error statement and is reported as not converged.
+3. The stated error of a quantity is **twice its last change** where the last three levels shrink steadily, or
+   the remaining change by Aitken's extrapolation when that is larger. Where the levels go up and down, it is
+   **twice the larger of the last two changes**: a peak read off a mesh does not converge smoothly, and one small
+   step between two meshes is not taken as convergence. It is an estimate with a margin, not a mathematical bound.
+   Where the levels move one way without shrinking there is nothing to extrapolate from, and the stated error is
+   twice the sum of the last two changes.
 4. A study is converged when the stated error of the peak stress is within 5 % and that of the displacement within
    1 % (1 % for a frequency, 2 % for a buckling factor), and the reactions balance the loads. The tolerances can be
    tightened per study.
@@ -101,8 +106,8 @@ value that applies the stated error, and with the source of the strength it is m
 At a sharp inside corner the elastic stress is unbounded (Williams, 1952): the number a mesh gives there grows with
 every refinement and is a property of the mesh, not of the part. Form Studio finds these edges on the mesh (two faces
 that meet at more than 180° inside the solid, turning by more than 15°), holds refinement back there, and leaves the
-stress within a stated radius of them out of the peak and the safety factor. The radius is 2 % of the part's diagonal,
-between 0.5 and 3 mm, and can be set per study.
+stress within a stated radius of them out of the peak and the safety factor. The radius is 2 % of the part's diagonal
+(at least 0.5 mm) and can be set per study.
 
 The edge of a fixed face and the edge of a loaded face are treated the same way when the peak is there and the stress
 there rises at each of the last two refinements, by more than 8 % in all: a perfectly rigid support and a load that
@@ -137,14 +142,18 @@ tolerance it must meet. `tests/test_fea_verification.py` runs the suite; this ta
 | Cantilever beam, end load | tip deflection | Timoshenko beam: F L^3/(3 E I) + F L/(kappa G A) | 0.19162 mm | 0.19161 mm | 0.01 % | 1.0 % | PASS |
 |  | tip deflection (Euler-Bernoulli, no shear) | F L^3/(3 E I) | 0.19048 mm | 0.19161 mm | 0.59 % | 1.5 % | PASS |
 |  | bending stress near mid-span, top fibre | M c / I at that node | 29.926 MPa | 29.924 MPa | 0.01 % | 2.0 % | PASS |
-| Plate with a hole in tension | peak stress at the hole / applied stress (Kt, gross) | Howland/Heywood in Peterson, chart 4.1 (d/W = 0.2); Kirsch gives 3 for an infinite plate | 3.1488 | 3.1695 | 0.66 % | 3.0 % | PASS |
-| Thick cylinder under internal pressure | peak von Mises stress (at the bore) | Lame, plane strain | 231.32 MPa | 232.73 MPa | 0.61 % | 2.0 % | PASS |
-|  | radial displacement of the bore | Lame, plane strain | 0.018159 mm | 0.018143 mm | 0.08 % | 1.0 % | PASS |
+|  | hand estimate: stress at the fixed end | M c / I; the estimate measures the section on the mesh | 60 MPa | 60 MPa | 0.00 % | 0.5 % | PASS |
+|  | hand estimate: deflection at the load | F L^3/(3 E I); the estimate measures the section on the mesh | 0.19048 mm | 0.19048 mm | 0.00 % | 0.5 % | PASS |
+| Plate with a hole in tension | peak stress at the hole / applied stress (Kt, gross) | Howland/Heywood in Peterson, chart 4.1 (d/W = 0.2); Kirsch gives 3 for an infinite plate | 3.1488 | 3.1556 | 0.22 % | 3.0 % | PASS |
+| Thick cylinder under internal pressure | peak von Mises stress (at the bore) | Lame, plane strain | 231.32 MPa | 231.53 MPa | 0.09 % | 2.0 % | PASS |
+|  | radial displacement of the bore | Lame, plane strain | 0.018159 mm | 0.018158 mm | 0.00 % | 1.0 % | PASS |
 | Cantilever under its own weight | tip deflection under gravity | w L^4/(8 E I) | 0.035192 mm | 0.035203 mm | 0.03 % | 1.0 % | PASS |
 | Two bonded solids in series | elongation of two bonded solids | F L1/(E1 A) + F L2/(E2 A) | 0.0085714 mm | 0.0085714 mm | 0.00 % | 0.5 % | PASS |
 |  | safety factor (the weaker solid governs) | yield / (F / A) | 24 | 24 | 0.00 % | 1.0 % | PASS |
 | Block under a bolt preload | shortening under a bolt preload | N L/(E A) | 0.0029762 mm | 0.0029762 mm | 0.00 % | 0.5 % | PASS |
 |  | stress under a bolt preload | N / A | 12.5 MPa | 12.5 MPa | 0.00 % | 1.0 % | PASS |
+| NAFEMS LE1: elliptic membrane | stress yy at D (2, 0) | NAFEMS, The Standard NAFEMS Benchmarks (1990), test LE1: 92.7 MPa (plane stress) | 92.7 MPa | 92.518 MPa | 0.20 % | 2.0 % | PASS |
+| NAFEMS LE10: thick plate under pressure | stress yy at D (2, 0, top) | NAFEMS, The Standard NAFEMS Benchmarks (1990), test LE10: -5.38 MPa | -5.38 MPa | -5.2714 MPa | 2.02 % | 3.0 % | PASS |
 | Natural frequencies of a cantilever | mode 1: first bending, thin direction | Euler-Bernoulli, beta L = 1.8751 | 104.44 Hz | 104.88 Hz | 0.42 % | 2.0 % | PASS |
 |  | mode 2: first bending, stiff direction | Euler-Bernoulli, beta L = 1.8751 | 208.88 Hz | 209.04 Hz | 0.08 % | 2.0 % | PASS |
 |  | mode 3: second bending, thin direction | Euler-Bernoulli, beta L = 4.6941 | 654.51 Hz | 655.57 Hz | 0.16 % | 2.0 % | PASS |
@@ -155,18 +164,20 @@ tolerance it must meet. `tests/test_fea_verification.py` runs the suite; this ta
 
 | Case | Study | Refinements | Unknowns | Stated error | Converged | Time |
 |---|---|---|---|---|---|---|
-| Cantilever beam, end load | static | 3 | 4,380 | 0.5 % | yes | 0.23 s |
-| Plate with a hole in tension | static | 3 | 22,572 | 1.2 % | yes | 1.26 s |
-| Thick cylinder under internal pressure | static | 4 | 33,234 | 1.9 % | yes | 2.02 s |
-| Cantilever under its own weight | static | 3 | 2,574 | 0.1 % | yes | 0.09 s |
-| Two bonded solids in series | static | 3 | 3,843 | 0.1 % | yes | 0.17 s |
-| Block under a bolt preload | static | 3 | 29,100 | 0.1 % | yes | 1.79 s |
-| Natural frequencies of a cantilever | modal | 3 | 3,474 | 0.2 % | yes | 0.16 s |
-| Natural frequencies of a free beam | modal | 3 | 3,474 | 0.1 % | yes | 0.16 s |
-| Euler buckling of a column | buckling | 3 | 5,541 | 0.5 % | yes | 0.22 s |
-| Sharp inside corner (singularity) | static | 5 | 105,135 | 4.5 % | yes | 6.12 s |
+| Cantilever beam, end load | static | 3 | 4,380 | 0.5 % | yes | 0.24 s |
+| Plate with a hole in tension | static | 4 | 43,461 | 0.7 % | yes | 2.89 s |
+| Thick cylinder under internal pressure | static | 3 | 12,345 | 0.3 % | yes | 0.69 s |
+| Cantilever under its own weight | static | 3 | 2,574 | 0.1 % | yes | 0.12 s |
+| Two bonded solids in series | static | 3 | 3,996 | 0.1 % | yes | 0.21 s |
+| Block under a bolt preload | static | 3 | 27,339 | 0.1 % | yes | 1.53 s |
+| NAFEMS LE1: elliptic membrane | static | 4 | 27,453 | 0.6 % | yes | 1.53 s |
+| NAFEMS LE10: thick plate under pressure | static | 4 | 70,632 | 1.9 % | yes | 5.19 s |
+| Natural frequencies of a cantilever | modal | 3 | 3,474 | 0.2 % | yes | 0.18 s |
+| Natural frequencies of a free beam | modal | 3 | 3,474 | 0.1 % | yes | 0.17 s |
+| Euler buckling of a column | buckling | 3 | 5,541 | 0.5 % | yes | 0.24 s |
+| Sharp inside corner (singularity) | static | 5 | 105,135 | 4.5 % | yes | 6.95 s |
 
-18 quantities in 10 cases, all within tolerance; 12.22 s in total. Run on 2026-11-28 with Netgen 6.2.2608, scikit-fem 12.0.2, SciPy 1.18.1, PyAMG 5.4.1 and NumPy 2.5.5.
+22 quantities in 12 cases, all within tolerance; 19.94 s in total. Run on 2026-11-28 with Netgen 6.2.2608, scikit-fem 12.0.2, SciPy 1.18.1, PyAMG 5.4.1 and NumPy 2.5.5.
 <!-- verification:end -->
 
 The cases:
@@ -184,6 +195,11 @@ The cases:
 - **Two bonded solids.** Steel and aluminium end to end in tension: springs in series, and the weaker solid sets the
   safety factor.
 - **Bolt preload.** A block clamped by a preload: N L / (E A) and N / A.
+- **NAFEMS LE1, elliptic membrane.** The published benchmark (The Standard NAFEMS Benchmarks, 1990): a quarter of an
+  elliptic plate 0.1 m thick with 10 MPa outward on its outer edge; the direct stress σyy at point D is 92.7 MPa.
+- **NAFEMS LE10, thick plate.** The same outline 0.6 m thick, 1 MPa on the upper face, held along the mid-plane edge
+  of its outer face; σyy at D on the top surface is −5.38 MPa. The support along an edge is a singular line: the
+  study names it and leaves the stress within 300 mm of it out, and the benchmark point lies far from it.
 - **Natural frequencies.** A clamped-free and a free-free steel beam against Euler-Bernoulli,
   f = (βL)² / (2π L²) · √(E I / ρ A) with βL = 1.8751, 4.6941 and 4.7300 (Blevins, table 8-1).
 - **Euler column.** A clamped-free column, P = π² E I / (4 L²).
@@ -205,9 +221,9 @@ three 6 mm holes, fixed at the two base holes and loaded at the hole of the upri
 <!-- timings:begin -->
 | Study | Time | Unknowns | Tetrahedra | Refinements | Evidence | Result |
 |---|---|---|---|---|---|---|
-| static | 22.8 s | 248,271 | 54,445 | 4 | simulated (FEA, linear static, converged to 3.5 %) | peak von Mises 50.7 MPa, safety factor 5.45 |
-| modal | 9.6 s | 71,583 | 13,103 | 3 | simulated (FEA, modal, converged to 0.5 %) | first frequencies 928, 1360, 3159 Hz |
-| buckling | 10.8 s | 71,583 | 13,103 | 3 | simulated (FEA, linear buckling, converged to 0.4 %) | load factor 152.3 |
+| static | 8.9 s | 106,110 | 22,470 | 3 | simulated (FEA, linear static, converged to 1.8 %) | peak von Mises 50.4 MPa, safety factor 5.48 |
+| modal | 9.3 s | 71,583 | 13,103 | 3 | simulated (FEA, modal, converged to 0.5 %) | first frequencies 925, 1357, 3154 Hz |
+| buckling | 10.5 s | 71,583 | 13,103 | 3 | simulated (FEA, linear buckling, converged to 0.4 %) | load factor 151.6 |
 
 Machine: arm64, Darwin 27.3.0, 18 cores. The time is the whole study in the engine: every mesh, every solve, the stress recovery and the field data.
 <!-- timings:end -->

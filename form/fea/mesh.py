@@ -5,10 +5,10 @@
     m = generate(geo, h=4.0, field=(points, sizes))   # the same with a size field: h is restricted at each point
 
 Netgen meshes the faces of the B-rep itself (its own OCCT reads the STEP), so every boundary vertex lies on the true
-surface at every refinement, and its curvature sizing puts more elements on fillets and around holes. The elements
-are straight-sided here; the solver uses quadratic (10-node) shape functions on them (form/fea/solve.py), and the
-geometric error of a straight facet on a curved face shrinks with every refinement, because the surface is meshed
-again from the geometry and not from the previous mesh.
+surface at every refinement, and its curvature sizing puts more elements on fillets and around holes. Netgen also
+places the mid-side node of every edge on the geometry (its second-order mesh), so the solver's quadratic (10-node)
+elements follow curved faces: a fillet is a curved surface in the model, not a row of flat facets
+(form/fea/solve.py maps each element with its own quadratic shape functions, an isoparametric element).
 
 Each boundary triangle carries the number of the B-rep face it lies on. A picked face (points on it, from the kernel)
 is found on the mesh by the triangles nearest to those points: `faces_at`.
@@ -52,6 +52,8 @@ class Mesh:
     h: float
     seconds: float = 0.0
     info: dict = field(default_factory=dict)
+    edges: np.ndarray | None = None              # (ne, 2) vertex pairs (low, high) of every edge of the tetrahedra
+    edge_mid: np.ndarray | None = None           # (ne, 3) the mid-side node of each, on the geometry where it is curved
 
 
 def from_shape(shape) -> Geometry:
@@ -88,8 +90,9 @@ def solid_centres(g: Geometry) -> list:
     return out
 
 
-def generate(g: Geometry, h: float, field=None, hmin: float = 0.0) -> Mesh:
-    """Mesh at size h (mm). field = (points (n, 3), sizes (n,)): the size is restricted to sizes[i] at points[i]."""
+def generate(g: Geometry, h: float, field=None, hmin: float = 0.0, curved: bool = True) -> Mesh:
+    """Mesh at size h (mm). field = (points (n, 3), sizes (n,)): the size is restricted to sizes[i] at points[i].
+    curved: also take the mid-side nodes of Netgen's second-order mesh, which lie on the geometry."""
     from netgen.meshing import MeshingParameters
     t0 = time.perf_counter()
     mp = MeshingParameters(maxh=float(h), minh=float(hmin), grading=GRADING, curvaturesafety=CURVATURE_SAFETY,
@@ -117,8 +120,37 @@ def generate(g: Geometry, h: float, field=None, hmin: float = 0.0) -> Mesh:
         remap = np.cumsum(used) - 1
         P, T, S = P[used], remap[T], remap[S]
     out = Mesh(P, T, dom, S, fd, float(h), time.perf_counter() - t0)
+    if curved:
+        try:
+            out.edges, out.edge_mid = _second_order(m, used, len(P))
+        except Exception:                        # noqa: BLE001 - no second-order mesh: straight sides, said in the result
+            out.edges = out.edge_mid = None
+    out.seconds = time.perf_counter() - t0
     out.info = quality(out)
+    out.info["curved"] = out.edge_mid is not None
     return out
+
+
+# mid-side node k of Netgen's 10-node tetrahedron lies between these two of its corners
+_NG_TET_MIDS = ((0, 1), (0, 2), (0, 3), (1, 2), (1, 3), (2, 3))
+
+
+def _second_order(m, used: np.ndarray, nv: int):
+    """Mid-side nodes of Netgen's second-order version of the mesh, placed on the geometry: (edges, positions).
+    `used` and `nv`: which of the first-order points were kept, and how many."""
+    n0 = len(used)
+    m.SecondOrder()
+    P2 = np.array(m.Coordinates(), dtype=float)
+    T10 = np.array(m.Elements3D().NumPy()["nodes"][:, :10], dtype=np.int64) - 1
+    if T10.shape[1] < 10 or (T10[:, 4:] < n0).any():
+        raise MeshError("Netgen made no second-order mesh.")
+    remap = np.cumsum(used) - 1
+    a = np.concatenate([remap[T10[:, i]] for i, _ in _NG_TET_MIDS])
+    b = np.concatenate([remap[T10[:, j]] for _, j in _NG_TET_MIDS])
+    mid = np.concatenate([T10[:, 4 + k] for k in range(6)])
+    lo, hi = np.minimum(a, b), np.maximum(a, b)
+    code, first = np.unique(lo * nv + hi, return_index=True)
+    return np.column_stack([lo[first], hi[first]]), P2[mid[first]]
 
 
 def _tet_edges(m: Mesh) -> np.ndarray:

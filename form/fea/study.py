@@ -21,7 +21,8 @@ run and says how to get it. A study that does not converge is stored as not conv
 factor.
 
 Supports: "fixed" (no movement), "roller" (free to slide in the face, no movement across it; a symmetry plane),
-"pin" (a cylindrical face: free to turn about its axis, held across and along it). Loads: "force" (newtons, spread
+"pin" (a cylindrical face: free to turn about its axis, held across and along it), "hold" (no movement along the
+directions given, free in the others). Loads: "force" (newtons, spread
 evenly over the faces), "pressure" (MPa, pushing on the face), "preload" (a bolt's clamping force between two face
 sets, a modelled connector), "gravity" (in g, with a direction). A modal study ignores loads; with no supports it is
 a free body.
@@ -43,7 +44,7 @@ from . import ENGINE, HOW_TO_GET, KIND_LABEL, KINDS, python
 from . import material as material_mod
 
 KEY_VERSION = 1                 # bump when the engine's method changes a result (form/fea/core.py ENGINE_VERSION too)
-FIXTURES = ("fixed", "roller", "pin")
+FIXTURES = ("fixed", "roller", "pin", "hold")
 LOADS = ("force", "pressure", "preload", "gravity")
 MESH_OPTIONS = {"h0": (0.01, 1e4), "levels_max": (3, 10), "dof_max": (2e4, 4e6), "budget_s": (5, 3600),
                 "tol_disp": (1e-4, 0.2), "tol_stress": (1e-3, 0.3), "tol_freq": (1e-4, 0.2), "tol_buckling": (1e-4, 0.2),
@@ -101,8 +102,22 @@ def clean(body: dict) -> dict:
     for i, f in enumerate(body.get("fixtures") or []):
         t = str((f or {}).get("type") or "fixed").lower()
         if t not in FIXTURES:
-            raise _err(f"Support {i + 1}: unknown type “{t}”.", "Types: fixed, roller, pin.")
-        fixtures.append({"type": t, "faces": _faces(f.get("faces") or f.get("at"), f"support {i + 1}")})
+            raise _err(f"Support {i + 1}: unknown type “{t}”.", "Types: fixed, roller, pin, hold.")
+        item = {"type": t, "faces": _faces(f.get("faces") or f.get("at"), f"support {i + 1}")}
+        if t == "hold":
+            dirs = f.get("directions") or ([f["direction"]] if f.get("direction") else [])
+            if dirs and isinstance(dirs[0], (int, float)):
+                dirs = [dirs]
+            if not 1 <= len(dirs) <= 3:
+                raise _err(f"Support {i + 1} (hold) needs directions: one to three vectors the face may not move along, "
+                           "e.g. [[0, 0, 1]].")
+            item["directions"] = []
+            for d in dirs:
+                v = _vec(d, f"A direction of support {i + 1}")
+                if not any(v):
+                    raise _err(f"A direction of support {i + 1} is zero.")
+                item["directions"].append(v)
+        fixtures.append(item)
     loads = []
     for i, ld in enumerate(body.get("loads") or []):
         t = str((ld or {}).get("type") or "").lower()
@@ -414,6 +429,8 @@ def _engine_spec(d: dict, prep: dict, mats: dict) -> dict:
     for f in d["fixtures"]:
         rs = refs(f["faces"])
         item = {"type": f["type"], "faces": rs}
+        if f["type"] == "hold":
+            item["directions"] = f["directions"]
         if f["type"] == "pin":
             bad = [r["_pick"] for r in rs if r["_pick"]["type"] != "cylinder"]
             if bad:
@@ -599,6 +616,60 @@ def run(st, pid: str, sid: str, force: bool = False, on_progress=None, cancelled
     except Exception:                                    # noqa: BLE001 - the feed is not the record
         pass
     return result(st, st.load(pid), sid)
+
+
+def pick_static(p: dict, sid: str = "") -> str:
+    """The static study a search uses as its strength constraint: the one named, else the design's only one."""
+    if sid:
+        d = get(p, sid)
+        if d["kind"] != "static":
+            raise _err(f"Study “{sid}” is a {KIND_LABEL[d['kind']]} study; a strength constraint needs a static one.")
+        return sid
+    statics = [d for d in definitions(p) if d["kind"] == "static"]
+    if not statics:
+        raise _err("The design has no static strength study, so there is nothing for fea.safety_factor to be read from.",
+                   "Define one first with strength_study (the faces that are held, the faces that are loaded, the "
+                   "material); the search then solves it on its candidates.")
+    if len(statics) > 1:
+        raise _err("The design has several static studies; say which one the constraint is read from.",
+                   "study=\"<id>\": " + ", ".join(f"{d['id']} ({d['name']})" for d in statics))
+    return statics[0]["id"]
+
+
+def evaluate(st, p: dict, sid: str, values: dict, budget_s: float = 45.0) -> dict:
+    """Solve a study on candidate parameter values (not a revision): the engine's result, stored nowhere. The picked
+    points are the study's own; a candidate on which a point no longer lands on a face raises StudioError."""
+    d = get(p, sid)
+    mats = materials_for(st, p, d)
+    py = python(st.cfg)
+    if py is None:
+        raise _err("The strength solver is not installed, so the constraint cannot be checked. Nothing was made up.",
+                   HOW_TO_GET, status=409, kind="unavailable")
+    rid = st.rid(p)
+    vals = {**st.rev(p)["values"], **{k: float(v) for k, v in (values or {}).items()}}
+    work = _dir(st, p, sid) / f"candidate-{uuid.uuid4().hex[:8]}.work"
+    work.mkdir(parents=True, exist_ok=True)
+    try:
+        prep = st._k("fea_prepare", timeout=300, key="pv-" + H(rid, vals), recipe_id=rid, values=vals,
+                     out_step=str(work / "solid.step"), picks=_picks(d), p=p)
+        if prep.get("error"):
+            raise _err(prep["error"])
+        spec = _engine_spec(d, prep, mats)
+        spec["mesh"] = {**spec.get("mesh", {}), "budget_s": min(float(spec.get("mesh", {}).get("budget_s", budget_s)), budget_s)}
+        _write(work / "job.json", {"step": prep["step"], "spec": spec})
+        from .. import taskstore
+        code = _spawn(py, work, lambda ev: None, taskstore.cancelled)
+        if code == -1:
+            raise _err("Cancelled.", status=409, kind="cancelled")
+        out = _read(work / "result.json")
+        if out is None:
+            raise _err("The solver stopped without a result.", status=500, kind="engine")
+        if out.get("error"):
+            raise _err(out["error"].get("message", "The study failed."), out["error"].get("hint", ""), status=422,
+                       kind=out["error"].get("kind"))
+        return out
+    finally:
+        shutil.rmtree(work, ignore_errors=True)
 
 
 def _read_text(path: Path) -> str | None:

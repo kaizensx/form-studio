@@ -6,7 +6,9 @@
 
     {"kind": "static" | "modal" | "buckling",
      "materials": [{"name", "E": MPa, "nu", "density": kg/m3, "yield": MPa | None, "centre": [x, y, z]}],   # one per solid
-     "fixtures": [{"type": "fixed" | "roller" | "pin", "faces": [...], "axis": [x, y, z] (pin)}],
+     "fixtures": [{"type": "fixed" | "roller" | "pin", "faces": [...], "axis": [x, y, z] (pin)},
+                  {"type": "hold", "faces": [...], "directions": [[x, y, z], ...]}],   # no movement along these;
+                                                # with "faces_b": only on the edge the two face sets share
      "loads": [{"type": "force", "faces": [...], "vector": [Fx, Fy, Fz]},          # N, spread evenly over the faces
                {"type": "pressure", "faces": [...], "value": MPa},                 # pushes on the face
                {"type": "preload", "faces": [...], "faces_b": [...], "force": N},  # a clamping pair, see below
@@ -19,9 +21,10 @@ What makes the result honest:
 * **Refinement until it stops changing.** The solid is meshed again, finer, at least three times. For a static study
   the next mesh is finer where the error indicator of the last one is large (Zienkiewicz-Zhu stress recovery), so
   fillets, holes and load paths get the elements. Every level is kept: unknowns, strain energy, largest displacement,
-  peak von Mises stress and the indicator. The stated error of a quantity is the larger of twice the change over the
-  last refinement and the remaining change by Aitken's extrapolation of the last three levels. It is an estimate
-  with a margin, not a bound. A study that does not reach its tolerance says so (`converged: false`) and gives no safety factor.
+  peak von Mises stress and the indicator. The stated error of a quantity is twice its last change (or the
+  remaining change by Aitken's extrapolation, when larger) where the levels shrink steadily, and twice the larger
+  of the last two changes where they go up and down (twice their sum where they move one way without shrinking).
+  It is an estimate with a margin, not a bound. A study that does not reach its tolerance says so (`converged: false`) and gives no safety factor.
 * **Singularities are named.** At a sharp inside corner the elastic stress is unbounded: the number there grows with
   every refinement and means nothing. Such edges are found on the mesh (two faces meeting at more than 180 degrees
   inside the solid), refinement is held back there, and stress within `singular_radius` of them is left out of the
@@ -30,6 +33,8 @@ What makes the result honest:
   more than 8 % in all. A zone that is left out stays out.
 * **Equilibrium is checked.** The reactions at the supports balance the applied loads to a stated residual; a study
   that fails the balance fails.
+* **A hand estimate beside it.** Where the part reads as a prismatic bar fixed at one end, the beam-theory stress
+  and deflection are given next to the simulated ones (form/fea/hand.py; evidence: computed, closed form).
 * **Supports must hold the part.** A static or buckling study whose supports leave a rigid motion free is refused,
   with the number of free motions.
 
@@ -62,6 +67,7 @@ REENTRANT_DEG = 15.0                           # faces meeting at an inside corn
 ASSUMPTIONS = ["linear elastic material (stress proportional to strain; no yielding, creep or fatigue)",
                "small strain and small displacement (the load does not change the shape it acts on)",
                "isotropic, homogeneous material in each solid (a printed part: solid, no layers or infill)",
+               "curved faces are followed by quadratic element sides, not exactly",
                "supports are rigid and loads are spread evenly over the picked faces",
                "several solids are bonded where they touch; sliding or opening contact is not modelled"]
 
@@ -112,20 +118,15 @@ class Model:
         return np.where(np.isin(self.m.face, list(face_ids)) & self.surf["outside"])[0]
 
     def node_normals(self, tris):
-        """Nodes of the triangles and the area-weighted mean outward normal at each."""
-        nodes = self.sp.tri_nodes(tris)
-        acc = {}
-        w = self.surf["normal"][tris] * self.surf["area"][tris][:, None]
-        flat, wn = nodes.ravel(), np.repeat(w, 6, axis=0)
-        uniq, inv = np.unique(flat, return_inverse=True)
-        acc = np.zeros((len(uniq), 3))
-        np.add.at(acc, inv, wn)
-        acc /= np.maximum(np.linalg.norm(acc, axis=1), 1e-300)[:, None]
-        return uniq, acc
+        """Nodes of the triangles and the outward normal of the (curved) surface at each."""
+        return self.sp.node_normals(tris)
 
     def constraints(self) -> S.Constraints:
         con = S.Constraints(self.sp)
         for fx, ids in zip(self.spec.get("fixtures") or [], self.faces["fixtures"]):
+            ids_b = None
+            if isinstance(ids, tuple):
+                ids, ids_b = ids
             tr = self.tris(ids)
             if len(tr) == 0:
                 raise StudyError("A support's face has no triangles on the outside of the mesh.")
@@ -142,8 +143,17 @@ class Model:
                 nrm /= np.maximum(np.linalg.norm(nrm, axis=1), 1e-300)[:, None]
                 con.hold(nodes, nrm)
                 con.hold(nodes, ax)
+            elif fx["type"] == "hold":
+                nodes = np.unique(self.sp.tri_nodes(tr))
+                if ids_b is not None:                     # only the edge the two face sets share
+                    nodes = np.intersect1d(nodes, np.unique(self.sp.tri_nodes(self.tris(ids_b))))
+                    if len(nodes) == 0:
+                        raise StudyError("The two face sets of a support share no edge.")
+                for d in fx["directions"]:
+                    d = np.asarray(d, float)
+                    con.hold(nodes, d / np.linalg.norm(d))
             else:
-                raise StudyError(f"Unknown support type “{fx['type']}” (fixed, roller, pin).")
+                raise StudyError(f"Unknown support type “{fx['type']}” (fixed, roller, pin, hold).")
         return con
 
     def face_centre(self, tris):
@@ -162,11 +172,11 @@ class Model:
                 fi = self.sp.body(self.rho, ld["vector"])
             elif t == "force":
                 tr = self.tris(ids)
-                area = self.surf["area"][tr].sum()
+                area = self.sp.tri_area(tr).sum()
                 fi = self.sp.traction(tr, np.asarray(ld["vector"], float) / area)
             elif t == "pressure":
                 tr = self.tris(ids)
-                fi = self.sp.traction(tr, -float(ld["value"]) * self.surf["normal"][tr])
+                fi = self.sp.traction(tr, pressure=float(ld["value"]))
             elif t == "preload":
                 ta, tb = self.tris(ids[0]), self.tris(ids[1])
                 d = self.face_centre(tb) - self.face_centre(ta)
@@ -175,20 +185,22 @@ class Model:
                     d = ax * np.sign(ax @ d or 1.0)
                 d = d / np.linalg.norm(d)
                 N = float(ld["force"])
-                fi = self.sp.traction(ta, N * d / self.surf["area"][ta].sum()) + \
-                    self.sp.traction(tb, -N * d / self.surf["area"][tb].sum())
+                fi = self.sp.traction(ta, N * d / self.sp.tri_area(ta).sum()) + \
+                    self.sp.traction(tb, -N * d / self.sp.tri_area(tb).sum())
             else:
                 raise StudyError(f"Unknown load type “{t}” (force, pressure, preload, gravity).")
             f += fi
             info.append({"type": t, "resultant_N": [float(x) for x in fi.reshape(-1, 3).sum(axis=0)]})
         return f, info
 
-    def zones(self, fixed_ids, load_ids) -> dict:
+    def zones(self, fixed_ids, load_ids, line_pairs=()) -> dict:
         """Distance of every node to: sharp inside corners, edges of fixed faces, edges of loaded faces."""
         e = mesh_mod.face_edges(self.m, self.surf)
         P, X = self.m.P, self.sp.X
         sharp = e["reentrant"] & (e["angle_deg"] > REENTRANT_DEG)
         in_fix = np.isin(e["f1"], fixed_ids) ^ np.isin(e["f2"], fixed_ids)
+        for a, b in line_pairs:                                  # a support along a line
+            in_fix |= (np.isin(e["f1"], a) & np.isin(e["f2"], b)) | (np.isin(e["f1"], b) & np.isin(e["f2"], a))
         in_load = np.isin(e["f1"], load_ids) ^ np.isin(e["f2"], load_ids)
 
         def dist(mask):
@@ -205,7 +217,8 @@ def _resolve_faces(geo, m, spec) -> dict:
         for r in refs or []:
             out.extend(mesh_mod.faces_at(m, r, geo.diag))
         return sorted(set(out))
-    fx = [many(f.get("faces")) for f in spec.get("fixtures") or []]
+    fx = [(many(f.get("faces")), many(f["faces_b"])) if f.get("faces_b") else many(f.get("faces"))
+          for f in spec.get("fixtures") or []]
     ld = []
     for ld_ in spec.get("loads") or []:
         if ld_["type"] == "preload":
@@ -232,10 +245,16 @@ def _free_rigid_motions(model: Model, con: S.Constraints) -> int:
 
 def series(values: list) -> dict:
     """How a quantity converged over the refinements: its last value, the change over the last refinement, and the
-    stated error. The stated error is the larger of MARGIN x the change over the last refinement and, when the last
-    three levels shrink geometrically with ratio r < 1, the remaining change by Aitken's extrapolation (last change
-    x r / (1 - r)); the extrapolated value is given in that case. A sequence that is not shrinking (r >= 0.9) has
-    no basis for an error statement and is marked diverging."""
+    stated error.
+
+    * The last three levels shrink steadily (same direction, ratio r < 0.9): MARGIN x the last change, or the
+      remaining change by Aitken's extrapolation (last change x r / (1 - r)) when that is larger. The extrapolated
+      value is given.
+    * They go up and down (a peak read off a mesh does not converge smoothly): MARGIN x the larger of the last two
+      changes, so one small step between two meshes does not read as convergence.
+    * They move the same way without shrinking (r >= 0.9): nothing to extrapolate from; MARGIN x the sum of the
+      last two changes, marked "not_shrinking". Growth without bound (a singularity) shows as changes far above any
+      tolerance, so it reads as not converged."""
     v = [float(x) for x in values]
     out = {"values": v, "value": v[-1], "change": None, "error": None, "extrapolated": None, "ratio": None}
     if len(v) < 2 or v[-1] == 0:
@@ -245,16 +264,17 @@ def series(values: list) -> dict:
     err = MARGIN * out["change"]
     if len(v) >= 3:
         d0 = v[-2] - v[-3]
-        if d0 != 0:
-            r = d1 / d0
-            out["ratio"] = r
-            if 0 < r < 0.9:
-                rest = d1 * r / (1 - r)
-                out["extrapolated"] = v[-1] + rest
-                err = max(err, abs(rest) / abs(v[-1]))
-            elif r >= 0.9 and out["change"] > 1e-9:
-                err = max(err, 10 * out["change"])
-                out["diverging"] = True
+        r = d1 / d0 if d0 != 0 else 0.0
+        out["ratio"] = r
+        if 0 < r < 0.9:
+            rest = d1 * r / (1 - r)
+            out["extrapolated"] = v[-1] + rest
+            err = max(err, abs(rest) / abs(v[-1]))
+        elif r >= 0.9 and out["change"] > 1e-9:
+            err = MARGIN * (abs(d1) + abs(d0)) / abs(v[-1])
+            out["not_shrinking"] = True
+        else:
+            err = MARGIN * max(abs(d1), abs(d0)) / abs(v[-1])
     out["error"] = err
     return out
 
@@ -287,6 +307,14 @@ def _next_field(model: Model, eta: np.ndarray, growth: float, hold: np.ndarray |
     # three significant figures: the next mesh does not depend on the last digits of an iterative solve
     mag = 10.0 ** (np.floor(np.log10(np.maximum(sizes, 1e-12))) - 2)
     return np.concatenate([cen, model.sp.X]), np.round(sizes / mag) * mag
+
+
+def _element(model: Model) -> str:
+    sp = model.sp
+    if sp.curved:
+        return "10-node tetrahedron (quadratic displacement; isoparametric, mid-side nodes on the geometry)"
+    return "10-node tetrahedron (quadratic displacement, straight sides" + \
+        (f": {sp.curved_note}" if sp.curved_note else "") + ")"
 
 
 def _where(model: Model, node: int) -> dict:
@@ -384,9 +412,10 @@ _ZONE_TEXT = {
     "corner": ("sharp inside corner",
                "Two faces meet at a sharp inside corner. The elastic stress there has no finite value: it grows with "
                "every refinement. Add a fillet to get a real number, or read the stress outside the radius given."),
-    "fixture": ("edge of a fixed face",
-                "The stress at the edge of a rigidly fixed face keeps growing with refinement: a perfectly rigid "
-                "support is a model, and its edge is a singular line. The real support gives a little."),
+    "fixture": ("edge of a held face, or a support along a line",
+                "The stress at the edge of a rigidly held face (or along a line support) keeps growing with "
+                "refinement: a perfectly rigid support is a model, and its edge is a singular line. The real support "
+                "gives a little."),
     "load": ("edge of a loaded face",
              "The stress at the edge of a loaded face keeps growing with refinement: the load ends abruptly there, or "
              "the face is so small that it acts as a point load."),
@@ -395,7 +424,7 @@ _ZONE_TEXT = {
 
 def run_static(geo, spec, progress, cancelled) -> tuple[dict, dict]:
     opt = {**DEFAULTS, **(spec.get("mesh") or {})}
-    rz = float(opt.get("singular_radius") or min(max(0.02 * geo.diag, 0.5), 3.0))
+    rz = float(opt.get("singular_radius") or max(0.02 * geo.diag, 0.5))
     h0 = float(opt.get("h0") or geo.diag / 12.0)
     t_start = time.perf_counter()
     levels, field, faces, last_dt = [], None, None, 0.0
@@ -422,11 +451,17 @@ def run_static(geo, spec, progress, cancelled) -> tuple[dict, dict]:
         model = Model(geo, m, spec, faces)
         progress(f"Solving refinement {n + 1}: {model.sp.ndof:,} unknowns", min(0.95, (n + 0.4) / 6))
         lv = _static_level(model, cancelled)
-        fixed_ids = sorted({i for fx, ids in zip(spec.get("fixtures") or [], faces["fixtures"]) if fx["type"] == "fixed" for i in ids})
+        fixed_ids, line_pairs = set(), []
+        for fx, ids in zip(spec.get("fixtures") or [], faces["fixtures"]):
+            if isinstance(ids, tuple):                           # held only on the edge two face sets share: a line
+                line_pairs.append(ids)
+            elif fx["type"] in ("fixed", "hold"):
+                fixed_ids |= set(ids)
+        fixed_ids = sorted(fixed_ids)
         load_ids = sorted({i for ld, ids in zip(spec.get("loads") or [], faces["loads"]) if ld["type"] in ("force", "pressure")
                            for i in ids} | {i for ld, ids in zip(spec.get("loads") or [], faces["loads"]) if ld["type"] == "preload"
                                             for i in list(ids[0]) + list(ids[1])})
-        lv["zones"] = model.zones(fixed_ids, load_ids)
+        lv["zones"] = model.zones(fixed_ids, load_ids, line_pairs)
         lv["model"] = model
         lv["util"] = _utilisation(model, lv["stress"])
         sol = lv["sol"]
@@ -438,7 +473,7 @@ def run_static(geo, spec, progress, cancelled) -> tuple[dict, dict]:
                         "moment_balance": sol["moment_residual"], "solver": lv["system"].method,
                         "iterations": int(lv["system"].iterations),
                         "seconds": round(time.perf_counter() - tl, 3), "mesh_seconds": round(m.seconds, 3),
-                        "mesh_quality_min": round(m.info["quality_min"], 4)}
+                        "mesh_quality_min": round(m.info["quality_min"], 4), "curved_elements": bool(model.sp.curved)}
         for old in levels:                                       # only the finest level keeps its matrices
             for k in ("system", "K", "f", "model", "stress", "sol"):
                 old.pop(k, None)
@@ -504,9 +539,10 @@ def _static_result(geo, spec, opt, rz, levels, stop, seconds, left_out) -> tuple
                         "tolerance": {"displacement": opt["tol_disp"], "stress": opt["tol_stress"]},
                         "error_indicator_last": lv["eta_rel"],
                         "method": "h-refinement: the solid is meshed again, finer where the Zienkiewicz-Zhu stress-"
-                                  "recovery indicator is large; the stated error is the larger of twice the change "
-                                  "over the last refinement and the remaining change by Aitken's extrapolation of "
-                                  "the last three levels. An estimate with a margin, not a bound."},
+                                  "recovery indicator is large; the stated error is twice the last change (or "
+                                  "Aitken's remaining change, when larger) where the levels shrink steadily, and "
+                                  "twice the larger of the last two changes where they go up and down. An estimate "
+                                  "with a margin, not a bound."},
         "max_displacement_mm": disp["value"], "max_displacement_at": _where(model, int(np.argmax(lv["unorm"])))["at"],
         "peak_von_mises_MPa": peak["series"]["value"], "peak_at": _where(model, node)["at"],
         "discretisation_error": {"stress": peak["series"]["error"], "displacement": disp["error"],
@@ -516,7 +552,7 @@ def _static_result(geo, spec, opt, rz, levels, stop, seconds, left_out) -> tuple
                         "balanced": bool(balanced), "applied_N": [float(x) for x in sol["applied"]],
                         "reaction_N": [float(x) for x in sol["reaction"]], "tolerance": opt["balance"] * 1e3},
         "loads": lv["loads"],
-        "mesh": {"element": "10-node tetrahedron (quadratic displacement, straight sides)", "mesher": "Netgen",
+        "mesh": {"element": _element(model), "mesher": "Netgen",
                  "tets": lv["record"]["tets"], "nodes": lv["record"]["nodes"], "unknowns": lv["record"]["unknowns"],
                  "h_mean_mm": lv["record"]["h_mean_mm"], "h_min_mm": lv["record"]["h_min_mm"],
                  "solids": geo.solids, "bonded": bool(geo.glued)},
@@ -552,6 +588,11 @@ def _static_result(geo, spec, opt, rz, levels, stop, seconds, left_out) -> tuple
             why.append("the reactions do not balance the loads")
         out["not_converged_because"] = "; ".join(why) + (f". Stopped because {stop}." if stop else ".")
     out["evidence"] = evidence(out)
+    try:                                                 # a second opinion that does not share the solver
+        from . import hand
+        out["hand_estimate"] = hand.estimate(model, spec, model.faces, sol["u"].reshape(-1, 3), out["peak_von_mises_MPa"])
+    except Exception as e:                               # noqa: BLE001 - the estimate is an extra, never a failure
+        out["hand_estimate"] = {"applies": False, "why": f"the estimate could not be made ({type(e).__name__}: {e})"}
     fld = _surface_field(model, {"displacement": sol["u"].reshape(-1, 3), "von_mises": lv["vm"],
                                  "safety_factor": sf_field, "singular": ~ok_nodes})
     return out, fld
@@ -635,6 +676,7 @@ def _uniform_levels(geo, spec, opt, progress, cancelled, solve_level, tol, label
         lv = solve_level(model)
         lv["model"], lv["h"] = model, h
         lv["record"].update({"level": n + 1, "h_mean_mm": round(m.info["h_mean"], 4), "tets": m.info["tets"],
+                             "curved_elements": bool(model.sp.curved),
                              "nodes": int(model.sp.N), "unknowns": int(model.sp.ndof),
                              "seconds": round(time.perf_counter() - tl, 3), "mesh_seconds": round(m.seconds, 3)})
         for old in levels:
@@ -696,11 +738,11 @@ def run_modal(geo, spec, progress, cancelled) -> tuple[dict, dict]:
            "mass_g": lv["record"]["mass_g"],
            "convergence": {"levels": [x["record"] for x in levels], "frequencies": ss, "tolerance": {"frequency": opt["tol_freq"]},
                            "method": "h-refinement: the solid is meshed again at 0.72 x the size, everywhere; the stated "
-                                     "error is the larger of twice the change over the last refinement and the "
-                                     "remaining change by Aitken's extrapolation of the last three levels. An "
-                                     "estimate with a margin, not a bound."},
+                                     "error is twice the last change (or Aitken's remaining change, when larger) "
+                                     "where the levels shrink steadily, and twice the larger of the last two changes "
+                                     "where they go up and down. An estimate with a margin, not a bound."},
            "discretisation_error": {"frequency": None if not np.isfinite(worst) else worst},
-           "mesh": {"element": "10-node tetrahedron (quadratic displacement, straight sides)", "mesher": "Netgen",
+           "mesh": {"element": _element(model), "mesher": "Netgen",
                     "tets": lv["record"]["tets"], "nodes": lv["record"]["nodes"], "unknowns": lv["record"]["unknowns"],
                     "h_mean_mm": lv["record"]["h_mean_mm"], "solids": geo.solids, "bonded": bool(geo.glued)},
            "model": "modal (undamped natural frequencies, consistent mass)",
@@ -750,11 +792,11 @@ def run_buckling(geo, spec, progress, cancelled) -> tuple[dict, dict]:
            "convergence": {"levels": [x["record"] for x in levels], "load_factors": ss,
                            "tolerance": {"load_factor": opt["tol_buckling"]},
                            "method": "h-refinement: the solid is meshed again at 0.72 x the size, everywhere; the stated "
-                                     "error is the larger of twice the change over the last refinement and the "
-                                     "remaining change by Aitken's extrapolation of the last three levels. An "
-                                     "estimate with a margin, not a bound."},
+                                     "error is twice the last change (or Aitken's remaining change, when larger) "
+                                     "where the levels shrink steadily, and twice the larger of the last two changes "
+                                     "where they go up and down. An estimate with a margin, not a bound."},
            "discretisation_error": {"load_factor": first["error"]},
-           "mesh": {"element": "10-node tetrahedron (quadratic displacement, straight sides)", "mesher": "Netgen",
+           "mesh": {"element": _element(lv["model"]), "mesher": "Netgen",
                     "tets": lv["record"]["tets"], "nodes": lv["record"]["nodes"], "unknowns": lv["record"]["unknowns"],
                     "h_mean_mm": lv["record"]["h_mean_mm"], "solids": geo.solids, "bonded": bool(geo.glued)},
            "model": "linear (eigenvalue) buckling on the stress of the linear static solution",

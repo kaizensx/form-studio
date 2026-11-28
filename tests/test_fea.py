@@ -99,6 +99,14 @@ class Definitions(unittest.TestCase):
                 study.clean(body)
             self.assertIn(word, str(cm.exception))
 
+    def test_a_hold_names_the_directions_that_may_not_move(self):
+        d = study.clean({"fixtures": [{"type": "hold", "faces": [[0, 0, 0]], "directions": [0, 0, 1]}],
+                         "loads": [{"type": "gravity"}]})
+        self.assertEqual(d["fixtures"][0]["directions"], [[0.0, 0.0, 1.0]])
+        with self.assertRaises(StudioError) as cm:
+            study.clean({"fixtures": [{"type": "hold", "faces": [[0, 0, 0]]}], "loads": [{"type": "gravity"}]})
+        self.assertIn("directions", str(cm.exception))
+
     def test_a_modal_study_needs_no_load_and_ignores_one(self):
         d = study.clean({"kind": "modal", "loads": [{"type": "gravity"}]})
         self.assertEqual((d["loads"], d["fixtures"], d["modes"]), ([], [], 6))
@@ -115,6 +123,74 @@ class Definitions(unittest.TestCase):
         self.assertEqual((d["material"], d["mesh"], opt["again"]), ("AL-6061", {"h0": 3.0}, True))
         with self.assertRaises(ValueError):
             fea_cli.parse("static", ["--fix", "1,2"])
+
+
+class StrengthAsAConstraint(unittest.TestCase):
+    """fea.safety_factor in a search: solved on real candidates best first, within a stated number of solves; a
+    candidate that was not solved is never called feasible (form/fea/constraint.py)."""
+
+    def _ranked(self, n):
+        return [{"values": {"t": float(i)}, "changes": {"t": float(i)}} for i in range(n)]
+
+    def _solver(self, passes_from, calls):
+        def solve(st, p, sid, values, cons, ops):
+            calls.append(values["t"])
+            ok = values["t"] >= passes_from
+            return {"ok": ok, "metrics": {"fea.safety_factor": 1.0 + values["t"]}, "violations": [] if ok else ["too weak"],
+                    "evidence": "simulated (FEA, linear static, converged to 1.0 %)", "seconds": 0.0}
+        return solve
+
+    def test_the_best_candidate_wins_when_it_meets_the_constraint(self):
+        from form.fea import constraint
+        calls = []
+        with mock.patch.object(constraint, "solve", self._solver(0, calls)):
+            r = constraint.verify_ranked(None, {}, "s", self._ranked(9), [("fea.safety_factor", ">=", 2.0)], {})
+        self.assertEqual((r["winner"], calls, r["runs"]), (0, [0.0], 1))
+
+    def test_halving_finds_the_best_candidate_that_passes_and_only_solved_ones_count(self):
+        from form.fea import constraint
+        calls = []
+        with mock.patch.object(constraint, "solve", self._solver(5, calls)):
+            r = constraint.verify_ranked(None, {}, "s", self._ranked(12), [("fea.safety_factor", ">=", 2.0)], {})
+        self.assertEqual(r["winner"], 5)
+        self.assertLessEqual(r["runs"], 6)
+        self.assertEqual(sorted(x["index"] for x in r["solved"]), sorted({int(c) for c in calls}))
+        self.assertTrue(all(x["ok"] == (x["index"] >= 5) for x in r["solved"]))
+
+    def test_the_number_of_solves_is_bounded_and_said(self):
+        from form.fea import constraint
+        calls = []
+        with mock.patch.object(constraint, "solve", self._solver(100, calls)):
+            r = constraint.verify_ranked(None, {}, "s", self._ranked(64), [("fea.safety_factor", ">=", 2.0)], {}, runs=4)
+        self.assertEqual((r["winner"], r["runs"]), (None, 3))            # best, worst, middle: none passes
+        calls.clear()
+        with mock.patch.object(constraint, "solve", self._solver(37, calls)):
+            r = constraint.verify_ranked(None, {}, "s", self._ranked(64), [("fea.safety_factor", ">=", 2.0)], {}, runs=4)
+        self.assertEqual(r["runs"], 4)
+        self.assertIn("limit of 4 solves", r["stopped"])
+        self.assertTrue(r["winner"] is not None and r["winner"] >= 37)   # a solved, passing one: not claimed better
+
+    def test_a_study_that_did_not_converge_has_no_safety_factor(self):
+        from form.fea import constraint
+        m = constraint.metrics({"converged": False, "safety_factor": None, "peak_von_mises_MPa": 50.0})
+        self.assertEqual(set(m.values()), {None})
+        m = constraint.metrics({"converged": True, "safety_factor": {"value": 3.0, "low": 2.8}, "peak_von_mises_MPa": 50.0,
+                                "max_displacement_mm": 0.2})
+        self.assertEqual(m["fea.safety_factor"], 2.8)                    # the lower value, error applied
+
+    def test_a_strength_metric_is_not_an_objective_and_unknown_ones_are_named(self):
+        from form import optimize as opt
+        from form.fea import constraint
+
+        class St:
+            def recipe(self, p): return None
+            def rev(self, p): return {"values": {}}
+        with self.assertRaises(opt.OptimizeError) as cm:
+            opt.run(St(), {}, [{"key": "t"}], {"minimize": "fea.peak_von_mises_MPa"}, [])
+        self.assertIn("not the objective", str(cm.exception))
+        with self.assertRaises(StudioError) as cm:
+            constraint.check_names([("fea.fatigue_life", ">=", 1.0)])
+        self.assertIn("fea.safety_factor", cm.exception.hint)
 
 
 class Materials(unittest.TestCase):
@@ -328,6 +404,9 @@ class RealStudies(WithStudio):
             self.assertGreater(s["stress_there_MPa_by_refinement"][-1], res["peak_von_mises_MPa"])
             self.assertTrue(s["why"] and s["left_out_within_mm"] > 0)
         self.assertEqual([f["type"] for f in res["faces"]], ["cylinder"] * 3)
+        self.assertFalse(res["hand_estimate"]["applies"])              # an L-bracket is not a prismatic bar, and says so
+        self.assertIn("not slender", res["hand_estimate"]["why"])
+        self.assertIn("isoparametric", res["mesh"]["element"])
 
     def test_4_the_field_is_what_a_viewport_can_colour(self):
         f = study.field(self.st, self.load(), self.d["id"])
@@ -416,6 +495,31 @@ class RealStudies(WithStudio):
         self.assertIn("off the part's surface", str(cm.exception))
         for x in (d, pin, off):
             study.remove(self.st, self.load(), x["id"])
+
+    def test_85_a_search_keeps_the_strength_constraint_on_solved_candidates(self):
+        """Thickness 3 to 10 mm, lightest with a safety factor of at least 3: every feasible candidate was solved."""
+        from form import lighten, optimize as opt
+        self.st.commit(self.load(), {"r": 6.0, "t": 6.0}, note="fillet back")
+        r = opt.run(self.st, self.load(), [{"key": "t", "min": 3, "max": 10}], {"minimize": "volume_cm3"},
+                    ["fea.safety_factor >= 3"], budget=10, study=self.d["id"])
+        st_ = r["strength"]
+        self.assertTrue(1 <= st_["solves"] <= 8)
+        self.assertIn("not steered", st_["how"])
+        solved = {json.dumps(x["values"], sort_keys=True): x for x in st_["solved"]}
+        self.assertFalse(solved[json.dumps({"t": 3.0})]["ok"])                 # the lightest is too weak
+        if r["best"] is not None:
+            win = solved[json.dumps(r["best"]["values"], sort_keys=True)]
+            self.assertTrue(win["ok"])
+            self.assertGreaterEqual(win["metrics"]["fea.safety_factor"], 3.0)
+            self.assertGreater(r["best"]["values"]["t"], 3.0)
+            self.assertRegex(win["evidence"], r"converged to")
+            self.assertEqual(r["feasible"], sum(1 for x in st_["solved"] if x["ok"]))
+        else:
+            self.assertIn("No candidate that was solved", st_["none_why"])
+        lt = lighten.search(self.st, self.load(), builds=1, require=["fea.safety_factor >= 50"], study=self.d["id"])
+        self.assertEqual(lt["candidates"], [])                                   # nothing lighter is that strong
+        self.assertTrue(any("fea.safety_factor >= 50" in x["why"] for x in lt["rejected"]), lt["rejected"])
+        self.assertEqual(lt["require"], ["fea.safety_factor >= 50"])
 
     def test_9_modal_buckling_and_cancel(self):
         m = study.define(self.st, self.load(), {"kind": "modal", "material": ALU, "modes": 3,

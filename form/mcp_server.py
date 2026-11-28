@@ -1465,17 +1465,21 @@ def build() -> MCPServer:
         return await _run(go)
 
     @mcp.tool(annotations=RO)
-    async def make_lighter(project: str, builds: int = 4) -> dict:
+    async def make_lighter(project: str, builds: int = 4, require: list[str] | None = None, study: str = "") -> dict:
         """Make it lighter: search changes that reduce mass while every check that passes now still passes. Tries the
         design's wall, thickness and lightening-pocket parameters (never interface parameters; a candidate that moves an
         interface dimension is dropped), building a ladder of values in the kernel, then takes the lightest few (builds)
         through the real checks and slicer. Also slices lower infill and one wall fewer over the slicer's process. Returns
         the baseline and candidates (id, changes and/or settings, computed mass_g, slicer slice_g, every check before and
-        after) and what was rejected and why. Nothing is committed: keep one with apply_lighter."""
+        after) and what was rejected and why. Nothing is committed: keep one with apply_lighter.
+        require: strength constraints a lighter design must still meet, e.g. ["fea.safety_factor >= 2"], read from the
+        design's static strength_study (study="<id>" when it has several): the study is solved on each geometry
+        candidate that kept its checks, and one that fails is rejected with its numbers. With a strength requirement
+        the print-setting candidates (less infill, fewer walls) are not offered: the study is of a solid part."""
         st = studio()
         def go():
             from . import lighten
-            return lighten.search(st, st.load(project), builds=builds)
+            return lighten.search(st, st.load(project), builds=builds, require=require, study=study)
         act(project, "search", "Searching for a lighter design that keeps every check passing")
         return await _run(go)
 
@@ -1605,19 +1609,24 @@ def build() -> MCPServer:
 
     @mcp.tool(annotations=RO)
     async def optimize(project: str, vary: list[dict], objective: dict[str, str], constraints: list[str] | None = None,
-                       budget: int = 40, ctx: Context = None) -> dict:
+                       budget: int = 40, study: str = "", ctx: Context = None) -> dict:
         """Optimize a design. Goal seek: search parameter ranges for the best design that meets constraints. Every candidate is built by the kernel.
         vary: [{"key": "arm_t", "min": 4, "max": 20}] (1-4 parameters).
         objective: {"minimize": "solid_mass_g"} or {"maximize": "statics.safety_factor"}.
         constraints: ["statics.safety_factor >= 3", "overhang_mm2 <= 1", "derived.usable_depth >= 30", "fit_yield >= 0.9"].
         Metrics: volume_cm3, solid_mass_g, width, depth, height, overhang_mm2, contact_mm2, min_wall_mm, fit_yield,
-        derived.<key>, statics.<key>. Nothing is saved: preview_change/render the best, then commit_change."""
+        derived.<key>, statics.<key>. Nothing is saved: preview_change/render the best, then commit_change.
+        A strength study as a constraint: "fea.safety_factor >= 2" (also fea.peak_von_mises_MPa, fea.max_displacement_mm)
+        reads the design's static strength_study (study="<id>" when it has several). Each value is a full solve, so
+        the search runs first and the study is then solved on its candidates, best first, within 8 solves and 300 s:
+        "strength" in the result lists every candidate solved with its numbers and evidence, and only those count as
+        feasible. fea.safety_factor is the lower value (stated error applied); not an objective."""
         st = studio()
         def go():
             from . import optimize as opt
             p = st.load(project)
             try:
-                return opt.run(st, p, vary, objective, constraints or [], budget)
+                return opt.run(st, p, vary, objective, constraints or [], budget, study=study)
             except (opt.OptimizeError, KeyError) as e:
                 raise StudioError(str(e).strip("'"), "Check parameter keys with describe_recipe.")
         act(project, "search", f"Searching: {next(iter(objective))} {next(iter(objective.values()))}"

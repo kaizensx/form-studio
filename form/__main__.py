@@ -344,6 +344,7 @@ def main(argv=None):
     g.add_argument("--maximize")
     o.add_argument("--require", action="append", default=[], help='constraint, e.g. "statics.safety_factor>=3"')
     o.add_argument("--budget", type=int, default=40)
+    o.add_argument("--study", default="", help='the static strength study a "fea.safety_factor>=2" constraint is read from')
     an = sub.add_parser("animate", help="turntable or revision-morph GIF")
     an.add_argument("project")
     an.add_argument("--morph", help="from:to revision numbers, e.g. 1:4")
@@ -360,6 +361,8 @@ def main(argv=None):
     lt.add_argument("--builds", type=int, default=4, help="how many geometry candidates go through the full checks")
     lt.add_argument("--apply", metavar="ID", help="keep candidate ID (c1, c2, ...) from the search")
     lt.add_argument("--expect-head", type=int)
+    lt.add_argument("--require", action="append", default=[], help='a strength constraint to keep, e.g. "fea.safety_factor>=2"')
+    lt.add_argument("--study", default="", help="the static strength study the constraint is read from")
     so = sub.add_parser("slicer-open", help="slice with settings chosen for this part on this printer and open the project in the slicer")
     so.add_argument("project")
     so.add_argument("--printer", metavar="ID", help="a printer id from `form printers` (default: the design's printer)")
@@ -637,7 +640,7 @@ def main(argv=None):
                 k, lo, hi = item.split(":")
                 vary.append({"key": k, "min": float(lo), "max": float(hi)})
             obj = {"minimize": a.minimize} if a.minimize else {"maximize": a.maximize}
-            _print(opt.run(st, st.load(a.project), vary, obj, a.require, a.budget))
+            _print(opt.run(st, st.load(a.project), vary, obj, a.require, a.budget, study=a.study))
         elif a.cmd == "animate":
             from . import animate
             p = st.load(a.project)
@@ -671,7 +674,7 @@ def main(argv=None):
                     out["job"] = st.run_sync(a.project)["state"]
                 _print(out)
             else:
-                _print(lighten.search(st, p, builds=a.builds))
+                _print(lighten.search(st, p, builds=a.builds, require=a.require or None, study=a.study))
         elif a.cmd == "slicer-open":
             from . import slicer_open
             r = slicer_open.run(st, st.load(a.project), a.printer, open_app=not a.no_open)
