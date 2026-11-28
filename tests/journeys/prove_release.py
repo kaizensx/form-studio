@@ -4,7 +4,7 @@ import zipfile
 
 from PySide6.QtCore import QPointF
 
-from _lib import fold, head, phone_dock, toasts_gone, wait_job
+from _lib import fold, goto, head, phone_dock, toasts_gone, wait_job
 
 DATA = "fresh"
 S = {}
@@ -21,8 +21,8 @@ def journey_setup(ui):
 
 def journey_companion(ui):
     # the phone is four times taller than the dock: its outline stops a little above the part, with a note
-    ui.key("Ctrl+2")
-    ui.wait_until(lambda: ui.store.get("stage") == "shape", 3, "the Shape stage")
+    ui.key("Ctrl+1")
+    ui.wait_until(lambda: ui.store.get("stage") == "shape", 3, "Design")
     vp = ui.item("viewport")
     h = ui.js("Store.values.device_height")
     for key in ("1", "2", "3", "4"):
@@ -44,8 +44,7 @@ def journey_companion(ui):
 
 
 def journey_fit(ui):
-    ui.key("Ctrl+3")
-    ui.wait_until(lambda: ui.store.get("stage") == "fit", 3, "the Fit stage with Ctrl+3")
+    goto(ui, "fit")                                    # Fit is a study in Check
     ui.settle(500)
     f0 = data(ui)["fit"]
     ui.check(f0 and 0 <= f0["yield"] <= 1, "the dock has a fit model")
@@ -74,7 +73,7 @@ def journey_fit(ui):
     else:
         raise AssertionError("no suggested action carries a change")
     # back to the window the design started with
-    ui.key("Ctrl+3")
+    goto(ui, "fit")
     ui.settle(400)
     ui.fill("fitHi", str(hi), enter=True)
     ui.wait_until(lambda: abs(data(ui)["fit"]["window"][1] - hi) < 1e-6, 20, "the original window")
@@ -128,8 +127,8 @@ def journey_prove(ui):
 
 
 def journey_release(ui):
-    ui.key("Ctrl+5")
-    ui.wait_until(lambda: ui.store.get("stage") == "release", 3, "the Release stage with Ctrl+5")
+    ui.key("Ctrl+3")
+    ui.wait_until(lambda: ui.store.get("stage") == "release", 3, "Make with Ctrl+3")
     ui.settle(500)
     g = data(ui)["gate"]
     ui.check(g["ready"], f"the gate is ready: {g}")

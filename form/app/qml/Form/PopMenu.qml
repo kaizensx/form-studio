@@ -1,7 +1,7 @@
 import QtQuick
 import QtQuick.Controls
 
-// A menu of actions in a popover. model: [{ text, icon?, keys?, danger?, enabled?, checked?, run() } | { sep: true }]
+// A menu of actions in a popover. model: [{ text, name?, icon?, keys?, danger?, enabled?, checked?, run() } | { sep: true }]
 // Up/Down move, Enter runs, Esc closes. openAt(item, x, y) opens it at a point of `item` (a right-click), open() where it was placed.
 Pop {
     id: m
@@ -31,6 +31,7 @@ Pop {
                 id: row
                 required property var modelData
                 required property int index
+                objectName: modelData.name || ""          // an entry may be named, for the journeys
                 readonly property bool off: modelData.enabled === false
                 width: col.width; height: modelData.sep ? 9 : 30
                 Rectangle { visible: !!row.modelData.sep; y: 4; x: 10; width: parent.width - 20; height: 1; color: Theme.rule }

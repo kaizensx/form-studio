@@ -86,7 +86,7 @@ def journey_boss_on_a_face(ui):
 
 
 def journey_every_printer(ui):
-    ui.key("Ctrl+4")
+    ui.key("Ctrl+2")
     ui.wait_until(lambda: ui.store.get("stage") == "prove", 3, "the Prove stage")
     ui.settle(500)
     b = ui.item("comparePrinters")
@@ -134,7 +134,7 @@ def journey_open_in_slicer(ui):
 
 
 def journey_turntable(ui):
-    ui.key("Ctrl+5")
+    ui.key("Ctrl+3")
     ui.wait_until(lambda: ui.store.get("stage") == "release", 3, "the Release stage")
     ui.settle(400)
     fold(ui, "Share")

@@ -7,7 +7,7 @@ Environment (tests/test_ui_journeys.py test_no_printer): every slicer points at 
 import os
 from pathlib import Path
 
-from _lib import open_project, toasts_gone, wait_job
+from _lib import goto, open_project, toasts_gone, wait_job
 
 DATA = "empty"
 S = {}
@@ -120,21 +120,19 @@ def journey_purpose_switch(ui):
              "a 3D model needs no label: the top bar stays quiet when printing turns on")
     toasts_gone(ui)
     ui.settle(600)                                     # the top bar and stage tabs settle after printing turns on
-    ui.click("stage-brief")
-    ui.wait_until(lambda: ui.store.get("stage") == "brief", 3, "Brief")
+    goto(ui, "brief")
     seg = ui.item("purposeSeg")
     ui.scroll_to(seg, 0.5)
     ui.click_text("For 3D printing", within=seg)
     ui.wait_until(lambda: data(ui)["purpose"]["purpose"] == "print", 10, "the design to be for printing")
     ui.wait_until(lambda: ui.js("Store.purpose") == "print", 10, "the app to follow")
     ui.eq(data(ui)["status"]["slice"]["off"]["why"], "no_slicer", "a print with no slicer: Design only, never an error")
+    ui.click("stage-release")
     ui.wait_until(lambda: ui.find(name="printerChip", within=ui.item("topBar")) is not None, 5,
-                  "the printer in the top bar from Describe on, for a design made for printing")
+                  "the printer in the top bar in Make, for a design made for printing")
     ui.click("stage-prove")
-    ui.wait_until(lambda: ui.find(name="printerChip") is not None, 5, "the printer chip in Review for a design made for printing")
-    ui.wait_until(lambda: ui.js("Store.viewer && Store.viewer.plateShown") is True, 5, "the build plate in Review")
-    ui.click("stage-brief")
-    ui.wait_until(lambda: ui.store.get("stage") == "brief", 3, "Brief again")
+    ui.wait_until(lambda: ui.js("Store.viewer && Store.viewer.plateShown") is True, 5, "the build plate in Check")
+    goto(ui, "brief")
     wait_job(ui, S["pid"])
     ids = [c["id"] for c in data(ui)["checks"]["checks"]]
     ui.check("envelope" in ids, f"the print checks run now: {ids}")

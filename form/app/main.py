@@ -101,7 +101,7 @@ def main(argv=None) -> int:
     ap.add_argument("--shot", metavar="PNG", help="save a screenshot and quit")
     ap.add_argument("--tree", metavar="JSON", help="save the visible item tree as JSON (with or instead of --shot) and quit")
     ap.add_argument("--project", help="open this project id")
-    ap.add_argument("--stage", choices=["brief", "shape", "fit", "prove", "release"])
+    ap.add_argument("--stage", choices=["brief", "shape", "fit", "prove", "release", "document"])
     ap.add_argument("--size", default="1440x900")
     ap.add_argument("--wait", type=int, default=2600, help="ms to wait before --shot")
     ap.add_argument("--eval", dest="js", help="QML/JS expression run in Main.qml before --shot (development)")

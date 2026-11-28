@@ -48,7 +48,7 @@ Column {
             ["Ctrl+Shift+H", "All designs"],
             ["Ctrl+[", "Back to all designs"],
             ["Ctrl+,", "Settings"],
-            ["Ctrl+1", "Describe"], ["Ctrl+2", "Design"], ["Ctrl+3", "Fit"], ["Ctrl+4", "Review"], ["Ctrl+5", "Make"],
+            ["Ctrl+1", "Design"], ["Ctrl+2", "Check"], ["Ctrl+3", "Make"], ["Ctrl+4", "Document"], ["Ctrl+I", "Overview of the design"],
             ["Ctrl+Return", "Commit the draft"],
             ["?", "This sheet"]] }]]
     // flat list, for the tests and anything else that wants every row

@@ -105,3 +105,30 @@ def click_stage(ui):
     (The corner of the window is not the stage: the conversation column may stand there.)"""
     vp = ui.item("viewport")
     ui.click("viewport", (float(vp.property("insetLeft")) + 44) / vp.width(), (float(vp.property("insetTop")) + 2) / vp.height())
+
+
+def goto(ui, sid):
+    """Go where a design's work is done. The four modes are tabs (shape: Design, prove: Check, release: Make,
+    document: Document). What used to be two more stages is reached the way a person reaches it now: "brief" is the
+    Overview, opened from the design capsule; "fit" is the Fit study, a row of Check."""
+    if sid == "brief":
+        if ui.js("Store.overview") is not True:
+            ui.click("designCapsule")
+        ui.wait_until(lambda: ui.js("Store.overview") is True, 3, "the Overview")
+        return
+    if sid == "fit":
+        goto(ui, "prove")
+        ui.click("studyFit")
+    else:
+        ui.click("stage-" + sid)
+    ui.wait_until(lambda: ui.store.get("stage") == sid and ui.js("Store.overview") is False, 3, sid)
+
+
+def plate_toggle(ui):
+    """The build plate of a design made for printing, shown or hidden from the shading chip under the view cube."""
+    ui.settle(350)                                     # a menu that has just closed is gone before the chip is pressed again
+    ui.click("shadeChip")
+    ui.wait_until(lambda: ui.exists("showPlate"), 3, "the chip's menu")
+    ui.settle(200)
+    ui.click("showPlate")
+    ui.wait_until(lambda: not ui.exists("showPlate"), 3, "the menu to close")

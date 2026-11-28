@@ -14,6 +14,12 @@ Icon 1.0 Icon.qml
 Btn 1.0 Btn.qml
 Tip 1.0 Tip.qml
 Tag 1.0 Tag.qml
+Ev 1.0 Ev.qml
+ViewCube 1.0 ViewCube.qml
+ShadeChip 1.0 ShadeChip.qml
+ResultStrip 1.0 ResultStrip.qml
+Overview 1.0 Overview.qml
+BenchRow 1.0 BenchRow.qml
 BetaTag 1.0 BetaTag.qml
 Cap 1.0 Cap.qml
 Sec 1.0 Sec.qml

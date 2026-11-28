@@ -9,7 +9,7 @@ The stand-in agent (tests/fixtures/fake_agent.py) plays both conversations: "sta
 create_design MCP tool, so its activity carries the conversation the way a real run does ($FORM_CONVERSATION)."""
 import time
 
-from _lib import DOCK, make, printing_on, toasts_gone
+from _lib import DOCK, goto, make, plate_toggle, printing_on, toasts_gone
 
 DATA = "fresh"
 S = {}
@@ -127,26 +127,26 @@ def journey_print_design_names_its_printer(ui):
     toasts_gone(ui)
     printing_on(ui)
     m = make(ui, "storage_box", "Desk tray")               # a 3D model: no printer, no plate
-    ui.click("stage-brief")
-    ui.wait_until(lambda: ui.store.get("stage") == "brief", 3, "Describe")
+    goto(ui, "brief")
     ui.settle(500)
     ui.check(ui.find(name="printerChip") is None, "a 3D model names no printer")
     ui.check(ui.js("!!Store.viewer && Store.viewer.plateShown") is False, "a 3D model has no plate")
     ui.click("stage-shape")                            # (as ground.py does: the next design opens from Design)
     ui.wait_until(lambda: ui.store.get("stage") == "shape", 3, "Design")
     p = make(ui, "dock", "Hallway phone dock", DOCK, purpose="print")
-    for sid in ("brief", "shape", "fit", "prove", "release"):
-        ui.click("stage-" + sid)
-        ui.wait_until(lambda: ui.store.get("stage") == sid, 3, sid)
-        ui.wait_until(lambda: ui.find(name="printerChip", within=ui.item("topBar")) is not None, 5, f"the printer in the top bar in {sid}")
+    for sid in ("shape", "fit", "prove", "release", "document"):
+        goto(ui, sid)
+        if sid == "release":                           # the printer is a property of the print route: named in Make only
+            ui.wait_until(lambda: ui.find(name="printerChip", within=ui.item("topBar")) is not None, 5, "the printer in the top bar in Make")
+        else:
+            ui.check(ui.find(name="printerChip") is None, f"no printer in the top bar in {sid}")
         ui.wait_until(lambda: ui.js("!!Store.viewer && Store.viewer.plateShown") is True, 5, f"the build plate in {sid}")
-    ui.click("stage-brief")
-    ui.wait_until(lambda: ui.store.get("stage") == "brief", 3, "Describe again")
+    goto(ui, "shape")
     ui.settle(800)
     both_looks(ui, "wpA-print-brief")
-    ui.click("showPlate")                              # it can still be hidden in Describe and Design
+    plate_toggle(ui)                                   # it can still be hidden in Design
     ui.wait_until(lambda: ui.js("Store.viewer.plateShown") is False, 3, "the plate hidden on request")
-    ui.click("showPlate")
+    plate_toggle(ui)
     ui.wait_until(lambda: ui.js("Store.viewer.plateShown") is True, 3, "and back")
     ui.check(p and m, "both designs exist")
     ui.no_warnings()

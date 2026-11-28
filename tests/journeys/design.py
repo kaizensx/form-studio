@@ -1,6 +1,6 @@
 """A new design (a recipe is still a building block agents use; here it is made through the engine): pipeline, stages, select on the model, draft by slider and by typing,
 commit, and go back with the timeline."""
-from _lib import head, open_sheet_wait, printing_on, wait_job
+from _lib import goto, head, open_sheet_wait, printing_on, wait_job
 
 DATA = "fresh"
 
@@ -28,9 +28,8 @@ def run(ui):
     ui.shot("design-created")
 
     # ── every stage tab ──
-    for stage in ("brief", "fit", "prove", "release", "shape"):
-        ui.click("stage-" + stage)
-        ui.wait_until(lambda: ui.store.get("stage") == stage, 3, f"the {stage} stage")
+    for stage in ("brief", "fit", "prove", "release", "document", "shape"):
+        goto(ui, stage)
         ui.settle(450)
         ui.shot("design-stage-" + stage)
 

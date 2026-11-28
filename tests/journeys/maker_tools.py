@@ -97,7 +97,7 @@ def journey_text_on_a_face(ui):
 
 
 def journey_geometric_diff(ui):
-    ui.key("Ctrl+5")
+    ui.key("Ctrl+3")
     ui.wait_until(lambda: ui.store.get("stage") == "release", 3, "the Release stage")
     ui.settle(500)
     btn = ui.item(text="Compare with head")

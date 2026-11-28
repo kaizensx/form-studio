@@ -103,7 +103,7 @@ def run(ui):
     # ── 4: Refinement opens from its header in every stage ──
     def refine():
         ui.run_js("Store.refine = { state: 'done', changes: [{ id: 'edge_break', kind: 'feature', label: 'Edge break', reason: 'Break the outer edges by 0.6 mm.' }], stage: '' }")
-    for st in ("shape", "prove", "release", "brief"):
+    for st in ("shape", "prove", "release", "document"):
         ui.click("stage-" + st); ui.settle(800); refine(); ui.settle(500)
         rp = ui.item("refinePanel")
         was = rp.height() > 60

@@ -353,10 +353,12 @@ def journey_palette_commands(ui):
     """Fifteen and more commands, each typed, picked with Enter, and checked by what it changed."""
     pid = S["pid"]
     # the stages by their names, and by the names they had before (kept in each stage's hint)
-    for q, text, stage in (("describe", "Describe", "brief"), ("fit", "Fit", "fit"), ("review", "Review", "prove"), ("make", "Make", "release"), ("design", "Design", "shape"),
-                           ("brief", "Describe", "brief"), ("prove", "Review", "prove"), ("shape", "Design", "shape")):
+    palette(ui, "describe", "Overview")
+    ui.wait_until(lambda: ui.js("Store.overview") is True, 3, "the palette to open the Overview (what Describe was)")
+    for q, text, stage in (("review", "Check", "prove"), ("make", "Make", "release"), ("document", "Document", "document"), ("design", "Design", "shape"),
+                           ("prove", "Check", "prove"), ("shape", "Design", "shape")):
         palette(ui, q, text)
-        ui.wait_until(lambda: ui.store.get("stage") == stage, 3, f"the palette to go to {text}")
+        ui.wait_until(lambda: ui.store.get("stage") == stage and ui.js("Store.overview") is False, 3, f"the palette to go to {text}")
     for name in ("front", "top", "under", "iso"):
         palette(ui, "view: " + name, "View: " + name)
         ui.wait_until(lambda: ui.store.get("viewName") == name, 3, f"the {name} view")
@@ -452,6 +454,13 @@ def journey_every_listed_shortcut(ui):
     def stage(k, sid):
         ui.key(k)
         ui.wait_until(lambda: ui.store.get("stage") == sid, 3, f"{k} to open {sid}")
+
+    def do_overview():
+        ui.key("Ctrl+I")
+        ui.wait_until(lambda: ui.js("Store.overview") is True, 3, "Ctrl+I to open the Overview")
+        ui.wait(250)
+        ui.key("Ctrl+I")
+        ui.wait_until(lambda: ui.js("Store.overview") is False, 3, "Ctrl+I to close it")
 
     def view(k, name):
         ui.key(k)
@@ -687,8 +696,8 @@ def journey_every_listed_shortcut(ui):
         "4": lambda: view("4", "top"), "5": lambda: (view("5", "under"), view("1", "iso")),
         ".": do_dot, "H": do_h, "Shift+H": do_shift_h, "Right-click": do_right_click,
         "Ctrl+K": do_palette, "Ctrl+N": do_new, "Ctrl+Shift+O": do_new_chat, "Ctrl+J": do_j, "Ctrl+Shift+H": do_home, "Ctrl+[": do_back, "Ctrl+.": do_focus, "Ctrl+,": do_settings,
-        "Ctrl+1": lambda: stage("Ctrl+1", "brief"), "Ctrl+2": lambda: stage("Ctrl+2", "shape"), "Ctrl+3": lambda: stage("Ctrl+3", "fit"),
-        "Ctrl+4": lambda: stage("Ctrl+4", "prove"), "Ctrl+5": lambda: (stage("Ctrl+5", "release"), stage("Ctrl+2", "shape")),
+        "Ctrl+1": lambda: (stage("Ctrl+2", "prove"), stage("Ctrl+1", "shape")), "Ctrl+2": lambda: stage("Ctrl+2", "prove"), "Ctrl+3": lambda: stage("Ctrl+3", "release"),
+        "Ctrl+4": lambda: (stage("Ctrl+4", "document"), stage("Ctrl+1", "shape")), "Ctrl+I": do_overview,
         "Ctrl+Return": do_commit, "?": do_question,
     }
     missing = [k for k in listed if k not in checks]

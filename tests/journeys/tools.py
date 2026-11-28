@@ -37,9 +37,10 @@ def journey_select_and_views(ui):
     for name, key in (("front", "2"), ("side", "3"), ("top", "4"), ("under", "5"), ("iso", "1")):
         ui.key(key)
         ui.wait_until(lambda: ui.store.get("viewName") == name, 3, f"key {key} to show the {name} view")
-    for label, name in (("Front", "front"), ("Top", "top"), ("Iso", "iso")):
-        ui.click_text(label)
-        ui.wait_until(lambda: ui.store.get("viewName") == name, 3, f"the {label} button")
+    for fx, fy, name in ((0.38, 0.62, "front"), (0.5, 0.36, "top"), (0.5, 0.94, "iso")):      # a face of the view cube; its rim is Iso
+        ui.wait(450)                                   # not a double click
+        ui.click("viewCube", fx, fy)
+        ui.wait_until(lambda: ui.store.get("viewName") == name, 3, f"the cube's {name} view")
     ui.settle(500)
     # orbit by dragging: the camera moves, nothing is selected
     az0 = ui.item("viewport").property("az")
@@ -148,7 +149,7 @@ def journey_analyze(ui):
         ui.click_text(label, within=bar)
         ui.wait_until(lambda: ui.store.get("analysisMap") == mid, 2, f"the {label} map to be asked for")
         ui.wait_until(lambda: ui.js("!!Store.analysis && Store.analysis.map === %r && !Store.analysisBusy" % mid), 120, f"the {label} map to load")
-        legend = ui.item("analysisLegend")
+        legend = ui.item("resultStrip")
         ui.check(len(ui.texts(legend)) >= 3, f"the {label} legend shows")
         ui.wait_until(lambda: ui.item("viewport").property("mapShown") is True, 5, "the map on the part")
         ui.settle(500)

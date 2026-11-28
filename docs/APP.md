@@ -41,11 +41,13 @@ uv tool install --python 3.12 "form-studio[all] @ git+https://github.com/kaizens
 
 | Area | What it holds |
 |---|---|
-| **Top** | Three capsules over the view. Left: the design, its revision and release state (the mark goes Home; the arrow opens the menu). Centre: the stages, Describe, Design, Fit, Review and Make, each with where it stands: measured values, features, fit yield, checks to review, release readiness. Right: the printer of a design made for printing (click it to choose another), search (Ctrl/⌘ K) and Settings. Work that takes longer than 300 ms is named beside them with progress |
-| **Viewport** (the whole window) | The kernel's geometry, one mesh per feature, with its dimensions, in a pool of light on a studio floor with an origin cross and a scale cue. The printer's build plate appears only in Fit, Review and Make of a design made for printing, or with the grid button in Describe and Design; elsewhere that button shows the floor's 10 mm grid |
+| **Top** | Three capsules over the view. Left: the design, its revision and release state (the mark goes Home; the arrow opens the menu). Centre: the four modes, Design, Check, Make and Document, each with where it stands: features, checks to review, release readiness, documents made. Right: search (Ctrl/⌘ K) and Settings, and in Make the printer of a design made for printing (click it to choose another). The design's name opens the Overview (Ctrl/⌘ I). Work that takes longer than 300 ms is named beside them with progress |
+| **Viewport** (the whole window) | The kernel's geometry, one mesh per feature, with its dimensions, in a pool of light on a studio floor with an origin cross and a scale cue. The printer's build plate appears only in Check and Make of a design made for printing, or from the shading chip in Design and Document |
 | **Tool dock** (left) | Select, Measure, Annotate, Section, Analyze, Assembly, History, Simulate the print and Photo render; the active tool's options sit beside it |
-| **Size and views** (bottom left) | Width × depth × height and volume of what is on screen, then Iso, Front, Side, Top and Under |
-| **Program** (right) | The panel of the stage you are in. In Design it is the features in build order as a numbered listing; click a line for its parameters. While a design builds, the line being built is lit and the built ones are ticked |
+| **Size** (bottom left) | Width × depth × height and volume of what is on screen |
+| **View cube and shading chip** (top right of the stage) | A face of the cube is a view: top, front, side; its rim is Iso and a double click looks from under. The chip under it switches the build plate of a design made for printing, the floor's 10 mm grid and the overall dimensions |
+| **Legend strip** (under the part) | While a map is shown on the part: its scale, how the result is known, and what it does not tell |
+| **Pane** (right) | The panel of the mode you are in. In Design it is the features in build order as a numbered listing; click a line for its parameters. While a design builds, the line being built is lit and the built ones are ticked |
 | **Pipeline** (the foot of the pane) | One line: a dot for each step (Parameters, Solid, Exports, Checks, Slice, Release), the revision and what its checks found, and Auto. A step is current only when it describes the revision on screen. A 3D model, or a design that is not sliced, has no Slice step |
 | **Conversation** (left) | Once something is said, a glass column on the left: the conversation picker, New and Fold at its head, the messages, the agent's steps, the views it looked at and attachments, and the prompt at its foot. Drag its edge to resize it (300 to 480 px, remembered). Ctrl/⌘ J or Fold turns it into one bar under the part: what the agent is doing, numbered suggestions (keys 1 to 4) and the prompt. A click into the 3D view, or Esc, folds it too, and taking up the prompt brings it back; it folds while a build plays. Paste a link to attach the file it points at |
 | **Stage** | What the column and the pane leave. The part, its dimension lines, the build's title and the print simulation are framed in it, and the camera returns the part to its middle when a column folds, opens or is resized. **Focus** (Ctrl/⌘ .) steps both side columns away; the tab on the pane's edge folds the pane alone. In a window under 1200 px, opening the conversation folds the panes to one button |
@@ -54,82 +56,22 @@ While a design builds, a pane in the lower part of the stage shows the feature b
 track with one segment per step and the features before and after. The caret in every text field is a thin lit line
 of the accent. Shadows, glows, glass and the room are dithered, so no gradient shows bands.
 
-### The five stages
+### The four modes
 
-| Stage | What you do there |
+| Mode | What you do there |
 |---|---|
-| **Describe** | What the part is for and its purpose (for 3D printing, or just a 3D model and how it will be made), the dimensions you measured with their provenance, reference photos and imported parts |
 | **Design** | Features in build order and their parameters. Select a feature on the model or in the list and change it; dragging a slider rebuilds the part in place while you drag, and the draft shows its computed impact before you commit |
-| **Fit** | The fit model for each interface: a section, the clearance, the chance of fitting and how to raise it. Hidden for a 3D model |
-| **Review** | Every check with its evidence, print orientation, the plates, and the slice: time, filament, layers, Watch it print. A 3D model shows the checks that apply to it and says which do not |
+| **Check** | Every check with its evidence, print orientation, the plates, and the slice: time, filament, layers, Watch it print. A 3D model shows the checks that apply to it and says which do not. **Fit** is a study here, for a design made for 3D printing: a row with its modelled yield that opens the fit model for each interface (a section, the clearance, the chance of fitting and how to raise it) |
 | **Make** | The release gate, approval (over failed checks only with a reason for each, on the record), the released files with their hashes, and the revision history. With 3D printing on, a 3D model is marked for printing here in one click |
+| **Document** | What can be handed on: assembly instructions, the report of a release, the share card, the turntable and the photo render, one row each. The drawing sheet is listed and says it is not built yet |
 
-The stages follow the work: describe it, design it, review it, make it. Fit sits between Design and Review for a
-design made for 3D printing. They were called Brief, Shape, Prove and Release; the CLI, MCP and `--stage` keep those
-ids (`brief`, `shape`, `fit`, `prove`, `release`), and the old names still find each stage in the command palette.
+**The Overview** (click the design's name, or Ctrl/⌘ I) is a sheet over the stage: what the part is for and its
+purpose (for 3D printing, or just a 3D model and how it will be made), the dimensions you measured with their
+provenance, reference photos and imported parts, and the revisions with who made each. It was the Describe stage.
 
-**Starting.** The opening screen shows while the engine starts: the logo is drawn on its origin, and the line under
-it says what is happening (starting the engine, starting the CAD kernel, loading your designs and setup). Then the
-logo travels to the top bar and stays there while Home appears behind it.
-
-### Home
-
-Home is where a design starts. One composer takes whatever you have: words (typed, or spoken with your system's
-dictation), a photo (with a bank card, a coin or a ruler in it, the agent estimates sizes from it and labels them
-"estimated from the photo"), a sketch drawn on the sketch pad, a STEP, STL or 3MF part, a PDF drawing, or a link (a
-model page is passed to the agent as a link; a direct STL, STEP, 3MF, PDF or picture link is downloaded and shown on
-the composer). Drop files anywhere on Home or paste them. Under the composer: **Start blank** (an empty design in the
-workspace, no agent) and, only when 3D printing is on, **Make it for: Anything / My printer**. A new design is a 3D
-model unless you pick My printer or say so in the request ("for my A1 mini"); Settings › Printing › **New designs are
-made for** can make every new design a print. A chip beside **Design it** names the agent, the model and the effort the
-next design is made with and opens the same picker as a conversation; with no agent connected it opens Settings ›
-Agents & models.
-
-Sending opens the workspace at once in a "being designed" state with what the agent is doing written in the middle of
-the stage (a conversation that grows moves to the left column); the design is attached
-the moment it exists and builds up feature by feature in the viewport, in build order, each feature fading and rising
-into place as it is named; a later revision grows in only the features whose geometry changed. For a new idea
-the agent proposes three or four concepts as real CAD, side by side and turning, with a line on each and their computed
-size and volume: continue with one, or ask in words for a mix ("the base of A with the hook of C"). When it needs a
-real number, a **Measure this** card shows where to measure on a picture or a diagram, the tolerance that matters and
-what the design assumes now; the number you type is committed with how you measured it, and the part updates.
-
-**The conversation is a record of the design.** A step that changes the design is a compact card: an icon, one
-sentence and a small picture of the render the agent took, which opens large. Each new revision posts a card with
-its number, the features it changed, the values from → to, and **Compare** and go back.
-
-**Conversations lead to their designs.** Opening a conversation opens the design in front of it; one that made several
-shows a strip of them under its title, and one that made none says "No design yet" with **Continue the conversation**
-(never the Home question). A design moved to the trash is named as such. While you work on a design, an agent working
-on another one never takes the view away: a line names it, with **Show**. A usage limit is a calm card that says
-which agent, when it can work again and what is saved, with **Use another agent**.
-
-Below: concepts waiting for a pick, then your designs as live 3D cards, then recent conversations, each with the
-designs it made. Designs are grouped by **family**: a design with its copies, saved variants, the concept you picked
-and the other designs made by the same request is one card, showing the member
-changed last, with a count on it. Click the count to open the family under its row (the first design first, each
-member saying whether it is a copy or a variant); click the card to open the design. Families are filtered by released
-and in progress and sorted by name or date. Right-click a card to rename, duplicate, export or move it to the trash.
-**Import** (from Home or the command palette) opens a `.formstudio` or `.formproj` design, a conversation exported as
-JSON.
-
-**Sketch pad.** Lines, rectangles, circles, arcs (centre, start, end), freehand strokes and dimensions, snapped to a
-5 mm grid and to the points already drawn (Alt draws freely), with undo and redo. A typed dimension is "stated" and
-overrides the drawn length. The agent receives the shapes as structured geometry in millimetres and the picture.
-
-On the first day, before there is a design, the question and the composer sit on the left and a real build turns
-slowly beside them: a sensor enclosure of 13 features, kernel geometry kept with the app and labelled as an example.
-It is not a project and nothing is created.
-
-![Home on the first day: one composer, and what you can start from](images/home-empty.webp)
-
-![Home with your designs under the composer](images/home-designs.webp)
-
-![The sketch pad](images/sketch.webp)
-
-![Concepts side by side](images/concepts.webp)
-
-## Keys
+Ctrl/⌘ 1 to 4 go to Design, Check, Make and Document. The CLI, MCP and `--stage` keep the engine's ids (`shape`,
+`prove`, `release`, `document`; `brief` opens the Overview and `fit` the Fit study), and the names the places had
+before (Describe, Review, Brief, Shape, Prove, Release) still find them in the command palette.
 
 | Key | Does |
 |---|---|
@@ -141,7 +83,8 @@ It is not a project and nothing is created.
 | Ctrl/⌘ [ | Back to all designs |
 | Ctrl/⌘ Shift H | All designs (Home) |
 | Ctrl/⌘ , | Settings |
-| Ctrl/⌘ 1 to 5 | Brief, Shape, Fit, Prove, Release |
+| Ctrl/⌘ 1 to 4 | Design, Check, Make, Document |
+| Ctrl/⌘ I | The Overview of the design |
 | Ctrl/⌘ Return | Commit the draft |
 | ? | All keys |
 

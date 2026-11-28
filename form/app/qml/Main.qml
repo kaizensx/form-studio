@@ -241,11 +241,11 @@ Window {
     function commitKey() { if (Store.hasDraft && !Store.draftError) Store.commit() }
     Shortcut { sequences: ["Ctrl+K"]; onActivated: Store.paletteOpen = !Store.paletteOpen; onActivatedAmbiguously: Store.paletteOpen = !Store.paletteOpen }
     Shortcut { sequence: "Escape"; onActivated: win.esc() }
-    Shortcut { sequence: "Ctrl+1"; onActivated: win.stageKey("brief"); onActivatedAmbiguously: win.stageKey("brief") }
-    Shortcut { sequence: "Ctrl+2"; onActivated: win.stageKey("shape"); onActivatedAmbiguously: win.stageKey("shape") }
-    Shortcut { sequence: "Ctrl+3"; onActivated: win.stageKey("fit"); onActivatedAmbiguously: win.stageKey("fit") }
-    Shortcut { sequence: "Ctrl+4"; onActivated: win.stageKey("prove"); onActivatedAmbiguously: win.stageKey("prove") }
-    Shortcut { sequence: "Ctrl+5"; onActivated: win.stageKey("release"); onActivatedAmbiguously: win.stageKey("release") }
+    Shortcut { sequence: "Ctrl+1"; onActivated: win.stageKey("shape"); onActivatedAmbiguously: win.stageKey("shape") }
+    Shortcut { sequence: "Ctrl+2"; onActivated: win.stageKey("prove"); onActivatedAmbiguously: win.stageKey("prove") }
+    Shortcut { sequence: "Ctrl+3"; onActivated: win.stageKey("release"); onActivatedAmbiguously: win.stageKey("release") }
+    Shortcut { sequence: "Ctrl+4"; onActivated: win.stageKey("document"); onActivatedAmbiguously: win.stageKey("document") }
+    Shortcut { sequence: "Ctrl+I"; enabled: Store.screen === "work" && !!Store.data; onActivated: Store.toggleOverview(); onActivatedAmbiguously: Store.toggleOverview() }
     Shortcut { sequence: "Ctrl+Return"; onActivated: win.commitKey(); onActivatedAmbiguously: win.commitKey() }
     function newDesign() { Store.startNew() }
     Shortcut { sequences: [StandardKey.New]; onActivated: win.newDesign(); onActivatedAmbiguously: win.newDesign() }

@@ -15,7 +15,7 @@ QtObject {
     property var view: null            // head geometry: { mesh, edges, bbox, volume_mm3, derived, companions, ... }
     property string screen: "boot"     // boot | home | work
     property var fatal: null
-    property string stage: "shape"     // brief | shape | fit | prove | release
+    property string stage: "shape"     // shape | prove (fit: the Fit study in it) | release | document
     property string feature: ""        // selected feature id, "" for none
     property var draftValues: ({})     // param key → value, only where it differs from head
     property var draftProv: ({})       // param key → { source, sigma }
@@ -143,15 +143,27 @@ QtObject {
         startFocus++
     }
     function newDesign(o) { o = o || {}; return create(o.name || "", o.recipe, o.brief || "", o.purpose, o.process) }
+    // The four modes of a design (direction I): Design it, Check it, Make it, Document it. They are the four words at
+    // the top of the window and the four chapters of the Bench. The ids are the engine's and the routes' own
+    // (shape, prove, release), so every route, key and script that names a stage still lands.
+    //   brief  is no longer a mode: it is the Overview, a sheet opened from the design capsule (setStage("brief") opens it)
+    //   fit    is a study in Check: `stage` may still be "fit" (the Fit study, opened), and its mode is Check
     readonly property var stages: [
-        { id: "brief", title: "Describe", hint: "The brief: what it is for, what is known" },
-        { id: "shape", title: "Design", hint: "The shape: select a feature, change it" },
-        { id: "fit", title: "Fit", hint: "Clearance under uncertainty" },
-        { id: "prove", title: "Review", hint: modelDesign ? "Prove it: the checks" : "Prove it: the checks and the slice" },
-        { id: "release", title: "Make", hint: "Release it: the gate, the files, the history" }
-    ].filter(function (x) { return x.id !== "fit" || printUi })     // the fit model is a printer's accuracy: only for a print
+        { id: "shape", title: "Design", hint: "The shape: the features, in build order" },
+        { id: "prove", title: "Check", hint: modelDesign ? "Review and prove it: the checks and the studies" : "Review and prove it: the checks, the fit, the slice" },
+        { id: "release", title: "Make", hint: "Release it: the gate, the files, the history" },
+        { id: "document", title: "Document", hint: "Drawings, instructions, the report" }
+    ]
+    readonly property string mode: stage === "fit" ? "prove" : stage === "brief" ? "shape" : stage
     onPrintUiChanged: if (!printUi && stage === "fit") stage = "prove"
-    readonly property var stageKey: ({ brief: 1, shape: 2, fit: 3, prove: 4, release: 5 })     // Ctrl+n; the same whether Fit shows or not
+    readonly property var stageKey: ({ shape: 1, prove: 2, release: 3, document: 4 })     // Ctrl+n
+    property bool overview: false      // the Overview of the design (what was Describe), over the stage
+    property real _ovT: 0
+    // (the menu bar's item and the window's shortcut can both answer one key press: the second is the same press)
+    function toggleOverview() { var t = Date.now(); if (t - _ovT < 150) return; _ovT = t; overview = !overview }
+    // the documents of the head revision that exist: assembly instructions made for it, the report of its release
+    readonly property int documentCount: (instructions && project && instructions.rev === project.head ? 1 : 0)
+                                       + (data && data.approval && data.approval.state === "approved" ? 1 : 0)
 
     function revision(n) {
         if (!project) return null
@@ -575,6 +587,9 @@ QtObject {
 
     // ── stage & view ─────────────────────────────────────────
     function setStage(id) {
+        if (id === "brief") { overview = true; return }          // Describe is the Overview now: the mode stays
+        if (id === "fit" && !printUi) id = "prove"                // the fit model is a printer's accuracy: only for a print
+        overview = false
         stage = id; section = null
         if (id !== "prove") layers = null
         if (id !== "release" && compare) endCompare()

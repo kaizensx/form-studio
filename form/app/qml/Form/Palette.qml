@@ -35,6 +35,8 @@ Item {
         function add(g, id, icon, text, hint, run, keys) { c.push({ g: g, id: id, icon: icon, text: text, hint: hint || "", run: run, keys: keys || "" }) }
         if (w) {
             Store.stages.forEach(function (s, i) { add("Go to", "stage." + s.id, "arrow_right", s.title, s.hint, function () { Store.setStage(s.id) }, "Ctrl+" + Store.stageKey[s.id]) })
+            add("Go to", "stage.brief", "file_text", "Overview", "Describe: the brief, what is known about the object, the revisions", function () { Store.setStage("brief") }, "Ctrl+I")
+            if (Store.printUi) add("Go to", "stage.fit", "arrow_right", "Fit study", "Check: clearance under uncertainty, a model", function () { Store.setStage("fit") })
         }
         add("Go to", "home", "home", "All designs", "Home", function () { Store.home() }, "Ctrl+Shift+H")
         if (w) {

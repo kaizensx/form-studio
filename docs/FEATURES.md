@@ -295,7 +295,7 @@ each one named as it arrives.
 When you bring meshes to make editable or to understand, the agent rebuilds them as CAD that reads like a part
 designed from scratch: named features, Params for the dimensions that matter, and edges only where the part has
 edges. The meshes stay in the design as blueprint references and are never used as the design itself. The staged
-workflow is `design_guide(topic="reference_parts")`; **Rebuild as editable CAD** in Describe › Reference parts starts it.
+workflow is `design_guide(topic="reference_parts")`; **Rebuild as editable CAD** in the Overview › Reference parts starts it.
 
 - **Read the mesh.** `analyze_reference` (`form analyze-reference <project> <mesh> [--levels JSON]`) cuts sections in
   the three principal planes at the levels where the part changes and returns them as pictures with dimensions and
@@ -341,7 +341,7 @@ Safe repairs run first and are listed: sliver triangles hanging off an edge, wro
 openings, loose debris. Vertices are never moved. A file whose size makes no sense in millimetres is asked about once
 (`--units m`) before anything is built. `reconstruct` runs the triage itself; `--route` forces one.
 
-**Make editable** on an imported mesh (Describe › Reference parts), `form reconstruct FILE [--name] [--tolerance MM]
+**Make editable** on an imported mesh (the Overview › Reference parts), `form reconstruct FILE [--name] [--tolerance MM]
 [--layer 0|1|2]`, or the MCP tool `reconstruct`. The result is a new design; the original mesh stays beside it in
 blueprint, and the report, the deviation map and every solid are kept in the design's `reconstruction` folder.
 Several meshes of one product (`form reconstruct A.stl B.stl C.stl`, MCP `reconstruct(files=[...])`) become **one
@@ -480,7 +480,7 @@ either. A real thin fin still fails.
 | **Wall thickness**, from thousands of surface samples, with the thinnest spot marked. | **Overhangs** by angle, flat ceilings, bridges and plate contact. |
 
 - **Maps on the model:** wall thickness, overhang, layer cross-section and small features, computed from the real
-  geometry. Each legend says what the map does not tell you.
+  geometry. Each map's legend is a strip under the part: its scale, how it is known, and what it does not tell you.
 - **Measure (M):** point-to-point distance with snapping, face area and tilt, and exact hole diameters from the solid.
   It works on every multi-part design and in every view (print layout, assembled, exploded); clicks answer at once and
   measurements follow the parts.
@@ -681,7 +681,7 @@ sliced by your own slicer and played back; leave it off and none of it gets in t
 ![A 3D model in Review: size, solid, mesh and STEP round trip, with no print checks](images/model-prove.webp)
 
 Every design has a **purpose**: *For 3D printing*, or *Just a 3D model* for rendering, CAD exchange, CNC, laser
-cutting, moulding or visualisation. New designs start from your answer on Home; change it any time in Describe or
+cutting, moulding or visualisation. New designs start from your answer on Home; change it any time in the Overview or
 from the top bar. `form new … --purpose model --process cnc`, `form purpose <project> model`.
 
 - **A 3D model is checked as a model.** Size, a valid solid, a closed mesh, the STEP round trip, loads and assembly

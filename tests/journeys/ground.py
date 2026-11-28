@@ -2,7 +2,7 @@
 printer on Home, while a design is being made or for a 3D model, which sits on a neutral studio floor with an origin
 cross and a scale cue. A design made for printing names its printer in the top bar in every stage and stands on its
 build plate from Describe on; in Describe and Design the plate can be hidden, and Fit, Review and Make show it anyway."""
-from _lib import DOCK, make, printing_on, toasts_gone
+from _lib import DOCK, goto, make, plate_toggle, printing_on, toasts_gone
 
 DATA = "fresh"
 S = {}
@@ -24,8 +24,7 @@ def plate(ui):
 
 
 def stage(ui, sid):
-    ui.click("stage-" + sid)
-    ui.wait_until(lambda: ui.store.get("stage") == sid, 3, sid)
+    goto(ui, sid)
     ui.settle(500)
 
 
@@ -74,23 +73,24 @@ def journey_the_plate_belongs_to_printing(ui):
     S["print"] = make(ui, "dock", "Hallway phone dock", DOCK, purpose="print")
     stage(ui, "shape")
     ui.wait_until(lambda: plate(ui), 3, "a print in Design stands on its build plate")
-    printer_on_top(ui, "a print in Design")
+    ui.check(ui.find(name="printerChip") is None, "the printer is named in Make, not in Design")
     ui.shot("ground-print-design")
-    ui.click("showPlate")
+    plate_toggle(ui)
     ui.wait_until(lambda: not plate(ui), 3, "the plate hidden on request")
-    ui.click("showPlate")
+    plate_toggle(ui)
     ui.wait_until(lambda: plate(ui), 3, "the plate back")
-    ui.click("showPlate")
+    plate_toggle(ui)
     ui.wait_until(lambda: not plate(ui), 3, "hidden again")
     for sid in ("fit", "prove", "release"):
         stage(ui, sid)
         ui.wait_until(lambda: plate(ui), 3, f"the build plate in {sid}")
-        printer_on_top(ui, "a print in " + sid)
+        if sid == "release":
+            printer_on_top(ui, "a print in Make")
         if sid == "fit":
             ui.shot("ground-print-fit")
     stage(ui, "shape")
     ui.wait_until(lambda: not plate(ui), 3, "hidden in Design, as the person asked")
-    printer_on_top(ui, "a print back in Design")
+    ui.check(ui.find(name="printerChip") is None, "and the printer is not named in Design")
 
 
 def journey_make_marks_a_model_for_printing(ui):

@@ -104,6 +104,12 @@ class Journeys(unittest.TestCase):
     def test_design(self):
         self.journey("design.py")
 
+    def test_direction_i(self):             # four modes, the Overview, Fit as a study, the view cube, the legend strip
+        self.journey("direction_i.py")
+
+    def test_direction_i_light(self):       # the same on paper, in a 1280 x 800 window
+        self.journey("direction_i.py", size="1280x800", env_extra={"FORM_APPEARANCE": "light"})
+
     def test_lightdesk(self):               # the room: panes never overlap, the bar and its keys, the cue and the program during a build
         self.journey("lightdesk.py", env_extra={"FORM_APPEARANCE": "dark"})
 

@@ -5,8 +5,9 @@ import "F.js" as F
 
 // The top of the window: three glass capsules floating over the room, and nothing between them.
 //   left    the mark (home), the design's name, its revision and whether it is released
-//   centre  the stages of the design, each with its one line (StageTabs), in a workspace
-//   right   the printer of a design made for printing, notices, search, settings
+//   centre  the four modes of the design, each with its one line (StageTabs), in a workspace
+//   right   notices, search, settings; the printer only in Make, of a design made for printing
+// The name in the left capsule opens the Overview of the design (what Describe was).
 // On Home the left capsule is just the lockup, without glass. A 3D model shows no printer and no purpose: not printing
 // is the normal case and needs no label. As the window narrows the name is cut first, then the stages draw closer;
 // nothing loses its function. The strip is still the window's title bar: drag it to move the window.
@@ -14,8 +15,8 @@ Item {
     id: bar
     objectName: "topBar"
     property real inset: 0                    // room for the macOS window buttons
-    readonly property int capY: 12            // where the capsules sit, and how tall they are
-    readonly property int capH: 40
+    readonly property int capY: 16            // where the capsules sit, and how tall they are
+    readonly property int capH: 44
     // macOS: where the close button starts. The three buttons (54 px) stand on the capsules' centre line, 24 px in
     // from the side, and the title capsule begins 14 px after them: one row, evenly spaced.
     readonly property int buttonsX: 24
@@ -63,7 +64,8 @@ Item {
                 anchors.verticalCenter: parent.verticalCenter
                 width: Math.min(implicitWidth, Math.max(90, (bar.width - stages.natural) / 2 - left.x - (stateTag.visible ? 210 : 104) - (partial.visible ? 60 : 0))); elide: Text.ElideRight; wrapMode: Text.NoWrap
                 HoverHandler { id: ph }
-                Tip { show: ph.hovered && !!Store.recipe; below: true; text: Store.recipe && Store.project ? (String(Store.project.recipe).indexOf("src:") === 0 ? "Designed by an agent" : "Started from: " + Store.recipe.title) : "" } }
+                MouseArea { objectName: "designCapsule"; anchors.fill: parent; anchors.margins: -7; cursorShape: Qt.PointingHandCursor; onClicked: Store.toggleOverview() }
+                Tip { show: ph.hovered && !!Store.recipe; below: true; keys: "Ctrl+I"; text: Store.overview ? "Close the Overview" : "Overview: the brief, what is known, the revisions" } }
             Item { width: 5; height: 1; visible: pname.visible }
             // the revision. A commit lands here: the number takes the pass colour for a moment and comes to rest,
             // so saving a revision is seen where the revision is named.
@@ -162,8 +164,8 @@ Item {
                         text: Store.agentElsewhere ? Store.agentElsewhere.by + " is working on " + Store.agentElsewhere.name : "" } }
                 MouseArea { id: awm; anchors.fill: parent; hoverEnabled: true; cursorShape: Qt.PointingHandCursor; onClicked: Store.showElsewhere() }
                 Tip { show: awm.containsMouse; below: true; text: Store.agentElsewhere && Store.agentElsewhere.title ? "In “" + Store.agentElsewhere.title + "”. Click to open that conversation." : "Click to open it." } }
-            // the printer a design made for printing prints on, in every stage (a 3D model has none)
-            PrinterChip { id: printer; anchors.verticalCenter: parent.verticalCenter; visible: Store.printUi && bar.work; roomy: bar.roomy; iconOnly: bar.width < 1400 }      // under 1400 px its name would push the stages off the window's centre line
+            // the printer a design made for printing prints on: a property of the print route, so only in Make
+            PrinterChip { id: printer; anchors.verticalCenter: parent.verticalCenter; visible: Store.printUi && bar.work && Store.mode === "release"; roomy: bar.roomy; iconOnly: bar.width < 1400 }      // under 1400 px its name would push the stages off the window's centre line
             Item { visible: printer.visible || away.visible; width: 13; height: 18; anchors.verticalCenter: parent.verticalCenter
                 Rectangle { x: 6; width: 1; height: parent.height; color: Theme.rule } }
             StatusChips { anchors.verticalCenter: parent.verticalCenter; compact: bar.work ? !bar.roomy : bar.tight }      // setup / update notices

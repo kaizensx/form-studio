@@ -6,7 +6,7 @@ into the transcript and folds back; while a build plays the cue (the lower third
 listing ticks the lines that are built and marks the one being built, and the tools step back; the size line under
 the part is the one computed from the solid. Pictures of each moment are kept for the design review
 (FORM_UI_SHOTS)."""
-from _lib import make
+from _lib import goto, make
 
 DATA = "fresh"
 
@@ -60,7 +60,7 @@ def run(ui):
     ui.shot("lightdesk-workspace")
 
     # the panes: all there, inside the window, none over another
-    names = ["titleCapsule", "stageTabs", "toolsCapsule", "toolDock", "viewsCapsule", "programPane", "talk"]
+    names = ["titleCapsule", "stageTabs", "toolsCapsule", "toolDock", "viewCube", "programPane", "talk"]
     rects = {n: _rect(ui, n) for n in names}
     w, h = ui.win.width(), ui.win.height()
     for n, r in rects.items():
@@ -119,7 +119,7 @@ def run(ui):
              f"the conversation is a column on the left, with the gutters of the panes on the right ({gut}): {t}")
     ui.check(_rect(ui, "toolDock")[0] >= t[0] + t[2] + 8, f"the tool dock stands right of it: {_rect(ui, 'toolDock')}")
     ui.check(float(ui.item("viewport").property("insetLeft")) >= t[0] + t[2] + 40, "the part is framed right of the column (the tool dock floats at the stage's edge)")
-    ui.check(_apart(t, _rect(ui, "viewsCapsule")), "it stays clear of the view buttons")
+    ui.check(_apart(t, _rect(ui, "viewCube")), "it stays clear of the view cube")
     if ui.win.width() >= 1200:
         ui.check(_apart(t, _rect(ui, "programPane")), "and of the panes on the right")
     else:
@@ -139,13 +139,12 @@ def run(ui):
     # the stages are in the top bar and the pane follows them
     ui.key("Ctrl+J")
     ui.settle(500)
-    for stage in ("brief", "prove", "release", "shape"):
-        ui.click("stage-" + stage)
-        ui.wait_until(lambda: ui.store.get("stage") == stage, 3, f"the {stage} stage")
+    for stage in ("document", "prove", "release", "shape"):
+        goto(ui, stage)
         ui.settle(500)
         r = _rect(ui, "programPane")
         ui.check(r[1] + r[3] <= ui.win.height() - gut + 1, f"{stage}: the pane ends above the foot of the window: {r}")
-        if stage in ("brief", "release"):
+        if stage in ("document", "release"):
             ui.shot("lightdesk-stage-" + stage)
 
     # Settings wears the same material

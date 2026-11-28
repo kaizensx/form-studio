@@ -2,6 +2,28 @@
 
 ## Unreleased
 
+### Changed
+
+- **Four modes: Design, Check, Make, Document** (design direction I, `docs/design/directions/i/IA.md`; the first
+  part of it). The five stages at the top of a design are four modes, each with its one line of state. **Describe
+  is the Overview**: click the design's name in the top left (Ctrl/⌘ I) and a sheet opens over the stage with the
+  brief, the purpose, what is known and measured, the references and the revisions; the conversation stays.
+  **Fit is a study in Check**: a row with its yield and the word *modelled*, which opens the fit model in place.
+  **Document** is new and honest about what exists: assembly instructions, the report of a release, the share
+  card, the turntable and the photo render are rows; the drawing sheet says it is not built yet. Ctrl/⌘ 1 to 4 are
+  Design, Check, Make and Document. The engine's ids (`shape`, `prove`, `release`, and `brief` and `fit`) still work
+  from the CLI, MCP, `--stage` and the palette, where the old names still find each place.
+- **A view cube and a shading chip at the stage's top right** replace the row of view buttons at the foot. A face of
+  the cube is a view (top, front, side), its rim is Iso, a double click looks from under; keys 1 to 5 are unchanged.
+  The chip under it holds the build plate of a design made for printing, the floor grid and the overall dimensions.
+- **A result's legend is a strip under the part.** While a map is shown on the part (wall thickness, overhang,
+  section area, small features) one strip under it carries the scale in the map's own colours, how the result is
+  known (computed, at which tessellation) and what it does not tell. It replaces the legend panel in the right
+  column.
+- **The printer is named in Make only**, for a design made for printing: it is a property of the print route.
+- **Nothing is set smaller than 11 px.** Evidence tags, list numbers and file keys that were 9 to 10 px are 11 px;
+  the window's margin is 20 px and the right pane 332 px wide, as the direction sets them.
+
 ### Fixed
 
 - **Parts that do not fit one plate go onto more plates, never off the plate.** A design whose parts (or copies of

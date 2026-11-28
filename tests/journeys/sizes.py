@@ -2,7 +2,7 @@
 large laptop screen (1728 × 1117). Nothing may overlap or run off its container, and the main controls still work."""
 from PySide6.QtCore import QPointF, QRectF
 
-from _lib import has_slicer, open_sheet_wait, close_sheet_esc, phone_dock
+from _lib import goto, has_slicer, open_sheet_wait, close_sheet_esc, phone_dock
 
 DATA = "fresh"
 
@@ -50,9 +50,8 @@ def run(ui):
     no_overlaps(ui, "topBar", "the top bar")
     no_overlaps(ui, "stageTabs", "the stage tabs")
     ui.shot(f"size-{tag}-shape")
-    for stage in ("brief", "fit", "prove", "release", "shape"):
-        ui.click("stage-" + stage)
-        ui.wait_until(lambda: ui.store.get("stage") == stage, 3, f"the {stage} stage")
+    for stage in ("brief", "fit", "prove", "release", "document", "shape"):
+        goto(ui, stage)
         ui.settle(450)
         no_overlaps(ui, "pipeline", f"the pipeline strip on {stage}")
         no_overlaps(ui, "stageTabs", f"the stage tabs on {stage}")
@@ -71,8 +70,8 @@ def run(ui):
         ui.run_js('Store.setAnalysis("thickness")')
     ui.wait_until(lambda: ui.js("!!Store.analysis && Store.analysis.map === 'thickness' && !Store.analysisBusy"), 120, "the thickness map")
     ui.settle(700)
-    no_overlaps(ui, "analysisLegend", "the map legend")
-    lg, vp = rect(ui.item("analysisLegend")), rect(ui.item("viewport"))
+    no_overlaps(ui, "resultStrip", "the map legend")
+    lg, vp = rect(ui.item("resultStrip")), rect(ui.item("viewport"))
     ui.check(lg.height() <= vp.height() * 0.62, f"the legend leaves the part visible: {lg.height():.0f} of {vp.height():.0f} px")
     ui.shot(f"size-{tag}-thickness")
     ui.run_js('Store.setAnalysis("")')
