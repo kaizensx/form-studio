@@ -40,11 +40,23 @@ Prefer the MCP server (`form-mcp`). Without MCP, the `form` CLI does the same an
 | Work the feature tree: suppress, restore, move, rename; see the part up to one feature | `edit_design` ops `suppress`/`restore`/`move`/`rename`, `render(upto=)`, `get_design_source` (`tree`) | `form tree <p> [suppress\|restore\|move\|rename F]`, `form tree <p> --upto F` |
 | Fillet, chamfer, hole (ISO 273, tap drill, ISO 286), pattern or shell on picked geometry (one feature in the source) | `add_feature` kinds `fillet`, `chamfer`, `hole`, `pattern`, `shell` (`preview=True` saves nothing) | `form model <p> fillet --at x,y,z --radius 2` |
 | Read or change a feature's sketch (constraints, dimensions as parameters); extrude, cut or revolve one | `get_sketch`, `edit_sketch`; `add_feature` kinds `extrude`, `cut`, `revolve` | `form sketch <p> F`, `form model <p> extrude --sketch s.json` |
+| Find a standard part (screw, insert, bearing, motor...) and place it on a hole or face: its hole cut, its fit checked | `standard_part` (search, describe, place, fit) | `form parts search "m3 socket"`, `form parts place <p> --spec iso4762:M3 --at x,y,z` |
+| The parts list to buy from, and supplier numbers the person gives | `bom` | `form bom <p> --csv parts.csv --pdf parts.pdf` |
+| A circuit board: an enclosure made around it and proved to fit; KiCad's own DRC/ERC and fab files when it is installed | `board_import` → `board_check`, `board_fab` | `form board import board.kicad_pcb`, `form board check <p>` |
 | See what changed in the solid between revisions | `geometry_diff` | `form diff <p> 1 3 --png diff.png` |
+| Can it be made (CNC, moulding, FDM, SLA, SLS, MJF, LPBF), with fixes proved by checking again | `manufacturability` → `apply_fix` | `form dfm <p> --process cnc --set tool_d=6 --set material=metal [--fix RULE]` |
+| Sheet metal: flat pattern DXF (proved by folding back), cut-file check, bend order, a service's limits | `flat_pattern`, `cut_file_check`, `bend_order`, `service_preflight` | `form sheet flat <p> --set material=steel_mild`, `form sheet check part.dxf --set t=2` |
+| CNC, 3-axis: toolpaths, G-code for a controller, read back and run on a stock model (gouge, leftover, collisions, cycle time); simulated, not proven on a machine | `cam_plan` → `cam_post` → `cam_simulate` | `form cam plan <p> --tool 6mm-flat --material aluminum`, `form cam post <p> --machine grbl` |
 | Assess anything the person brings (mesh, STEP, photo, PDF, link, words) and get the route | `triage` | `form triage scan.stl` |
 | Turn an STL, OBJ or 3MF into a design by the route its triage chooses (parametric CAD, a surface body, a mesh body, parts) | `reconstruct` | `form reconstruct part.stl --tolerance 0.02` |
 | Rebuild a mesh by hand: what is left to add or cut, then tune the sizes | `reference_residual`, `fit_params`, `compare_to_reference` | — |
 | Assembly instructions as a PDF | `assembly_instructions` | `form instructions <p> --out steps.pdf` |
+| An engineering drawing from the solid (dimensions bound to parameters, fits, GD&T only where declared) | `drawing` | `form drawing <p> --sheet A3 --out part.pdf` |
+| STEP AP242 with PMI, read back | `export_pmi` | `form drawing pmi <p>` |
+| Check a person's drawing against the part (never guess a digit: mark it unsure) | `check_drawing` | `form drawing check <p> theirs.pdf` |
+| Play a mechanism: loops, couplings, traces, clearance along the cycle, holding torque, an MP4 | `motion_study` | `form motion <p> --drivers '[{"joint": "crank", "from": 0, "to": 360}]'` |
+| URDF, SRDF and MJCF with inertia from the B-rep, checked and parsed back | `robot_files` | `form urdf <p>`, `form mjcf <p>` |
+| A feasible assembly order and insertion directions (the explode and instructions follow it) | `assembly_sequence` | `form sequence <p>` |
 
 Every design has a **purpose**: `print` (for 3D printing) or `model` (just a 3D model: rendering, CAD exchange, CNC,
 laser, moulding). `get_project` reports it and `form_overview` says whether the person prints at all (`has_printer`).
@@ -56,8 +68,8 @@ Rules that keep the record honest:
 1. **Units:** mm, degrees, grams. For a design started from a building block, only use parameter keys that `describe_recipe` lists.
 2. **Preview, then commit.** Pass `expect_head` so you never overwrite someone else's newer revision.
 3. **Provenance is evidence.** Mark a value `measured` only when the user measured it and gave you the number. Ask how they measured it, for example with calipers. Otherwise it stays `assumed`.
-4. **Never invent physical results.** `record_physical_result` is only for what the user reports after a real print.
-5. **Name evidence classes correctly.** A slice is a simulation. Fit yield is a statistical model. Checks are labelled computed, heuristic or model. Say which one you are reporting.
+4. **Never invent physical results.** `record_physical_result` is only for what the user reports after a real print or a real machining run.
+5. **Name evidence classes correctly.** A slice is a simulation. A CNC program is "simulated, not proven on a machine" until the person records what it did on one. Fit yield is a statistical model. Checks are labelled computed, heuristic or model. Say which one you are reporting.
 6. **You cannot approve a release.** The user approves in the app's Release stage, after reviewing the checks and acknowledging the warnings.
 7. **No printing, no uploads.** Form Studio never sends files to a printer or a service, and you must not either unless the user explicitly asks.
 

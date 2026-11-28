@@ -139,7 +139,7 @@ class DesignGuideIsTheSkillText(unittest.TestCase):
                                else json.loads(res.content[0].text))
                         self.assertEqual(out["guide"], guidance.read(skill, rel), t)
                         self.assertEqual(out["skill"], f"skill://{skill}/SKILL.md")
-                    self.assertEqual(len((await c.list_tools()).tools), 109)
+                    self.assertEqual(len((await c.list_tools()).tools), 129)
             finally:
                 if old is None:
                     os.environ.pop("FORM_DATA", None)

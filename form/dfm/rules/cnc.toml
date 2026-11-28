@@ -1,0 +1,119 @@
+# CNC milling. Every limit below names the page it was read from; a limit that is plain geometry (a cutter of
+# radius r cannot leave a corner smaller than r) says "computed" and needs no source.
+# Read on 2026-11-28. Pages without a date are "undated": the date we read them is what we can state.
+
+[process]
+id = "cnc"
+label = "CNC machining"
+evidence = "computed (B-rep)"
+options = ["axes", "tool_d", "flute_l", "holder_d", "material", "rotary_axis"]
+defaults = { axes = 3, rotary_axis = "x" }
+needs = ["tool_d", "material"]
+not_judged = "Fixturing and clamping forces, tool deflection, chatter, surface finish, thread forms, burrs and tolerances are not judged. The tool is a flat end mill of the stated diameter; holder collisions are checked only when holder_d and flute_l are given."
+
+[[source]]
+id = "hubs-cnc"
+title = "How to design parts for CNC machining"
+publisher = "Protolabs Network (formerly Hubs), knowledge base"
+url = "https://www.hubs.com/knowledge-base/how-design-parts-cnc-machining/"
+published = "undated"
+read = "2026-11-28"
+
+[[rule]]
+id = "cnc.access"
+title = "Every face can be reached by the tool"
+measure = "unreached_mm2"
+op = "<="
+fail = 0.0
+unit = "mm²"
+source = "computed"
+why = "Surface no setup of this machine reaches with a flat end mill of the stated diameter: it cannot be cut as drawn."
+
+[[rule]]
+id = "cnc.corner_tool"
+title = "Internal vertical corners are at least the tool radius"
+measure = "corner_r_mm"
+op = ">="
+fail = "tool_r"
+unit = "mm"
+source = "computed"
+why = "A cutter of radius r leaves a radius r in every internal vertical corner; a smaller corner cannot be cut with it."
+fix = "corner_radius"
+
+[[rule]]
+id = "cnc.corner_depth"
+title = "Internal vertical corner radius at least a third of the cavity depth"
+measure = "corner_r_over_depth"
+op = ">="
+warn = 0.3333
+unit = "× depth"
+source = "hubs-cnc"
+quote = "Vertical corner radius: recommended ⅓ × cavity depth (or larger)"
+fix = "corner_radius"
+
+[[rule]]
+id = "cnc.reach"
+title = "Tool reach within its cutting length"
+measure = "reach_over_d"
+op = "<="
+warn = 4.0
+fail = 30.0
+unit = "× tool diameter"
+source = "hubs-cnc"
+quote = "End mills have a limited cutting length, typically 3 to 4 times their diameter; specialised tooling reaches tool diameter to depth ratios of up to 30:1."
+
+[[rule]]
+id = "cnc.wall"
+title = "Thinnest wall"
+measure = "wall_min_mm"
+op = ">="
+fail = { metal = 0.5, plastic = 1.0 }
+warn = { metal = 0.8, plastic = 1.5 }
+unit = "mm"
+by = "material"
+source = "hubs-cnc"
+quote = "Thin walls: recommended 0.8 mm (metals), 1.5 mm (plastics); feasible 0.5 mm (metals), 1.0 mm (plastics)."
+fix = "thicken"
+
+[[rule]]
+id = "cnc.hole_depth"
+title = "Hole depth against its diameter"
+measure = "hole_depth_over_d"
+op = "<="
+warn = 4.0
+fail = 40.0
+unit = "× diameter"
+source = "hubs-cnc"
+quote = "Hole depth: recommended 4 × nominal diameter, typical 10 ×, feasible 40 ×."
+
+[[rule]]
+id = "cnc.hole_min"
+title = "Smallest hole"
+measure = "hole_d_mm"
+op = ">="
+fail = 1.0
+warn = 2.5
+unit = "mm"
+source = "hubs-cnc"
+quote = "Holes: any diameter above 1 mm is feasible; under 2.5 mm is micro-machining."
+
+[[rule]]
+id = "cnc.hole_drill"
+title = "Holes at a standard drill size"
+measure = "hole_off_drill_mm"
+op = "<="
+warn = 0.01
+unit = "mm off the nearest size"
+source = "hubs-cnc"
+quote = "Hole diameter: recommended a standard drill bit size."
+series = "Metric jobber drill sizes in 0.1 mm steps from 1.0 to 13.0 mm and 0.5 mm steps to 20 mm. The series itself is unsourced: no drill standard was read for it."
+fix = "hole_to_drill"
+
+[[rule]]
+id = "cnc.setups"
+title = "Setups needed"
+measure = "setups"
+op = "info"
+unit = "setups"
+source = "computed"
+why = "The fewest fixture orientations that reach every reachable face, by greedy set cover. No sourced limit: shown, never failed."

@@ -121,6 +121,10 @@ tables against the library.
   sprockets; its `Chain` (a chain wrapped over sprockets at any positions) has no build123d port, and Form Studio's
   two-sprocket `chain_drive` uses the standard chain-length formula instead. Nothing copied.
 
+- **ezdxf** 1.4.5 (https://github.com/mozman/ezdxf). Licence: MIT. Installed with build123d (one of its
+  dependencies). Used as a library by `form/sheet/dxf.py` to write flat patterns and cut profiles and to read DXF
+  files for the cut-file check, and by `form/triage.py`. Nothing copied.
+
 ## Optional engines, installed only when you ask
 
 None of these is bundled. Settings › Engines & software (or `form install`) installs each one into an environment of its own
@@ -151,9 +155,19 @@ under the data folder (`form/engines.py`), showing its size and licence first. T
   Because the LGPL libraries are separate, replaceable files in an environment the person can change, Form Studio's
   own code stays MIT. Gmsh (GPL-2.0-or-later) and CalculiX (GPL-2.0-or-later) were considered and are not used,
   shipped or downloaded.
+- **MuJoCo** 4.0.1 (robot files loaded and stepped, `robot.mujoco`; https://github.com/google-deepmind/mujoco).
+  Licence: Apache License 2.0. With **yourdfpy** 0.0.60 (https://github.com/clemense/yourdfpy, MIT), its dependencies
+  trimesh (MIT) and lxml (BSD-3-Clause), and NumPy 2.5.5. Licences read from the installed packages' metadata.
 - **uv** 0.13.7 (https://github.com/astral-sh/uv), downloaded from its GitHub release and checked against a pinned
   SHA-256 before use, makes these environments. Licence: MIT OR Apache-2.0. The Python 3.12 it installs for them is
   CPython (Python Software Foundation License) from uv's managed builds.
+
+## Programs run when you have them
+
+- **KiCad** (https://www.kicad.org, GPL-3.0-or-later) is never bundled or downloaded by Form Studio. When you have
+  installed it, its `kicad-cli` runs as a separate process for board checks (DRC, ERC) and board fab files; its
+  reports and files are kept as KiCad wrote them. Form Studio reads `.kicad_pcb` files with its own parser
+  (`form/board/sexpr.py`); no KiCad code and no third-party KiCad parser is in Form Studio.
 
 ## Fonts
 

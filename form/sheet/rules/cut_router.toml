@@ -1,0 +1,126 @@
+# The cut-file check for CNC router: what a DXF must be before a shop can cut it. Same format as the
+# manufacturability tables (form/dfm/rules.py). Read on 2026-11-28. Limits that scale with the sheet use
+# per = "t" (the thickness, an option: without it they are not checked).
+
+[process]
+id = "cut_router"
+label = "Cut file: CNC router"
+evidence = "computed (2D), rules with sources"
+options = ["t", "units", "tol"]
+needs = []
+not_judged = "Tabs, hold-down, feeds, the 50 % material-removal limit and the shop's nesting are not judged."
+
+[[source]]
+id = "scs-guidelines"
+title = "How to prepare your file for sheet cutting (Sheet Cutting Guidelines)"
+publisher = "SendCutSend"
+url = "https://sendcutsend.com/laser-cutting-guidelines"
+published = "undated"
+read = "2026-11-28"
+
+[[rule]]
+id = "cut.closed"
+title = "Every cut contour is closed"
+measure = "open_contours"
+op = "<="
+fail = 0
+unit = "mm gap"
+source = "scs-guidelines"
+quote = "Every cut path must form a closed shape. If your shape stops, so does the cutter."
+
+[[rule]]
+id = "cut.duplicates"
+title = "No duplicate or overlapping lines"
+measure = "duplicate_lines"
+op = "<="
+fail = 0
+unit = "mm overlap"
+source = "scs-guidelines"
+quote = "All stray points, duplicate lines, empty objects and text areas have been removed."
+
+[[rule]]
+id = "cut.crossing"
+title = "Contours do not cross or touch each other"
+measure = "crossings"
+op = "<="
+fail = 0
+unit = "crossings"
+source = "scs-guidelines"
+quote = "Two parts sharing a line, or overlapping lines inside one part, won't cut correctly."
+
+[[rule]]
+id = "cut.tiny"
+title = "No tiny segments"
+measure = "segment_mm"
+op = ">="
+warn = 0.05
+unit = "mm"
+source = "unsourced"
+why = "Segments shorter than 0.05 mm are usually export debris; the threshold is Form Studio's (no shop publishes one)."
+
+[[rule]]
+id = "cut.text"
+title = "Text converted to outlines"
+measure = "text_entities"
+op = "<="
+fail = 0
+unit = "text entities"
+source = "scs-guidelines"
+quote = "Convert all text to outlines. Active text boxes won't cut."
+
+[[rule]]
+id = "cut.layers"
+title = "Cut geometry on one layer"
+measure = "cut_layers"
+op = "<="
+warn = 1
+unit = "layers"
+source = "scs-guidelines"
+quote = "All cut-path geometry should be on the same layer."
+
+[[rule]]
+id = "cut.units"
+title = "Units a shop accepts (inch or mm)"
+measure = "units_ok"
+op = "fits"
+unit = ""
+source = "scs-guidelines"
+quote = "We don't support cm or meter units."
+
+[[rule]]
+id = "router.hole"
+title = "Smallest hole or slot (the bit)"
+measure = "hole_width_mm"
+op = ">="
+fail = 3.175
+unit = "mm"
+source = "scs-guidelines"
+quote = "Minimum hole/cutout size (CNC routing): .125″ (bit diameter)"
+
+[[rule]]
+id = "router.corner"
+title = "Inside corner radius (the bit's radius)"
+measure = "corner_r_mm"
+op = ">="
+fail = 1.6002
+unit = "mm"
+source = "scs-guidelines"
+quote = "Minimum internal corner radius (CNC routing): .063″ (radius of 0.125″ bit)"
+
+[[rule]]
+id = "router.size_min"
+title = "Part at least 1 × 2 in"
+measure = "part_min_fits"
+op = "fits"
+unit = "mm"
+source = "scs-guidelines"
+quote = "Minimum part size (CNC routing): 1″ x 2″"
+
+[[rule]]
+id = "router.size_max"
+title = "Part at most 44 × 30 in (44 × 23 in for Delrin)"
+measure = "part_max_fits"
+op = "fits"
+unit = "mm"
+source = "scs-guidelines"
+quote = "Maximum: 44″ x 23″ (Delrin) or 44″ x 30″ (ABS, ACM, HDPE, MDF, Plywood, UHMW)"

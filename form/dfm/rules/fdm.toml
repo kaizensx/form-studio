@@ -1,0 +1,48 @@
+# FDM / FFF printing. Read on 2026-11-28. Orientation: as modelled, +Z up, the lowest point on the plate (pass
+# up=[x,y,z] for another build direction).
+
+[process]
+id = "fdm"
+label = "FDM printing"
+evidence = "computed (B-rep)"
+options = ["up", "machine"]
+needs = []
+not_judged = "Layer adhesion, warping, bridging length, seams, infill and strength are not judged. The slice (Make) is the print's own simulation."
+
+[[source]]
+id = "hubs-3dp"
+title = "What are the key design elements for 3D printing?"
+publisher = "Protolabs Network (formerly Hubs), knowledge base"
+url = "https://www.hubs.com/knowledge-base/key-design-considerations-3d-printing/"
+published = "undated"
+read = "2026-11-28"
+
+[[rule]]
+id = "fdm.wall"
+title = "Thinnest wall"
+measure = "wall_min_mm"
+op = ">="
+fail = 0.8
+unit = "mm"
+source = "hubs-3dp"
+quote = "All 3D printers in the network can print walls greater than 0.8 mm."
+fix = "thicken"
+
+[[rule]]
+id = "fdm.overhang"
+title = "Overhangs within the self-supporting angle"
+measure = "overhang_from_level_deg"
+op = ">="
+warn = 45.0
+unit = "° from level"
+source = "hubs-3dp"
+quote = "FDM and SLA: about 45° before support material is needed."
+
+[[rule]]
+id = "fdm.size"
+title = "Fits the machine"
+measure = "fits_machine"
+op = "fits"
+unit = "mm"
+source = "computed"
+why = "The part's box in the build orientation against the machine's build volume. With no machine stated, not checked."

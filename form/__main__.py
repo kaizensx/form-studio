@@ -54,6 +54,11 @@
   form mass <project> [--part P] [--pose JSON] [--material M] [--frame as_built|assembled] [--library]
                                      mass, centre of mass, inertia and principal axes from the B-rep, per part and assembled
   form materials [ID]                the materials library: density and mechanical properties, each with its source
+  form motion <project> [--drivers JSON] [--duration S] [--frames N] [--traces JSON] [--hold JSON] [--video]
+                                     a motion study: loops closed, points traced, clearance along the cycle, holding torque
+  form urdf|mjcf <project> [--collision auto|coacd|hull|box] [--assume M] [--limits JSON]
+                                     robot files (URDF, SRDF, MJCF) with inertia and meshes per link, checked and parsed back
+  form sequence <project> [--budget S]   an assembly order and each part's insertion direction (the explode follows it)
   form orient <project> [--apply [id]]   rank the ways the part can lie on the plate; --apply sets the best (or the id given)
   form print orient <project> [--cosmetic X,Y,Z] [--study ID | --load X,Y,Z] [--calibrate] [--verify N] [--pick ID]
                                      the Pareto front of print orientations (support, time, strength, surface,
@@ -554,6 +559,104 @@ def main(argv=None):
     eg.add_argument("--list", action="store_true")
     eg.add_argument("--remove", metavar="ID")
     eg.add_argument("--expect-head", type=int)
+    dm = sub.add_parser("dfm", help="manufacturability, every rule with its source, measured on the solid: dfm <project> "
+                                    "[--process cnc|injection|fdm|sla|sls|mjf|lpbf] [--set k=v ...] [--fix ID [--preview]] "
+                                    "[--png FILE]; dfm rules [PROCESS] lists the rule tables")
+    dm.add_argument("project", help="a project, or `rules` for the rule tables")
+    dm.add_argument("extra", nargs="?", default="", help="with `rules`: one process")
+    dm.add_argument("--process", default="")
+    dm.add_argument("--set", action="append", default=[], metavar="KEY=VALUE",
+                    help="an option: tool_d=6 material=metal axes=5 resin=abs pull=0,0,1 up=0,0,1 machine=200,200,200")
+    dm.add_argument("--override", action="append", default=[], metavar="RULE:fail=X,warn=Y",
+                    help="your shop's limit for one rule (recorded as specified)")
+    dm.add_argument("--fix", metavar="ID", help="apply a proposed fix (its id or rule id) and prove it by checking again")
+    dm.add_argument("--preview", action="store_true", help="with --fix: build and check the fix, save nothing")
+    dm.add_argument("--accept-trades", action="store_true")
+    dm.add_argument("--expect-head", type=int)
+    dm.add_argument("--png", help="write a picture of the result on the part here")
+    dm.add_argument("--full", action="store_true", help="every finding, not the first 30")
+    sh = sub.add_parser("sheet", help="sheet metal and cut parts, JSON: sheet flat <project> [--set material=steel_mild "
+                                      "--set k=0.42 --out part.dxf]; sheet profile <project> [--kerf 0.2]; sheet check "
+                                      "<file.dxf|project> [--process laser|waterjet|router --set t=2]; sheet bends "
+                                      "<project>; sheet preflight <project|file.dxf> [--service sendcutsend --material "
+                                      "al_5052_h32 --thickness 3.175]; sheet tables")
+    sh.add_argument("action", choices=["flat", "profile", "check", "bends", "preflight", "tables"])
+    sh.add_argument("target", nargs="?", default="", help="a project, or a DXF file for check and preflight")
+    sh.add_argument("--set", action="append", default=[], metavar="KEY=VALUE",
+                    help="material, k, method (table|din6935), forming (air|bottoming|coining), label, t, punch, die_v")
+    sh.add_argument("--kerf", type=float, default=0.0)
+    sh.add_argument("--process", default="laser")
+    sh.add_argument("--service", default="sendcutsend")
+    sh.add_argument("--material", default="")
+    sh.add_argument("--thickness", type=float)
+    sh.add_argument("--rev", type=int)
+    sh.add_argument("--out", help="write the DXF here too")
+    # -- standard parts and the parts list (form/catalog.py, form/placement.py, form/bom.py) --
+    pa = sub.add_parser("parts", help="standard parts from published tables: parts search QUERY | families | describe "
+                                      "SPEC [--step] | din DESIGNATION | snap|place|list|fit|remove <project> ...")
+    pa.add_argument("action", choices=("search", "families", "describe", "din", "snap", "place", "list", "fit", "remove"))
+    pa.add_argument("args", nargs="*", help="search: the query; describe: a spec as JSON or family:size; din: the "
+                                            "designation; snap/place/list/fit/remove: the project first")
+    pa.add_argument("--spec", help='the part as JSON ({"family": "iso4762", "size": "M3", "length": 10}) or family:size')
+    pa.add_argument("--at", metavar="x,y,z", help="a point on a hole's wall or a flat face, mm")
+    pa.add_argument("--normal", metavar="x,y,z", help="outward direction (needed with --no-snap)")
+    pa.add_argument("--depth", type=float, help="host thickness the cut goes through (default: measured)")
+    pa.add_argument("--qty", type=int, default=1)
+    pa.add_argument("--no-cut", action="store_true", help="record the part without cutting its mating feature")
+    pa.add_argument("--no-snap", action="store_true", help="use --at and --normal as given")
+    pa.add_argument("--step", action="store_true", help="describe: also build it and write a STEP")
+    pa.add_argument("--expect-head", type=int)
+    bo = sub.add_parser("bom", help="the parts list: bom <project> [--csv FILE | --pdf FILE] | supplier add|remove "
+                                    "<project> DESIGNATION ... | catalogue [QUERY] [--confirm]")
+    bo.add_argument("args", nargs="+", help="<project>, or supplier add|remove <project> DESIGNATION, or catalogue [QUERY]")
+    bo.add_argument("--csv", metavar="FILE")
+    bo.add_argument("--pdf", metavar="FILE")
+    bo.add_argument("--no-made", action="store_true", help="purchased items only (no kernel call for the made parts)")
+    bo.add_argument("--supplier")
+    bo.add_argument("--part-number")
+    bo.add_argument("--url", default="")
+    bo.add_argument("--note", default="")
+    bo.add_argument("--confirm", action="store_true", help="catalogue: really search after reading what is sent")
+    cm = sub.add_parser("cam", help="CNC, 3-axis: cam plan|post|simulate|status <project> [--machine grbl|linuxcnc|fanuc|haas|marlin] "
+                                    "[--tool 6mm-flat ...] [--material aluminum] [--set k=v ...]; cam materials lists the "
+                                    "speeds table. G-code is simulated on a stock model and measured against the design")
+    cm.add_argument("action", choices=["plan", "post", "simulate", "status", "materials", "posts"])
+    cm.add_argument("project", nargs="?", default="")
+    cm.add_argument("--machine", default="", help="the post: grbl, linuxcnc, fanuc, haas, marlin")
+    cm.add_argument("--tool", action="append", default=[], metavar="NAME|JSON",
+                    help="a tool: 6mm-flat, 3mm-ball, 6mm-bull-r1, 5mm-drill, 6mm-chamfer-90, or JSON with flute_l, length, holder_d")
+    cm.add_argument("--material", default="")
+    cm.add_argument("--set", action="append", default=[], metavar="KEY=VALUE",
+                    help="an option: setups=auto stock.margin_xy=6 machine.rapid=5000 machine.accel=800 tolerance=0.05 chamfer=0.5")
+    cm.add_argument("--options", default="", help="plan options as JSON (ops, feeds, stock, machine)")
+    cm.add_argument("--units", default="", choices=["", "mm", "inch"])
+    cm.add_argument("--wcs", default="")
+    cm.add_argument("--include", action="store_true", help="ask for the program to go into the next release")
+    cm.add_argument("--exclude", action="store_true", help="leave the program out of the release")
+    cm.add_argument("--line-numbers", action="store_true")
+    cm.add_argument("--cell", type=float, help="simulation cell size, mm")
+    cm.add_argument("--out", help="with post: also copy the first program here")
+    cm.add_argument("--force", action="store_true")
+    # -- circuit boards and their enclosures (form/board) --
+    bd = sub.add_parser("board", help="circuit boards: board read FILE | import FILE [--project P] [--step S] "
+                                      "[--heights JSON] [--regenerate] | check <project> [--fit|--board] [--fab F] | "
+                                      "fab <project> [--kinds gerbers,drill,pos,bom,step] | kicad (JSON)")
+    bd.add_argument("action", choices=("read", "import", "check", "fab", "kicad"))
+    bd.add_argument("args", nargs="*", help="read/import: the board file (.kicad_pcb or .emn); check/fab: the project")
+    bd.add_argument("--project", default="", help="import: the design whose board this replaces")
+    bd.add_argument("--name", default="")
+    bd.add_argument("--step", default="", help="import: KiCad's board STEP, for the parts' heights")
+    bd.add_argument("--kicad-step", action="store_true", help="import: have your KiCad export the board STEP for heights")
+    bd.add_argument("--heights", default="", help='import: part heights as JSON, e.g. {"C1": 10.5}')
+    bd.add_argument("--connectors", default="", help='import: overrides as JSON, e.g. {"J2": {"side": "+x"}}')
+    bd.add_argument("--regenerate", action="store_true", help="import into a project: make the enclosure again")
+    bd.add_argument("--lid-screw", type=float, default=3.0)
+    bd.add_argument("--fit", action="store_true", help="check: only the board against the enclosure")
+    bd.add_argument("--board", action="store_true", help="check: only KiCad's DRC/ERC and the fab limits")
+    bd.add_argument("--fab", action="append", help="check: a fab (jlcpcb, pcbway, oshpark); repeat")
+    bd.add_argument("--no-kicad", action="store_true", help="check: do not run KiCad even when it is installed")
+    bd.add_argument("--kinds", default="", help="fab: comma-separated kinds")
+    bd.add_argument("--expect-head", type=int)
     gd = sub.add_parser("diff", help="what changed between two revisions, computed on the solids: diff <project> A [B] [--png FILE]")
     gd.add_argument("project")
     gd.add_argument("a", type=int)
@@ -600,6 +703,19 @@ def main(argv=None):
     ins.add_argument("project")
     ins.add_argument("--rev", type=int)
     ins.add_argument("--out", help="copy the PDF here")
+    # -- engineering drawings, PMI and drawing checks (form/drawing) --
+    dr = sub.add_parser("drawing", help="engineering drawing from the solid: drawing <project> [--sheet A3] [--projection first] "
+                                        "[--out part.pdf]; drawing pmi <project>; drawing check <project> <file>; "
+                                        "drawing spec <project> <json>; drawing set <project> <dimension> <value>")
+    dr.add_argument("args", nargs="+", help="<project> | pmi <project> | check <project> <file> [--rows JSON] | "
+                                            "spec <project> <json> | set <project> <dimension id> <value>")
+    dr.add_argument("--sheet", default=None, help="A4-A0 or 'ANSI A'-'ANSI E' (A3 by default)")
+    dr.add_argument("--projection", default=None, choices=["first", "third"])
+    dr.add_argument("--rev", type=int)
+    dr.add_argument("--out", help="copy the PDF (or the STEP for pmi) here")
+    dr.add_argument("--rows", help="check: the rows an agent read off an image, as JSON")
+    dr.add_argument("--no-prove", action="store_true", help="bind parameters by value only (no nudged rebuilds)")
+    dr.add_argument("--expect-head", type=int)
     # -- selections, annotations, colours and materials (form/selection.py, form/materials.py) --
     se = sub.add_parser("select", help="analyse points, edges, faces or a painted region on the solid; --keep saves it as an annotation")
     se.add_argument("project")
@@ -625,6 +741,34 @@ def main(argv=None):
     ms.add_argument("--library", action="store_true", help="add the sourced record of each material used")
     mt = sub.add_parser("materials", help="the materials library with sources: materials [ID]")
     mt.add_argument("id", nargs="?")
+    mo = sub.add_parser("motion", help="motion study: motion <project> [--drivers JSON] [--duration S] [--frames N] "
+                                       "[--traces JSON] [--hold JSON] [--video]")
+    mo.add_argument("project")
+    mo.add_argument("--drivers", help='JSON, e.g. \'[{"joint": "crank", "from": 0, "to": 360}]\'')
+    mo.add_argument("--duration", type=float, default=2.0)
+    mo.add_argument("--frames", type=int, default=49)
+    mo.add_argument("--traces", help='JSON, e.g. \'[{"part": "coupler", "at": [10, 0, 0]}]\'')
+    mo.add_argument("--hold", help="JSON {joint: value} for joints nothing drives")
+    mo.add_argument("--no-clearance", action="store_true")
+    mo.add_argument("--no-torque", action="store_true")
+    mo.add_argument("--video", action="store_true", help="also an MP4 (needs ffmpeg)")
+    mo.add_argument("--budget", type=float, default=60.0, help="seconds for the clearance check")
+    mo.add_argument("--assume", help="a material for parts without one (labelled), for the torque")
+    mo.add_argument("--rev", type=int)
+    mo.add_argument("--full", action="store_true", help="print every frame (default: frames per joint and trace are left out)")
+    for nm in ("urdf", "mjcf"):
+        rb = sub.add_parser(nm, help=f"robot files (URDF, SRDF and MJCF; prints the {nm.upper()} path first): {nm} <project> "
+                                     "[--collision auto|coacd|hull|box] [--assume M] [--limits JSON]")
+        rb.add_argument("project")
+        rb.add_argument("--collision", default="auto", choices=["auto", "coacd", "hull", "box"])
+        rb.add_argument("--assume", help="a material for parts without one (labelled)")
+        rb.add_argument("--limits", help='JSON {joint: {"effort": N·m, "velocity": rad/s}}')
+        rb.add_argument("--samples", type=int, default=64, help="random poses for the SRDF's Never pairs")
+        rb.add_argument("--rev", type=int)
+    sq = sub.add_parser("sequence", help="assembly order and insertion directions: sequence <project> [--budget S]")
+    sq.add_argument("project")
+    sq.add_argument("--budget", type=float, default=90.0)
+    sq.add_argument("--rev", type=int)
     apx = sub.add_parser("appearance", help="colour and material of the design or one part: --color #rrggbb --material petg [--part ID]")
     apx.add_argument("project")
     apx.add_argument("--part", default="")
@@ -913,6 +1057,205 @@ def main(argv=None):
                                   a.expect_head, origin="cli")
                 out["printability"] = engrave.printability(a.text, a.height, a.depth, a.sunk, nz)
                 _print(out)
+        elif a.cmd == "dfm":
+            from . import dfm
+            from .dfm import rules as dfm_rules
+            if a.project == "rules":
+                procs = [dfm.process_id(a.extra)] if a.extra else dfm_rules.processes()
+                _print({pid: dfm_rules.table(pid) for pid in procs})
+            else:
+                opts: dict = {}
+                for kv in a.set:
+                    k, _, v = kv.partition("=")
+                    opts[k.strip()] = v.strip()
+                ovr: dict = {}
+                for o in a.override:
+                    rid, _, rest = o.partition(":")
+                    ovr[rid] = {k: float(v) for k, v in (x.split("=") for x in rest.split(",") if "=" in x)}
+                if ovr:
+                    opts["overrides"] = ovr
+                p = st.load(a.project)
+                if a.fix:
+                    out = dfm.apply_fix(st, p, a.process or None, a.fix, opts, apply=not a.preview,
+                                        accept_trades=a.accept_trades, expect_head=a.expect_head)
+                else:
+                    res = dfm.check(st, p, a.process or None, opts)
+                    out = dfm.summary(res, findings=10 ** 6 if a.full else 30)
+                    out["fixes"] = [{k: v for k, v in f.items() if k != "attempts"} for f in res.get("fixes", [])]
+                    if a.png and res.get("overlay_file"):
+                        import shutil as _sh
+                        _sh.copyfile(dfm.render(st, p, res), a.png)
+                        out["png"] = str(Path(a.png).resolve())
+                _print(out)
+        elif a.cmd == "sheet":
+            from . import sheet
+            from .sheet import cutcheck as _cc, tables as _tb
+            sopts: dict = {}
+            for kv in a.set:
+                k, _, v = kv.partition("=")
+                sopts[k.strip()] = v.strip()
+            is_file = a.target.lower().endswith(".dxf")
+            if a.action == "tables":
+                _print({"bend": {k: v for k, v in _tb.bend_table().items() if k not in ("source", "material")},
+                        "services": {sid: {k: v for k, v in _tb.service(sid).items() if k not in ("source", "material")}
+                                     for sid in _tb.services()}})
+            elif a.action == "check":
+                if is_file:
+                    _print(sheet.cut_check(a.target, _cc.process_id(a.process), sopts))
+                else:
+                    _print(sheet.cut_check(None, _cc.process_id(a.process), sopts, st, st.load(a.target), a.rev))
+            elif a.action == "preflight":
+                if is_file:
+                    _print(sheet.service_preflight(service=a.service, material=a.material or None, t=a.thickness,
+                                                   path=a.target))
+                else:
+                    _print(sheet.service_preflight(st, st.load(a.target), a.service, a.material or None, a.thickness,
+                                                   rev=a.rev))
+            else:
+                p = st.load(a.target)
+                if a.action == "flat":
+                    res = sheet.flat_pattern(st, p, sopts, a.rev, out=a.out)
+                    _print({**sheet.summary(res), "dxf": res.get("dxf"), "png": res.get("png")})
+                elif a.action == "profile":
+                    res = sheet.profile(st, p, a.kerf, sopts.get("label"), a.rev, out=a.out)
+                    _print({k: v for k, v in res.items() if k not in ("entities", "exact", "etch")})
+                else:
+                    _print(sheet.bend_order(st, p, sopts, a.rev))
+        elif a.cmd == "parts":
+            from . import catalog, placement
+            xyz = lambda t: [float(x) for x in t.split(",")]
+
+            def spec_of(t):
+                if not t:
+                    raise StudioError("Give the part: --spec as JSON, or family:size (form parts search finds one).")
+                if t.strip().startswith("{"):
+                    return json.loads(t)
+                fam, _, size = t.partition(":")
+                return {"family": fam, "size": size}
+            args = list(a.args)
+            if a.action == "search":
+                _print({"results": catalog.search(" ".join(args)), "note": "Local tables only; nothing was sent anywhere."})
+            elif a.action == "families":
+                _print({"families": catalog.families()})
+            elif a.action == "din":
+                _print(catalog.din(" ".join(args)))
+            elif a.action == "describe":
+                sp = spec_of(a.spec or (args[0] if args else ""))
+                if a.step:
+                    out = st.root / ".catalog" / "step"
+                    out.mkdir(parents=True, exist_ok=True)
+                    it = catalog.resolve(sp)
+                    _print(catalog.part_info(st, it, step_path=str(out / f"{it['family']}-{it['size']}.step")))
+                else:
+                    _print(catalog.describe(sp))
+            else:
+                if not args:
+                    raise StudioError(f"parts {a.action} needs the project.")
+                p = st.load(args[0])
+                if a.action == "list":
+                    _print({"placements": placement.list_parts(st, p)})
+                elif a.action == "fit":
+                    _print(placement.fit(st, p))
+                elif a.action == "remove":
+                    if len(args) < 2:
+                        raise StudioError("parts remove <project> std_N")
+                    _print(placement.remove(st, p, args[1], a.expect_head, origin="cli"))
+                elif a.action == "snap":
+                    if not a.at:
+                        raise StudioError("Give --at x,y,z.")
+                    _print(placement.snap(st, p, xyz(a.at), xyz(a.normal) if a.normal else None))
+                else:
+                    if not a.at:
+                        raise StudioError("Give --at x,y,z (a point on a hole's wall or a flat face).")
+                    _print(placement.place(st, p, spec_of(a.spec or (args[1] if len(args) > 1 else "")), xyz(a.at),
+                                           xyz(a.normal) if a.normal else None, a.depth, a.qty, not a.no_cut,
+                                           not a.no_snap, None, a.expect_head, origin="cli"))
+        elif a.cmd == "board":
+            from .board import api as board_api, kicad_cli, model as board_model
+            args = list(a.args)
+            if a.action == "kicad":
+                _print(kicad_cli.status(st.cfg))
+            elif not args:
+                raise StudioError(f"form board {a.action} needs " + ("a board file." if a.action in ("read", "import") else "a project."))
+            elif a.action == "read":
+                b = board_api.read(args[0])
+                _print({"summary": board_model.summary(b), "board": b})
+            elif a.action == "import":
+                _print(board_api.import_board(st, args[0], project=a.project or None, name=a.name, step=a.step or None,
+                                              heights=json.loads(a.heights) if a.heights else None,
+                                              connectors=json.loads(a.connectors) if a.connectors else None,
+                                              regenerate=a.regenerate, expect_head=a.expect_head, lid_screw=a.lid_screw,
+                                              use_kicad_step=a.kicad_step))
+            elif a.action == "check":
+                p = st.load(args[0])
+                out = {}
+                if not a.board:
+                    out["fit"] = board_api.fit(st, p)
+                if not a.fit:
+                    out["board"] = board_api.checks(st, p, a.fab, not a.no_kicad)
+                _print(out)
+            else:
+                p = st.load(args[0])
+                _print(board_api.fab_files(st, p, [k for k in a.kinds.split(",") if k] or None))
+        elif a.cmd == "bom":
+            from . import bom as bm
+            args = list(a.args)
+            if args[0] == "catalogue":
+                q = " ".join(args[1:])
+                _print(bm.catalogue_search(st.cfg, q, a.confirm) if q else bm.catalogue_status(st.cfg))
+            elif args[0] == "supplier":
+                if len(args) < 4 or args[1] not in ("add", "remove"):
+                    raise StudioError("bom supplier add|remove <project> DESIGNATION --supplier NAME --part-number N [--url URL]")
+                p = st.load(args[2])
+                dsg = " ".join(args[3:])
+                if args[1] == "add":
+                    _print(bm.add_supplier(st, p, dsg, a.supplier, a.part_number, a.url, a.note, by="person"))
+                else:
+                    _print(bm.remove_supplier(st, p, dsg, a.supplier or "", a.part_number or ""))
+            else:
+                p = st.load(args[0])
+                b = bm.build(st, p, made=not a.no_made)
+                if a.csv:
+                    Path(a.csv).write_text(bm.csv_text(b), encoding="utf-8")
+                    b["csv"] = str(Path(a.csv).resolve())
+                if a.pdf:
+                    import shutil as _sh
+                    _sh.copyfile(bm.pdf(st, p, b), a.pdf)
+                    b["pdf"] = str(Path(a.pdf).resolve())
+                _print(b)
+        elif a.cmd == "cam":
+            from . import cam
+            from .cam import feeds as cam_feeds, posts as cam_posts
+            if a.action == "materials":
+                _print({"materials": cam_feeds.materials(),
+                        "sources": {k: cam_feeds.source_text(v) for k, v in cam_feeds.table()["sources"].items()}})
+            elif a.action == "posts":
+                _print({k: {"label": v["label"], "extension": v["ext"], "canned_cycles": v["canned"], "tool_changer": v["m6"]}
+                        for k, v in cam_posts.DIALECTS.items()})
+            else:
+                if not a.project:
+                    raise StudioError("Which project?", "form cam " + a.action + " <project>")
+                p = st.load(a.project)
+                given = bool(a.tool or a.material or a.set or a.options)
+                opts = cam.options_from_cli(a.tool, a.material, a.set, a.options) if given else None
+                inc = True if a.include else False if a.exclude else None
+                if a.action == "plan":
+                    _print(cam.plan_summary(cam.plan(st, p, opts if opts is not None else (p.get("cam") or {}).get("options") or {},
+                                                     force=a.force)))
+                elif a.action == "post":
+                    out = cam.post(st, p, a.machine or None, opts, a.units or None, a.wcs or None, inc, a.line_numbers,
+                                   a.cell, a.force)
+                    if a.out:
+                        import shutil as _sh
+                        _sh.copyfile(out["programs"][0]["file"], a.out)
+                        out["out"] = str(Path(a.out).resolve())
+                    _print(out)
+                elif a.action == "simulate":
+                    out = cam.simulate(st, p, sim_cell=a.cell, force=a.force)
+                    out["status"] = cam.status(st, p)
+                    _print(out)
+                else:
+                    _print(cam.status(st, p))
         elif a.cmd == "diff":
             from . import geomdiff
             import shutil as _sh
@@ -922,6 +1265,39 @@ def main(argv=None):
                 _sh.copyfile(geomdiff.png_path(st, p, d), a.png)
                 d["png"] = str(Path(a.png).resolve())
             _print(d)
+        elif a.cmd == "drawing":
+            import shutil as _sh
+            from . import drawing as _dr
+            args = list(a.args)
+            verb = args[0] if args[0] in ("pmi", "check", "spec", "set") and len(args) > 1 else "make"
+            if verb != "make":
+                args = args[1:]
+            p = st.load(args[0])
+            try:
+                if verb == "pmi":
+                    out = _dr.export_pmi(st, p, a.rev, sheet=a.sheet)
+                    if a.out:
+                        _sh.copyfile(out["path"], a.out)
+                        out["path"] = str(Path(a.out).resolve())
+                elif verb == "check":
+                    from .drawing import check as _chk
+                    if len(args) < 2:
+                        raise SystemExit("drawing check <project> <file>")
+                    out = _chk.run(st, p, args[1], json.loads(a.rows) if a.rows else None, a.rev)
+                elif verb == "spec":
+                    out = _dr.set_spec(st, p["id"], json.loads(args[1]) if len(args) > 1 else {})
+                elif verb == "set":
+                    if len(args) < 3:
+                        raise SystemExit("drawing set <project> <dimension id> <value>")
+                    out = _dr.set_dimension(st, p, args[1], float(args[2]), a.expect_head, a.rev)
+                else:
+                    out = _dr.build(st, p, a.rev, sheet=a.sheet, projection=a.projection, prove=not a.no_prove)
+                    if a.out:
+                        _sh.copyfile(out["paths"]["pdf"], a.out)
+                        out["paths"]["pdf"] = str(Path(a.out).resolve())
+            except _dr.DrawingError as e:
+                raise StudioError(str(e), e.hint)
+            _print(out)
         elif a.cmd == "instructions":
             from . import instructions
             import shutil as _sh
@@ -957,6 +1333,47 @@ def main(argv=None):
             r["headline"] = massprops.headline(r)
             if a.library:
                 r["library"] = {k: ml.record(k) for k in r["materials"]}
+            _print(r)
+        elif a.cmd == "motion":
+            from . import motion
+
+            def js(x, what):
+                try:
+                    return json.loads(x) if x else None
+                except ValueError:
+                    raise StudioError(f"--{what} is JSON.")
+            r = motion.run(st, st.load(a.project), drivers=js(a.drivers, "drivers"), duration_s=a.duration, frames=a.frames,
+                           hold=js(a.hold, "hold"), traces=js(a.traces, "traces"), clearance_check=not a.no_clearance,
+                           torque_check=not a.no_torque, video=a.video, budget_s=a.budget, assume=a.assume, rev=a.rev)
+            r["headline"] = motion.headline(r)
+            if not a.full:
+                r.pop("frames", None)
+                for j in r.get("joints", []):
+                    for k in ("value", "velocity", "acceleration"):
+                        j.pop(k, None)
+                for t in r.get("traces", []):
+                    for k in ("positions_mm", "velocity_mm_s", "acceleration_mm_s2", "speed_mm_s", "accel_mm_s2"):
+                        t.pop(k, None)
+                if r.get("clearance"):
+                    r["clearance"].pop("per_frame", None)
+                if r.get("torque"):
+                    for j in r["torque"].get("joints", []):
+                        j.pop("values", None)
+            _print(r)
+        elif a.cmd in ("urdf", "mjcf"):
+            from . import robot
+            try:
+                lim = json.loads(a.limits) if a.limits else None
+            except ValueError:
+                raise StudioError("--limits is JSON.")
+            r = robot.write(st, st.load(a.project), collision=a.collision, assume_material=a.assume, limits=lim,
+                            samples=a.samples, rev=a.rev)
+            r["headline"] = robot.headline(r)
+            _print({"file": r["paths"][a.cmd], **r})
+        elif a.cmd == "sequence":
+            from . import sequence
+            r = sequence.plan(st, st.load(a.project), budget_s=a.budget, rev=a.rev)
+            r["headline"] = sequence.headline(r)
             _print(r)
         elif a.cmd == "materials":
             from . import material_library as ml

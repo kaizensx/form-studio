@@ -3,6 +3,8 @@
 Every step is one part going onto what is already assembled: the parts already in place in grey, the new part in
 signal orange at its exploded offset (``Part.explode``, relative to its parent) with arrows to where it seats. The order
 is the declaration's tree: a part comes after the part it is attached to or moves on, in declaration order otherwise.
+When an assembly sequence has been computed for this geometry (form/sequence.py, ``assembly_sequence``), its order is
+used instead and each arrow follows the part's computed insertion direction (proved free, not chosen).
 The step text is the part's own ``note`` when the design gives one; otherwise it says only what the declaration says
 (which part it goes on, by which joint or mate). Part volumes on the parts page are the kernel's (computed). Nothing is
 invented: a design without an assembly declaration has no instructions.
@@ -20,7 +22,7 @@ from pathlib import Path
 
 import numpy as np
 
-VERSION = 1
+VERSION = 2
 PAGE = (1240, 1754)                 # A4 at 150 dpi
 NEW = (226, 77, 38)
 DONE = (196, 192, 182)
@@ -167,10 +169,15 @@ def _frame(parts):
 
 
 def out_dir(st, p: dict, n: int | None = None):
-    """Where the instructions of revision n are written (keyed by its solid and the design's name)."""
+    """Where the instructions of revision n are written: keyed by its solid, the design's name and the computed
+    assembly sequence, when there is a complete one (form/sequence.py)."""
+    from . import sequence
     from .studio import H
+    n = st.rev(p, n)["n"]
     gk = st.keys(p, n)["geometry"]
-    return st.dir(p["id"]) / "artifacts" / "side" / ("instructions-" + H("instructions", VERSION, gk, p["name"])[:16])
+    seq = sequence.stored(st, p, n)
+    skey = seq["key"] if seq and seq.get("complete") else None
+    return st.dir(p["id"]) / "artifacts" / "side" / ("instructions-" + H("instructions", VERSION, gk, p["name"], skey)[:16])
 
 
 def cached(st, p: dict) -> dict | None:
@@ -182,18 +189,38 @@ def cached(st, p: dict) -> dict | None:
         return None
 
 
+def by_sequence(parts: list, seq: dict | None) -> tuple[list, dict]:
+    """Parts in the computed sequence's order with its explode offsets (insertion direction, reversed), when the
+    sequence is complete and names the same parts; else unchanged."""
+    if not seq or not seq.get("complete"):
+        return parts, {}
+    ids = {q["id"] for q in parts}
+    if set(seq["order"]) != ids:
+        return parts, {}
+    by = {q["id"]: q for q in parts}
+    steps = {s["part"]: s for s in seq["steps"]}
+    out = []
+    for pid in seq["order"]:
+        q = dict(by[pid])
+        q["explode"] = list(seq["explode"].get(pid, q["explode"]))
+        out.append(q)
+    return out, steps
+
+
 def build(st, p: dict, n: int | None = None) -> dict:
-    """Write the instructions for revision n (default the head). Cached by the geometry key."""
-    from . import render
+    """Write the instructions for revision n (default the head). Cached by the geometry key (and the computed
+    sequence, when there is one)."""
+    from . import render, sequence
     from .studio import H
     r = st.rev(p, n)
     gk = st.keys(p, r["n"])["geometry"]
+    seq = sequence.stored(st, p, r["n"])
     out = out_dir(st, p, r["n"])
     meta = out / "instructions.json"
     if meta.is_file():
         return json.loads(meta.read_text(encoding="utf-8"))
     raw = st._k("instructions", timeout=300, key=gk, recipe_id=st.rid(p, r["n"]), values=r["values"], p=p, rev=r["n"])
-    parts = order(raw["parts"])
+    parts, seq_steps = by_sequence(order(raw["parts"]), seq)
     by = {q["id"]: q for q in parts}
     # the frame holds every part, assembled and exploded, so the camera never jumps between steps
     flo, fhi = _frame(parts)
@@ -209,6 +236,11 @@ def build(st, p: dict, n: int | None = None) -> dict:
     placed = []
     for i, q in enumerate(parts):
         text = step_text(q, by, raw["mates"])
+        ss = seq_steps.get(q["id"])
+        if ss and ss.get("insert") and not q.get("note"):
+            text = ss["text"]
+        elif ss and ss.get("insert"):
+            text += f" Insert it {ss['direction_text']}."
         shift = np.asarray(q["explode"], float)
         mesh = [_mesh(x, DONE) for x in placed] + [_mesh(q, NEW, shift)]
         lines = []
@@ -217,7 +249,8 @@ def build(st, p: dict, n: int | None = None) -> dict:
             lines = [(np.array([[*(c + shift), *c]]), NEW)]
         img = render.render_png({"mesh": mesh}, [], "iso", size=(1060, 760), overlay=False, frame_box=(flo, fhi),
                                 lines=lines, as_image=True)
-        steps.append({"n": i + 1, "part": q["id"], "label": q["label"], "text": text, "from_design": bool(q.get("note"))})
+        steps.append({"n": i + 1, "part": q["id"], "label": q["label"], "text": text, "from_design": bool(q.get("note")),
+                      **({"insert": ss.get("insert"), "from_sequence": True} if ss else {})})
         pages.append(_page(f"Step {i + 1}", q["label"], img, [text], foot))
         placed.append(q)
     out.mkdir(parents=True, exist_ok=True)
@@ -230,6 +263,7 @@ def build(st, p: dict, n: int | None = None) -> dict:
     pages[0].save(out / name, "PDF", resolution=150.0, save_all=True, append_images=pages[1:],
                   title=f"{p['name']} assembly instructions", producer="Form Studio")
     res = {"rev": r["n"], "key": out.name, "pdf": name, "pages": pngs, "steps": steps, "parts": len(parts),
-           "pdf_path": str(out / name)}
+           "pdf_path": str(out / name),
+           "order": ("computed assembly sequence (" + seq["evidence"] + ")") if seq_steps else "the declaration's tree"}
     meta.write_text(json.dumps(res, indent=1), encoding="utf-8")
     return res

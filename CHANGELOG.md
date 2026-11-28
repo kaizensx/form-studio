@@ -25,9 +25,37 @@
   height and the corners. It is an indicator, never a predicted lift. [docs/PRINT_PHYSICS.md](docs/PRINT_PHYSICS.md).
 - **`print_orient`, `print_strength`, `print_warp`** (MCP) and **`form print orient|strength|warp <project>`**
   (terminal, JSON). Bench entries in Check (Orientation front, Strength as printed, Warp risk) and in Make (Print
-  orientation: the setup's orientation, and whether it is on the front). 109 MCP tools.
+  orientation: the setup's orientation, and whether it is on the front). 129 MCP tools.
 - A strength study's field data now carries the stress tensor at the surface nodes (`stress`, six components), and
   for a layered study the tension across the layers and the shear between them.
+- **Engineering drawings from the solid.** A shop drawing of any design on A4 to A0 or ANSI A to E: the views
+  projected by OCCT's hidden-line removal on the B-rep (first or third angle, ISO 5456-2), a full section through the
+  bores with hatching and its cutting plane, a detail view of a chamfer too small to read at the sheet's scale, an
+  isometric, the largest ISO 5455 scale that fits, an ISO 5457 border and an ISO 7200 title block that leaves a field
+  empty when Form Studio does not know it. Vector PDF (drawn by Qt, fonts embedded), SVG and DXF, plus paper and night
+  previews; the sheet itself is a scene graph (`sheet.json`) for the direction-I sheet pane to draw.
+- **A dimension is its parameter.** Sizes are measured on the B-rep and each size parameter is bound to the one it
+  equals, proved by building the design again with the parameter nudged. The drawing says "5 of 7 size parameters
+  dimensioned, 0 twice", lists each parameter it cannot show with the sizes it drives, and changing a dimension
+  commits a new value for its parameter. Placement is a layout algorithm: linear dimensions packed into tiers
+  (baseline nests, chain shares a line, ISO 129-1), leaders and frames searched for free space, and every sheet is
+  checked for overlaps.
+- **Fits, general tolerances, GD&T and surface texture.** ISO 286 limits computed from the standard's formulas (IT5
+  to IT11, deviations d to u, the delta rule for K to U holes) and checked cell by cell against the published
+  tables; the few cells where the standard's own table differs from its formula are listed and say so. ISO 2768
+  general tolerances, ISO 1101 feature control frames, ISO 5459 datums and ISO 21920-1 surface symbols, drawn only
+  where the design (a `drawing()` method) or the person declares them, and refused when the declaration breaks the
+  standard (a datum on a flatness, perpendicularity without one).
+- **STEP AP242 with semantic PMI.** Dimensions with their limits, datums and geometric tolerances attached to the
+  solid's faces through OCCT's XCAF document, then the file is read back and compared annotation by annotation:
+  14 of 14 on the bearing flange.
+- **Check against a drawing.** A person's drawing (PDF, DXF or an image) checked dimension by dimension against the
+  part: expected and measured, the tolerance it was judged by, PASS, FAIL or UNSURE, a crop of the sheet and a render
+  with the measured feature lit. A PDF's text layer and DXF entities are read exactly; an image is read by the agent,
+  row by row with its place on the sheet, and anything it is unsure of stays UNSURE. Form Studio runs no OCR.
+- MCP tools `drawing`, `export_pmi` and `check_drawing` (126 tools); `form drawing <project> [--sheet A3]
+  [--projection first] [--out part.pdf]`, `form drawing pmi|check|spec|set ...`; a Drawing section with "Drawing,
+  A3", "STEP with PMI" in the app's documents.
 - **Engineering calculators that write the part.** Seven calculators size a part from what it has to do, by a named
   standard's equations, and write it as a design with parameters: snap joints (cantilever and annular, Bayer's
   snap-fit guide), living hinges (elastic by strain, or moulded PP and PE from cited practice), springs
@@ -40,9 +68,52 @@
   against 72 published quantities; a snap hook is also checked by finite elements where the strength engine is
   installed. [docs/CALCULATORS.md](docs/CALCULATORS.md).
 - **`calculate`** (MCP) and **`form calc <calculator> key=value ... [--build]`** (terminal, JSON), and the Bench
-  entry **Engineering calculation**. 106 MCP tools.
+  entry **Engineering calculation**. 126 MCP tools.
 - ISO 286 tables and published fastener dimensions moved to modules with no CAD kernel behind them
   (`form/iso286.py`, `form/hardware_tables.py`); `form.craft.fits` and `form.parts` read the same copy.
+- **Sheet metal and cut parts.** Design a bent part from a base flange, edge flanges, hems, jogs, relief cuts
+  (rectangular or obround) and louvres, each with its thickness and inside radius (`form.sheet.build.Sheet`). The
+  part is unfolded on the exact solid: one skin walked across tangent edges, constant thickness checked face by
+  face and by volume, each bend's allowance θ·(r + K·t) with a K-factor from a cited table (the generic air,
+  bottoming and coining table, DIN 6935's formula, or your shop's value, recorded as specified). The flat is proved
+  by folding it back from its own numbers onto the part (within 0.01 mm; on the test parts under 1e-13 mm), and an
+  L-bracket and a U-channel match their analytic flat lengths. What cannot be unfolded is named with the face and
+  why. The flat pattern DXF has cut, bend-up, bend-down (with angle, radius and K notes), etch (the label as
+  outlines) and notes layers. A cut-file checker reads any DXF (layers by intent) for laser, waterjet or router:
+  open contours, duplicates and overlaps, crossings, tiny segments, text not converted to outlines, the smallest
+  hole or slot, hole to edge and to bend, inside corner radius, part size, each rule with the SendCutSend or
+  Protolabs page it comes from, or marked unsourced. A bend order is searched with a stated V-die and gooseneck
+  punch model and collisions are flagged. Any flat part exports as a clean profile with optional kerf
+  compensation. A SendCutSend preflight checks material, thickness, bending and limits from their pages, read
+  2026-11-28; nothing is uploaded or ordered. Manufacturability's `sheet_metal` process now judges bent parts
+  (flange length, holes to edge and bend, hems). `flat_pattern`, `cut_file_check`, `bend_order`,
+  `service_preflight` over MCP (126 tools), `form sheet`, three Bench entries, and docs/SHEET_METAL.md.
+- **CNC, 3-axis: toolpaths with a stock simulation that measures gouge and leftover.** Plan the machining of a
+  design on a mill or router: facing, adaptive clearing at constant engagement, finishing of floors and walls, the
+  outline cut through with tabs, drilling with pecks, helical boring, chamfering, and 3D finishing in parallel
+  passes and waterlines. Tools are flat, ball, bull-nose, drill and chamfer, each with its flute length, stick-out
+  and holder. Speeds and feeds are chip load × flutes × RPM from a table that quotes its source (Harvey Tool's
+  machining guidelines); plunge feeds, drills and materials no source covers are marked assumed. The G-code is
+  written for Grbl, LinuxCNC, Fanuc, Haas or Marlin, then read back the way that controller reads it and run on a
+  model of the stock with the tools' real shapes. You get the deepest gouge and where it is, the material left and
+  where, rapid moves through stock, shank and holder collisions, and the cycle time under your machine's limits.
+  Setups come from the manufacturability check when you ask for them. A program goes into a release only with a
+  current simulation (a new revision, another tool or an edited file makes it stale), nothing assumed and your
+  approval, and it is labelled "simulated, not proven on a machine" until you record what it did on one. The
+  viewport's data (toolpaths by operation, the stock with gouge and leftover marked) is written beside it.
+  `cam_plan`, `cam_post`, `cam_simulate` over MCP (126 tools), `form cam`, the Bench's "CNC, 3-axis", and
+  docs/CAM.md.
+- **Manufacturability, with fixes that are proved.** Check a design for CNC milling (3, 4 or 5 axes), injection
+  moulding, or FDM, resin (SLA), SLS, MJF and metal (LPBF) printing. Every rule is measured on the exact solid and
+  every limit names the guide it was read from and the date (Protolabs, Protolabs Network, Formlabs, Materialise,
+  RJG), or says it is geometry. Moulding proposes the pull direction and the parting line, finds undercuts and says
+  which need a side action or a lifter, checks draft per face and estimates clamp tonnage with its range; CNC finds
+  what a cutter of your diameter cannot reach, the setups needed, internal corners against the tool and the cavity
+  depth, tool reach and holes. Problems are drawn on the part. Draft, internal corners, escape holes and walls or
+  holes set by a parameter can be fixed: the fix is written into the design as a parameter and a feature, checked
+  before it is saved, saved as a revision and checked again; it is called fixed only when that check passes. A rule
+  that could not be checked is never a pass. `manufacturability` and `apply_fix` over MCP (126 tools), `form dfm`,
+  and docs/MANUFACTURABILITY.md.
 - **The Bench.** Every study, route and document of a design in one listing: at the top of the Review pane the
   studies (checks, assembly and joints, requirements, analysis maps, fit, critique, slice, print simulation,
   orientation, every printer, cost, make it lighter), at the top of the Make pane the routes (exports, 3MF with
@@ -53,7 +124,7 @@
   made. States come from keys of the head revision's inputs, never set by hand. The command palette finds every
   entry.
 - **`list_studies`, `run_study`, `get_study`** (MCP) and **`form study list|run|show <project> [id]`** (terminal): the
-  same Bench, headless. 103 MCP tools. Mass & inertia, Materials & sources (each value with its document) and Features
+  same Bench, headless. 126 MCP tools. Mass & inertia, Materials & sources (each value with its document) and Features
   (built, suppressed by hand, left out with the reason) are Bench studies too; a change made by hand is a new
   revision, so every study of the revision before it shows stale. The command palette also finds the hand tools:
   Sketch on a plane, Fillet or chamfer, Hole, shell or sketch on a face, Feature tree.
@@ -98,9 +169,72 @@
   materials`. New engineering materials: alloy steel 4140, white oak, nylon PA6 (moulded).
 - **Concept cards show mass and material.** `propose_concepts` takes a material per concept; a print concept without
   one is shown in PLA, marked assumed.
+- **Standard parts, generated from the standards' tables.** ISO 4762 (and DIN 912) socket head, ISO 7380-1 button
+  head and ISO 10642 countersunk screws, ISO 4032 nuts, ISO 7089 washers, CNC Kitchen heat-set inserts, ISO 15
+  deep-groove bearings (60x, 62x, 6xx, 608), ISO 8734 dowels, DIN 705 A collars, ground shafts and THK LM6-12UU
+  bushings, GT2 pulleys and belts, NEMA 17/23 motors, V-Slot 2020/2040 with T-nuts, NdFeB magnets by grade and
+  ISO 3601-1 O-rings with their gland. Every dimension names its table or datasheet; sizes outside a table are
+  refused; threads are cosmetic and say so. Designations as they are ordered ("ISO 4762 M5×12 A2-70").
+- **Place a part by picking a hole or a face.** It snaps to the hole's axis or the face, measures the host's
+  thickness, picks a screw's stock length, cuts the matching hole, counterbore, pocket, seat or motor mount into the
+  design's source as a feature, enters the assembly as purchased, and is checked for fit on the B-rep (interference
+  of the fitted part with the cut host, and the clearance per side from the tables). In the app: **Part here…** on a
+  selection, the Bench's **Standard parts**, or the palette.
+- **A buyable parts list.** Purchased items grouped by designation, with quantity, material and mass (catalogue value,
+  else the B-rep volume times the sourced density, else none), and the made parts with their mass; CSV and a PDF
+  page. Supplier numbers come only from you or a page at a link you give. An optional catalogue service is in
+  Settings, off by default, and says before each search what is sent and to whom; no provider ships yet.
+- **`standard_part`, `bom`** (MCP) and **`form parts …`, `form bom …`** (terminal). 126 MCP tools.
+- **Motion studies.** A mechanism played over time from its own declaration: drivers (a ramp, keyframes, a speed or a
+  sine), couplings (gears, rack and pinion, lead screw, belt, cam) and closed loops solved per frame by Newton's method
+  on the loop-closure equations, so a four-bar moves as one. Frames a linkage cannot reach (beyond its Grashof limit)
+  are reported, never posed. Points are traced with path, velocity and acceleration; every pair of parts that moves
+  relative to another is checked at every frame, with the smallest gap, when it happens and the first contact; the
+  holding torque under gravity of each driven joint comes from the parts' masses. An MP4 film of the motion (ffmpeg,
+  no GIF). MCP `motion_study`, `animate(kind="motion")`, `form motion`. Verified against the closed-form four-bar
+  (Freudenstein) to 1e-5°, and the non-Grashof case frame by frame.
+- **More joints.** `cylindrical` (turns and slides on one axis) and `ball` joints; `Coupling`, `gears`, `rack`,
+  `lead_screw`, `cam` and `Loop` in the assembly declaration.
+- **Robot files.** URDF, SRDF and MJCF from the assembly: a link per part, joints with their limits, couplings as
+  mimic and equality joints, loops as MJCF connects, inertia per link from the B-rep mass properties, visual meshes
+  and collision as CoACD pieces or convex hulls. Health checks (positive-definite inertia, triangle inequality, mesh
+  paths, unit axes, one tree, no self-collision at rest), then the files are loaded by yourdfpy and MuJoCo (a new
+  optional engine, MuJoCo 4.0.1 and yourdfpy 0.0.60 in their own Python), or validated structurally and labelled so.
+  MCP `robot_files`, `form urdf`, `form mjcf`.
+- **Assembly sequence.** A feasible order and each part's straight insertion direction, by disassembly: local freedom
+  from the contact normals, then a collision sweep. Threads unscrew along their mate axis. The exploded view and the
+  assembly instructions follow it, so each arrow is a proved direction. A set that cannot come apart one at a time is
+  reported, never ordered by guess. MCP `assembly_sequence`, `form sequence`.
+- Bench entries Motion, Robot files and Assembly steps.
+- **Boards and enclosures.** Bring a KiCad `.kicad_pcb` (read by Form Studio's own parser, no KiCad needed) or an
+  IDF `.emn`, and get an enclosure made around it as editable features: corner lugs clear of the board, standoffs
+  under its mounting holes with heat-set inserts, an opening for each connector sized from its plug's envelope and
+  centred on its face, a lid with a lip printed beside the box, vents, and the inserts and screws in the parts list.
+  The board is then checked against the enclosure on the solids: board to wall, a standoff under each hole, each
+  plug swept out through its wall, every part of known height under the lid, a screwdriver's way to each board screw.
+  Bring the board again after a change and the checks say what no longer lines up, with what moved. Heights come only
+  from the board file, a board STEP or you; a part without one is "not checked".
+- **Board checks with your own KiCad.** When `kicad-cli` is installed, KiCad's DRC and ERC run and are reported as
+  KiCad's; when it is not, the result says so and KiCad is an opt-in engine in Settings (`form install kicad`). The
+  board's track widths, spacing, drills, annular rings and size are checked against the published limits of JLCPCB,
+  PCBWay and OSH Park, each quoted with its page and the date it was read.
+- **Board fab files.** Gerbers, drill files, pick-and-place, BOM and the board STEP through your KiCad.
+- **`board_import`, `board_check`, `board_fab`** (MCP), **`form board read|import|check|fab|kicad`** (terminal) and the
+  Bench's **Board and enclosure**, **Board checks** and **Board fab files**. docs/BOARDS.md, with the plan for
+  schematic capture and routing (K2). 126 MCP tools.
 
 ### Changed
 
+- **One ISO 286 module** (`form/iso286.py`) for drawings, hand-made holes and the fit calculator: limits computed
+  from the standard's formulas, the cells where its published table differs kept as the table says, and the printed
+  tables kept as the reference every cell is checked against. Fits now cover deviations d to u and holes D to U.
+- **A drawing's title block gives the material and the mass** from the B-rep volume and the sourced density, with
+  the evidence; with no material both stay empty. A new material makes a new sheet.
+- **The Bench lists every wave's entries:** strength, the engineering calculation, manufacturability, sheet metal,
+  CNC, the drawing and STEP with PMI, standard parts and the parts list, motion, robot files and assembly steps,
+  the board and its enclosure, beside mass, materials and features.
+- The packaged app paints drawings and reads PDF drawings (its executable runs the Qt painter, and QtPdf ships), the
+  MuJoCo check finds its code, and CAM's speeds table ships with the rule and bend tables.
 - Filament and engineering densities are now the cited datasheet values (for example PETG 1.28, PA-CF 1.09, stainless
   304 8.00 g/cm³); woods keep the bd_materials catalogue density, labelled typical. "Oak" is red oak.
 - **Strength studies with a stated error.** Pick the faces that are held and the faces that are loaded, and get
@@ -154,6 +288,9 @@
   about 190 MB. Without it a study computes nothing and says how to get it.
 
 ### Fixed
+
+- A commit no longer fails on a design whose `derived()` reports a value as text (the bearing flange's housing
+  limits).
 
 - **Parts that do not fit one plate go onto more plates, never off the plate.** A design whose parts (or copies of
   it) do not fit the printer's bed is packed onto as many plates as it takes: largest first, turned about Z where

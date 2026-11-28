@@ -44,6 +44,22 @@ class ToolBridge(unittest.TestCase):
         rc, out = self.run_cli("tool", "get_project", "[1]")
         self.assertEqual(rc, 2)
 
+    def test_a_studio_made_for_another_data_folder_is_not_reused(self):
+        """Another test (or an earlier call) in this process left the server's Studio pointing at a data folder that
+        is gone; the next call makes one for the folder FORM_DATA names now."""
+        import shutil
+        from form import mcp_server
+        gone = Path(tempfile.mkdtemp(prefix="form-tool-gone-"))
+        with mock.patch.dict(os.environ, {"FORM_DATA": str(gone)}):
+            first = mcp_server.studio()
+            self.assertEqual(Path(first.root).resolve(), gone.resolve())
+        shutil.rmtree(gone)
+        rc, out = self.run_cli("tool", "form_overview")
+        self.assertEqual(rc, 0, out)
+        now = mcp_server.studio()
+        self.assertIsNot(now, first)
+        self.assertEqual(Path(now.root).resolve(), (self.tmp / "data").resolve())
+
 
 if __name__ == "__main__":
     unittest.main()

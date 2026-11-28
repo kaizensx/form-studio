@@ -194,6 +194,13 @@ def H(*parts) -> str:
     return hashlib.sha256(json.dumps(parts, sort_keys=True, default=str).encode()).hexdigest()[:16]
 
 
+def _changed(a, b) -> bool:
+    """A derived value changed: numbers by more than 1e-6, anything else (a limits string, a name) when unequal."""
+    if isinstance(a, (int, float)) and isinstance(b, (int, float)):
+        return abs(a - b) > 1e-6
+    return a != b
+
+
 def _slicer_tag(s: dict) -> list:
     """Artifact keys name the slicer kind, except Bambu Studio's, whose keys predate other slicers."""
     kind = s.get("kind", "bambu")
@@ -1390,7 +1397,8 @@ class Studio:
         v = self._k("view", key=gk, recipe_id=self.rid(p, r["n"]), values=r["values"], tol=tol, dock_mass_g=self._sliced_mass(p, r["n"]), p=p,
                     rev=r["n"], timeout=timeout)
         v["companions"] = (v.get("companions") or []) + self.reference_companions(p)
-        return v
+        from . import sequence                    # a computed assembly sequence: explode along it (nothing computed here)
+        return sequence.annotate_view(self, p, v, r["n"])
 
     def _sliced_mass(self, p, n=None):
         try:
@@ -1453,7 +1461,7 @@ class Studio:
         bd = {d["key"]: d for d in base["derived"]}
         derived = [{"key": d["key"], "label": d["label"], "unit": d["unit"], "from": bd[d["key"]]["value"], "to": d["value"],
                     "interface": bool(d.get("interface"))}
-                   for d in cand["derived"] if d["key"] in bd and abs(d["value"] - bd[d["key"]]["value"]) > 1e-6]
+                   for d in cand["derived"] if d["key"] in bd and _changed(d["value"], bd[d["key"]]["value"])]
         metrics = [{"key": "volume", "label": "Material volume", "unit": "cm³", "from": base["volume_mm3"] / 1000, "to": cand["volume_mm3"] / 1000}]
         bs, cs = base.get("statics") or {}, cand.get("statics") or {}
         for k, (label, unit) in STATICS_LABELS.items():
@@ -2028,11 +2036,15 @@ class Studio:
                 if body.get("result") not in ("too_tight", "good", "too_loose"):
                     raise StudioError("Choose how the printed part fitted.")
                 rec["result"] = body["result"]
+            elif kind == "machined":                   # what the person saw when the posted CNC program ran
+                from . import cam
+                rec.update(cam.record(self, p, body.get("result"), rec["note"]))
             else:
                 raise StudioError("Unknown evidence type.")
             p["evidence"].append(rec)
             self.decide(p, "evidence", f"Physical result recorded for r{p['head']}: " +
-                        (f"{len(rec['pairs'])} measured width(s)" if kind == "widths" else rec["result"].replace("_", " ")))
+                        (f"{len(rec['pairs'])} measured width(s)" if kind == "widths" else
+                         ("machined, " if kind == "machined" else "") + rec["result"].replace("_", " ")))
             self.save(p)
             return rec
 
@@ -2076,6 +2088,12 @@ class Studio:
         if unmet:
             reasons.append(unmet)
             blocking.append(unmet)
+        from . import cam                             # a CNC program asked into the release: simulated, current, confirmed
+        cg = cam.gate(self, p)
+        for why in cg["reasons"]:
+            reasons.append(why)
+            blocking.append(why)
+        warns += cg["warnings"]
         physical = [e for e in p["evidence"] if e["rev"] == p["head"] and (e["kind"] == "fit" or e.get("source") == "part")]
         model = bool(off) and off.get("why") == "purpose"
         level = ("Geometry computed · game asset, not for 3D printing" if purpose_mod.is_game(p) else
@@ -2084,8 +2102,12 @@ class Studio:
             + ("physical result recorded for this revision" if physical else "not physically validated")
         # a person may still release over failed checks: each one acknowledged and a reason written, and the release
         # says so in its manifest and report. Missing or stale outputs always block: there would be no files to freeze.
+        if cg.get("include") and not cg["reasons"]:
+            level += " · CNC program " + cg["label"]
         out = {"ready": not reasons, "reasons": reasons, "warnings": warns, "failures": failures, "blocking": blocking,
                "can_override": not blocking and bool(failures), "evidence_level": level, "physical": len(physical)}
+        if cg.get("include"):
+            out["cam"] = {k: cg.get(k) for k in ("state", "label", "simulation", "programs")}
         if model:                                      # nothing about slicing is missing from a model: it is not a print
             out["purpose"] = "model"
         elif off:
@@ -2146,6 +2168,9 @@ class Studio:
             from . import maker_docs                      # BOM, ASSEMBLY, PRINT_REPORT, MEASUREMENT_PLAN (+ images), hashed like the rest
             documents = maker_docs.write(self, p, rel, release=rel.name)
             files.update(documents)
+            from .cam import project as cam_project       # the CNC program, only with its current simulation
+            cam_files, cam_entry = cam_project.release_files(self, p, rel)
+            files.update(cam_files)
             manifest = {
                 "schema": "form-release/1", "project": p["id"], "name": p["name"], "revision": rev["n"], "approved": time.time(),
                 "units": "mm", "recipe": self.rid(p), "recipe_sha": self.recipe_sha(self.rid(p)), "kernel": self.kernel_id(),
@@ -2165,12 +2190,14 @@ class Studio:
                 "acknowledged_warnings": [w for w in g["warnings"]], "released_with_failed_checks": overridden,
                 "note": note, "evidence_level": g["evidence_level"] + (" · released with failed checks" if overridden else ""),
                 "documents": sorted(documents),
+                **({"cam": cam_entry} if cam_entry else {}),
                 "physical_evidence": [e for e in p["evidence"] if e["rev"] == rev["n"] and (e["kind"] == "fit" or e.get("source") == "part")],
                 "limits": (["A 3D model: print checks and slicing do not apply."] if model else
                            ["Not sliced (Design only): print time, filament and toolpaths were not estimated."] if not sl else
                            ["Slicer output is a simulation, not a print."]) + ["No structural analysis was performed."]
                           + ([] if model else ["Fit yield is a statistical model; see checks for the source of each input."])
-                          + (["Mesh design (OpenSCAD): no STEP file and no B-rep checks."] if getattr(self.recipe(p), "mesh", False) else []),
+                          + (["Mesh design (OpenSCAD): no STEP file and no B-rep checks."] if getattr(self.recipe(p), "mesh", False) else [])
+                          + (["CNC program: " + cam_entry["label"] + ". Prove it on the machine."] if cam_entry else []),
             }
             (rel / "MANIFEST.json").write_text(json.dumps(manifest, indent=1), encoding="utf-8")
             (rel / "REPORT.md").write_text(self._report(p, manifest), encoding="utf-8")

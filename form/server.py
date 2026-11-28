@@ -309,6 +309,19 @@ def make_handler(st: Studio):
                                        "width", "lip", "lip_height") if q.get(k) not in (None, "")}
                 return self._json(feature_helpers.preview(q.get("kind") or "boss", nozzle=st.slicer_info(p=p).get("nozzle_mm"),
                                                           allow_strain=float(q["allow_strain"]) if q.get("allow_strain") else None, **o))
+            # -- standard parts and the parts list (form/catalog.py, form/placement.py, form/bom.py) --
+            if rest == "/parts":
+                from . import placement
+                return self._json({"placements": placement.list_parts(st, p)})
+            if rest == "/parts/search":
+                from . import catalog
+                return self._json({"results": catalog.search(q.get("q") or "")})
+            if rest == "/parts/fit":
+                from . import placement
+                return self._json(placement.fit(st, p))
+            if rest == "/bom":
+                from . import bom
+                return self._json(bom.build(st, p, made=q.get("made") != "0"))
             if rest == "/bench" or rest.startswith("/bench/"):     # the Bench: every study, route and document (form/studies.py)
                 from . import studies
                 sid = rest[len("/bench/"):] if rest.startswith("/bench/") else ""
@@ -809,6 +822,26 @@ def make_handler(st: Studio):
                 st.activity(pid, "design", f"Standard feature: r{out['head']:02d}.", by="you")
                 out["job"] = auto(st.load(pid))
                 return self._json(out)
+            if action in ("part_place", "part_remove"):
+                from . import placement
+                eh = int(body["expect_head"]) if body.get("expect_head") is not None else None
+                if action == "part_remove":
+                    out = placement.remove(st, p, str(body.get("id", "")), eh)
+                else:
+                    out = placement.place(st, p, body.get("spec") or {}, body.get("at"), body.get("normal"),
+                                          float(body["depth"]) if body.get("depth") else None, int(body.get("qty") or 1),
+                                          body.get("cut", True) is not False, body.get("snap", True) is not False, None, eh)
+                st.activity(pid, "design", f"Standard part: r{out['head']:02d}.", by="you")
+                out["job"] = auto(st.load(pid))
+                return self._json(out)
+            if action in ("supplier_add", "supplier_remove"):
+                from . import bom
+                if action == "supplier_remove":
+                    return self._json(bom.remove_supplier(st, p, str(body.get("designation", "")), str(body.get("supplier", "")),
+                                                          str(body.get("part_number", ""))))
+                return self._json(bom.add_supplier(st, p, str(body.get("designation", "")), str(body.get("supplier", "")),
+                                                   str(body.get("part_number", "")), str(body.get("url", "")),
+                                                   str(body.get("note", "")), by="person"))
             if action == "lighten":
                 from . import lighten
                 return self._json(lighten.search(st, p, builds=int(body.get("builds") or 4)))
@@ -841,6 +874,25 @@ def make_handler(st: Studio):
             if action == "instructions":
                 from . import instructions
                 return self._json(instructions.build(st, p, int(body["rev"]) if body.get("rev") is not None else None))
+            if action in ("drawing", "drawing_spec", "drawing_set", "drawing_pmi", "drawing_check"):
+                from . import drawing as dr
+                rev = int(body["rev"]) if body.get("rev") is not None else None
+                try:
+                    if action == "drawing_spec":
+                        return self._json(dr.set_spec(st, p["id"], body.get("spec") or {}, bool(body.get("replace"))))
+                    if action == "drawing_set":            # dragging or typing a dimension edits its parameter
+                        out = dr.set_dimension(st, p, str(body["dimension"]), float(body["value"]),
+                                               body.get("expect_head"), rev)
+                        return self._json({**out, "commit": {"head": out["commit"]["head"]}, "job": auto(out["commit"])})
+                    if action == "drawing_pmi":
+                        return self._json(dr.export_pmi(st, p, rev))
+                    if action == "drawing_check":
+                        from .drawing import check
+                        return self._json(check.run(st, p, str(body["source"]), body.get("rows"), rev))
+                    return self._json(dr.build(st, p, rev, sheet=body.get("sheet"), projection=body.get("projection"),
+                                               prove=body.get("prove", True) is not False))
+                except dr.DrawingError as e:
+                    raise StudioError(str(e), e.hint)
             if action == "preview":
                 return self._json(st.preview(p, body.get("values", {})))
             if action == "commit":
