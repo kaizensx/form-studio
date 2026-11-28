@@ -188,7 +188,10 @@ def journey_bracket(ui):
     ui.check("face" in sketch(ui)["plane"], "the plane is the picked face, kept as a query")
     ui.check(ui.js("Store.sketchHost.vp.el") > 85, "the camera looks straight down on the face")
     ui.key("R")
-    a, b = px(ui, 8 - ox, -26 - oy), px(ui, 24 - ox, -14 - oy)
+    # its corners on whole millimetres of the sketch (the picked origin is wherever the pixel landed, and the sketch
+    # snaps to its own grid): 16 x 12 mm wherever the stage frames the part
+    x0, y0 = round(8 - ox), round(-26 - oy)
+    a, b = px(ui, x0, y0), px(ui, x0 + 16, y0 + 12)
     area = ui.item("sketchArea")
     ui.drag("sketchArea", ((b[0] - a[0]) * area.width(), (b[1] - a[1]) * area.height()), a[0], a[1])
     ui.wait_until(lambda: solved(ui).get("closed") and len(sketch(ui)["entities"]) == 4, 10, "a closed rectangle on the face")
