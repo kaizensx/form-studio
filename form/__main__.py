@@ -608,6 +608,26 @@ def main(argv=None):
     bo.add_argument("--url", default="")
     bo.add_argument("--note", default="")
     bo.add_argument("--confirm", action="store_true", help="catalogue: really search after reading what is sent")
+    cm = sub.add_parser("cam", help="CNC, 3-axis: cam plan|post|simulate|status <project> [--machine grbl|linuxcnc|fanuc|haas|marlin] "
+                                    "[--tool 6mm-flat ...] [--material aluminum] [--set k=v ...]; cam materials lists the "
+                                    "speeds table. G-code is simulated on a stock model and measured against the design")
+    cm.add_argument("action", choices=["plan", "post", "simulate", "status", "materials", "posts"])
+    cm.add_argument("project", nargs="?", default="")
+    cm.add_argument("--machine", default="", help="the post: grbl, linuxcnc, fanuc, haas, marlin")
+    cm.add_argument("--tool", action="append", default=[], metavar="NAME|JSON",
+                    help="a tool: 6mm-flat, 3mm-ball, 6mm-bull-r1, 5mm-drill, 6mm-chamfer-90, or JSON with flute_l, length, holder_d")
+    cm.add_argument("--material", default="")
+    cm.add_argument("--set", action="append", default=[], metavar="KEY=VALUE",
+                    help="an option: setups=auto stock.margin_xy=6 machine.rapid=5000 machine.accel=800 tolerance=0.05 chamfer=0.5")
+    cm.add_argument("--options", default="", help="plan options as JSON (ops, feeds, stock, machine)")
+    cm.add_argument("--units", default="", choices=["", "mm", "inch"])
+    cm.add_argument("--wcs", default="")
+    cm.add_argument("--include", action="store_true", help="ask for the program to go into the next release")
+    cm.add_argument("--exclude", action="store_true", help="leave the program out of the release")
+    cm.add_argument("--line-numbers", action="store_true")
+    cm.add_argument("--cell", type=float, help="simulation cell size, mm")
+    cm.add_argument("--out", help="with post: also copy the first program here")
+    cm.add_argument("--force", action="store_true")
     gd = sub.add_parser("diff", help="what changed between two revisions, computed on the solids: diff <project> A [B] [--png FILE]")
     gd.add_argument("project")
     gd.add_argument("a", type=int)
@@ -1147,6 +1167,39 @@ def main(argv=None):
                     _sh.copyfile(bm.pdf(st, p, b), a.pdf)
                     b["pdf"] = str(Path(a.pdf).resolve())
                 _print(b)
+        elif a.cmd == "cam":
+            from . import cam
+            from .cam import feeds as cam_feeds, posts as cam_posts
+            if a.action == "materials":
+                _print({"materials": cam_feeds.materials(),
+                        "sources": {k: cam_feeds.source_text(v) for k, v in cam_feeds.table()["sources"].items()}})
+            elif a.action == "posts":
+                _print({k: {"label": v["label"], "extension": v["ext"], "canned_cycles": v["canned"], "tool_changer": v["m6"]}
+                        for k, v in cam_posts.DIALECTS.items()})
+            else:
+                if not a.project:
+                    raise StudioError("Which project?", "form cam " + a.action + " <project>")
+                p = st.load(a.project)
+                given = bool(a.tool or a.material or a.set or a.options)
+                opts = cam.options_from_cli(a.tool, a.material, a.set, a.options) if given else None
+                inc = True if a.include else False if a.exclude else None
+                if a.action == "plan":
+                    _print(cam.plan_summary(cam.plan(st, p, opts if opts is not None else (p.get("cam") or {}).get("options") or {},
+                                                     force=a.force)))
+                elif a.action == "post":
+                    out = cam.post(st, p, a.machine or None, opts, a.units or None, a.wcs or None, inc, a.line_numbers,
+                                   a.cell, a.force)
+                    if a.out:
+                        import shutil as _sh
+                        _sh.copyfile(out["programs"][0]["file"], a.out)
+                        out["out"] = str(Path(a.out).resolve())
+                    _print(out)
+                elif a.action == "simulate":
+                    out = cam.simulate(st, p, sim_cell=a.cell, force=a.force)
+                    out["status"] = cam.status(st, p)
+                    _print(out)
+                else:
+                    _print(cam.status(st, p))
         elif a.cmd == "diff":
             from . import geomdiff
             import shutil as _sh

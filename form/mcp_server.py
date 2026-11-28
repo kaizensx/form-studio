@@ -1524,6 +1524,75 @@ def build() -> MCPServer:
         return await _run(go)
 
     @mcp.tool(annotations=RW)
+    async def cam_plan(project: str, tools: list | None = None, material: str = "", options: dict | None = None,
+                       rev: int | None = None) -> dict:
+        """Plan the CNC machining of a design on a 3-axis mill or router. Operations come from the part's shape:
+        facing, drilling (pecking when deep) and helical boring, adaptive clearing at constant engagement, 2.5D
+        finishing of floors and walls, 3D finishing (parallel and waterline, by drop-cutter), chamfering, and the
+        outline cut through with tabs. tools: short names ("6mm-flat", "3mm-ball", "6mm-bull-r1", "5mm-drill",
+        "6mm-chamfer-90") or {kind: flat|ball|bull|drill|chamfer, d, flutes, flute_l, length, holder_d, holder_l,
+        corner_r, angle}; a tool whose flute length or stick-out was not given is "assumed". material: a row of the
+        speeds table (aluminum, brass, steel, stainless, acrylic, polycarbonate, ...); speed and feed are
+        chip load x flutes x RPM from a cited table, each number marked sourced/computed, specified or assumed.
+        options: {machine: {rapid, accel, junction_deviation, max_feed, max_rpm}, stock: {margin_xy, margin_top} or
+        {size: [x, y, z]}, setups: "auto" (from the manufacturability check's access analysis) or ["+Z", "-Z", ...],
+        origin: corner|center, zero: top|bottom, ops: [{op: face|adaptive|finish|contour|drill|bore|chamfer|raster|
+        waterline, tool, stepover, stepdown, feeds: {rpm, feed, plunge}, ...}], feeds: {tool_id: {rpm, feed,
+        plunge}} (the person's own numbers: specified), tolerance, chamfer (mm), tabs, cutout}. Returns the setups
+        with their operations, speeds and feeds with sources, what is assumed (each blocks a release) and notes.
+        A plan is not checked: cam_post writes the G-code and simulates it."""
+        st = studio()
+        def go():
+            from . import cam
+            p = st.load(project)
+            o = dict(options or {})
+            if tools:
+                o["tools"] = tools
+            if material:
+                o["material"] = material
+            return cam.plan_summary(cam.plan(st, p, o, rev))
+        return await _run(go)
+
+    @mcp.tool(annotations=RW)
+    async def cam_post(project: str, machine: str = "", units: str = "", wcs: str = "", include: bool | None = None,
+                       options: dict | None = None, line_numbers: bool = False) -> dict:
+        """Write the G-code of the design's CAM plan for a controller, read it back and simulate it from the file.
+        machine: grbl, linuxcnc, fanuc (generic), haas or marlin (Marlin with a spindle). units mm or inch; wcs G54
+        to G59. Each dialect gets its own modal codes, tool changes (M6 and G43 where the controller has them, a
+        pause where it does not), drilling cycles (G81/G83 or written out) and ending. The posted file is parsed as
+        that controller reads it, compared with the plan move for move, and run on a stock model with the tools'
+        real shapes: gouge (exact distance of the part's surface into the cutter), leftover volume and places,
+        rapids through stock, shank and holder collisions, cycle time under the machine's stated limits. Every
+        result is "simulated, not proven on a machine". include=true asks for the program to go into the next
+        release: that needs a current simulation with no gouge or collision, no assumed tool, speed or feed, and
+        the person's approval (request_release). options: plan first with these (as cam_plan). Returns the files,
+        the first lines, the simulation and the release status."""
+        st = studio()
+        def go():
+            from . import cam
+            p = st.load(project)
+            return cam.post(st, p, machine or None, options, units or None, wcs or None, include, line_numbers)
+        return await _run(go)
+
+    @mcp.tool(annotations=RW)
+    async def cam_simulate(project: str, cell: float | None = None, force: bool = False) -> dict:
+        """Simulate the design's posted CNC program again from its file and say where it stands. The stock is a
+        height field (cell: mm, default a quarter of the smallest tool radius, at most 0.25); the tool's real shape
+        is swept along the motion parsed from the G-code. Returns per setup: gouge (max mm, where, which
+        operation), leftover (volume, max, regions), collisions, removed volume and cycle time per operation, with
+        the machine limits used; the file the viewport draws (form-cam-view/1: toolpaths coloured by operation, the
+        stock with gouge and leftover marked); and status: current, or stale and why (the design, tools, options,
+        speeds table or post changed, or the file was edited). Simulated, not proven on a machine."""
+        st = studio()
+        def go():
+            from . import cam
+            p = st.load(project)
+            out = cam.simulate(st, p, sim_cell=cell, force=force)
+            out["status"] = cam.status(st, p)
+            return out
+        return await _run(go)
+
+    @mcp.tool(annotations=RW)
     async def add_text(project: str, text: str, at: list[float], normal: list[float], height: float = 6.0,
                        depth: float = 0.6, sunk: bool = False, up: list[float] | None = None,
                        expect_head: int | None = None) -> dict:
@@ -2084,13 +2153,17 @@ def build() -> MCPServer:
     @mcp.tool(annotations=RW)
     async def record_physical_result(project: str, kind: str, result: str | None = None,
                                      widths: list[dict] | None = None, source: str = "part", note: str = "") -> dict:
-        """Record what the USER observed after a real print. Never call this with values the user did not report.
+        """Record what the USER observed after a real print or a real machining run. Never call this with values
+        the user did not report.
         kind="fit": result is too_tight | good | too_loose for this revision.
         kind="widths": measured pairs [{"nominal": mm, "measured": mm}] from a coupon (source="coupon") or this part
-        (source="part"); they calibrate this printer profile for every future design."""
+        (source="part"); they calibrate this printer profile for every future design.
+        kind="machined": the posted CNC program was run on a machine; result is good | gouged | collision |
+        left_material | scrapped. It belongs to that program (its file hashes); until one is recorded the program
+        is labelled "simulated, not proven on a machine"."""
         st = studio()
         body = {"kind": kind, "note": note}
-        if kind == "fit":
+        if kind in ("fit", "machined"):
             body["result"] = result
         elif kind == "widths":
             body.update({"pairs": widths or [], "source": source})

@@ -618,6 +618,17 @@ as profiles with optional kerf; a SendCutSend preflight checks material, thickne
 anything. `form sheet`; MCP `flat_pattern`, `cut_file_check`, `bend_order`, `service_preflight`. See
 [SHEET_METAL.md](SHEET_METAL.md).
 
+**CNC, 3-axis: toolpaths checked on a stock simulation.** Facing, adaptive clearing at constant engagement,
+finishing of floors and walls, the outline with tabs, drilling with pecks and helical boring, chamfering, and 3D
+finishing in parallel passes and waterlines, from the design's own solid with Form Studio's own drop-cutter. Speeds
+and feeds are chip load × flutes × RPM from a cited table; what no source covers is assumed and says so. The G-code
+is written for Grbl, LinuxCNC, Fanuc, Haas or Marlin, read back as that controller reads it, and run on a model of
+the stock with the tools' real shapes: gouge (the exact distance of the part's surface into the cutter), leftover
+volume and where it is, rapids through stock, shank and holder collisions, and the cycle time under your machine's
+limits. A program goes into a release only with a current simulation, nothing assumed and your approval, labelled
+"simulated, not proven on a machine" until you record what it did on one. MCP `cam_plan`, `cam_post`,
+`cam_simulate`; `form cam`. See [CAM.md](CAM.md).
+
 ## Analysis, measurement and annotations
 
 | | |

@@ -331,6 +331,7 @@ form tool get_project '{"project": "desk-stand"}'                               
 | **How the engine is built** | [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) |
 | **Strength studies and their verification** | [docs/STRENGTH.md](docs/STRENGTH.md) |
 | **Engineering calculators and their verification** | [docs/CALCULATORS.md](docs/CALCULATORS.md) |
+| **CNC toolpaths and their stock simulation** | [docs/CAM.md](docs/CAM.md) |
 
 ## Community
 

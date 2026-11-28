@@ -64,6 +64,21 @@
   2026-11-28; nothing is uploaded or ordered. Manufacturability's `sheet_metal` process now judges bent parts
   (flange length, holes to edge and bend, hems). `flat_pattern`, `cut_file_check`, `bend_order`,
   `service_preflight` over MCP (109 tools), `form sheet`, three Bench entries, and docs/SHEET_METAL.md.
+- **CNC, 3-axis: toolpaths with a stock simulation that measures gouge and leftover.** Plan the machining of a
+  design on a mill or router: facing, adaptive clearing at constant engagement, finishing of floors and walls, the
+  outline cut through with tabs, drilling with pecks, helical boring, chamfering, and 3D finishing in parallel
+  passes and waterlines. Tools are flat, ball, bull-nose, drill and chamfer, each with its flute length, stick-out
+  and holder. Speeds and feeds are chip load × flutes × RPM from a table that quotes its source (Harvey Tool's
+  machining guidelines); plunge feeds, drills and materials no source covers are marked assumed. The G-code is
+  written for Grbl, LinuxCNC, Fanuc, Haas or Marlin, then read back the way that controller reads it and run on a
+  model of the stock with the tools' real shapes. You get the deepest gouge and where it is, the material left and
+  where, rapid moves through stock, shank and holder collisions, and the cycle time under your machine's limits.
+  Setups come from the manufacturability check when you ask for them. A program goes into a release only with a
+  current simulation (a new revision, another tool or an edited file makes it stale), nothing assumed and your
+  approval, and it is labelled "simulated, not proven on a machine" until you record what it did on one. The
+  viewport's data (toolpaths by operation, the stock with gouge and leftover marked) is written beside it.
+  `cam_plan`, `cam_post`, `cam_simulate` over MCP (108 tools), `form cam`, the Bench's "CNC, 3-axis", and
+  docs/CAM.md.
 - **Manufacturability, with fixes that are proved.** Check a design for CNC milling (3, 4 or 5 axes), injection
   moulding, or FDM, resin (SLA), SLS, MJF and metal (LPBF) printing. Every rule is measured on the exact solid and
   every limit names the guide it was read from and the date (Protolabs, Protolabs Network, Formlabs, Materialise,
