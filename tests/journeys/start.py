@@ -47,8 +47,14 @@ def journey_blank(ui):
     ui.check(ui.sees("Anything", "startPurpose") and ui.sees("Game asset", "startPurpose"), "Make it for: Anything / Game asset")
     ui.check(not ui.sees("My printer", "startPurpose"), "no print choice while printing is off")
     ui.check(not ui.sees("not for printing", "topBar") and ui.find(name="printerChip") is None, "no printer talk in the top bar")
-    # the agent and model are chosen in the composer, beside Design it; the printer right under it
-    ui.check(ui.exists("startModel") and ui.find(name="startModel", within=ui.item("startComposer")) is not None, "the agent and model chip is in the composer")
+    # the agent and model are chosen under the composer, at the right end of the "Make it for" line
+    ui.check(ui.find(name="startModel", within=ui.item("startOptions")) is not None and ui.find(name="startModel", within=ui.item("startComposer")) is None,
+             "the agent and model chip is under the composer, not in it")
+    opts, chip = ui.item("startOptions"), ui.item("startModel")
+    ui.check(abs((chip.x() + chip.width()) - (opts.width() - 4)) < 1.5, "it ends at the bar's right edge")
+    from PySide6.QtCore import QPointF
+    seg = ui.item("startPurpose")
+    ui.check(seg.mapToScene(QPointF(seg.width(), 0)).x() < chip.mapToScene(QPointF(0, 0)).x(), "and stands clear of Make it for")
     ui.check(not ui.exists("startPrinter"), "no printer chip for a 3D model")
     n_before = len(ui.api("/studio")["projects"])
     ui.click("startBlank")
