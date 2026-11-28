@@ -2,7 +2,35 @@
 
 ## Unreleased
 
+### Added
+
+- **A reply ends in Sources, built from the tool log** (direction I, wave O). Every tool call of a turn whose result
+  says how its content is known is one numbered row with its evidence word: SIMULATED, COMPUTED, SPECIFIED, OPENED,
+  MEASURED or ASSUMED. The word is the result's own `evidence`; a document or link that was read is OPENED, a
+  measurement you answered is MEASURED. A call that failed, or whose result names no class, is not a source
+  (`form/cite.py`). A number in the reply carries a source's index only when that exact number stands in that
+  source's result. Nothing is taken from what the model says about itself.
+- **The plan card.** When the agent plans a design (`plan_design`), its steps are a numbered card in the conversation.
+  If it then asks for approval, the question is answered on the card: Approve, Edit (your words go back as the
+  answer) or its other choice. A plan nobody was asked about is shown as the plan; the card says "approved by you"
+  only after you answered.
+- **By hand since the last reply.** Edits you make by hand between two replies are one note in the conversation, and
+  the agent reads the same list with your next message, with the revisions.
+- **Saved prompts.** The bookmark on a message of yours keeps it as a command; the palette lists it under *Saved
+  prompts* and sends it again.
+- **Commands on the selection.** With something picked on the part, the prompt starts with what it is ("On 2 edges")
+  and the message goes with the selection's numbers.
+- **Reduce motion** in Settings › General: movement becomes a short fade, at once. The system's setting turns it on too.
+
 ### Changed
+
+- **The live line in the conversation** names what the agent is doing in the design's words, the tool and the step
+  ("Running the strength study · strength_study · step 3"), or the feature a build is on. The Designing screen uses
+  the same words.
+- **The palette** has the prompt's lit well, the open design as its scope, group names in grey capitals and one lit
+  row. Revision cards share the look of the Sources and plan cards.
+- **A still window redraws less**: the room's light is stepped five times in two seconds, not five times a second.
+- Design cards on Home no longer carry an index number.
 
 - **The right pane is the Bench's chapter for the mode, in one row grammar** (direction I, second part). Check lists
   the studies, Make the routes, Document the documents, and every row reads the same: a state mark, the name, the

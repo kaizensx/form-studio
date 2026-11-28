@@ -17,13 +17,8 @@ Item {
     // Start blank: nothing asked yet, nothing on the plate
     readonly property bool empty: Store.blankCanvas && dz.me.length === 0 && !Store.chatBusy
     readonly property var steps: {
-        var map = { design_guide: "Reading the design contract", create_design: "Writing the design as code", update_design: "Changing the code",
-                    propose_concepts: "Building concepts side by side", render: "Looking at the part", read_document: "Reading the drawing",
-                    import_reference: "Importing the reference part", ask_user: "Asking you", ask_measurement: "Asking you to measure",
-                    create_project: "Starting from a building block", describe_recipe: "Reading a building block", preview_change: "Trying a change",
-                    commit_change: "Keeping a change", run_pipeline: "Building, checking and slicing", get_project: "Reading the design" }
         var out = []
-        tools.forEach(function (t) { var n = String(t.name || "").replace(/^mcp__form__/, ""); var l = map[n] || ("Calling " + n)
+        tools.forEach(function (t) { var l = F.toolSay(t.name)
             if (!out.length || out[out.length - 1] !== l) out.push(l) })
         return out
     }

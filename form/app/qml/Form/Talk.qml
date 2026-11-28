@@ -63,14 +63,6 @@ Rectangle {
     // the messages saved as commands outlive the session
     Settings { id: kept; category: "talk"; property string prompts: "[]" }
     Connections { target: Store; function onSavedPromptsChanged() { kept.prompts = JSON.stringify(Store.savedPrompts) } }
-    // the feature a build is on, in the design's own words; else what the tool that runs does
-    readonly property var toolSays: ({ create_design: "Writing the design", update_design: "Rewriting the design", edit_design: "Editing a feature",
-        create_project: "Starting the design", commit_change: "Committing a revision", preview_change: "Trying a change", render: "Looking at the part",
-        get_project: "Reading the design", run_pipeline: "Running the checks", plan_design: "Planning the features", design_brief: "Writing the brief",
-        design_guide: "Reading the design guide", read_document: "Opening a document", fetch_link: "Opening a link", strength_study: "Running the strength study",
-        get_strength_study: "Reading the strength study", run_study: "Running a study", measure: "Measuring the solid", mass_properties: "Working out the mass",
-        ask_user: "Asking you", ask_measurement: "Asking for a measurement", import_reference: "Importing a reference", reconstruct: "Rebuilding the mesh as CAD",
-        critique: "Reviewing its own design", optimize: "Searching for a better design", manufacturability: "Checking it can be made" })
     // the step the agent is on in this turn: every tool call since your message
     readonly property int stepNow: { var n = 0, it = Store.chatItems; for (var i = it.length - 1; i >= 0 && it[i].t !== "user"; i--) if (it[i].t === "tool") n++; return n }
     function liveDetail() {
@@ -86,7 +78,7 @@ Rectangle {
         if (Store.chatAsking) return who + " is waiting for your answer"
         if (!L) return who + " is thinking…"
         if (Store.building && Store.building.label) return "Building " + Store.building.label
-        if (L.kind === "tool") return talk.toolSays[L.name] || "Calling " + L.name
+        if (L.kind === "tool") return F.toolSay(L.name)
         if (L.kind === "text") return "Writing…"
         if (L.kind === "thinking") return "Thinking…" + (L.chars ? " " + (L.chars / 1000).toFixed(1) + " kB" : "")
         return "Working…"

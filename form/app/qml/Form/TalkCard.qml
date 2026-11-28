@@ -12,7 +12,7 @@ Rectangle {
     readonly property real pad: 13
     implicitHeight: body.y + body.implicitHeight + 11
     radius: 14
-    color: Theme.alpha(Theme.dark ? "#000000" : "#ffffff", Theme.dark ? 0.20 : 0.55)
+    color: Theme.dark ? Qt.rgba(0, 0, 0, 0.20) : Qt.rgba(1, 1, 1, 0.55)
     border.width: 1; border.color: lit ? Theme.alpha(Theme.datum, 0.45) : Theme.rule
     Behavior on border.color { Tint {} }
     Txt { id: cap; objectName: "cardTitle"; x: card.pad; y: 11; kind: "cap"; text: card.title; wrapMode: Text.NoWrap }
