@@ -116,7 +116,7 @@ instead.
 
 ## Tools at a glance
 
-97 tools. Read-only tools never change a project.
+100 tools. Read-only tools never change a project.
 
 | Tool | Access | What it does |
 |---|---|---|
@@ -217,6 +217,9 @@ instead.
 | [`export_conversation`](#export_conversation) | read-only | Export a conversation. A saved conversation as Markdown (format="md", to read or share) or JSON (format="json", to import again). |
 | [`model_mesh`](#model_mesh) | changes | Model a subdivision cage in Blender with declarative ops (never code), e.g. [{"op":"cage_new","primitive":"cube","size":[40,30,20]}, {"op":"name_region","name":"top", "faces":{"normal":[0,0,1],"within_deg":10}}, {"op":"extrude_region","faces":{"region":"top"},"offset":8}]. |
 | [`game_asset`](#game_asset) | changes | Make a design a game asset: LOD0-LOD3 at triangle budgets (from subdivision cage levels first; decimated LODs are automatic retopology), UVs (region seams or Smart UV, packed), materials from the design's zones, Cycles-baked base colour, normal, ORM and AO maps (texture_px 1024\|2048\|4096; bake fast\|quality), convex-hull collision per part (collision="coacd" when CoACD is installed), pivot and scale. |
+| [`list_studies`](#list_studies) | read-only | List every study, route and document of a design with its state: the Bench. |
+| [`run_study`](#run_study) | changes | Run one Bench entry for the head revision (ids from list_studies). |
+| [`get_study`](#get_study) | read-only | Read one Bench entry: its state, the revision it describes, its headline with evidence, its files and stored numbers, and the log of its runs. |
 
 ## Tools
 
@@ -1902,6 +1905,46 @@ Reads the project, never changes it. Every check is computed from the written GL
 | `retopo` | string |  |
 | `formats` | array \| null |  |
 | `materials` | object \| null |  |
+
+### `list_studies`
+
+*Read-only.*
+
+List every study, route and document of a design with its state: the Bench. group: study (Review), route
+or document (Make). Each entry: id, label, state (never, current, stale, failed, running, unavailable, n/a),
+rev (the revision its result describes; a stale entry names the revision its newest result was computed for),
+headline with evidence, needs, inputs, and by whom it runs (engine; agent: call `tool` yourself; person: only
+they do it, in Form Studio). Reads only; nothing is run.
+
+| Argument | Type | Required |
+|---|---|---|
+| `project` | string | yes |
+| `group` | string \| null |  |
+
+### `run_study`
+
+Run one Bench entry for the head revision (ids from list_studies). A current entry comes back as it is
+unless force=True. Waits up to wait_s, then returns a job to poll with get_job. An entry the agent must do
+(critique) returns the tool to call; one only a person does (release) is never done here.
+
+| Argument | Type | Required |
+|---|---|---|
+| `project` | string | yes |
+| `id` | string | yes |
+| `force` | boolean |  |
+| `wait_s` | number |  |
+
+### `get_study`
+
+*Read-only.*
+
+Read one Bench entry: its state, the revision it describes, its headline with evidence, its files and
+stored numbers, and the log of its runs. Reads only.
+
+| Argument | Type | Required |
+|---|---|---|
+| `project` | string | yes |
+| `id` | string | yes |
 
 ## Prompts
 
