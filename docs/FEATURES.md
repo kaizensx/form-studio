@@ -556,6 +556,24 @@ equations, the sources and the verification table are in [CALCULATORS.md](CALCUL
 - **Simplifications are stated on the sheet:** the VDI 2230 core, Lewis bending with no ISO 6336 factors, printed
   springs and hinges with their caveats.
 - **Headless:** `calculate`; `form calc <calculator> key=value ... [--build]`, `form calc list|show|verify`.
+**Manufacturability, with fixes that are proved.** For CNC (3, 4 and 5 axes), injection moulding and five printing
+technologies (FDM, SLA, SLS, MJF, LPBF), every rule is measured on the exact solid and every limit names its source
+and the date it was read. Moulding proposes a pull direction (searched over the Gaussian sphere for the least
+undercut) and the parting line, says which undercuts need a side action or a lifter, checks draft per face and
+estimates clamp tonnage; CNC finds what the stated cutter cannot reach, the fewest setups, internal corners against
+the tool and the cavity depth, tool reach and holes. Results are drawn on the part. A fix (draft, corner radius,
+escape holes, a wall or hole parameter) is written into the source, checked before it is saved, saved as a revision
+and checked again; it is called fixed only by that second check. `form dfm`; MCP `manufacturability`, `apply_fix`.
+See [MANUFACTURABILITY.md](MANUFACTURABILITY.md).
+
+**Sheet metal and cut parts.** Bent parts designed from flanges, hems, jogs, reliefs and louvres
+(`form.sheet.build`), unfolded on the exact solid with a K-factor from a cited table or your shop's value, and
+proved by folding the flat back onto the part within 0.01 mm. The flat pattern DXF has cut, bend (up and down, with
+angle, radius and K notes), etch and notes layers. Any DXF can be checked before a laser, waterjet or router cuts
+it, every rule with its fabricator source; a bend order is found with a stated press-brake model; flat parts export
+as profiles with optional kerf; a SendCutSend preflight checks material, thickness and limits without sending
+anything. `form sheet`; MCP `flat_pattern`, `cut_file_check`, `bend_order`, `service_preflight`. See
+[SHEET_METAL.md](SHEET_METAL.md).
 
 ## Analysis, measurement and annotations
 
@@ -705,7 +723,7 @@ equations, the sources and the verification table are in [CALCULATORS.md](CALCUL
 | OpenSCAD | Builds `.scad` designs; Customizer ranges become parameters |
 | Blender | Photoreal renders; its 3D-Print Toolbox checks when the add-on is installed |
 | Your slicer | Slices, and opens the 3MF or G-code in it |
-| Any MCP client | The full engine over 106 tools ([MCP reference](MCP.md)) |
+| Any MCP client | The full engine over 109 tools ([MCP reference](MCP.md)) |
 
 When a program's version outside the supported range is why something failed, the error names the supported versions
 and what to do.

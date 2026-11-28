@@ -1,0 +1,128 @@
+# Injection moulding for a two-plate tool. Read on 2026-11-28.
+
+[process]
+id = "injection"
+label = "Injection moulding"
+evidence = "computed (B-rep)"
+options = ["pull", "resin", "cavities", "textured"]
+defaults = { cavities = 1 }
+needs = ["resin"]
+not_judged = "Fill, packing, cooling, warpage, shrinkage, weld lines, gate and runner placement, ejection and sink are not judged. The parting line is proposed for a two-plate tool; the parting surface, shut-offs and the tool itself are not designed."
+
+[[source]]
+id = "protolabs-im"
+title = "Plastic Injection Molding Design Guidelines"
+publisher = "Protolabs"
+url = "https://protolabs.com/services/injection-molding/plastic-injection-molding/design-guidelines"
+published = "undated"
+read = "2026-11-28"
+
+[[source]]
+id = "rjg-tonnage"
+title = "Clamp Tonnage: More is Better, Right?"
+publisher = "RJG, Inc."
+url = "https://rjginc.com/clamp-tonnage-more-is-better-right/"
+published = "2017-05-01"
+read = "2026-11-28"
+
+[[rule]]
+id = "injection.undercut"
+title = "No undercut against the pull"
+measure = "undercut_mm2"
+op = "<="
+fail = 0.0
+unit = "mm²"
+source = "computed"
+why = "Surface the tool cannot release along the pull in either half: it needs a side action, a lifter or a collapsible core."
+
+[[rule]]
+id = "injection.draft"
+title = "Draft on faces along the pull"
+measure = "draft_deg"
+op = ">="
+fail = 0.5
+warn = 2.0
+unit = "°"
+source = "protolabs-im"
+quote = "Draft: 0.5° minimum on vertical faces, 2° works well in most situations, 3° minimum for a shut-off or light texture."
+fix = "draft"
+
+[[rule]]
+id = "injection.draft_textured"
+title = "Draft on textured faces"
+measure = "draft_deg"
+op = ">="
+fail = 3.0
+unit = "°"
+when = "textured"
+source = "protolabs-im"
+quote = "3° minimum for light texture (PM-T1), 5° and up for PM-T2."
+fix = "draft"
+
+[[rule]]
+id = "injection.wall_min"
+title = "Thinnest wall for the resin"
+measure = "wall_min_mm"
+op = ">="
+by = "resin"
+unit = "mm"
+source = "protolabs-im"
+quote = "Recommended wall thickness by resin (the table on the page)."
+fix = "thicken"
+warn = { abs = 1.143, acetal = 0.762, acrylic = 0.635, lcp = 0.762, lfrp = 1.905, nylon = 0.762, pc = 1.016, polyester = 0.635, pe = 0.762, pps = 0.508, pp = 0.889, ps = 0.889, pu = 2.032 }
+
+[[rule]]
+id = "injection.wall_max"
+title = "Thickest wall for the resin"
+measure = "wall_max_mm"
+op = "<="
+by = "resin"
+unit = "mm"
+source = "protolabs-im"
+quote = "Recommended wall thickness by resin (the table on the page)."
+warn = { abs = 3.556, acetal = 3.048, acrylic = 12.7, lcp = 3.048, lfrp = 25.4, nylon = 2.921, pc = 3.81, polyester = 3.175, pe = 5.08, pps = 4.572, pp = 3.81, ps = 3.81, pu = 19.05 }
+
+[[rule]]
+id = "injection.projected_area"
+title = "Projected area within the service's tool limit"
+measure = "projected_in2"
+op = "<="
+warn = 175.0
+unit = "in²"
+source = "protolabs-im"
+quote = "Maximum projected mold area: 175 sq. in. (112,903 sq. mm)."
+
+[[rule]]
+id = "injection.depth"
+title = "Depth from the parting line"
+measure = "depth_from_parting_mm"
+op = "<="
+warn = 101.0
+unit = "mm"
+source = "protolabs-im"
+quote = "Depth from parting line: 4 in (101 mm), or up to 8 in (203.2 mm) if the parting line can pass through the middle of the part."
+
+[[rule]]
+id = "injection.tonnage"
+title = "Clamp tonnage"
+measure = "tonnage_t"
+op = "info"
+unit = "US tons"
+source = "rjg-tonnage"
+quote = "Typical tonnage factors can range from 2 to 10 tons/in², but for a starting point we recommend 3 tons/in²."
+factor = { low = 2.0, start = 3.0, high = 10.0 }
+
+[resins]
+abs = "ABS"
+acetal = "Acetal (POM)"
+acrylic = "Acrylic (PMMA)"
+lcp = "Liquid crystal polymer"
+lfrp = "Long-fibre reinforced plastic"
+nylon = "Nylon (PA)"
+pc = "Polycarbonate"
+polyester = "Polyester"
+pe = "Polyethylene"
+pps = "Polyphenylene sulfide"
+pp = "Polypropylene"
+ps = "Polystyrene"
+pu = "Polyurethane"

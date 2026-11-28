@@ -1,0 +1,117 @@
+# Bend allowance: the K-factor (where the neutral fibre lies, as a fraction of the thickness from the inside of the
+# bend) and the default inside radius, each with the page it was read from and the date it was read. A shop's own
+# K-factor replaces these and is then recorded as "specified".
+#
+# Bend allowance BA = θ · (r + K · t)   (θ the bend angle in radians, r the inside radius, t the thickness)
+# The flat length of a bent part is the sum of its straight flats plus one BA per bend.
+
+[[source]]
+id = "wikipedia-bending"
+title = "Bending (metalworking), section K-factor, table Generic K-factors"
+publisher = "Wikipedia"
+url = "https://en.wikipedia.org/wiki/Bending_(metalworking)"
+published = "last edited 2026-09-06"
+read = "2026-11-28"
+note = "The page calls the table a rule of thumb (\"Actual results may vary remarkably\") and gives no primary source for it. The K-factor formula next to it cites Diegel, O., BendWorks (2002). The same table appears in METU's MECH 114 course notes, Sheet Metal Work."
+
+[[source]]
+id = "din6935-cadde"
+title = "Blech biegen (DIN 6935 correction factor and developed length, as reproduced)"
+publisher = "cad.de forum upload (Lenzcad), a secondary source; DIN 6935 itself (Beuth/DIN Media) was not read"
+url = "https://ww3.cad.de/foren/ubb/uploads/Lenzcad/Blechbiegen.pdf"
+published = "undated"
+read = "2026-11-28"
+note = "Gives k = 0.65 + 0.5·log10(r/t) with k on the ISO/DIN scale (0 inside, 1 mid-plane, 2 outside), i.e. K = k / 2 on the scale used here, and L_bend = (r + t·k/2)·π·α/180°. It states no range of r/t for the formula."
+
+[[source]]
+id = "fractory-bending"
+title = "Sheet Metal Bending – Methods, Design Tips & K Factor"
+publisher = "Fractory (Andreas Velling)"
+url = "https://fractory.com/sheet-metal-bending/"
+published = "2019-02-11, updated 2026-09-21"
+read = "2026-11-28"
+
+[[source]]
+id = "protolabs-sheet"
+title = "Sheet Metal Fabrication: Design Guidelines"
+publisher = "Protolabs"
+url = "https://www.protolabs.com/services/sheet-metal-fabrication/design-guidelines/"
+published = "undated"
+read = "2026-11-28"
+
+# ---- K-factor by method -------------------------------------------------------------------------------------
+
+[kfactor]
+default = "table"
+methods = ["table", "din6935", "value"]
+
+# The generic table: by forming (air bending, bottoming, coining), by the class of the material (soft, medium,
+# hard) and by r/t: up to 1, 1 to 3, over 3. Rows exactly as the source prints them.
+[kfactor.table]
+source = "wikipedia-bending"
+bands = [1.0, 3.0]      # r/t ≤ 1, 1 < r/t ≤ 3, r/t > 3 (the source: "0 to thickness", "thickness to 3 × thickness", "greater than 3 × thickness")
+air = { soft = [0.33, 0.40, 0.50], medium = [0.38, 0.43, 0.50], hard = [0.40, 0.45, 0.50] }
+bottoming = { soft = [0.42, 0.46, 0.50], medium = [0.44, 0.47, 0.50], hard = [0.46, 0.48, 0.50] }
+coining = { soft = [0.38, 0.44, 0.50], medium = [0.41, 0.46, 0.50], hard = [0.44, 0.47, 0.50] }
+
+[kfactor.din6935]
+source = "din6935-cadde"
+formula = "K = (0.65 + 0.5 * log10(r / t)) / 2"
+# The source gives no range. Form Studio keeps K between 0 and 0.5 (the inside face and the mid-plane): a cap that
+# is plain geometry for the lower end and Form Studio's choice (unsourced) for the upper end.
+cap = [0.0, 0.5]
+cap_source = "unsourced"
+
+# ---- materials ----------------------------------------------------------------------------------------------
+# class: which column of the generic table a material reads. The table's columns are "soft", "medium" and "hard"
+# with no alloy named; the class given here is Form Studio's reading (assumed), shown as such on every result.
+# r_default: the inside radius a flange gets when none is given: equal to the thickness, after Fractory ("choosing
+# the inner radius (ir) to be the same as the material thickness").
+
+[[material]]
+id = "al_5052_h32"
+label = "Aluminium 5052-H32"
+class = "soft"
+class_source = "assumed"
+r_default = "t"
+r_source = "fractory-bending"
+
+[[material]]
+id = "al_6061_t6"
+label = "Aluminium 6061-T6"
+class = "hard"
+class_source = "assumed"
+r_default = "t"
+r_source = "fractory-bending"
+
+[[material]]
+id = "steel_mild"
+label = "Mild steel (cold rolled 1008 / A36)"
+class = "medium"
+class_source = "assumed"
+r_default = "t"
+r_source = "fractory-bending"
+
+[[material]]
+id = "steel_304"
+label = "Stainless steel 304"
+class = "hard"
+class_source = "assumed"
+r_default = "t"
+r_source = "fractory-bending"
+
+[[material]]
+id = "copper"
+label = "Copper (soft temper)"
+class = "soft"
+class_source = "assumed"
+r_default = "t"
+r_source = "fractory-bending"
+
+# ---- hems --------------------------------------------------------------------------------------------------
+[hem]
+min_inside_d = "t"
+source = "protolabs-sheet"
+quote = "minimum inside diameter equals the material thickness"
+return_length = "6t"
+return_quote = "a hem return length of 6x material thickness"

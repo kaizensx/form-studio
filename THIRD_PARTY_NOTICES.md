@@ -121,6 +121,10 @@ tables against the library.
   sprockets; its `Chain` (a chain wrapped over sprockets at any positions) has no build123d port, and Form Studio's
   two-sprocket `chain_drive` uses the standard chain-length formula instead. Nothing copied.
 
+- **ezdxf** 1.4.5 (https://github.com/mozman/ezdxf). Licence: MIT. Installed with build123d (one of its
+  dependencies). Used as a library by `form/sheet/dxf.py` to write flat patterns and cut profiles and to read DXF
+  files for the cut-file check, and by `form/triage.py`. Nothing copied.
+
 ## Optional engines, installed only when you ask
 
 None of these is bundled. Settings › Engines & software (or `form install`) installs each one into an environment of its own

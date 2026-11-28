@@ -19,6 +19,34 @@
   entry **Engineering calculation**. 106 MCP tools.
 - ISO 286 tables and published fastener dimensions moved to modules with no CAD kernel behind them
   (`form/iso286.py`, `form/hardware_tables.py`); `form.craft.fits` and `form.parts` read the same copy.
+- **Sheet metal and cut parts.** Design a bent part from a base flange, edge flanges, hems, jogs, relief cuts
+  (rectangular or obround) and louvres, each with its thickness and inside radius (`form.sheet.build.Sheet`). The
+  part is unfolded on the exact solid: one skin walked across tangent edges, constant thickness checked face by
+  face and by volume, each bend's allowance θ·(r + K·t) with a K-factor from a cited table (the generic air,
+  bottoming and coining table, DIN 6935's formula, or your shop's value, recorded as specified). The flat is proved
+  by folding it back from its own numbers onto the part (within 0.01 mm; on the test parts under 1e-13 mm), and an
+  L-bracket and a U-channel match their analytic flat lengths. What cannot be unfolded is named with the face and
+  why. The flat pattern DXF has cut, bend-up, bend-down (with angle, radius and K notes), etch (the label as
+  outlines) and notes layers. A cut-file checker reads any DXF (layers by intent) for laser, waterjet or router:
+  open contours, duplicates and overlaps, crossings, tiny segments, text not converted to outlines, the smallest
+  hole or slot, hole to edge and to bend, inside corner radius, part size, each rule with the SendCutSend or
+  Protolabs page it comes from, or marked unsourced. A bend order is searched with a stated V-die and gooseneck
+  punch model and collisions are flagged. Any flat part exports as a clean profile with optional kerf
+  compensation. A SendCutSend preflight checks material, thickness, bending and limits from their pages, read
+  2026-11-28; nothing is uploaded or ordered. Manufacturability's `sheet_metal` process now judges bent parts
+  (flange length, holes to edge and bend, hems). `flat_pattern`, `cut_file_check`, `bend_order`,
+  `service_preflight` over MCP (109 tools), `form sheet`, three Bench entries, and docs/SHEET_METAL.md.
+- **Manufacturability, with fixes that are proved.** Check a design for CNC milling (3, 4 or 5 axes), injection
+  moulding, or FDM, resin (SLA), SLS, MJF and metal (LPBF) printing. Every rule is measured on the exact solid and
+  every limit names the guide it was read from and the date (Protolabs, Protolabs Network, Formlabs, Materialise,
+  RJG), or says it is geometry. Moulding proposes the pull direction and the parting line, finds undercuts and says
+  which need a side action or a lifter, checks draft per face and estimates clamp tonnage with its range; CNC finds
+  what a cutter of your diameter cannot reach, the setups needed, internal corners against the tool and the cavity
+  depth, tool reach and holes. Problems are drawn on the part. Draft, internal corners, escape holes and walls or
+  holes set by a parameter can be fixed: the fix is written into the design as a parameter and a feature, checked
+  before it is saved, saved as a revision and checked again; it is called fixed only when that check passes. A rule
+  that could not be checked is never a pass. `manufacturability` and `apply_fix` over MCP (109 tools), `form dfm`,
+  and docs/MANUFACTURABILITY.md.
 - **The Bench.** Every study, route and document of a design in one listing: at the top of the Review pane the
   studies (checks, assembly and joints, requirements, analysis maps, fit, critique, slice, print simulation,
   orientation, every printer, cost, make it lighter), at the top of the Make pane the routes (exports, 3MF with
@@ -29,7 +57,7 @@
   made. States come from keys of the head revision's inputs, never set by hand. The command palette finds every
   entry.
 - **`list_studies`, `run_study`, `get_study`** (MCP) and **`form study list|run|show <project> [id]`** (terminal): the
-  same Bench, headless. 103 MCP tools. Mass & inertia, Materials & sources (each value with its document) and Features
+  same Bench, headless. 109 MCP tools. Mass & inertia, Materials & sources (each value with its document) and Features
   (built, suppressed by hand, left out with the reason) are Bench studies too; a change made by hand is a new
   revision, so every study of the revision before it shows stale. The command palette also finds the hand tools:
   Sketch on a plane, Fillet or chamfer, Hole, shell or sketch on a face, Feature tree.

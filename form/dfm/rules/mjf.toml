@@ -1,0 +1,65 @@
+# Multi Jet Fusion (HP), PA 12. Read on 2026-11-28.
+
+[process]
+id = "mjf"
+label = "MJF printing"
+evidence = "computed (B-rep)"
+options = ["up", "machine"]
+needs = []
+machine_note = "PA 12 on Multi Jet Fusion, as Materialise builds it (the source's table)"
+machine = [370.0, 274.0, 375.0]
+not_judged = "Warping, shrinkage by orientation, colour and porosity are not judged. Overhangs need no supports in a powder bed, so they are not checked."
+
+[[source]]
+id = "materialise-mjf"
+title = "Design Guidelines for PA 12 (MJF)"
+publisher = "Materialise Academy"
+url = "https://www.materialise.com/en/academy/industrial/design-am/pa12-mjf"
+published = "undated"
+read = "2026-11-28"
+
+[[rule]]
+id = "mjf.wall"
+title = "Thinnest wall"
+measure = "wall_min_mm"
+op = ">="
+fail = 1.0
+unit = "mm"
+source = "materialise-mjf"
+quote = "Wall thickness: at least 1 mm (living hinges excepted)."
+fix = "thicken"
+
+[[rule]]
+id = "mjf.hole"
+title = "Smallest hole"
+measure = "hole_d_mm"
+op = ">="
+fail = 1.0
+warn = 2.0
+unit = "mm"
+source = "materialise-mjf"
+quote = "Minimum hole diameter: recommended 2 mm, minimum 1 mm (powder must then be cleared by hand)."
+
+[[rule]]
+id = "mjf.trapped"
+title = "No closed hollow without powder-removal holes"
+measure = "trapped_voids"
+op = "<="
+fail = 0
+unit = "voids"
+source = "computed"
+why = "A closed void keeps its unfused powder."
+fix = "escape_holes"
+hole_d = 2.0
+hole_n = 2
+hole_source = "materialise-mjf"
+hole_quote = "Hollow parts: at least two powder-removal holes of 2 mm minimum diameter."
+
+[[rule]]
+id = "mjf.size"
+title = "Fits the machine"
+measure = "fits_machine"
+op = "fits"
+unit = "mm"
+source = "materialise-mjf"
+quote = "Maximum part dimensions: 370 × 274 × 375 mm."

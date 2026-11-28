@@ -545,6 +545,38 @@ def main(argv=None):
     eg.add_argument("--list", action="store_true")
     eg.add_argument("--remove", metavar="ID")
     eg.add_argument("--expect-head", type=int)
+    dm = sub.add_parser("dfm", help="manufacturability, every rule with its source, measured on the solid: dfm <project> "
+                                    "[--process cnc|injection|fdm|sla|sls|mjf|lpbf] [--set k=v ...] [--fix ID [--preview]] "
+                                    "[--png FILE]; dfm rules [PROCESS] lists the rule tables")
+    dm.add_argument("project", help="a project, or `rules` for the rule tables")
+    dm.add_argument("extra", nargs="?", default="", help="with `rules`: one process")
+    dm.add_argument("--process", default="")
+    dm.add_argument("--set", action="append", default=[], metavar="KEY=VALUE",
+                    help="an option: tool_d=6 material=metal axes=5 resin=abs pull=0,0,1 up=0,0,1 machine=200,200,200")
+    dm.add_argument("--override", action="append", default=[], metavar="RULE:fail=X,warn=Y",
+                    help="your shop's limit for one rule (recorded as specified)")
+    dm.add_argument("--fix", metavar="ID", help="apply a proposed fix (its id or rule id) and prove it by checking again")
+    dm.add_argument("--preview", action="store_true", help="with --fix: build and check the fix, save nothing")
+    dm.add_argument("--accept-trades", action="store_true")
+    dm.add_argument("--expect-head", type=int)
+    dm.add_argument("--png", help="write a picture of the result on the part here")
+    dm.add_argument("--full", action="store_true", help="every finding, not the first 30")
+    sh = sub.add_parser("sheet", help="sheet metal and cut parts, JSON: sheet flat <project> [--set material=steel_mild "
+                                      "--set k=0.42 --out part.dxf]; sheet profile <project> [--kerf 0.2]; sheet check "
+                                      "<file.dxf|project> [--process laser|waterjet|router --set t=2]; sheet bends "
+                                      "<project>; sheet preflight <project|file.dxf> [--service sendcutsend --material "
+                                      "al_5052_h32 --thickness 3.175]; sheet tables")
+    sh.add_argument("action", choices=["flat", "profile", "check", "bends", "preflight", "tables"])
+    sh.add_argument("target", nargs="?", default="", help="a project, or a DXF file for check and preflight")
+    sh.add_argument("--set", action="append", default=[], metavar="KEY=VALUE",
+                    help="material, k, method (table|din6935), forming (air|bottoming|coining), label, t, punch, die_v")
+    sh.add_argument("--kerf", type=float, default=0.0)
+    sh.add_argument("--process", default="laser")
+    sh.add_argument("--service", default="sendcutsend")
+    sh.add_argument("--material", default="")
+    sh.add_argument("--thickness", type=float)
+    sh.add_argument("--rev", type=int)
+    sh.add_argument("--out", help="write the DXF here too")
     gd = sub.add_parser("diff", help="what changed between two revisions, computed on the solids: diff <project> A [B] [--png FILE]")
     gd.add_argument("project")
     gd.add_argument("a", type=int)
@@ -904,6 +936,70 @@ def main(argv=None):
                                   a.expect_head, origin="cli")
                 out["printability"] = engrave.printability(a.text, a.height, a.depth, a.sunk, nz)
                 _print(out)
+        elif a.cmd == "dfm":
+            from . import dfm
+            from .dfm import rules as dfm_rules
+            if a.project == "rules":
+                procs = [dfm.process_id(a.extra)] if a.extra else dfm_rules.processes()
+                _print({pid: dfm_rules.table(pid) for pid in procs})
+            else:
+                opts: dict = {}
+                for kv in a.set:
+                    k, _, v = kv.partition("=")
+                    opts[k.strip()] = v.strip()
+                ovr: dict = {}
+                for o in a.override:
+                    rid, _, rest = o.partition(":")
+                    ovr[rid] = {k: float(v) for k, v in (x.split("=") for x in rest.split(",") if "=" in x)}
+                if ovr:
+                    opts["overrides"] = ovr
+                p = st.load(a.project)
+                if a.fix:
+                    out = dfm.apply_fix(st, p, a.process or None, a.fix, opts, apply=not a.preview,
+                                        accept_trades=a.accept_trades, expect_head=a.expect_head)
+                else:
+                    res = dfm.check(st, p, a.process or None, opts)
+                    out = dfm.summary(res, findings=10 ** 6 if a.full else 30)
+                    out["fixes"] = [{k: v for k, v in f.items() if k != "attempts"} for f in res.get("fixes", [])]
+                    if a.png and res.get("overlay_file"):
+                        import shutil as _sh
+                        _sh.copyfile(dfm.render(st, p, res), a.png)
+                        out["png"] = str(Path(a.png).resolve())
+                _print(out)
+        elif a.cmd == "sheet":
+            from . import sheet
+            from .sheet import cutcheck as _cc, tables as _tb
+            sopts: dict = {}
+            for kv in a.set:
+                k, _, v = kv.partition("=")
+                sopts[k.strip()] = v.strip()
+            is_file = a.target.lower().endswith(".dxf")
+            if a.action == "tables":
+                _print({"bend": {k: v for k, v in _tb.bend_table().items() if k not in ("source", "material")},
+                        "services": {sid: {k: v for k, v in _tb.service(sid).items() if k not in ("source", "material")}
+                                     for sid in _tb.services()}})
+            elif a.action == "check":
+                if is_file:
+                    _print(sheet.cut_check(a.target, _cc.process_id(a.process), sopts))
+                else:
+                    _print(sheet.cut_check(None, _cc.process_id(a.process), sopts, st, st.load(a.target), a.rev))
+            elif a.action == "preflight":
+                if is_file:
+                    _print(sheet.service_preflight(service=a.service, material=a.material or None, t=a.thickness,
+                                                   path=a.target))
+                else:
+                    _print(sheet.service_preflight(st, st.load(a.target), a.service, a.material or None, a.thickness,
+                                                   rev=a.rev))
+            else:
+                p = st.load(a.target)
+                if a.action == "flat":
+                    res = sheet.flat_pattern(st, p, sopts, a.rev, out=a.out)
+                    _print({**sheet.summary(res), "dxf": res.get("dxf"), "png": res.get("png")})
+                elif a.action == "profile":
+                    res = sheet.profile(st, p, a.kerf, sopts.get("label"), a.rev, out=a.out)
+                    _print({k: v for k, v in res.items() if k not in ("entities", "exact", "etch")})
+                else:
+                    _print(sheet.bend_order(st, p, sopts, a.rev))
         elif a.cmd == "diff":
             from . import geomdiff
             import shutil as _sh
