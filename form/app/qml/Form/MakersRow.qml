@@ -24,7 +24,7 @@ Column {
     }
     function start(g) {
         if (g.inputs.indexOf("text") >= 0) { mk.asking = g.id; textField.text = ""; textField.input.forceActiveFocus(); return }
-        if (g.inputs.indexOf("image") >= 0) { picDlg.gen = g; picDlg.open(); return }
+        if (g.inputs.indexOf("image") >= 0) { picDlg.gen = g; Store.ask(picDlg); return }
         run(g)
     }
 
