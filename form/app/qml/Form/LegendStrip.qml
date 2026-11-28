@@ -17,7 +17,11 @@ Glass {
     readonly property var d: r || _last
     readonly property string dk: d ? d.kind : ""
     radius: 22
-    height: Math.round(col.implicitHeight + 28)
+    height: Math.round(col.implicitHeight + 22)
+    // folded (the default, so the part keeps the stage): the title, the evidence and the scale or timeline. Unfolded:
+    // its controls, the stated error and what it does not tell, which the pane's card also says. A study that did not
+    // converge says so folded too.
+    readonly property bool full: Ws.legendOpen
     opacity: on ? 1 : 0; visible: opacity > 0.01
     Behavior on opacity { NumberAnimation { duration: ls.on ? Theme.strip : Theme.exit; easing.type: Easing.BezierSpline; easing.bezierCurve: Theme.easeMode } }
     property real lift: on ? 0 : Theme.shift(Theme.rise)
@@ -70,12 +74,17 @@ Glass {
     readonly property real late: Math.max(0, Math.min(1, (Results.settle - 0.4) / 0.6))      // the error line lights last
 
     Column {
-        id: col; x: 18; y: 14; width: parent.width - 36; spacing: 9
+        id: col; x: 18; y: 11; width: parent.width - 36; spacing: 8
         Item { width: parent.width; height: 18
             Txt { id: ttl; objectName: "legendTitle"; font.weight: Theme.wSemi; anchors.verticalCenter: parent.verticalCenter; wrapMode: Text.NoWrap; text: ls.title }
             Txt { objectName: "legendSub"; anchors.left: ttl.right; anchors.leftMargin: 10; anchors.baseline: ttl.baseline; font.pixelSize: 12; tone: 2; wrapMode: Text.NoWrap; elide: Text.ElideRight
                 width: Math.max(0, how.x - x - 10); text: ls.sub }
-            Ev { id: how; objectName: "legendEvidence"; anchors.right: parent.right; anchors.baseline: ttl.baseline; color: Theme.ink2; text: ls.how } }
+            Ev { id: how; objectName: "legendEvidence"; anchors.right: more.left; anchors.rightMargin: 8; anchors.baseline: ttl.baseline; color: Theme.ink2; text: ls.how }
+            Item { id: more; objectName: "legendMore"; anchors.right: parent.right; anchors.rightMargin: -6; width: 24; height: 24; anchors.verticalCenter: parent.verticalCenter
+                Rectangle { anchors.fill: parent; radius: 12; color: lmm.containsMouse ? Theme.washHover : "transparent" }
+                Icon { anchors.centerIn: parent; name: "chevron_down"; size: 12; color: Theme.ink3; rotation: ls.full ? 180 : 0 }
+                MouseArea { id: lmm; anchors.fill: parent; hoverEnabled: true; onClicked: Ws.legendOpen = !Ws.legendOpen }
+                Tip { show: lmm.containsMouse; text: ls.full ? "Fold it to one line" : "The stated error, what it does not tell, and the controls" } } }
 
         // ── the scale of a field: continuous, with the peak at its end and the value under the pointer ──
         // topology: what the optimiser takes away, on the field's ramp (clay kept, white removed)
@@ -189,7 +198,7 @@ Glass {
         }
 
         // ── how it is looked at ──
-        Row { spacing: 10; visible: ls.dk === "field" || (ls.dk === "cam" && ls.d.setups.length > 1); height: visible ? 24 : 0
+        Row { spacing: 10; visible: ls.full && (ls.dk === "field" || (ls.dk === "cam" && ls.d.setups.length > 1)); height: visible ? 24 : 0
             Seg { objectName: "scaleSeg"; visible: ls.dk === "field"; height: 24; model: [{ value: "hue", text: "One hue" }, { value: "many", text: "Many colours" }]
                 value: Results.scale; onPicked: function (v) { Results.scale = v } }
             Seg { objectName: "deformSeg"; visible: ls.dk === "field" && !ls.d.modes && ls.d.deform && ls.d.deform.auto > 0; height: 24
@@ -205,7 +214,9 @@ Glass {
         }
 
         // the stated error (or why there is none), then what the result does not tell: always in sight
-        Txt { objectName: "legendLimits"; width: parent.width; font.pixelSize: 12; tone: 2; lineHeight: 1.4; textFormat: Text.StyledText
+        Txt { objectName: "legendError"; visible: !ls.full && ls.dk === "field" && ls.d.converged !== true; width: parent.width; font.pixelSize: 12
+            color: Theme.signal; wrapMode: Text.NoWrap; elide: Text.ElideRight; text: ls.errorText }
+        Txt { objectName: "legendLimits"; visible: ls.full; width: parent.width; font.pixelSize: 12; tone: 2; lineHeight: 1.4; textFormat: Text.StyledText
             readonly property color to: ls.dk === "field" && ls.d.converged !== true ? Theme.signal : Theme.ink
             function hex(a, b, k) { function h(x, y) { return ("0" + Math.round((x + (y - x) * k) * 255).toString(16)).slice(-2) } return "#" + h(a.r, b.r) + h(a.g, b.g) + h(a.b, b.b) }
             text: !ls.d ? "" : "<font color=\"" + hex(Theme.ink2, to, ls.late) + "\">" + ls.esc(ls.errorText) + "</font> " + ls.esc(ls.d.not || "") }

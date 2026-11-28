@@ -91,6 +91,10 @@ def journey_strength(ui):
     ui.check("MPa" in str(ui.item("legendSub").property("text")), "its unit")
     ev = str(ui.item("legendEvidence").property("text")).lower()
     ui.check("simulated" in ev and "linear static" in ev, f"how it is known: {ev!r}")
+    # folded, the strip is one slim line; its chevron unfolds the stated error and the limits (it stays unfolded)
+    if not ui.exists("legendLimits"):
+        ui.click("legendMore")
+        ui.wait_until(lambda: ui.exists("legendLimits"), 3, "the strip unfolded")
     lim = str(ui.item("legendLimits").property("text"))
     pct = "%.1f" % (100 * want["discretisation_error"]["stress"])
     ui.check(("± " + pct.rstrip("0").rstrip(".") + " %") in lim, f"the stated error: {lim[:120]!r}")
@@ -161,6 +165,9 @@ def journey_dfm(ui):
     ui.eq(len(res(ui, "Results.r.rows")), len(want["rows"]), "one row per rule")
     ui.check(res(ui, lay + ".isDfm && " + lay + ".covers"), "the overlay stands in for the clay part")
     strip = ui.item("legendStrip")
+    if not ui.exists("legendLimits"):                  # folded by default: its chevron unfolds what it does not judge
+        ui.click("legendMore")
+        ui.wait_until(lambda: ui.exists("legendLimits"), 3, "the strip unfolded")
     lim = str(ui.item("legendLimits").property("text"))
     ui.check("Not told here" in lim, "the strip says what the check does not judge")
     ui.check(ui.sees("parting line", within=strip) if want["data"].get("parting_line") else True, "the parting line is in the legend")

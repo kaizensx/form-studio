@@ -783,7 +783,7 @@ Item {
             opacity: ws.cueOn ? 0.45 : 1; Behavior on opacity { NumberAnimation { duration: Theme.cross } }
             onPicked: function (name) { Store.setView(name) } }
         ShadeChip { id: shade; source: studio; arrive: 4; z: 5; visible: cube.visible
-            x: Math.round(ws.paneX - Theme.gap - width); y: cube.y + cube.height + 8 }
+            x: Math.round(cube.x + (cube.width - width) / 2); y: cube.y + cube.height + 8 }
 
         // ── under the part: the legend of the result shown on it ──
         ResultStrip { id: strip; source: studio; z: 5

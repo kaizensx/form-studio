@@ -13,7 +13,9 @@ Glass {
     property string pending: ""          // the name of the map being computed
     property var check: null             // the matching pipeline check, when there is one
     property bool on: false
-    property bool detail: false          // how it was computed, unfolded
+    // unfolded: the matching check, what the map does not tell and how it was computed. Folded (the default, so the
+    // part keeps the stage) the strip is its title, its scale and the scale's words; the pane's card says the rest.
+    property bool detail: Ws.legendOpen
     readonly property var legend: map ? map.legend : null
     readonly property var st: map && map.stats ? map.stats : ({})
     readonly property var stops: legend ? legend.stops || [] : []
@@ -21,7 +23,7 @@ Glass {
     // what the map does not tell, in the legend's own first sentence ("Not a strength analysis.")
     readonly property string limits: legend ? String(legend.not).split(". ")[0].replace(/\.$/, "") + "." : ""
     function esc(t) { return String(t).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;") }
-    height: Math.round(col.implicitHeight + 27)
+    height: Math.round(col.implicitHeight + 24)
     opacity: on ? 1 : 0; visible: opacity > 0.01
     Behavior on opacity { NumberAnimation { duration: rs.on ? Theme.strip : Theme.exit; easing.type: Easing.BezierSpline; easing.bezierCurve: Theme.easeMode } }
     property real lift: on ? 0 : Theme.shift(Theme.rise)
@@ -38,7 +40,7 @@ Glass {
         return st.small_holes !== undefined ? st.small_holes + " of " + st.holes + " holes small" : ""
     }
     Column {
-        id: col; x: 18; y: 14; width: parent.width - 36; spacing: 9
+        id: col; x: 18; y: 12; width: parent.width - 36; spacing: 8
         Item { width: parent.width; height: 18
             Txt { id: ttl; objectName: "stripTitle"; font.weight: Theme.wSemi; anchors.verticalCenter: parent.verticalCenter; wrapMode: Text.NoWrap
                 text: rs.legend ? rs.legend.title : rs.pending }
@@ -50,8 +52,8 @@ Glass {
             Item { id: fold; objectName: "legendDetail"; anchors.right: parent.right; anchors.rightMargin: -6; width: 24; height: 24; anchors.verticalCenter: parent.verticalCenter
                 Rectangle { anchors.fill: parent; radius: 12; color: fm.containsMouse ? Theme.washHover : "transparent" }
                 Icon { anchors.centerIn: parent; name: "chevron_down"; size: 12; color: Theme.ink3; rotation: rs.detail ? 180 : 0 }
-                MouseArea { id: fm; anchors.fill: parent; hoverEnabled: true; onClicked: rs.detail = !rs.detail }
-                Tip { show: fm.containsMouse; text: rs.detail ? "Fold the method away" : "How this is computed" } } }
+                MouseArea { id: fm; anchors.fill: parent; hoverEnabled: true; onClicked: Ws.legendOpen = !Ws.legendOpen }
+                Tip { show: fm.containsMouse; text: rs.detail ? "Fold it to one line" : "What it does not tell, and how it is computed" } } }
         // the scale: one band per stop, in the map's own colours, and its words under it
         Row { id: bar; width: parent.width; height: 10; spacing: 2; visible: rs.stops.length > 0
             Repeater { model: rs.stops
@@ -67,7 +69,7 @@ Glass {
                     mono: true; font.pixelSize: 11; font.weight: Theme.wMedium; tone: 3; lineHeight: 1; topPadding: 0; bottomPadding: 0
                     text: modelData.label; wrapMode: Text.NoWrap; elide: Text.ElideRight } } }
         // the matching check, and what the map does not tell: always in sight
-        Txt { objectName: "stripLimits"; width: parent.width; font.pixelSize: 12; tone: 2; visible: !!rs.legend; lineHeight: 1.4
+        Txt { objectName: "stripLimits"; width: parent.width; font.pixelSize: 12; tone: 2; visible: !!rs.legend && rs.detail; lineHeight: 1.4
             textFormat: Text.StyledText
             text: rs.legend ? (rs.check ? "<font color=\"" + Theme.ink + "\">" + rs.esc(rs.check.label) + " " + rs.esc(String(rs.check.value)) + "</font>, from the checks. " : "")
                 + rs.esc(rs.limits) : "" }

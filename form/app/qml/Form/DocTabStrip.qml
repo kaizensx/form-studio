@@ -12,13 +12,13 @@ Glass {
     readonly property bool on: model.length > 1
     height: 44; radius: 22
     FontMetrics { id: fm; font.family: Theme.sans; font.pixelSize: 12; font.weight: Theme.wMedium }
-    function natural(t) { return Math.ceil(fm.advanceWidth(t.title)) + 14 + 6 + 20 + (t.key === "design" ? 0 : 18) }
+    function natural(t) { return t ? Math.ceil(fm.advanceWidth(t.title)) + 14 + 6 + 20 + (t.key === "design" ? 0 : 18) : 0 }
     readonly property real need: { var w = 8; for (var i = 0; i < model.length; i++) w += Math.min(168, natural(model[i])) + (i ? 2 : 0); return w }
     // too many for the room: the tab in front, and a count for the rest
     readonly property bool folded: need > room
-    readonly property var shown: folded ? [model[Frame.index]] : model
+    readonly property var shown: folded ? [model[Math.min(Frame.index, model.length - 1)]].filter(function (t) { return !!t }) : model
     readonly property int hidden: model.length - shown.length
-    width: Math.round(Math.min(room, folded ? 8 + Math.min(Math.max(80, room - 8 - 64), natural(model[Frame.index])) + 2 + 56 : need))
+    width: Math.round(Math.min(room, folded ? 8 + Math.min(Math.max(80, room - 8 - 64), natural(shown[0])) + 2 + 56 : need))
     visible: on && room >= 120
 
     property int dragFrom: -1

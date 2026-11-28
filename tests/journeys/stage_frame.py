@@ -47,7 +47,8 @@ def _inside(ui, what):
 
 def _bar(ui, suggestions):
     """The conversation folded to the bar; with suggestions (nothing said yet) or with a short talk."""
-    ui.run_js("Store.talkOpen = true; Store.talkCalm = true; Store.chatItems = %s" % ("[]" if suggestions else json.dumps(TALK)))
+    # (the suggestions show while the prompt is taken up: the keyboard is put there, as a click on it does)
+    ui.run_js("Store.talkOpen = true; Store.talkCalm = true; Store.chatItems = %s%s" % ("[]" if suggestions else json.dumps(TALK), "; Store.chatFocus++" if suggestions else ""))
     ui.settle(1400)
     if suggestions:
         ui.check(ui.exists("talkSuggestion"), "the bar shows its suggestions")
@@ -89,7 +90,7 @@ def run(ui):
     _bar(ui, False)
     ui.check(not ui.exists("talkSuggestion"), "a talk in the bar: no suggestions")
     d0 = _inside(ui, "the vase over a one-line bar")["dist"]
-    ui.run_js("Store.chatItems = []")
+    ui.run_js("Store.chatItems = []; Store.chatFocus++")
     ui.wait(_half_glide(ui))
     mid = ui.js("Store.viewer.dist")
     ui.settle(1400)

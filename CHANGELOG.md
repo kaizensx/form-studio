@@ -8,12 +8,21 @@
   icon and its name, in groups with a caption: Create, Modify, Reference and Insert in Design; Inspect, Studies and
   Review in Check; Print, Machine and Output in Make; Sheets, Lists and Picture in Document. The dock keeps Select,
   Measure, Section and Annotate. A study, route or document in the band (Strength, DFM, Fit, Stack-up, Motion, Print
-  orient, CAM, Flat pattern, Board, Drawing, PMI, BOM, Report) opens its row of the Bench. Keys are in the tooltips.
+  orient, CAM, Flat pattern, Board, Drawing, PMI, BOM, Report) opens its row of the Bench. Sweep, Loft, Rib, Mirror,
+  Draft, Split, Move face, Plane and Axis show because the engine builds them; the window has no panel for them yet,
+  so each writes its request in the conversation for you to finish. Keys are in the tooltips.
   In a narrow window the band gives up labels, then captions, then puts the last tools under More; Hide folds it
   back into the icon dock, and it stays that way. The stage loses 44 px of height to it and no width.
 - **Document tabs.** The model, each result opened on the part, the drawing, the results report, a version compare
   and a CNC job each have a tab beside the design's name. Close them, drag them into order, switch with ⌘1 to ⌘9
   (Alt elsewhere). They come back when the design is opened again. The modes are now ⌃1 to ⌃4 on macOS.
+- **More room for the part.** The legend under a result is one slim strip by default: its name, its scale and
+  how it is known; the stated error, what it does not tell and the controls unfold from its chevron (and the pane's
+  card says them too). A study that did not converge still says so folded. The bar under the part is one line while
+  nothing is written; its suggestions, the agent and model and the hints come when the prompt is taken up, and the
+  status line over it only shows when the agent is doing something. The shading chip under the view cube is a small
+  round button. A pane folded by hand stays folded, also after a restart. In Check with a result at 1440 × 900 the
+  free stage is 579 px tall instead of 372; at 1100 × 700, 379 instead of 172.
 - **The project rail.** Home, the Bench, the designs you worked on last with how many conversations each has,
   Trash and Settings, in a 44 px column at the left of a design; opened, 220 px with the names. Folded it takes no
   width from the stage.

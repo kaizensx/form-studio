@@ -86,12 +86,13 @@ def run(ui):
         ui.check(("%.1f" % (bb[1][a] - bb[0][a])) in says, f"the size line carries {bb[1][a] - bb[0][a]:.1f}: {says}")
     ui.check("cm³" in says, f"and the volume: {says}")
 
-    # the bar: folded, with numbered suggestions; a number key picks one while the prompt is empty
-    ui.check(ui.js("Store.chatItems.length") == 0 and rects["talk"][3] < 330, f"the conversation is a bar under the part: {rects['talk']}")
-    ui.expect("Ask about this design, or describe a change.", "talk")
-    sugg = ui.find_all(name="talkSuggestion")
-    ui.check(len(sugg) >= 2, f"numbered suggestions from the design's real state: {len(sugg)}")
+    # the bar: folded, one line while nothing is written (its placeholder says what it is for, so no status line
+    # stands over it); taken up, it has numbered suggestions, and a number key picks one while the prompt is empty
+    ui.check(ui.js("Store.chatItems.length") == 0 and rects["talk"][3] < 80, f"the conversation is one line under the part: {rects['talk']}")
+    ui.check(not ui.exists("talkLead") and not ui.exists("talkSuggestion"), "no status line and no suggestions while the prompt waits")
+    ui.check("describe a change" in " ".join(ui.texts("talk")), "the prompt says what it is for")
     ui.click("composer")
+    ui.wait_until(lambda: len(ui.find_all(name="talkSuggestion")) >= 2, 3, "numbered suggestions from the design's real state, once the prompt is taken up")
     ui.key("2")                                        # "Make it lighter without failing a check" opens its sheet
     ui.wait_until(lambda: (ui.store.get("sheet") or {}).get("kind") == "lighter", 6, "key 2 to pick the second suggestion")
     ui.eq(ui.item("composer").property("text"), "", "the key picked the suggestion and typed nothing")

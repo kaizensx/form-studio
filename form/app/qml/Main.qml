@@ -26,7 +26,7 @@ Window {
     // ── remembered between runs: window place and size, the agent column, recent commands ──
     Settings { id: mem; category: "window"
         property real x: -1; property real y: -1; property real w: 0; property real h: 0
-        property real talkWidth: 340; property bool talkOpen: true; property string recent: "[]" }
+        property real talkWidth: 340; property bool talkOpen: true; property string recent: "[]"; property bool paneFolded: false }
     property bool restored: false
     function restore() {
         if (!headless) {
@@ -35,13 +35,14 @@ Window {
             if (mem.x >= 0 && mem.y >= 0 && mem.x < Screen.virtualX + Screen.desktopAvailableWidth - 120 && mem.y < Screen.virtualY + Screen.desktopAvailableHeight - 120) { x = mem.x; y = mem.y }
             Store.talkWidth = Math.max(talk.minW, Math.min(talk.maxW, mem.talkWidth)); Store.talkOpen = mem.talkOpen && width >= 1200      // a narrow window starts with the conversation folded: the part and its panes first
             try { Store.paletteRecent = JSON.parse(mem.recent) } catch (e) { Store.paletteRecent = [] }
+            Store.paneFolded = mem.paneFolded
         }
         restored = true
     }
     function remember() {
         if (!restored || headless) return
         if (visibility === Window.Windowed) { mem.x = x; mem.y = y; mem.w = width; mem.h = height }
-        mem.talkWidth = Store.talkWidth; mem.talkOpen = Store.talkOpen; mem.recent = JSON.stringify(Store.paletteRecent)
+        mem.talkWidth = Store.talkWidth; mem.talkOpen = Store.talkOpen; mem.recent = JSON.stringify(Store.paletteRecent); mem.paneFolded = Store.paneFolded
     }
     Timer { id: later; interval: 600; onTriggered: win.remember() }
     onXChanged: later.restart(); onYChanged: later.restart()
@@ -56,7 +57,8 @@ Window {
     Connections { target: Store
         function onTalkWidthChanged() { later.restart() }
         function onTalkOpenChanged() { later.restart() }
-        function onPaletteRecentChanged() { later.restart() } }
+        function onPaletteRecentChanged() { later.restart() }
+        function onPaneFoldedChanged() { later.restart() } }
     Component.onCompleted: { setBackdrop(); restore(); buttons.restart(); Store.boot(startProject, startStage); Store.bootSetup(headless); Store.checkWhatsNew(headless) }
 
     // the native menu bar (macOS). Elsewhere the same actions are in the top bar's menu button and the palette.
