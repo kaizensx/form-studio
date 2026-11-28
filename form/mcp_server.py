@@ -1881,6 +1881,69 @@ def build() -> MCPServer:
         return await _run(go)
 
     @mcp.tool(annotations=RW)
+    async def board_import(file: str, project: str = "", name: str = "", step: str = "",
+                           heights: dict[str, float] | None = None, connectors: dict | None = None,
+                           regenerate: bool = False, use_kicad_step: bool = False, lid_screw: float = 3.0,
+                           purpose: str | None = None, expect_head: int | None = None) -> dict:
+        """Bring a circuit board in and get an enclosure that is checked against it. file: a KiCad .kicad_pcb (read
+        by Form Studio's own parser, no KiCad needed; its .kicad_pro and .kicad_sch are copied with it) or an IDF 3.0
+        .emn (with its .emp). Read: outline and holes, thickness, each part's courtyard and the height the footprint
+        states, connectors and the board edge they mate through, mounting holes (with the screw that fits), keep-outs.
+        Without project: a new design is made around the board, as editable features (shell with corner lugs,
+        cavity, standoffs under the mounting holes with heat-set inserts, openings sized from each plug's envelope
+        and aligned to its connector's face, a lid printed beside the box with a lip, vents, the inserts and screws
+        from the standard-parts tables). With project: the board replaces that design's board and the enclosure is
+        kept (regenerate=True makes it again), so board_check says what no longer fits; "changes" lists what moved.
+        Heights are never guessed: step= a board STEP KiCad exported (heights measured over each courtyard),
+        use_kicad_step=True to have the person's KiCad export it, or heights={"C1": 10.5} from the person; parts
+        without one are "not checked". connectors={"J2": {"side": "+x", "plug": [w, h]}} overrides a mating side
+        (-x, +x, -y, +y, up) or gives a plug's size."""
+        st = studio()
+        def go():
+            from .board import api
+            return api.import_board(st, file, project=project or None, name=name, step=step or None, heights=heights,
+                                    connectors=connectors, regenerate=regenerate, expect_head=expect_head,
+                                    lid_screw=lid_screw, purpose=purpose, use_kicad_step=use_kicad_step)
+        return await _run(go)
+
+    @mcp.tool(annotations=RO)
+    async def board_check(project: str, what: str = "all", fabs: list[str] | None = None, kicad: bool = True) -> dict:
+        """Check a design's board and its enclosure. what="fit": the board as it is now against the head revision's
+        enclosure, measured on the solids (computed): board to wall gap, a standoff under each mounting hole, each
+        connector's plug envelope swept out through its wall, every part of known height against the box and the
+        lid as assembled, a screwdriver's way to each board screw. what="board": KiCad's own DRC and ERC through the
+        person's kicad-cli (KiCad's report, read as it is; when KiCad is not installed this says so and gives the
+        install route, and nothing is run in its place), and the board's track width, spacing, drills, annular
+        rings, size and thickness against the published limits of fabs (jlcpcb, pcbway, oshpark; each limit quoted
+        with its page and the date it was read). what="all": both. No findings is not a manufacturability approval."""
+        st = studio()
+        def go():
+            from .board import api
+            p = st.load(project)
+            w = (what or "all").lower()
+            if w not in ("all", "fit", "board"):
+                raise StudioError(f"Unknown what “{what}”.", "all, fit or board.")
+            out = {}
+            if w in ("all", "fit"):
+                out["fit"] = api.fit(st, p)
+            if w in ("all", "board"):
+                out["board"] = api.checks(st, p, fabs, kicad)
+            return out
+        return await _run(go)
+
+    @mcp.tool(annotations=RW)
+    async def board_fab(project: str, kinds: list[str] | None = None) -> dict:
+        """Fab files for a design's board through the person's KiCad (kicad-cli): kinds from gerbers, drill, pos
+        (pick-and-place), bom (from the schematic beside the board) and step (the board STEP); default all. Written
+        under <project>/board/fab/<board hash>/; nothing is uploaded or sent to a fab. Without KiCad only "step" is
+        made, from Form Studio's plain board model (slab and part boxes), and said so; the rest name the install route."""
+        st = studio()
+        def go():
+            from .board import api
+            return api.fab_files(st, st.load(project), kinds)
+        return await _run(go)
+
+    @mcp.tool(annotations=RW)
     async def remove_feature(project: str, feature_id: str, expect_head: int | None = None) -> dict:
         """Remove a feature as a new revision: a standard feature added with add_feature ("boss_1", "hook_1"), or any
         feature of a FeatureDesign (its method goes; the features before it load from their checkpoints)."""

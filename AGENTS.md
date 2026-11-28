@@ -39,6 +39,7 @@ Prefer the MCP server (`form-mcp`). Without MCP, the `form` CLI does the same an
 | Read or change a feature's sketch (constraints, dimensions as parameters); extrude, cut or revolve one | `get_sketch`, `edit_sketch`; `add_feature` kinds `extrude`, `cut`, `revolve` | `form sketch <p> F`, `form model <p> extrude --sketch s.json` |
 | Find a standard part (screw, insert, bearing, motor...) and place it on a hole or face: its hole cut, its fit checked | `standard_part` (search, describe, place, fit) | `form parts search "m3 socket"`, `form parts place <p> --spec iso4762:M3 --at x,y,z` |
 | The parts list to buy from, and supplier numbers the person gives | `bom` | `form bom <p> --csv parts.csv --pdf parts.pdf` |
+| A circuit board: an enclosure made around it and proved to fit; KiCad's own DRC/ERC and fab files when it is installed | `board_import` → `board_check`, `board_fab` | `form board import board.kicad_pcb`, `form board check <p>` |
 | See what changed in the solid between revisions | `geometry_diff` | `form diff <p> 1 3 --png diff.png` |
 | Can it be made (CNC, moulding, FDM, SLA, SLS, MJF, LPBF), with fixes proved by checking again | `manufacturability` → `apply_fix` | `form dfm <p> --process cnc --set tool_d=6 --set material=metal [--fix RULE]` |
 | Sheet metal: flat pattern DXF (proved by folding back), cut-file check, bend order, a service's limits | `flat_pattern`, `cut_file_check`, `bend_order`, `service_preflight` | `form sheet flat <p> --set material=steel_mild`, `form sheet check part.dxf --set t=2` |

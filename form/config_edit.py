@@ -44,7 +44,7 @@ SCHEMA: dict[str, dict] = {
     **{"use." + k: {"type": "bool", "tab": "software", "hidden": True, "label": "Use " + n,
                     "help": "false: " + n + " is never called, also when it is installed."}
        for k, n in (("coacd", "CoACD"), ("mujoco", "MuJoCo"), ("corpus", "the CADEvolve corpus"), ("blender", "Blender"), ("freecad", "FreeCAD"),
-                    ("openscad", "OpenSCAD"), ("bambu", "Bambu Studio"), ("orca", "OrcaSlicer"), ("prusa", "PrusaSlicer"),
+                    ("openscad", "OpenSCAD"), ("kicad", "KiCad"), ("bambu", "Bambu Studio"), ("orca", "OrcaSlicer"), ("prusa", "PrusaSlicer"),
                     ("superslicer", "SuperSlicer"), ("qidi", "QIDISlicer"), ("elegoo", "ElegooSlicer"),
                     ("snapmaker", "Snapmaker Orca"))},
     "refine.enabled": {"type": "bool", "tab": "general", "label": "Refine every design after it builds",
@@ -132,6 +132,9 @@ SCHEMA: dict[str, dict] = {
                      "help": "Optional. Empty: found in the usual places."},
     "cad.freecad": {"type": "path", "tab": "apps", "label": "FreeCAD (FreeCADCmd)", "unlocks": "“Open in FreeCAD” and a re-import check of each STEP",
                     "help": "Optional. Empty: found in the usual places."},
+    "cad.kicad_cli": {"type": "path", "tab": "apps", "label": "KiCad (kicad-cli)",
+                      "unlocks": "KiCad's own DRC and ERC on a design's board, and its Gerbers, drill files and board STEP",
+                      "help": "Optional. Empty: found in the usual places."},
     "apps.cad": {"type": "str", "tab": "apps", "label": "“Open in CAD” uses", "help": "An application name or a command. Empty: the system default."},
     "apps.viewer": {"type": "str", "tab": "apps", "label": "“Open in viewer” uses", "help": "Empty: the system default."},
 }
@@ -405,6 +408,8 @@ def _detect(cfg: dict) -> dict:
         from . import cad_bridges
         out["cad.openscad"] = short(cad_bridges.find_openscad(cfg) or "")
         out["cad.freecad"] = short(cad_bridges.find_freecad(cfg) or "")
+        from .board import kicad_cli
+        out["cad.kicad_cli"] = short(kicad_cli.find(cfg) or "")
     except Exception:
         pass
     try:

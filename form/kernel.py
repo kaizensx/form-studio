@@ -1409,3 +1409,5 @@ from .catalog import KERNEL_OPS as _CATALOG_OPS  # noqa: E402  (standard parts: 
 OPS.update(_CATALOG_OPS)
 from .placement import KERNEL_OPS as _PLACEMENT_OPS  # noqa: E402  (standard parts placed: snap and fit)
 OPS.update(_PLACEMENT_OPS)
+from .board.fit import KERNEL_OPS as _BOARD_OPS  # noqa: E402  (a circuit board against its enclosure)
+OPS.update(_BOARD_OPS)

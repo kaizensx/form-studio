@@ -56,7 +56,7 @@ GROUPS = [("engine", "Form Studio itself"), ("ai", "Claude Code"), ("agents", "O
           ("cad", "CAD and 3D apps"), ("slicer", "3D printing (optional)")]
 # group → the capability (form/capabilities.py) a registry item belongs to, unless it names its own
 CAPABILITY_OF_GROUP = {"engine": "core", "slicer": "print", "ai": "agent", "agents": "agent", "form": "core"}
-CAPABILITY_OF_ID = {"parts": "parts", "blender": "render", "freecad": "exchange", "openscad": "exchange",
+CAPABILITY_OF_ID = {"parts": "parts", "blender": "render", "freecad": "exchange", "openscad": "exchange", "kicad": "exchange",
                     "recon.learned": "mesh", "recon.cadfit": "mesh", "exemplars.cadevolve": "core",
                     "game.coacd": "render", "fea": "core", "robot.mujoco": "exchange"}
 
@@ -278,6 +278,16 @@ def _d_freecad(cfg, ctx) -> Found:
     if not exe:
         return Found("missing", "Not installed. Only “Open in FreeCAD” and the STEP re-import check need it.")
     return Found("ok", f"FreeCADCmd · {exe}", path=exe)
+
+
+def _d_kicad(cfg, ctx) -> Found:
+    from .board import kicad_cli
+    exe = kicad_cli.find(cfg)
+    if not exe:
+        return Found("missing", "Not installed. Only KiCad's own board checks (DRC, ERC) and board fab files need it; "
+                                "boards are read and enclosures checked without it.")
+    v = kicad_cli.version(exe)
+    return Found("ok", f"kicad-cli {v} · {exe}", version=v, path=exe)
 
 
 def _d_blender(cfg, ctx) -> Found:
@@ -995,6 +1005,14 @@ REGISTRY: list[Software] = [
              about="FreeCAD, the open-source CAD app. “Open in FreeCAD” hands it a design, and the checks read each design's STEP "
                    "export back in it as an independent check that it imports cleanly.",
              gives="Open in FreeCAD, and a second CAD app's check of every STEP export."),
+    Software("kicad", "KiCad", "KiCad's own design-rule and electrical-rule checks, and board fab files, for designs made "
+             "around a circuit board.", "optional", "cad", _d_kicad,
+             _app_methods("kicad", "KiCad.KiCad", "org.kicad.KiCad", "https://www.kicad.org/download/", apt="kicad"),
+             homepage="https://www.kicad.org/download/",
+             about="KiCad, the open-source circuit board app. Form Studio reads boards without it; with it, Board checks "
+                   "run KiCad's own DRC and ERC and report KiCad's findings as KiCad's, and Board fab files makes "
+                   "Gerbers, drill files, pick-and-place, the BOM and the board STEP through its kicad-cli.",
+             gives="KiCad's own DRC and ERC on your board, and its Gerbers, drill files and board STEP."),
 ]
 
 

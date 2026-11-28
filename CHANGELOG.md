@@ -182,6 +182,22 @@
   assembly instructions follow it, so each arrow is a proved direction. A set that cannot come apart one at a time is
   reported, never ordered by guess. MCP `assembly_sequence`, `form sequence`.
 - Bench entries Motion, Robot files and Assembly steps.
+- **Boards and enclosures.** Bring a KiCad `.kicad_pcb` (read by Form Studio's own parser, no KiCad needed) or an
+  IDF `.emn`, and get an enclosure made around it as editable features: corner lugs clear of the board, standoffs
+  under its mounting holes with heat-set inserts, an opening for each connector sized from its plug's envelope and
+  centred on its face, a lid with a lip printed beside the box, vents, and the inserts and screws in the parts list.
+  The board is then checked against the enclosure on the solids: board to wall, a standoff under each hole, each
+  plug swept out through its wall, every part of known height under the lid, a screwdriver's way to each board screw.
+  Bring the board again after a change and the checks say what no longer lines up, with what moved. Heights come only
+  from the board file, a board STEP or you; a part without one is "not checked".
+- **Board checks with your own KiCad.** When `kicad-cli` is installed, KiCad's DRC and ERC run and are reported as
+  KiCad's; when it is not, the result says so and KiCad is an opt-in engine in Settings (`form install kicad`). The
+  board's track widths, spacing, drills, annular rings and size are checked against the published limits of JLCPCB,
+  PCBWay and OSH Park, each quoted with its page and the date it was read.
+- **Board fab files.** Gerbers, drill files, pick-and-place, BOM and the board STEP through your KiCad.
+- **`board_import`, `board_check`, `board_fab`** (MCP), **`form board read|import|check|fab|kicad`** (terminal) and the
+  Bench's **Board and enclosure**, **Board checks** and **Board fab files**. docs/BOARDS.md, with the plan for
+  schematic capture and routing (K2). 108 MCP tools.
 
 ### Changed
 

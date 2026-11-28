@@ -137,6 +137,8 @@ Start from words, a photo with a card or coin for scale, a sketch with real dime
 
 Agents design with engineering parts that carry their sources: ISO 273 screw clearances, heat-set insert pockets, nut traps, bearing seats, printable threads and involute gears. Assemblies are declared as parts, joints and mates; every joint is swept through its range and checked for collisions, with Assembled and Exploded views and assembly instructions as a PDF. Constraints refuse impossible combinations with the feature, the parameters and a way forward, and an optimiser finds the best values under the requirements you state.
 
+Bring a circuit board (KiCad `.kicad_pcb` or IDF) and the agent makes an enclosure around it: standoffs on its mounting holes, openings aligned to its connectors, a lid with a lip. The board is checked against the enclosure on the solids at every revision, so a moved connector or a taller part shows up as a failed check; with KiCad installed, its own DRC and ERC and the fab files come from your copy ([docs/BOARDS.md](docs/BOARDS.md)).
+
 A library of design helpers gives the agent proven building blocks for mechanisms (hinges, snap fits, bayonets, ratchets, cams, gear trains and planetary sets), for surfaces (lofts, sweeps, shells and variable fillets), for organic forms (helmet shells, grips, handles) and for texture (knurls and embossed patterns on the solid itself, fine grain as a mesh texture), each with typed fallbacks and a clear error when a value cannot work.
 
 ## Reconstruct
