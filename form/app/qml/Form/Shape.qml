@@ -124,7 +124,10 @@ Column {
                 { text: "Move down", icon: "chevron_down", enabled: i > 0 && i < fs.length - 1, run: function () { root.treeOp({ op: "move", feature: f.id, after: fs[i + 1].id }) } },
                 { sep: true },
                 { text: "Pattern…", icon: "repeat", enabled: i > 0 && !sup, run: function () { root.openId = f.id; root.openWhat = "pattern" } },
-                { text: "What it depends on", icon: "git_branch", run: function () { root.openId = f.id; root.openWhat = "deps"; root.loadTree() } }].filter(function (e) { return e.visible !== false })
+                { text: "What it depends on", icon: "git_branch", run: function () { root.openId = f.id; root.openWhat = "deps"; root.loadTree() } },
+                { text: "Compare versions…", icon: "git_compare", enabled: !!Store.project && Store.project.revisions.length > 1,
+                  run: function () { var h = Store.project.head, rs = Store.project.revisions.map(function (r) { return r.n }).filter(function (n) { return n !== h })
+                      Store.openSheet("compare", { a: rs[rs.length - 1], b: h, focus: f.id }) } }].filter(function (e) { return e.visible !== false })
     }
     PopMenu { id: rowMenu; objectName: "featureMenu"; property int at: -1
         // the entries of this line as it is now (a binding would keep the ones of the line it was last opened on

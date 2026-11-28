@@ -25,7 +25,7 @@ Item {
     readonly property var files: ({ "import": "ImportSheet.qml", generate: "GenerateSheet.qml", alternatives: "Alternatives.qml", photo: "PhotoSheet.qml", ring: "RingSheet.qml", setup: "SetupSheet.qml", settings: "SettingsSheet.qml", update: "UpdateSheet.qml", slicer: "SlicerSheet.qml", render: "PhotoRenderSheet.qml", variants: "VariantsSheet.qml", share: "ShareSheet.qml", shortcuts: "ShortcutsSheet.qml", about: "AboutSheet.qml", whatsnew: "WhatsNew.qml", printer: "PrinterSheet.qml",
                                     sketch: "SketchSheet.qml", concepts: "ConceptsSheet.qml", text: "TextSheet.qml", feature: "FeatureSheet.qml", turntable: "TurntableSheet.qml",
                                     lighter: "LighterSheet.qml", replace: "ReplaceSheet.qml", game: "GameSheet.qml", handsketch: "SketchEditor.qml",
-                                    parts: "PartsSheet.qml" })
+                                    parts: "PartsSheet.qml", compare: "CompareSheet.qml" })
     readonly property bool open: !!Store.sheet
     readonly property Item sheet: ld.item
     readonly property bool fills: !!sheet && sheet.fillsBody === true

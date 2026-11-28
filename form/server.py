@@ -234,6 +234,10 @@ def make_handler(st: Studio):
             got = modelling_api.route_get(st, p, rest, q)
             if got is not None:
                 return self._json(got)
+            from . import proapi                           # the compare sheet and the tree's PMI (form/proapi.py)
+            got = proapi.route_get(st, p, rest, q)
+            if got is not None:
+                return self._json(got)
             if rest == "/refine":                          # the refinement job and the head's refine changes
                 from .refine import jobs as refine_jobs
                 return self._json(refine_jobs.status(st, pid))

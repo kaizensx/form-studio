@@ -58,7 +58,12 @@ Glass {
                     text: rv.modelData.summary || rv.modelData.note || "revision" }
                 Txt { x: 62; y: 25; kind: "fine"; tone: 3; width: parent.width - 62; elide: Text.ElideRight; wrapMode: Text.NoWrap
                     text: "by " + Store.who(rv.modelData.origin) }
-                Txt { id: when; anchors.right: parent.right; y: 6; kind: "fine"; tone: 3; text: F.ago(rv.modelData.ts) } } } }
+                Txt { id: when; anchors.right: parent.right; y: 6; kind: "fine"; tone: 3; text: F.ago(rv.modelData.ts) }
+                // a revision other than the head opens the compare sheet against the head (CompareSheet.qml)
+                Rectangle { z: -1; anchors.fill: parent; radius: 10; color: rvm.containsMouse && !rv.head ? Theme.washHover : "transparent" }
+                MouseArea { id: rvm; objectName: "overviewRev-" + rv.modelData.n; anchors.fill: parent; hoverEnabled: true; enabled: !rv.head
+                    cursorShape: Qt.PointingHandCursor; onClicked: { Store.overview = false; Store.openSheet("compare", { a: rv.modelData.n, b: ov.p.head }) } }
+                Tip { show: rvm.containsMouse; text: "What changed from " + F.pad(rv.modelData.n) + " to the head" } } } }
 
     Row { id: foot; x: 28; anchors.bottom: parent.bottom; anchors.bottomMargin: 22; spacing: 8; height: 32
         Btn { text: "Revisions on the part"; icon: "history"; onClicked: { Store.overview = false; Store.timelineOpen = true } }
