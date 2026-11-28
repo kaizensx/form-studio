@@ -56,6 +56,14 @@ def clear_symbols(ui, when):
 
     def hit(a, b):
         return a[0] < b[0] + b[2] and b[0] < a[0] + a[2] and a[1] < b[1] + b[3] and b[1] < a[1] + a[3]
+    so = ui.item("sketchOnPart")
+    for a in tags:
+        ui.check(a[0] >= 0 and a[1] >= 0 and a[0] + a[2] <= so.width() and a[1] + a[3] <= so.height(), f"{when}: a dimension at {a[:2]} is outside the view")
+    cap = ui.find(name="sketchCapsule")
+    if cap is not None and cap.isVisible():
+        cr = (cap.x(), cap.y(), cap.width(), cap.height())
+        for a in gs + tags:
+            ui.check(not hit(a, cr), f"{when}: a symbol or a dimension at {a[:2]} sits under the sketch's capsule")
     for i, a in enumerate(gs):
         for b in gs[i + 1:]:
             ui.check(not hit(a, b), f"{when}: two constraint symbols overlap at {a[:2]} and {b[:2]}")

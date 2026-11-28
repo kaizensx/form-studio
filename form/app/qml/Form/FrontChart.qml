@@ -25,7 +25,8 @@ Item {
     readonly property var sy: span(1)
     function xAt(v) { return padL + (v - sx[0]) / (sx[1] - sx[0]) * w }
     function yAt(v) { return padT + h - (v - sy[0]) / (sy[1] - sy[0]) * h }
-    function colorOf(p) { return p.state === "front" ? "#3ee6ff" : p.state === "feasible" ? Theme.ink2 : p.state === "failed" ? Theme.signal : Theme.ink3 }
+    readonly property color accent: Theme.dark ? "#3ee6ff" : Theme.datum
+    function colorOf(p) { return p.state === "front" ? accent : p.state === "feasible" ? Theme.ink2 : p.state === "failed" ? Theme.signal : Theme.ink3 }
     property int hot: -1
     onRChanged: plot.requestPaint()
     onWidthChanged: plot.requestPaint()
@@ -43,7 +44,7 @@ Item {
             // the front, in the order of the first axis
             var fr = fc.pts.filter(function (p) { return p.state === "front" }).sort(function (a, b) { return a.at[0] - b.at[0] })
             if (fr.length > 1) {
-                g.strokeStyle = Qt.rgba(0.243, 0.902, 1, 0.55); g.lineWidth = 1.5; g.beginPath()
+                g.strokeStyle = Theme.alpha(fc.accent, 0.55); g.lineWidth = 1.5; g.beginPath()
                 for (var i = 0; i < fr.length; i++) { var x = fc.xAt(fr[i].at[0]), y = fc.yAt(fr[i].at[1]); if (i) g.lineTo(x, y); else g.moveTo(x, y) }
                 g.stroke()
             }

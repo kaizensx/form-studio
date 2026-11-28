@@ -448,8 +448,11 @@ Item {
             for (j = 0; j + 1 < pts.length; j++) { var a0 = px(pts[j]), b0 = px(pts[j + 1]); segs.push([a0.x, a0.y, b0.x, b0.y]) }
         }
         for (j = 0; j < n; j++) { var q0 = px(sk.points[j]); rects.push({ x: q0.x - 5, y: q0.y - 5, w: 10, h: 10 }) }
+        // the capsule at the head of the stage and the foot with Extrude: nothing is seated under them
+        ;[cap, foot].forEach(function (it) { if (it && it.visible && it.width > 0) rects.push({ x: it.x - 6, y: it.y - 6, w: it.width + 12, h: it.height + 12 }) })
         function tagW(k) { return Math.ceil(dimText(k).length * 6.7) + 16 }
-        function free(r) { return !so._hit(r, rects) && !so._cuts(r, segs) }
+        function inView(r) { return r.x >= 2 && r.y >= 2 && r.x + r.w <= so.width - 2 && r.y + r.h <= so.height - 2 }
+        function free(r) { return inView(r) && !so._hit(r, rects) && !so._cuts(r, segs) }
         function keep(ci, c) {
             L.dims[ci] = { x: c.x, y: c.y }
             rects.push(c.r)
@@ -459,7 +462,7 @@ Item {
         // a length between two points of the plane, measured along the line through them or across (hdist, vdist):
         // nrm is the side the dimension line stands off to; the nearest free seat on that side, then on the other
         function linear(ci, k, P, Q, nrm) {
-            var w = tagW(k), h = 22, first = null, clear = null
+            var w = tagW(k), h = 22, first = null, clear = null, seen = null
             for (var side = 0; side < 2; side++) for (var t = 0; t < 4; t++) {
                 var sg = side ? -1 : 1, nx = nrm[0] * sg, ny = nrm[1] * sg, off = (28 + 24 * t) * mm
                 var dp = P[0] * nx + P[1] * ny, dq = Q[0] * nx + Q[1] * ny, far = Math.max(dp, dq) + off
@@ -475,10 +478,12 @@ Item {
                                   inside ? [a.x, a.y, b.x, b.y] : [a.x - ux * 14, a.y - uy * 14, tx, ty]],
                           arrows: inside ? [[a.x, a.y, -ux, -uy], [b.x, b.y, ux, uy]] : [[a.x, a.y, ux, uy], [b.x, b.y, -ux, -uy]] }
                 if (!first) first = c
-                if (!clear && !so._hit(c.r, rects)) clear = c
+                if (!seen && inView(c.r)) seen = c
+                if (!clear && inView(c.r) && !so._hit(c.r, rects)) clear = c
                 if (free(c.r)) { keep(ci, c); return }
             }
-            if (clear || first) keep(ci, clear || first)
+            // clear of the tags in sight, else any seat in sight, else the nearest
+            if (clear || seen || first) keep(ci, clear || seen || first)
         }
         // a diameter or a radius: a leader through the centre, its arrow on the curve, the value beyond it
         function round(ci, k, C, r, dia, mid) {

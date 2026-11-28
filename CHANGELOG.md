@@ -18,7 +18,8 @@
 - **The topology timeline plots the compliance of every iteration**, lit up to the iteration shown.
 - **Constraint symbols on small sketches keep clear** of each other and of the dimension tags: each is seated at the
   cheapest free place round what it holds, the outer side first, the rings reaching further out when the profile is
-  small; when no place is free, the one that covers least.
+  small; when no place is free, the one that covers least. Neither symbols nor dimension tags sit under the sketch's
+  capsule or its foot any more.
 - Journeys `fronts.py` (both fronts from real runs) and `lattice.py` (an octet and a graded gyroid); the topology
   journey now runs with the strength engine and opens the run from the Bench sheet.
 
@@ -141,10 +142,13 @@
   needs a colour), and the second axis's name wrapped into the plot. The front is cyan and the axis name is one line
   above the plot.
 - **The results journey measured orbit cost wrongly.** It took the mean time between swapped frames while stepping
-  the view from a script; a view that swaps an extra frame per step (the HUD settling) looked faster. With a result
-  on the part the render thread records a frame in 1.0 to 1.7 ms against 1.0 ms for the part alone, and a view
-  turned on every frame runs at the display's 120 fps either way (measured, `tests/journeys/results.py` `Frames`). The
-  16 ms against 10.8 ms of the last pass was that artefact, not a cost.
+  the view from a script; a view that swaps an extra frame per step (the HUD settling) looked faster: the part alone
+  swapped about 2.4 frames per step, a result 2.0, at the same 25 ms per step. Measured on this Mac (120 Hz display):
+  stepped, the render thread records a frame in 1.0 ms for the part alone and 0.8 to 1.7 ms with a result (the
+  strength field the most); turned on every frame, every case runs at 114 to 125 fps, the display's rate, and the
+  render thread's time per frame varies 3.6 to 7.8 ms from run to run with no result above the part's spread. The
+  journey now reports frames per second and the render thread's own time. The 16 ms against 10.8 ms of the last pass
+  was the artefact, not a cost, so nothing in the result layer was changed for it.
 
 - **A hand edit's revision card reads the revision before the edit** (r04 → r05): the engine took the head after the
   commit. A note without a new revision has no card.

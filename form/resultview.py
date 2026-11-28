@@ -526,8 +526,8 @@ def _stack(st, p: dict, e: dict, opts: dict) -> dict:
             "worst_case": [wc["min"], wc["max"]], "rss": [rs["min"], rs["max"]],
             "spec": res.get("spec") or {}, "cpk": cap.get("cpk") if isinstance(cap.get("cpk"), (int, float)) and math.isfinite(cap["cpk"]) else None,
             "chart": (res.get("chart") or [])[:6],
-            "not": "Not told here: tolerances on angles beyond the linear range, form errors not declared as GD&T, "
-                        "wear, load and assembly forces. " + _sentence((res.get("caveats") or [""])[0])}
+            "not": "Not told here: angles beyond the linear range, form errors not declared as GD&T, wear and loads.",
+            "caveat": _sentence((res.get("caveats") or [""])[0])}
 
 
 # ---- topology optimisation: the density of every iteration (docs/OPTIMISATION.md, frames) --------------------------
@@ -555,8 +555,8 @@ def _topology(st, p: dict, e: dict, opts: dict) -> dict:
             "headline": r.get("headline") or "", "evidence": r.get("evidence") or e.get("evidence") or "simulated",
             "converged": bool(r.get("converged")), "volfrac": st_.get("volfrac"), "resolution": r.get("resolution") or "",
             "history": hist,
-            "not": "Not told here: the density field is a layout, not a part; the pockets built from it are studied "
-                        "again, and their own study is what the safety factor is. " + _sentence(r.get("resolution") or "")}
+            "not": "Not told here: a layout, not a part; the pockets built from it are studied again.",
+            "resolution_note": _sentence(r.get("resolution") or "")}
 
 
 # ---- lattice infill: the lattice alone, clipped to its region (docs/LATTICES.md) ------------------------------------
@@ -642,7 +642,7 @@ def _orient(st, p: dict, e: dict, opts: dict) -> dict:
     return {"kind": "front", "app": "printOrient", "state": "current", "rev": r.get("rev") or e.get("rev"),
             "evidence": e.get("evidence") or "computed, modelled", "headline": O.headline(r),
             "axes": axes, "points": pts, "front": [q["index"] for q in pts],
-            "note": "The orientations no other one beats on every objective at once; two of them drawn here. "
+            "note": "The orientations no other one beats on every objective at once, drawn here on two of its objectives (points that differ only in the others coincide). "
                     + ("Time calibrated on a real slice." if cal else "Time uncalibrated: it ranks orientations and little more."),
             "open": "A point turns the part on the stage to lie that way, and shows its numbers; Use this writes it to the "
                     "print setup."}

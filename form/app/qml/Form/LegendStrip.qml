@@ -80,7 +80,7 @@ Glass {
             Txt { id: ttl; objectName: "legendTitle"; font.weight: Theme.wSemi; anchors.verticalCenter: parent.verticalCenter; wrapMode: Text.NoWrap; text: ls.title }
             Txt { objectName: "legendSub"; anchors.left: ttl.right; anchors.leftMargin: 10; anchors.baseline: ttl.baseline; font.pixelSize: 12; tone: 2; wrapMode: Text.NoWrap; elide: Text.ElideRight
                 width: Math.max(0, how.x - x - 10); text: ls.sub }
-            Ev { id: how; objectName: "legendEvidence"; anchors.right: parent.right; anchors.baseline: ttl.baseline; color: Theme.ink2; text: ls.how } }
+            Ev { id: how; objectName: "legendEvidence"; anchors.right: parent.right; width: Math.min(implicitWidth, parent.width - ttl.width - 16); elide: Text.ElideRight; horizontalAlignment: Text.AlignRight; anchors.baseline: ttl.baseline; color: Theme.ink2; text: ls.how } }
 
         // ── the scale of a field: continuous, with the peak at its end and the value under the pointer ──
         // topology: what the optimiser takes away, on the field's ramp (clay kept, white removed)
@@ -106,7 +106,7 @@ Glass {
                     for (var i = 0; i <= 16; i++) gr.addColorStop(i / 16, Results.rampAt(i / 16))
                     c.fillStyle = gr; c.globalAlpha = g ? 1 : 0.35; c.beginPath(); c.roundedRect(0, 0, width, height, 4, 4); c.fill()
                     if (!g) { c.globalAlpha = 1; c.fillStyle = Theme.ink; c.fillRect(Math.round(width / 2) - 1, -3, 2, height + 6) } } }
-            Txt { visible: parent.graded; y: 14; mono: true; font.pixelSize: 11; tone: 3; wrapMode: Text.NoWrap; text: Results.fmt(parent.rg[0], "") + "  " + (ls.d ? ls.d.grading : "") }
+            Txt { visible: parent.graded; y: 14; mono: true; font.pixelSize: 11; tone: 3; wrapMode: Text.NoWrap; text: Results.fmt(parent.rg[0], "") + "  ·  graded by " + (ls.d ? ls.d.grading : "") }
             Txt { visible: parent.graded; y: 14; anchors.right: parent.right; mono: true; font.pixelSize: 11; tone: 3; wrapMode: Text.NoWrap; text: Results.fmt(parent.rg[1], "") }
             Txt { objectName: "latticeValue"; visible: !parent.graded; y: 14; x: Math.round(parent.width / 2 - width / 2); mono: true; font.pixelSize: 11; tone: 1; wrapMode: Text.NoWrap
                 text: Results.fmt(parent.rg[0], "") + " of solid, uniform" } }
