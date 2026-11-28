@@ -631,15 +631,16 @@ Item {
                 c.strokeStyle = Theme.alpha(acc, 0.6); c.lineWidth = 1; c.setLineDash([5, 4]); c.beginPath()
                 loops.forEach(function (lp) {
                     ink.poly(c, lp.map(function (p) { var m = foot(p); return [2 * m[0] - p[0], 2 * m[1] - p[1]] })); c.closePath()
-                    var stp = Math.max(1, Math.ceil(lp.length / 8))
-                    for (var j = 0; j < lp.length; j += stp) {
-                        var m = foot(lp[j]), r = Math.hypot(lp[j][0] - m[0], lp[j][1] - m[1])
-                        if (r < 0.2) continue
-                        for (var t = 0; t <= 48; t++) {
-                            var an = 2 * Math.PI * t / 48, z = so.px([m[0] - uy * r * Math.cos(an), m[1] + ux * r * Math.cos(an)], r * Math.sin(an))
+                    // the circles its farthest and its nearest point travel
+                    var far = null, near = null
+                    lp.forEach(function (p) { var m = foot(p), r = Math.hypot(p[0] - m[0], p[1] - m[1]); if (!far || r > far.r) far = { m: m, r: r }; if (!near || r < near.r) near = { m: m, r: r } })
+                    ;[far, near].forEach(function (g, gi) {
+                        if (!g || g.r < 0.2 || (gi === 1 && far.r - near.r < 0.2)) return
+                        for (var t = 0; t <= 64; t++) {
+                            var an = 2 * Math.PI * t / 64, z = so.px([g.m[0] - uy * g.r * Math.cos(an), g.m[1] + ux * g.r * Math.cos(an)], g.r * Math.sin(an))
                             if (t) c.lineTo(z.x, z.y); else c.moveTo(z.x, z.y)
                         }
-                    }
+                    })
                 })
                 c.stroke()
                 // the axis itself: a centre line, past both ends
