@@ -396,7 +396,8 @@ def op_model_pick(key, recipe_id, values, kind, picks, opts=None, tol=0.05):
                 continue
             seen.add(hash(e))
             q = edge_query(e, adj, own, lo, sz)
-            info = {"query": q, "length_mm": round(float(e.length), 3), "at": [round(x, 3) for x in _vec(e.center())]}
+            info = {"query": q, "length_mm": round(float(e.length), 3), "at": [round(x, 3) for x in _vec(e.center())],
+                    "ends": [[round(x, 4) for x in _vec(e.position_at(t))] for t in (0, 1)]}
             if q.get("r"):
                 info["radius_mm"] = q["r"]
             rows.append(info)

@@ -1121,6 +1121,21 @@ From a sketch: kind="extrude" | "cut" | "revolve" with sketch = {plane, points, 
 (get_sketch shows the form; plane {"datum": "XY"|"XZ"|"YZ", "offset"} or a picked face: give picks=[{"at": ...}]
 on it), depth (mm; a cut with depth 0 goes through), angle and axis_entity (a line of the sketch) for revolve.
 Named dimensions become parameters "<feature>_<name>"; the sketch must solve and close.
+End conditions (options= for extrude, cut): end blind | through | next (up to next) | face | vertex | offset
+(from a face) | mid (mid-plane); to_at (a point on the face) or to ([x, y, z], a vertex); offset; reverse;
+draft (degrees); end2, depth2, to2_at, offset2, draft2 (a second direction); thin, thin_mode one | mid | two,
+thin2 (a thin wall); new_body. Revolve: end angle | face (to_at), angle2 (the other way), mid, reverse.
+More kinds, their fields in options=: "sweep" (sketch = the profile; path a sketch, or path_picks on the
+body's edges; twist; cut or new_body), "loft" (sections: 2 or more sketches; ruled), "rib" (sketch = an open
+line; thickness; direction parallel | normal; flip), "mirror" (plane "XY" | "XZ" | "YZ" with plane_offset, a
+datum plane id or {"at": point on a flat face}; of = feature ids, none = the whole body), "draft" (picks on
+faces, angle, neutral = a plane, flip), "move_face" (picks, distance), "thicken" (a pick on a face, or a
+sketch; thickness, both, new_body), "boolean" (op combine | subtract | intersect; target and tools: points
+inside the bodies), "split" (plane, keep both | above | below), "variable_fillet" (picks near edges, r_start,
+r_end, start: a point at the r_start end), "datum_plane" (base and offset, angle, about x | y; a pick on a
+flat face; or through: 3 points; a sketch on it has plane {"ref": its id}), "datum_axis" (through: 2 points;
+base X | Y | Z with origin; edge_at; or planes: two). Sizes become parameters; what cannot be made is
+refused with the reason.
 
 | Argument | Type | Required |
 |---|---|---|
@@ -1166,6 +1181,7 @@ Named dimensions become parameters "<feature>_<name>"; the sketch must solve and
 | `preview` | boolean |  |
 | `sketch` | object \| null |  |
 | `axis_entity` | integer \| null |  |
+| `options` | object \| null |  |
 
 ### `get_sketch`
 

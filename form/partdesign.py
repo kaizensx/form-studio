@@ -40,7 +40,17 @@ import subprocess
 import tempfile
 from pathlib import Path
 
-HAND_CALLS = {"handsketch": ("extrude", "revolve"), "handfeat": ("fillet", "chamfer", "hole", "pattern", "shell")}
+HAND_CALLS = {"handsketch": ("extrude", "revolve"), "handfeat": ("fillet", "chamfer", "hole", "pattern", "shell"),
+              "handmore": ("sweep", "loft", "rib", "mirror", "draft", "move_face", "thicken", "boolean", "split",
+                           "variable_fillet", "datum_plane", "datum_axis")}
+# features PartDesign has no equivalent for: frozen (or decomposed into Pad/Pocket when the step is a prism), with why
+NO_PD = {"handmore.rib": "PartDesign has no rib feature",
+         "handmore.move_face": "PartDesign has no move/offset-face feature",
+         "handmore.thicken": "PartDesign's Thickness hollows a solid; it does not thicken a surface",
+         "handmore.boolean": "the bodies are one design's solids, not PartDesign Bodies",
+         "handmore.split": "PartDesign has no split (it is Part workbench's Slice)",
+         "handmore.variable_fillet": "PartDesign's Fillet has one radius; a variable radius has no equivalent",
+         "handmore.datum_axis": "a datum axis changes no solid"}
 TIMEOUT = 600.0
 MARK = "FreeCAD PartDesign export written by Form Studio"   # the first comment line of every export script
 TOPONAMING = ("FreeCAD's topological naming is still fragile: fillets, chamfers and thicknesses name edges and faces "
@@ -53,8 +63,8 @@ FIT = {"close": "Fine", "normal": "Medium", "loose": "Coarse"}
 # ---- reading the source: which arguments of a hand call are parameters ----------------------------------------------
 
 def _sig(mod: str, fn: str):
-    from . import handfeat, handsketch
-    return inspect.signature(getattr({"handfeat": handfeat, "handsketch": handsketch}[mod], fn))
+    from . import handfeat, handmore, handsketch
+    return inspect.signature(getattr({"handfeat": handfeat, "handsketch": handsketch, "handmore": handmore}[mod], fn))
 
 
 def bindings(source: str) -> dict:
@@ -213,10 +223,12 @@ def _hand_sketch(data: dict, v: dict, fid: str, plane) -> dict:
         if row:
             cons.append(row)
     pl = d["plane"]
-    if "datum" in pl:
+    if "datum" in pl and not isinstance(pl.get("offset"), str):
         pd = _plane_dict(plane, pl["datum"], pl.get("offset") or 0)
     else:
         pd = _plane_dict(plane)
+        if pl.get("ref"):
+            pd["ref"] = pl["ref"]
     return {"plane": pd, "geometry": geo, "constraints": cons}
 
 
@@ -352,7 +364,7 @@ def op_partdesign_plan(key, recipe_id, values, out_dir, binds=None, tol=0.05):
     Returns the plan form/partdesign_fc.py builds from (every number computed on the B-rep)."""
     from build123d import export_brep
 
-    from . import featureprog, handfeat, handsketch
+    from . import featureprog, handfeat, handmore, handsketch
     from .recipes import resolve
     recipe = resolve(recipe_id)
     v = recipe.validate(values)
@@ -378,7 +390,8 @@ def op_partdesign_plan(key, recipe_id, values, out_dir, binds=None, tol=0.05):
             return res
         setattr(mod, name, w)
 
-    for mod, names in ((handsketch, HAND_CALLS["handsketch"]), (handfeat, HAND_CALLS["handfeat"])):
+    for mod, names in ((handsketch, HAND_CALLS["handsketch"]), (handfeat, HAND_CALLS["handfeat"]),
+                       (handmore, HAND_CALLS["handmore"])):
         for n in names:
             watch(mod, n)
     feats: list = []                                    # (fid, before, after, calls)
@@ -446,7 +459,13 @@ def op_partdesign_plan(key, recipe_id, values, out_dir, binds=None, tol=0.05):
         done_ids.add(id(rec))
         _fid, before, after, cs = rec
         if after is before:
-            steps.append({"i": len(steps), "feature": fid, "label": label, "kind": "empty"})
+            row = {"i": len(steps), "feature": fid, "label": label, "kind": "empty"}
+            if len(cs) == 1 and cs[0]["call"] == "handmore.datum_plane":
+                try:
+                    row.update(_datum_step(cs[0]["args"], before, binds.get(fid) or {}))
+                except Exception as e:                     # noqa: BLE001 - reported; it changes no solid
+                    row["why"] = f"the datum plane could not be read ({type(e).__name__})"
+            steps.append(row)
             continue
         st = {"i": len(steps), "feature": fid, "label": label, "brep": f"step_{len(steps):02d}.brep",
               "expect": _stats(after)}
@@ -455,6 +474,94 @@ def op_partdesign_plan(key, recipe_id, values, out_dir, binds=None, tol=0.05):
         steps.append(st)
     export_brep(final, str(out / "final.brep"))
     return {"steps": steps, "final": _stats(final), "final_brep": "final.brep", "design": "feature" if is_fd else "recipe"}
+
+
+class _NoPD(Exception):
+    """A hand feature with no PartDesign equivalent: it goes in decomposed or frozen, saying why."""
+
+
+PAD_TYPES = {"blind": "Length", "mid": "Length", "vertex": "Length", "face": "UpToFace", "offset": "UpToFace",
+             "next": "UpToFirst"}
+
+
+def _pad_plan(a, data, sk, b, args, before, trail, plane, fid) -> dict:
+    """A Pad or Pocket with its end conditions (Type, Midplane, Reversed, Offset, TaperAngle, a second side)."""
+    from build123d import Vector
+
+    from . import handfeat
+    if float(a.get("thin") or 0):
+        raise _NoPD("a thin feature: PartDesign's Pad and Pocket have no thin wall")
+    add = a.get("mode") == "add"
+    depth = float(a.get("depth") or 0)
+    end = a.get("end") or ""
+    if not end and not a.get("end2") and not a.get("draft") and not a.get("reverse"):     # the classic form
+        if add:
+            return {"kind": "pad", "source": "hand", "sketch": sk, "depth": depth, "bind": b}
+        return {"kind": "pocket", "source": "hand", "sketch": sk, "depth": depth, "bind": b,
+                "through": depth <= 0, "midplane": depth <= 0 and "datum" in data["plane"]}
+    end = end or ("blind" if depth > 0 else ("through" if not add else "blind"))
+    notes = []
+    b = dict(b)
+    for k in ("offset", "draft", "depth2", "offset2", "draft2"):
+        if args.get(k):
+            b[k] = args[k]
+
+    def side(e, dep, to, d):
+        out = {"Type": ("UpToLast" if add else "ThroughAll") if e == "through" else PAD_TYPES[e]}
+        if e in ("blind", "mid"):
+            out["Length"] = dep
+        if e == "vertex":
+            out["Length"] = (Vector(*to) - plane.origin).dot(d)
+            out["computed"] = True
+            notes.append("up to vertex: FreeCAD holds the depth to the vertex as a length")
+        if e in ("face", "offset"):
+            out["face"] = _face_sig(handfeat.find_face(before, trail, to, fid))
+        return out
+    n = plane.z_dir * ((-1.0 if not add else 1.0) * (-1.0 if a.get("reverse") else 1.0))
+    row = {"kind": "pad" if add else "pocket", "source": "hand", "sketch": sk, "bind": b, "ends": True,
+           "side1": side(end, depth, a.get("to"), n), "midplane": end == "mid",
+           "reversed": bool(a.get("reverse")), "offset": float(a.get("offset") or 0) if end == "offset" else 0.0,
+           "taper": float(a.get("draft") or 0)}
+    if a.get("end2"):
+        row["side2"] = side(a["end2"], float(a.get("depth2") or 0), a.get("to2"), -n)
+        row["offset2"] = float(a.get("offset2") or 0) if a["end2"] == "offset" else 0.0
+        row["taper2"] = float(a.get("draft2") or 0)
+    if notes:
+        row["note"] = "; ".join(notes)
+    # FreeCAD's signs for the taper and the offset are tried both ways; the solid decides
+    row["variants"] = [{}, {"flip_taper": True}, {"flip_offset": True}, {"flip_taper": True, "flip_offset": True}]
+    return row
+
+
+def _plane_ref(spec, before, trail, v, what) -> dict:
+    """A plane a mirror or draft names, as FreeCAD can name it: an origin plane, a datum plane feature, or a face."""
+    from . import handsketch
+    pl = handsketch.resolve_plane(spec, before, trail, what, v)
+    out = _plane_dict(pl)
+    if "datum" in spec and not float(spec.get("offset") or 0):
+        out["origin_plane"] = spec["datum"]
+    elif "ref" in spec:
+        out["ref"] = spec["ref"]
+    elif "face" in spec:
+        from . import handfeat
+        out["face"] = _face_sig(handfeat.find_face(before, trail, spec["face"], what))
+    return out
+
+
+def _datum_step(a, before, bind) -> dict:
+    """A datum plane feature as a PartDesign Plane: attached to an origin plane with an offset and a turn where it
+    is written that way (both bound to the spreadsheet), else placed where it is."""
+    from . import handsketch
+    spec = a["spec"]
+    v = a.get("v") or {}
+    pl = handsketch.resolve_plane(spec, before, list(a.get("trail") or []), "datum", v)
+    row = {"kind": "datum_plane", "source": "hand", "plane": _plane_dict(pl)}
+    if isinstance(spec.get("base"), str) and "through" not in spec:
+        row["attach"] = {"datum": spec["base"], "offset": handsketch._val(spec.get("offset", 0), v),
+                         "angle": handsketch._val(spec.get("angle", 0), v), "about": spec.get("about", "x"),
+                         "bind_offset": spec.get("offset") if isinstance(spec.get("offset"), str) else None,
+                         "bind_angle": spec.get("angle") if isinstance(spec.get("angle"), str) else None}
+    return row
 
 
 def _native(fid, label, before, after, cs, bind, recipe, v, steps) -> dict:
@@ -469,20 +576,77 @@ def _native(fid, label, before, after, cs, bind, recipe, v, steps) -> dict:
                                      ("d", "d"), ("head_d", "head_d"), ("head_depth", "head_depth"),
                                      ("count", "count"), ("step", "step"), ("thickness", "thickness")) if n in args}
         try:
+            vv = a.get("v") or v
             if call in ("handsketch.extrude", "handsketch.revolve"):
                 data = handsketch.check(a.get("data"))
-                plane = handsketch.plane_of(data, before, list(a.get("trail") or []), fid)
-                sk = _hand_sketch(data, a.get("v") or v, fid, plane)
+                trail0 = list(a.get("trail") or [])
+                plane = handsketch.plane_of(data, before, trail0, fid, vv)
+                sk = _hand_sketch(data, vv, fid, plane)
+                if a.get("mode") == "new":
+                    raise _NoPD("a new body beside the first: a PartDesign Body holds one solid")
                 if call == "handsketch.extrude":
-                    depth = float(a.get("depth") or 0)
-                    if a.get("mode") == "add":
-                        return {"kind": "pad", "source": "hand", "sketch": sk, "depth": depth, "bind": b}
-                    return {"kind": "pocket", "source": "hand", "sketch": sk, "depth": depth, "bind": b,
-                            "through": depth <= 0, "midplane": depth <= 0 and "datum" in data["plane"]}
+                    return _pad_plan(a, data, sk, b, args, before, trail0, plane, fid)
                 kind = "revolution" if a.get("mode") == "add" else "groove"
-                return {"kind": kind, "source": "hand", "sketch": sk, "angle": float(a["angle"]), "bind": b,
-                        "axis_ref": _sketch_axis_ref(data, int(a["axis_entity"])),
-                        "variants": [{}, {"Reversed": True}]}
+                row = {"kind": kind, "source": "hand", "sketch": sk, "angle": float(a["angle"]), "bind": b,
+                       "axis_ref": _sketch_axis_ref(data, int(a["axis_entity"])),
+                       "variants": [{}, {"Reversed": True}]}
+                if a.get("end") == "face":
+                    from . import handfeat
+                    row["upto_face"] = _face_sig(handfeat.find_face(before, trail0, a["to"], fid))
+                if float(a.get("angle2") or 0):
+                    row["angle2"] = float(a["angle2"])
+                    if args.get("angle2"):
+                        b["angle2"] = args["angle2"]
+                if a.get("mid"):
+                    row["midplane"] = True
+                if a.get("reverse"):
+                    row["variants"] = [{"Reversed": True}, {}]
+                return row
+            if call == "handmore.sweep":
+                if abs(float(a.get("twist") or 0)) > 1e-9:
+                    raise _NoPD("a twisted sweep: PartDesign's Pipe has no twist")
+                if a.get("mode") == "new":
+                    raise _NoPD("a new body beside the first: a PartDesign Body holds one solid")
+                pd = handsketch.check(a["profile"])
+                trail0 = list(a.get("trail") or [])
+                prof = _hand_sketch(pd, vv, fid, handsketch.plane_of(pd, before, trail0, fid, vv))
+                row = {"kind": "pipe", "source": "hand", "cut": a.get("mode") == "cut", "sketch": prof, "bind": b,
+                       "frenet": bool(a.get("frenet")), "variants": [{"Transition": "Right corner"}, {}]}
+                path = a["path"]
+                if isinstance(path, dict) and "edges" in path:
+                    from . import handfeat
+                    row["spine_edges"] = [_edge_sig(e) for e in handfeat.find_edges(before, trail0, path["edges"], fid)]
+                else:
+                    pdd = handsketch.check(path)
+                    row["spine"] = _hand_sketch(pdd, vv, fid + "_path", handsketch.plane_of(pdd, before, trail0, fid, vv))
+                return row
+            if call == "handmore.loft":
+                if a.get("mode") == "new":
+                    raise _NoPD("a new body beside the first: a PartDesign Body holds one solid")
+                trail0 = list(a.get("trail") or [])
+                secs = []
+                for i, sd in enumerate(a["sections"], 1):
+                    d = handsketch.check(sd)
+                    secs.append(_hand_sketch(d, vv, f"{fid}_s{i}", handsketch.plane_of(d, before, trail0, fid, vv)))
+                return {"kind": "loft", "source": "hand", "cut": a.get("mode") == "cut", "sections": secs,
+                        "ruled": bool(a.get("ruled")), "bind": b, "variants": [{}]}
+            if call == "handmore.mirror":
+                of = a.get("of")
+                return {"kind": "mirrored", "source": "hand", "of": ([of] if isinstance(of, str) else list(of or [])),
+                        "plane": _plane_ref(a["plane"], before, list(a.get("trail") or []), vv, fid), "bind": b,
+                        "variants": [{}]}
+            if call == "handmore.draft":
+                from . import handfeat
+                trail0 = list(a.get("trail") or [])
+                faces = [handfeat.find_face(before, trail0, q, fid) for q in a["faces"]]
+                if args.get("angle"):
+                    b["angle"] = args["angle"]
+                return {"kind": "draft", "source": "hand", "angle": float(a["angle"]),
+                        "faces": [_face_sig(f) for f in faces],
+                        "plane": _plane_ref(a["neutral"], before, trail0, vv, fid), "flip": bool(a.get("flip")),
+                        "bind": b, "variants": [{}, {"Reversed": True}]}
+            if call in NO_PD:
+                raise _NoPD(NO_PD[call])
             trail = list(a.get("trail") or [])
             if call in ("handfeat.fillet", "handfeat.chamfer"):
                 edges = handfeat.find_edges(before, trail, a["edges"], fid)
@@ -520,6 +684,8 @@ def _native(fid, label, before, after, cs, bind, recipe, v, steps) -> dict:
                             "faces": [_face_sig(f)], "bind": b,
                             "variants": [{"Join": "Arc"}, {"Join": "Arc", "Reversed": True}, {"Join": "Intersection"},
                                          {"Join": "Intersection", "Reversed": True}]}
+        except _NoPD as e:
+            why = str(e)
         except Exception as e:                           # noqa: BLE001 - reported, the step goes in another way
             why = f"its {call} could not be read ({type(e).__name__}: {str(e)[:160]})"
     elif len(cs) > 1:

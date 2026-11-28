@@ -129,7 +129,17 @@ def run(plan, here, out_path):
         made.append(s)
         pl = sk["plane"]
         want = placement(pl["origin"], pl["x"], pl["z"])
-        if pl.get("datum"):
+        if pl.get("ref") and objs.get(pl["ref"]) is not None:
+            s.AttachmentSupport = [(objs[pl["ref"]], "")]
+            s.MapMode = "FlatFace"
+            s.recompute()
+            if not same_placement(s.Placement, want):
+                s.MapMode = "Deactivated"
+                s.AttachmentSupport = []
+                s.Placement = want
+                rep["notes"].append("%s: the sketch is placed on %s's plane, not attached (FreeCAD orients it "
+                                    "differently)" % (name, pl["ref"]))
+        elif pl.get("datum"):
             s.AttachmentSupport = [(origin[pl["datum"] + "_Plane"], "")]
             s.MapMode = "FlatFace"
             s.AttachmentOffset = App.Placement(V(0, 0, float(pl.get("offset") or 0)), App.Rotation())
@@ -240,12 +250,112 @@ def run(plan, here, out_path):
         apply(o, variant)
         return o
 
+    def plane_link(pl, prev, made):
+        """A plane a mirror or draft names: an origin plane, a datum plane feature, a face, or a Plane placed there."""
+        if pl.get("origin_plane"):
+            return (origin[pl["origin_plane"] + "_Plane"], [""])
+        if pl.get("ref") and objs.get(pl["ref"]) is not None:
+            return (objs[pl["ref"]], [""])
+        if pl.get("face"):
+            return (prev, match_faces(prev.Shape, [pl["face"]]))
+        d = body.newObject("PartDesign::Plane", "Plane")
+        made.append(d)
+        d.MapMode = "Deactivated"
+        d.Placement = placement(pl["origin"], pl["x"], pl["z"])
+        return (d, [""])
+
+    def ends(st, o, variant, prev):
+        bd = st.get("bind", {})
+        ft = -1.0 if (variant or {}).get("flip_taper") else 1.0
+        fo = -1.0 if (variant or {}).get("flip_offset") else 1.0
+        two = "side2" in st
+        if two:
+            o.SideType = "Two sides"
+        elif st.get("midplane"):
+            o.SideType = "Symmetric"
+        for n, sd in ((1, st["side1"]), (2, st.get("side2"))):
+            if sd is None:
+                continue
+            suf = "" if n == 1 else "2"
+            setattr(o, "Type" + suf, sd["Type"])
+            if "Length" in sd:
+                setattr(o, "Length" + suf, float(sd["Length"]))
+                if not sd.get("computed"):
+                    bind(o, "Length" + suf, bd.get("depth" if n == 1 else "depth2"))
+            if sd.get("face"):
+                setattr(o, "UpToFace" + suf, (prev, match_faces(prev.Shape, [sd["face"]])))
+            off = st.get("offset" if n == 1 else "offset2") or 0.0
+            if off:
+                setattr(o, "Offset" + suf, -fo * float(off))
+                bind(o, "Offset" + suf, bd.get("offset" if n == 1 else "offset2"), " * -1" if fo > 0 else "")
+            tp = st.get("taper" if n == 1 else "taper2") or 0.0
+            if tp:
+                setattr(o, "TaperAngle" + suf, ft * float(tp))
+                bind(o, "TaperAngle" + suf, bd.get("draft" if n == 1 else "draft2"),
+                     " * 1 deg" if ft > 0 else " * -1 deg")
+        if st.get("reversed"):
+            o.Reversed = True
+
     def build(st, variant, made):
         k, fid = st["kind"], st["feature"]
         prev = body.Tip
+        if k in ("pad", "pocket") and st.get("ends"):
+            s = sketch(fid + "_sketch", st["sketch"], made)
+            o = body.newObject("PartDesign::Pad" if k == "pad" else "PartDesign::Pocket", fid)
+            made.append(o)
+            o.Profile = s
+            ends(st, o, variant, prev)
+            return o
         if k in ("pad", "pocket"):
             return pad_or_pocket(st, made, variant, st["sketch"], st.get("depth"), st.get("bind", {}).get("depth"), k,
                                  through=st.get("through", False), mid=st.get("midplane", False))
+        if k == "pipe":
+            s = sketch(fid + "_sketch", st["sketch"], made)
+            o = body.newObject("PartDesign::SubtractivePipe" if st.get("cut") else "PartDesign::AdditivePipe", fid)
+            made.append(o)
+            o.Profile = s
+            if st.get("spine"):
+                sp = sketch(fid + "_path", st["spine"], made)
+                sp.Visibility = False
+                o.Spine = (sp, ["Edge%d" % (i + 1) for i, g in enumerate(st["spine"]["geometry"]) if not g.get("c")])
+            else:
+                o.Spine = (prev, match_edges(prev.Shape, st["spine_edges"]))
+            o.Mode = "Frenet" if st.get("frenet") else "Standard"
+            apply(o, variant)
+            return o
+        if k == "loft":
+            secs = [sketch("%s_s%d" % (fid, i + 1), sk, made) for i, sk in enumerate(st["sections"])]
+            o = body.newObject("PartDesign::SubtractiveLoft" if st.get("cut") else "PartDesign::AdditiveLoft", fid)
+            made.append(o)
+            o.Profile = secs[0]
+            o.Sections = secs[1:]
+            o.Ruled = bool(st.get("ruled"))
+            apply(o, variant)
+            return o
+        if k == "mirrored":
+            o = body.newObject("PartDesign::Mirrored", fid)
+            made.append(o)
+            if st.get("of"):
+                missing = [f for f in st["of"] if objs.get(f) is None]
+                if missing:
+                    raise RuntimeError("it mirrors %s, which is not a native feature here" % ", ".join(missing))
+                o.Originals = [objs[f] for f in st["of"]]
+            else:
+                o.TransformMode = "Whole shape"
+            o.MirrorPlane = plane_link(st["plane"], prev, made)
+            apply(o, variant)
+            return o
+        if k == "draft":
+            o = body.newObject("PartDesign::Draft", fid)
+            made.append(o)
+            o.Base = (prev, match_faces(prev.Shape, st["faces"]))
+            o.NeutralPlane = plane_link(st["plane"], prev, made)
+            o.Angle = float(st["angle"])
+            bind(o, "Angle", st.get("bind", {}).get("angle"), " * 1 deg")
+            if st.get("flip"):
+                o.Reversed = not o.Reversed
+            apply(o, {kk: (not o.Reversed if kk == "Reversed" else vv) for kk, vv in (variant or {}).items()})
+            return o
         if k in ("revolution", "groove"):
             s = sketch(fid + "_sketch", st["sketch"], made)
             o = body.newObject("PartDesign::Revolution" if k == "revolution" else "PartDesign::Groove", fid)
@@ -254,6 +364,15 @@ def run(plan, here, out_path):
             o.ReferenceAxis = (s, [st["axis_ref"]])
             o.Angle = float(st["angle"])
             bind(o, "Angle", st.get("bind", {}).get("angle"), " * 1 deg")
+            if st.get("upto_face"):
+                o.Type = "UpToFace"
+                o.UpToFace = (prev, match_faces(prev.Shape, [st["upto_face"]]))
+            if st.get("angle2"):
+                o.Type = "TwoAngles"
+                o.Angle2 = float(st["angle2"])
+                bind(o, "Angle2", st.get("bind", {}).get("angle2"), " * 1 deg")
+            if st.get("midplane"):
+                o.Midplane = True
             apply(o, variant)
             return o
         if k in ("fillet", "chamfer"):
@@ -353,6 +472,39 @@ def run(plan, here, out_path):
                                      name="%s_%s%d" % (fid, part["op"], j + 1))
             return last
         raise RuntimeError("no FreeCAD feature for kind " + k)
+
+    def datum_plane(st):
+        pl = st["plane"]
+        want = placement(pl["origin"], pl["x"], pl["z"])
+        d = body.newObject("PartDesign::Plane", st["feature"])
+        at = st.get("attach")
+        how = "placed"
+        if at:
+            d.AttachmentSupport = [(origin[at["datum"] + "_Plane"], "")]
+            d.MapMode = "FlatFace"
+            ax = V(1, 0, 0) if at.get("about", "x") == "x" else V(0, 1, 0)
+            rot = App.Rotation(ax, float(at.get("angle") or 0))
+            d.AttachmentOffset = App.Placement(rot.multVec(V(0, 0, float(at.get("offset") or 0))), rot)
+            if not float(at.get("angle") or 0) and at.get("bind_offset"):
+                bind(d, ".AttachmentOffset.Base.z", at["bind_offset"])
+            elif not float(at.get("offset") or 0) and at.get("bind_angle"):
+                bind(d, ".AttachmentOffset.Rotation.Angle", at["bind_angle"], " * 1 deg")
+            doc.recompute()
+            z_ok = (d.Placement.Rotation.multVec(V(0, 0, 1)) - want.Rotation.multVec(V(0, 0, 1))).Length < 1e-6
+            on = abs((d.Placement.Base - want.Base).dot(want.Rotation.multVec(V(0, 0, 1)))) < 1e-6
+            how = "native" if z_ok and on else "placed"
+        if how == "placed":
+            for e in list(d.ExpressionEngine):
+                d.setExpression(e[0], None)
+            bound_now.clear()
+            d.MapMode = "Deactivated"
+            d.AttachmentSupport = []
+            d.Placement = want
+            doc.recompute()
+        objs[st["feature"]] = d
+        rep["bound"] += [b for b in bound_now if b not in rep["bound"]]
+        return {"status": "native", "objects": [d.Name], "bound": sorted(set(bound_now)), "dev": 0.0,
+                "attached": how == "native"}
 
     def remove(made):
         for o in reversed(made):
@@ -455,6 +607,14 @@ def run(plan, here, out_path):
                "source": st.get("source", "")}
         if st["kind"] in ("suppressed", "skipped", "empty"):
             row["status"] = st["kind"]
+            rep["steps"].append(row)
+            continue
+        if st["kind"] == "datum_plane":
+            bound_now.clear()
+            try:
+                row.update(datum_plane(st))
+            except Exception as e:
+                row.update(status="failed", error=str(e)[:300])
             rep["steps"].append(row)
             continue
         expected = load(st.get("brep"))

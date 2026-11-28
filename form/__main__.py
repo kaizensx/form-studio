@@ -49,6 +49,9 @@
   form tree <project> [suppress|restore|move|rename FEATURE] [--upto FEATURE]   the feature tree, by hand
   form model <project> fillet|chamfer|hole|pattern|shell --at x,y,z ... [--preview]   a picked feature as code
   form model <project> extrude|cut|revolve --sketch F.json [--at x,y,z] [--depth D]    a feature from a sketch
+             [--end blind|through|next|face|vertex|offset|mid] [--to-at x,y,z] [--reverse] [--opt KEY=VALUE]
+  form model <project> sweep|loft|rib|mirror|draft|move_face|thicken|boolean|split|variable_fillet|datum_plane|
+             datum_axis [--at x,y,z ...] [--opt KEY=VALUE ...] [--options JSON]   more features (docs/CLI.md)
   form sketch <project> FEATURE [--ops JSON] [--set name=v]   a feature's sketch, solved; edit it
   form verify <project> <release>    re-hash a release against its manifest
   form chat "message" [--project ID] [--conversation ID] [--agent claude|codex] [--model X] [--attach FILE] [--json]
@@ -124,6 +127,32 @@ def _kv(pairs: list[str]) -> dict:
         except ValueError:
             raise SystemExit(f"{k}: “{v}” is not a number (units are mm, degrees, grams).")
     return out
+
+
+def _model_options(a, xyz) -> dict:
+    """form model's end conditions and the more kinds' options: --end, --to-at, --reverse, --new-body, --opt KEY=VALUE
+    (VALUE read as JSON when it parses), --options JSON or a file holding it."""
+    o: dict = {}
+    if a.options:
+        p = Path(a.options)
+        o.update(json.loads(p.read_text(encoding="utf-8") if p.suffix == ".json" and p.is_file() else a.options))
+    for kv in a.opt:
+        k, sep, val = kv.partition("=")
+        if not sep or not k:
+            raise SystemExit(f"--opt takes KEY=VALUE, not {kv!r}")
+        try:
+            o[k] = json.loads(val)
+        except ValueError:
+            o[k] = val
+    if a.end:
+        o["end"] = a.end
+    if a.to_at:
+        o["to_at"] = xyz(a.to_at)
+    if a.reverse:
+        o["reverse"] = True
+    if a.new_body:
+        o["new_body"] = True
+    return o
 
 
 def _print(obj) -> None:
@@ -486,7 +515,18 @@ def main(argv=None):
     mo = sub.add_parser("model", help="a picked feature as code: model <project> fillet|chamfer|hole|pattern|shell "
                                       "[--at x,y,z ...] [options] [--preview]")
     mo.add_argument("project")
-    mo.add_argument("kind", choices=["fillet", "chamfer", "hole", "pattern", "shell", "extrude", "cut", "revolve"])
+    mo.add_argument("kind", choices=["fillet", "chamfer", "hole", "pattern", "shell", "extrude", "cut", "revolve",
+                                     "sweep", "loft", "rib", "mirror", "draft", "move_face", "thicken", "boolean",
+                                     "split", "variable_fillet", "datum_plane", "datum_axis"])
+    mo.add_argument("--end", choices=["blind", "through", "next", "face", "vertex", "offset", "mid", "angle"],
+                    help="extrude, cut: the end condition (revolve: angle or face)")
+    mo.add_argument("--to-at", metavar="x,y,z", help="up to face / offset from face: a point on that face")
+    mo.add_argument("--reverse", action="store_true", help="the other direction")
+    mo.add_argument("--new-body", action="store_true", help="a separate body (multi-body designs)")
+    mo.add_argument("--opt", action="append", default=[], metavar="KEY=VALUE",
+                    help="any other option (VALUE read as JSON when it is JSON): offset=2, end2=\"blind\", depth2=3, "
+                         "draft=5, thin=1.2, thin_mode=\"mid\", plane=\"YZ\", of=[\"boss\"], sections=[...]; see docs/CLI.md")
+    mo.add_argument("--options", metavar="JSON|FILE.json", help="the options as one JSON object (or a file holding it)")
     mo.add_argument("--sketch", metavar="FILE.json", help="extrude, cut, revolve: the sketch ({plane, points, entities, "
                     "constraints}); with --at, it goes on the face at that point")
     mo.add_argument("--axis-entity", type=int, help="revolve: the sketch line it turns about")
@@ -1107,6 +1147,7 @@ def main(argv=None):
                         o["sketch"] = json.loads(Path(a.sketch).read_text(encoding="utf-8"))
                     if a.axis_entity is not None:
                         o["axis_entity"] = a.axis_entity
+                    o.update(_model_options(a, xyz))
                     planned = modelling.plan(st, p, a.kind, [{"at": xyz(t)} for t in a.at], **o)
                     ops = planned["ops"]
                 if a.preview:
