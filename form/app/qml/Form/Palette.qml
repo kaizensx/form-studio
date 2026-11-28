@@ -4,12 +4,39 @@ import "F.js" as F
 
 // Command palette: every action, design and conversation, from the keyboard. No animation: it is used all day.
 // A pane of glass over the room with the command line's prompt (the accent "›") before the search field.
-// Results are grouped (Recent, Go to, Tools, Designs, Conversations, Settings); typing matches loosely — the letters in
-// order, not necessarily together — and the matched letters are lit. The commands you ran last come first.
+// Results are grouped (Recent, Go to, Tools, In the open design, Designs, Conversations, Settings); typing matches
+// loosely — the letters in order, not necessarily together — and the matched letters are lit. The commands you ran
+// last come first.
+// A row previews what it leads to: after its name one quiet line (what it is), and at the right edge its figure in
+// mono when it has one (a feature's value, a study's headline, a design's revision and checks) or its key.
+// Tab searches everywhere: the words are then also looked for inside the conversations (GET /conversations?q=, which
+// reads every message and answers with the line around the match) and in every setting's name; those rows stand
+// under "Everywhere". Tab again goes back.
 Item {
     id: pal
     anchors.fill: parent; visible: Store.paletteOpen; z: 50
-    onVisibleChanged: if (visible) { q.text = ""; sel = 0; rest = null; Store.loadConvs(); q.input.forceActiveFocus() }
+    onVisibleChanged: if (visible) { q.text = ""; sel = 0; rest = null; everywhere = false; found = []; Store.loadConvs(); q.input.forceActiveFocus() }
+    // ── Tab: search everywhere ──
+    property bool everywhere: false
+    property var found: []                     // conversations whose messages hold the words: { id, title, updated, match }
+    property string foundFor: ""               // the words `found` answers
+    function toggleEverywhere() { everywhere = !everywhere; if (everywhere && !Store.config) Store.loadConfig(); seek.restart() }
+    function look() {
+        var t = q.text.trim()
+        if (!everywhere || t.length < 2) { found = []; foundFor = ""; return }
+        Store.get("/conversations?q=" + encodeURIComponent(t)).then(function (r) {
+            if (q.text.trim() !== t || !pal.everywhere) return           // the words moved on while the engine read
+            pal.found = (r.conversations || []).filter(function (c) { return c.messages > 0 && !!c.match }).slice(0, 6); pal.foundFor = t
+            Qt.callLater(pal.pickBest) }, function () {})
+    }
+    Timer { id: seek; interval: 160; onTriggered: pal.look() }
+    // the line around the match as the engine found it (lower case, "…" at a cut end), with the words lit
+    function quote(m, t) {
+        var w = t.split(" ")[0], s = String(m || ""), i = s.toLowerCase().indexOf(w), at = []
+        if (s.length > 64) { var a = Math.max(0, Math.min(i - 18, s.length - 64)); s = (a > 0 ? "…" : "") + s.slice(a, a + 64).replace(/^…/, "") + "…"; i = s.toLowerCase().indexOf(w) }
+        for (var k = 0; i >= 0 && k < w.length; k++) at.push(i + 1 + k)
+        return { text: "“" + s + "”", at: at }
+    }
     property int sel: 0
     // the pointer picks a row only once it moves: a pointer resting where the list appears (or where rows slide in
     // as you type) never takes the highlight from the keyboard
@@ -24,7 +51,8 @@ Item {
     objectName: "palette"
     readonly property string selText: rows[picks[sel]] ? rows[picks[sel]].text : ""     // the highlighted command
     property alias query: q.text
-    readonly property var groups: ["Recent", "Saved prompts", "Go to", "Tools", "Bench", "Designs", "Conversations", "Settings"]
+    readonly property var groups: ["Recent", "Saved prompts", "Go to", "Tools", "In design", "Bench", "Designs", "Conversations", "Settings", "Everywhere"]
+    function groupName(g) { return g === "In design" ? "In " + (Store.project ? Store.project.name : "this design") : g }
     function updates() { Store.checkUpdates(true).then(function (u) {
         if (u && u.available) { Store.updateHidden = false; Store.openSheet("update") }
         else if (u && !u.enabled) Store.toast("Update checks are off", "[updates] check = false or FORM_NO_UPDATE_CHECK=1")
@@ -33,6 +61,7 @@ Item {
     readonly property var all: {
         var c = [], w = Store.screen === "work"
         function add(g, id, icon, text, hint, run, keys) { c.push({ g: g, id: id, icon: icon, text: text, hint: hint || "", run: run, keys: keys || "" }) }
+        function val(v) { c[c.length - 1].value = v || "" }          // the figure at the row's right edge
         if (w) {
             // a mode also answers to what it was called and to what it holds (`also`: words that find it, never shown)
             var also = { shape: "shape tree program features model", prove: "review prove studies checks", release: "release routes export print", document: "documents drawings report" }
@@ -80,15 +109,22 @@ Item {
             add("Tools", "freecad", "external_link", "Open the STEP in FreeCAD", "Release · working files", function () { Store.openIn("step", "freecad") })
             if (Store.canAskReview) add("Tools", "review", "eye", "Ask for a design review", "Silhouette, relationships, details", function () { Store.askReview() })
         }
+        // the open design's features, in build order: each with the values it is made of
+        if (w && Store.recipe && Store.recipe.features) Store.recipe.features.forEach(function (ft, i) {
+            var ps = (Store.recipe.params || []).filter(function (p) { return p.feature === ft.id }), vs = Store.head ? Store.head.values : null, out = [], unit = ""
+            for (var k = 0; vs && k < ps.length && out.length < 3; k++) { var v = vs[ps[k].key]; if (typeof v === "number") { out.push(String(Number(v.toFixed(2)))); unit = ps[k].unit || "" } }
+            add("In design", "feature." + ft.id, "box", (i < 9 ? "0" : "") + (i + 1) + " " + (ft.label || ft.id), "feature", function () { Store.setStage("shape"); Store.select(ft.id) })
+            val(out.length === 1 ? out[0] + (unit ? " " + unit : "") : out.join(" × ")) })
         // the Bench: every study, route and document of this design with its state (form/studies.py); a current one
         // opens what it made, any other runs
         if (w && Store.bench && Store.bench.project === Store.pid) Store.bench.entries.forEach(function (e) {
             if (e.state === "n/a") return
-            var st = e.state === "current" ? "Current" + (e.headline ? " · " + e.headline : "") : e.state === "stale" ? "Stale: describes " + F.pad(e.rev)
+            var st = e.state === "current" ? "Current" : e.state === "stale" ? "Stale: describes " + F.pad(e.rev)
                    : e.state === "never" ? "Never run" : e.state === "unavailable" ? (e.why || "Cannot run here") : e.state === "failed" ? "Failed" : "Running"
             add("Bench", "bench." + e.id, e.group === "study" ? "list_checks" : e.group === "route" ? "external_link" : "file_text",
                 (e.state === "current" || e.state === "running" ? "" : e.by === "agent" ? "Ask for: " : e.by === "person" ? "" : "Run: ") + e.label, st,
                 function () { if (e.state === "current" && e.by === "engine") Store.openStudy(e); else if (e.state !== "running") Store.runStudy(e.id) })
+            if (e.state === "current") val(e.headline)
         })
         // messages you saved as commands (the bookmark on a message of yours): one key sends it again, with the selection
         Store.savedPrompts.forEach(function (p, i) { add("Saved prompts", "prompt." + i + "." + p.name, "bookmark", p.name, p.text.length > p.name.length ? "your saved prompt" : "send it again",
@@ -99,11 +135,12 @@ Item {
         add("Tools", "blank", "square_dashed", "Start blank", "An empty design: describe, sketch or import what goes in it", function () { Store.startBlank() })
         add("Tools", "block", "cuboid", "Start from a block", "A rounded block shaped with sliders, no agent", function () { Store.startBlock("") })
         if (Store.concepts.length) add("Tools", "concepts", "boxes", "Concepts waiting for a pick", Store.concepts[0].name, function () { Store.openConcepts(Store.concepts[0].id) })
-        if (Store.studio) Store.studio.projects.forEach(function (p) { if (!p.error && p.id !== Store.pid) add("Designs", "p." + p.id, "cuboid", p.name, F.pad(p.head) + " · " + F.ago(p.updated), function () { Store.open(p.id) }) })
+        if (Store.studio) Store.studio.projects.forEach(function (p) { if (!p.error && p.id !== Store.pid) { add("Designs", "p." + p.id, "cuboid", p.name, F.ago(p.updated), function () { Store.open(p.id) })
+            val(F.pad(p.head) + (p.checks ? (p.checks.fail ? " · " + p.checks.fail + " fail" : p.checks.warn ? " · " + p.checks.warn + " to review" : " · " + p.checks.pass + " pass") : "")) } })
         add("Conversations", "chat.new", "message_square_plus", "New conversation", "", function () { Store.newChat(); Store.talkOpen = true }, "Ctrl+Shift+O")
         if (w) add("Conversations", "chat.toggle", "panel_left", (Store.talkOpen ? "Hide" : "Show") + " the conversation", "", function () { Store.toggleTalk() }, "Ctrl+J")
         if (w) add("View", "view.focus", "maximize_2", Store.focusView ? "Leave Focus: bring the side columns back" : "Focus: the part alone, both side columns away", "", function () { Store.focusView = !Store.focusView }, "Ctrl+.")
-        Store.convs.forEach(function (cv) { if (cv.messages > 0 && cv.id !== Store.convId) add("Conversations", "c." + cv.id, "message_square", cv.title, F.ago(cv.updated), function () { Store.openConv(cv.id); Store.talkOpen = true }) })
+        Store.convs.forEach(function (cv) { if (cv.messages > 0 && cv.id !== Store.convId) { add("Conversations", "c." + cv.id, "message_square", cv.title, "conversation", function () { Store.openConv(cv.id); Store.talkOpen = true }); val(F.ago(cv.updated)) } })
         // the model that answers: every model of the current agent, and each other agent that is installed
         var ai = Store.chatAgentInfo
         if (ai) (ai.models || []).forEach(function (m) { add("Conversations", "model." + ai.id + "." + m.id, "bot", "Model: " + m.label, Store.chatModel === m.id || (m.id === "default" && !Store.chatModel) ? "In use · " + ai.label : ai.label, function () { Store.setChatChoice(undefined, m.id) }) })
@@ -167,7 +204,7 @@ Item {
     function rank(c, t) {
         var best = pal.match(c.text, t)
         if (c.also && pal.wordStart(c.also, t) >= 0 && (!best || best.score < 1600)) best = { score: 1600, at: [] }
-        var h = t.length >= 3 ? pal.wordStart(String(c.hint).toLowerCase(), t) : -1
+        var h = t.length >= 3 ? pal.wordStart((String(c.hint) + " " + String(c.value || "")).toLowerCase(), t) : -1
         if (h >= 0 && (!best || best.score < 700 - Math.min(80, h))) best = { score: 700 - Math.min(80, h), at: [] }
         if (!best) return null
         // the modes are the map of the app: at an equal match they come first; what was used lately, next
@@ -190,16 +227,37 @@ Item {
                 if (m) hit.push(Object.assign({}, items[i], { at: m.at, score: m.score, n: i }))
             }
             hit.sort(function (a, b) { return b.score - a.score || a.n - b.n })
-            items = hit.slice(0, 14)
+            items = hit.slice(0, pal.everywhere ? 5 : 14)          // everywhere: room for what was said
+            if (pal.everywhere) {
+                // inside the conversations: the line around the words, as the engine read it
+                if (pal.foundFor === q.text.trim()) pal.found.forEach(function (cv, k) {
+                    if (!cv.match) return                                   // only its title matched: it is listed under Conversations
+                    var qt = pal.quote(cv.match, t)
+                    items.push({ g: "Everywhere", id: "found." + cv.id, icon: "message_square", text: qt.text, at: qt.at, score: 400 - k, n: 9000 + k,
+                                 hint: "in " + cv.title, value: F.ago(cv.updated), keys: "",
+                                 run: function () { Store.openConv(cv.id); Store.talkOpen = true } }) })
+                // every setting by name: it opens its page
+                var names = { general: "General", printer: "Printing", chat: "Agents & models", apps: "Other apps", costs: "Costs", appearance: "Appearance", backups: "Backups", updates: "Updates", advanced: "Advanced" }
+                var sets = []
+                ;(Store.config ? Store.config.settings : []).forEach(function (r, k) {
+                    if (r.hidden || (r.tab === "printer" && !Store.printOn) || !names[r.tab]) return
+                    var path = "Settings › " + names[r.tab] + " › ", m = pal.match(r.label, t)
+                    if (m && m.score >= 1000) sets.push({ g: "Everywhere", id: "set." + r.key, icon: "sliders_horizontal", text: path + r.label, score: m.score - 800, n: 9500 + k,
+                        at: m.at.map(function (x) { return x + path.length }), hint: "", keys: "", value: "", run: function () { Store.openSettings(r.tab) } }) })
+                sets.sort(function (a, b) { return b.score - a.score || a.n - b.n })
+                items = items.concat(sets.slice(0, 4))
+            }
         }
         pal.groups.forEach(function (g) {
             var l = items.filter(function (c) { return c.g === g })
             if (!l.length) return
-            out.push({ head: g })
+            out.push({ head: pal.groupName(g) })
             l.forEach(function (c) { out.push(c) })
         })
         return out
     }
+    // the rows without their headers, as plain facts (what a journey reads)
+    readonly property var listed: rows.filter(function (r) { return !r.head }).map(function (r) { return { id: r.id, g: r.g, text: r.text, hint: r.hint || "", value: r.value || "" } })
     readonly property var picks: { var p = []; for (var i = 0; i < rows.length; i++) if (!rows[i].head) p.push(i); return p }
     // what typing highlights: the closest match, wherever its group is listed (the rows stay in group order)
     readonly property int best: { var b = 0, s = -1e9; for (var i = 0; i < picks.length; i++) { var r = rows[picks[i]]; if (r.score !== undefined && r.score > s) { s = r.score; b = i } } return b }
@@ -222,7 +280,7 @@ Item {
         id: box
         source: Store.backdrop; radius: Theme.rPane
         width: Math.min(640, parent.width - 80); anchors.horizontalCenter: parent.horizontalCenter; y: Math.max(64, Math.round(parent.height * 0.14))
-        height: 58 + Math.min(list.contentHeight, Math.min(460, parent.height - y - 120)) + 12 + 36
+        height: 58 + Math.min(list.contentHeight, Math.min(pal.everywhere ? 600 : 460, parent.height - y - 120)) + 12 + 36
         onHeightChanged: place()
         Rectangle { anchors.fill: parent; radius: box.radius; color: Theme.alpha(Theme.plate1, box.blurred ? 0.66 : 0.9) }
         MouseArea { anchors.fill: parent }
@@ -230,18 +288,19 @@ Item {
         Rectangle { id: well; x: 8; y: 8; width: parent.width - 16; height: 44; radius: Theme.rPane - 8; color: Theme.glassWell; border.width: 1; border.color: Theme.alpha(Theme.datum, 0.55)
             Rectangle { anchors.fill: parent; anchors.margins: -3; radius: parent.radius + 3; color: "transparent"; border.width: 3; border.color: Theme.alpha(Theme.datum, 0.13) } }
         // where the search looks first: the open design
-        Rectangle { id: ctx; objectName: "paletteScope"; visible: !!Store.project && Store.screen === "work"; anchors.right: well.right; anchors.rightMargin: 10; anchors.verticalCenter: well.verticalCenter
+        Rectangle { id: ctx; objectName: "paletteScope"; visible: pal.everywhere || (!!Store.project && Store.screen === "work"); anchors.right: well.right; anchors.rightMargin: 10; anchors.verticalCenter: well.verticalCenter
             width: ctxT.width + 16; height: 22; radius: 6; color: Theme.alpha(Theme.lineBase, Theme.dark ? 0.10 : 0.07)
             Txt { id: ctxT; anchors.centerIn: parent; kind: "cap"; tone: 2; color: Theme.ink2; wrapMode: Text.NoWrap; elide: Text.ElideRight
-                width: Math.min(implicitWidth, 180); text: Store.project ? Store.project.name : "" } }
+                width: Math.min(implicitWidth, 180); text: pal.everywhere ? "Everywhere" : Store.project ? Store.project.name : "" } }
         Text { x: 22; y: 7; height: 44; verticalAlignment: Text.AlignVCenter; text: "›"; color: Theme.datum
             font.family: Theme.mono; font.pixelSize: 20; font.weight: Theme.wMedium; renderType: Theme.textRender }
         Field { id: q; x: 40; y: 14; width: parent.width - 62 - (ctx.visible ? ctx.width + 8 : 0); height: 32; bare: true; placeholder: "Search commands, designs and conversations"
-            onEdited: { pal.sel = 0; list.positionViewAtBeginning(); Qt.callLater(pal.pickBest) }     // once the rows follow the text
+            onEdited: { pal.sel = 0; list.positionViewAtBeginning(); Qt.callLater(pal.pickBest); if (pal.everywhere) seek.restart() }     // once the rows follow the text
             input.font.pixelSize: 15
             input.Keys.onPressed: function (e) {
                 if (e.key === Qt.Key_Down || (e.key === Qt.Key_N && (e.modifiers & Qt.ControlModifier))) { pal.move(1); e.accepted = true }
                 else if (e.key === Qt.Key_Up || (e.key === Qt.Key_P && (e.modifiers & Qt.ControlModifier))) { pal.move(-1); e.accepted = true }
+                else if (e.key === Qt.Key_Tab || e.key === Qt.Key_Backtab) { pal.toggleEverywhere(); e.accepted = true }
                 else if (e.key === Qt.Key_Escape) { Store.paletteOpen = false; e.accepted = true }
                 else if (e.key === Qt.Key_Return || e.key === Qt.Key_Enter) { pal.go(pal.sel); e.accepted = true }
             } }
@@ -264,9 +323,13 @@ Item {
                         GradientStop { position: 1; color: Theme.alpha(Theme.lineBase, Theme.dark ? 0.09 : 0.05) } } }
                 Icon { visible: !row.isHead; x: 14; name: row.modelData.icon || "dot"; size: 15; anchors.verticalCenter: parent.verticalCenter; color: row.on ? Theme.ink : Theme.ink2 }
                 Txt { visible: !row.isHead; x: 42; anchors.verticalCenter: parent.verticalCenter; textFormat: Text.StyledText; font.weight: Theme.wMedium; text: row.isHead ? "" : pal.lit(row.modelData.text, row.modelData.at)
-                    width: Math.min(implicitWidth, parent.width - 40 - 12 - (kb.visible ? kb.width + 10 : 0) - 60); elide: Text.ElideRight; wrapMode: Text.NoWrap; id: lab }
-                Txt { visible: !row.isHead; kind: "fine"; anchors.left: lab.right; anchors.leftMargin: 10; anchors.right: kb.visible ? kb.left : parent.right; anchors.rightMargin: 12
-                    anchors.verticalCenter: parent.verticalCenter; elide: Text.ElideMiddle; wrapMode: Text.NoWrap; tone: 3; text: row.modelData.hint || "" }
+                    width: Math.min(implicitWidth, parent.width - 40 - 12 - (kb.visible ? kb.width + 10 : 0) - (pv.visible ? pv.width + 12 : 0) - 60); elide: Text.ElideRight; wrapMode: Text.NoWrap; id: lab }
+                Txt { visible: !row.isHead; kind: "fine"; anchors.left: lab.right; anchors.leftMargin: 10; anchors.right: pv.visible ? pv.left : kb.visible ? kb.left : parent.right; anchors.rightMargin: 12
+                    anchors.verticalCenter: parent.verticalCenter; elide: Text.ElideRight; wrapMode: Text.NoWrap; tone: 3; text: row.modelData.hint || "" }
+                // the preview: the row's own figure, in mono, where a key would stand
+                Txt { id: pv; objectName: "paletteValue"; visible: !row.isHead && !!row.modelData.value && !kb.visible; mono: true; font.pixelSize: 11; tone: 2; lineHeight: 1.0
+                    anchors.right: parent.right; anchors.rightMargin: 14; anchors.verticalCenter: parent.verticalCenter
+                    width: Math.min(implicitWidth, 190); elide: Text.ElideRight; wrapMode: Text.NoWrap; text: row.modelData.value || "" }
                 Kbd { id: kb; visible: !row.isHead && !!row.modelData.keys; keys: row.modelData.keys || ""; anchors.right: parent.right; anchors.rightMargin: 10; anchors.verticalCenter: parent.verticalCenter }
                 MouseArea { anchors.fill: parent; enabled: !row.isHead; hoverEnabled: true
                     onPositionChanged: function (mouse) { if (!pal.pointed(this, mouse)) return
@@ -279,8 +342,9 @@ Item {
         Row { anchors.bottom: parent.bottom; anchors.bottomMargin: 11; x: 22; spacing: 14
             Row { spacing: 5; Kbd { keys: "Up" } Kbd { keys: "Down" } Txt { kind: "fine"; text: "move"; anchors.verticalCenter: parent.verticalCenter } }
             Row { spacing: 5; Kbd { keys: "Return" } Txt { kind: "fine"; text: "run"; anchors.verticalCenter: parent.verticalCenter } }
-            Row { spacing: 5; Kbd { keys: "Esc" } Txt { kind: "fine"; text: "close"; anchors.verticalCenter: parent.verticalCenter } } }
+            Row { objectName: "paletteTab"; spacing: 5; Kbd { keys: "Tab" } Txt { kind: "fine"; text: pal.everywhere ? (Store.project && Store.screen === "work" ? "back to " + Store.project.name : "commands only") : "search everywhere"; anchors.verticalCenter: parent.verticalCenter
+                width: Math.min(implicitWidth, 190); elide: Text.ElideRight; wrapMode: Text.NoWrap } } }
         Txt { anchors.bottom: parent.bottom; anchors.bottomMargin: 12; anchors.right: parent.right; anchors.rightMargin: 22; kind: "fine"; mono: true; tone: 3
-            text: pal.all.length + " commands" }
+            text: pal.everywhere && q.text.trim().length >= 2 && pal.foundFor === q.text.trim() ? (pal.found.length ? "said in " + F.plural(pal.found.length, "conversation") : "said in no conversation") : pal.all.length + " commands" }
     }
 }
