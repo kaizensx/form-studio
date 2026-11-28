@@ -130,6 +130,7 @@ QtObject {
     readonly property int sheetM: 640      // a form
     readonly property int sheetL: 840      // settings, lists with detail
     readonly property int sheetXl: 1080    // a canvas beside controls (render, variants, share)
+    readonly property int sheetXxl: 1200   // a room of its own: Settings, its nav beside the page
 
     // weights (Instrument Sans is variable)
     readonly property int wBody: 400
@@ -173,7 +174,7 @@ QtObject {
     //   stagger 45 between items of an entrance cascade
     // `reduced` is read once at start (OS "reduce motion", or FORM_REDUCED_MOTION=1). When set, movement and scale are
     // dropped (Theme.move(ms) returns 0, Theme.shift(px) returns 0) and only opacity/colour still animate.
-    property bool reduceMotion: false       // the person's own switch (Settings › General › Appearance), remembered
+    property bool reduceMotion: false       // the person's own switch (Settings › Appearance), remembered
     readonly property bool reduced: Bridge.reducedMotion || reduceMotion
     readonly property int press: 110
     // direction I (docs/design/directions/i/IA.md, the motion spec). Nothing is longer than 520 ms.

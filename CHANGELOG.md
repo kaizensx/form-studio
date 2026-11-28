@@ -4,6 +4,27 @@
 
 ### Added
 
+- **Home, as drawn for direction I.** The agent and model that design the next request are chosen under the
+  composer, at the right end of the *Make it for* line, not inside the prompt well. The makers' generators are one
+  quiet line under it (*Or make*: the ones that fit, then *More* with the rest and *Generate from words or a
+  picture*). The shelf's header has a **Trash** link with the count once something was deleted; it opens Recently
+  deleted. A card's second line leads with the design's checks when one fails or wants a look ("1 check to
+  review"), from the checks of its head revision; when they all pass, or have not run, it says what the design is
+  as before. The engine's list of designs carries that count (`/api/studio`: `projects[].checks`, and `trash`).
+- **Settings, rebuilt to the direction I sheet.** The word *Settings* over a bare column of pages, no title bar and
+  no action bar. General opens with **Set up for** as tiles, each with its switch, and **Engines**: every engine by
+  name with its licence, its size and where it stands (strength studies, MuJoCo, KiCad and Freerouting among them),
+  a switch for one that is installed, Install for one that is not. The mesh generators (TRELLIS.2, Meshy, Tripo)
+  are rows of the same list with their switch; it moved there from the Generate sheet, and a switch sends nothing.
+  Appearance with Reduce motion, Costs and Backups each have their own page. Unsaved changes bring up a bar at the
+  foot of the page with Revert and Save.
+- **The Generate sheet** lists the mesh generators as one list on glass: a state, a name, what it needs, one action
+  (Use this, or Turn on in Settings).
+- **The palette previews a row and searches everywhere.** A row shows its own figure at the right edge: a feature's
+  value, a study's headline, another design's revision and checks. The features of the open design are rows under
+  its name. **Tab** widens the search to what was said inside your conversations (the engine reads every message
+  and the row quotes the line around the words, from the one message that holds them) and to every setting by name;
+  Tab again goes back. The ranking keeps its tiers.
 - **A reply ends in Sources, built from the tool log** (direction I, wave O). Every tool call of a turn whose result
   says how its content is known is one numbered row with its evidence word: SIMULATED, COMPUTED, SPECIFIED, OPENED,
   MEASURED or ASSUMED. The word is the result's own `evidence`; a document or link that was read is OPENED, a
@@ -23,7 +44,7 @@
   prompts* and sends it again.
 - **Commands on the selection.** With something picked on the part, the prompt starts with what it is ("On 2 edges")
   and the message goes with the selection's numbers.
-- **Reduce motion** in Settings › General: movement becomes a short fade, at once. The system's setting turns it on too.
+- **Reduce motion** in Settings › Appearance: movement becomes a short fade, at once. The system's setting turns it on too.
 - **Results are drawn on the part** (direction I, decision 7). Select a current row of the Bench and what it found
   is on the design itself, from the file its engine stored, with a legend strip under the part that says the scale
   and its unit, how the result is known and what it does not tell.

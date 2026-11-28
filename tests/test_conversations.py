@@ -123,6 +123,11 @@ class Store(Base):
         self.assertEqual([m["id"] for m in s.list(q="cable")], [a["id"]])
         hit = s.list(q="bridged roof")                                    # found in the reply text, not the title
         self.assertEqual([m["id"] for m in hit], [a["id"]])
+        # the line around the words, as it was written (the palette's "search everywhere" quotes it): capitals kept
+        self.assertIn("The channel is 6 mm wide; bridged roof is assumed", hit[0]["match"])
+        cable = s.list(q="cable")[0]                                       # words of the title itself need no quote
+        self.assertTrue(("match" not in cable) == ("cable" in cable.get("title", "").lower()), cable)
+        self.assertEqual(s.list(q="BRIDGED")[0]["id"], a["id"])            # the search itself ignores case
         self.assertEqual(s.list(q="nothing-like-this"), [])
         self.assertEqual(s.latest("dock")["id"], b["id"])
         s.pin(a["id"])

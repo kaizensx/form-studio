@@ -556,10 +556,32 @@ class Studio:
                                 "purpose": purpose_mod.of(p), "concept": p.get("concept"),   # concepts: form/concepts.py
                                 "lineage": p.get("lineage"),                                 # where it came from
                                 "origin": p.get("origin"),               # the conversation and request that made it
+                                "checks": self.checks_summary(p),        # the head's checks, counted (None: not run)
                                 "parts": [q.get("id") for q in (p.get("multipart") or {}).get("parts") or []] or None})
                 except StudioError as e:
                     out.append({"id": d.name, "name": d.name, "error": str(e)})
         return out
+
+    def checks_summary(self, p: dict) -> dict | None:
+        """The checks of the head revision, counted, for a list of designs: {"pass", "warn", "fail", "rev"}. Only
+        what is current counts (the file under the key the head's inputs give); None when the checks have not run
+        for the head, or the design cannot be read that far."""
+        try:
+            ch = self.read(p, "checks", self.keys(p)["checks"])
+        except Exception:                             # noqa: BLE001  a design whose recipe no longer loads still lists
+            return None
+        if not ch:
+            return None
+        r = ch.get("rollup") or {}
+        return {"pass": int(r.get("PASS", 0)), "warn": int(r.get("WARN", 0)), "fail": int(r.get("FAIL", 0)),
+                "rev": ch.get("rev")}
+
+    def trash_count(self) -> int:
+        """How many deleted designs are in <data dir>/.trash (Recently deleted, form/backup.py)."""
+        try:
+            return sum(1 for d in (self.root / ".trash").iterdir() if d.is_dir())
+        except OSError:
+            return 0
 
     def load(self, pid: str) -> dict:
         path = self.dir(pid) / "project.json"

@@ -317,6 +317,9 @@ class Journeys(unittest.TestCase):
                                             "FORM_FAKE_LATEST": "99.0.0",
                                             "FORM_UITEST_API_AGENTS": "1"})     # the provider rows on Settings › Agents & models
 
+    def test_palette_everywhere(self):       # a row's preview, Tab: what was said inside conversations, settings by name
+        self.journey("palette_everywhere.py")
+
     def test_printers(self):
         # Bambu Studio is a fixture folder; every other slicer points at a program that does not exist
         sys.path.insert(0, str(HERE))

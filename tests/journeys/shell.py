@@ -102,15 +102,16 @@ def journey_settings_saves_to_the_file(ui):
     card = ui.item("sheetCard")
     ui.wait_until(lambda: ui.store.get("config") is not None, 10, "the settings to load")
     ui.settle(200)
-    save = ui.item(text="Save", within=card, exact=False)
-    ui.check(save.property("enabled") is False, "Save is off until something changes")
+    ui.check(not ui.exists("settingsSaveBar"), "no Save bar until something changes")
     ui.click("settingsNav_updates")                  # General applies at once; Updates has switches that wait for Save
     ui.settle(300)
     row = [r for r in ui.js("Store.config.settings") if r["type"] == "bool" and r["tab"] == "updates"][0]
     toggles = [t for t in ui.find_all(within=card) if t.metaObject().className().startswith("Toggle")]
     ui.check(toggles, "the Updates tab has a switch")
     ui.click(toggles[0])
-    ui.wait_until(lambda: save.property("enabled") is True, 2, "Save to turn on after a change")
+    save = ui.item("settingsSave", timeout=3)         # the bar floats in at the foot of the page
+    ui.expect("Save 1 change", within=save)
+    ui.settle(300)
     ui.shot("sheet-settings-dirty")
     ui.click(save)
     ui.wait_until(lambda: cfg.exists() and cfg.read_text(encoding="utf-8") != (before or ""), 10, "studio.toml to be written")
@@ -126,7 +127,7 @@ def journey_settings_saves_to_the_file(ui):
     ui.settle(600)
     toggles = [t for t in ui.find_all(within=card) if t.metaObject().className().startswith("Toggle")]
     ui.click(toggles[0])
-    ui.wait_until(lambda: save.property("enabled") is True, 15, "Save to turn on again")
+    ui.wait_until(lambda: ui.exists("settingsSave"), 15, "the Save bar again")
     ui.key("Return")                                   # Enter is the sheet's primary action
     ui.wait_until(lambda: tomllib.loads(cfg.read_text(encoding="utf-8"))[sec][key] == row["value"], 10, "the setting to be restored by Enter")
     ui.check(any(p.name.startswith(cfg.name) and p != cfg for p in cfg.parent.iterdir()), "a backup was made next to studio.toml")

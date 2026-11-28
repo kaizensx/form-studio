@@ -223,47 +223,7 @@ Item {
                             onClicked: { sc.linking = !sc.linking; if (sc.linking) lf.input.forceActiveFocus(); else ta.forceActiveFocus() } }
                         Btn { kind: "quiet"; icon: "mic"; tip: Theme.mac ? "Speak instead of typing: press Fn twice (macOS dictation), then talk" : "Speak instead of typing: Windows+H starts dictation in this field"
                             onClicked: { ta.forceActiveFocus(); Store.toast("Dictation", Theme.mac ? "Press Fn twice and speak; the words go into the field." : "Press Windows+H and speak; the words go into the field.") } } }
-                    // the agent and model that design it: the same chip as the conversation's composer (Talk.qml), beside
-                    // Design it. What is picked here is what the request is sent with. Without an agent it says so and
-                    // opens Settings › Agents & models. Its words shorten before the tools on the left are covered.
-                    Item { id: mchip; objectName: "startModel"
-                        readonly property real room: go.x - 6 - (tools.x + tools.width + 4)          // between the tools and Design it
-                        readonly property bool bare: room < 55 + 56                                   // only the icon and the chevron fit
-                        width: (bare ? 0 : ml.width) + (bare ? 48 : 55); height: 30; x: go.x - 6 - width; y: 7
-                        visible: !!Store.studio && room >= 48
-                        activeFocusOnTab: true
-                        function act() { if (!Store.chatReady) Store.openSettings("agents"); else if (mpop.opened) mpop.close(); else mpop.open() }
-                        Keys.onPressed: function (e) { if (e.key === Qt.Key_Space || e.key === Qt.Key_Return || e.key === Qt.Key_Enter) { e.accepted = true; mchip.act() } }
-                        // (one thing more than the conversation's chip: a hairline at rest, so on Home it reads as a control)
-                        Rectangle { anchors.fill: parent; radius: height / 2; color: mcm.pressed ? Theme.washPress : mcm.containsMouse || mpop.opened ? Theme.washHover : "transparent"; Behavior on color { Tint {} }
-                            border.width: 1; border.color: Theme.rule2 }
-                        Icon { x: 9; name: "sparkles"; size: 15; color: Theme.ink2; anchors.verticalCenter: parent.verticalCenter }
-                        Txt { id: ml; objectName: "startModelLabel"; visible: !mchip.bare; x: 31; font.pixelSize: 12; tone: 2; wrapMode: Text.NoWrap; anchors.verticalCenter: parent.verticalCenter
-                            width: Math.min(Math.ceil(implicitWidth), Math.max(0, mchip.room - 55)); elide: Text.ElideRight
-                            text: !Store.chatReady ? "Connect an agent"
-                                : Store.chatAgentLabel + " · " + Store.modelShort(Store.chatAgent, Store.chatModel) + (Store.chatEffort ? " · " + Store.chatEffort : "") }
-                        Icon { x: mchip.bare ? 29 : ml.x + ml.width + 7; name: Store.chatReady ? "chevron_down" : "chevron_right"; size: 13; color: Theme.ink3; anchors.verticalCenter: parent.verticalCenter }
-                        FocusRing { on: mchip.activeFocus; radius: 15 }
-                        MouseArea { id: mcm; anchors.fill: parent; hoverEnabled: true; cursorShape: Qt.PointingHandCursor; onClicked: mchip.act() }
-                        Tip { show: mcm.containsMouse && !mpop.opened
-                            text: Store.chatReady ? "The agent and model that design it. Click to change them." : "No agent is connected: add one in Settings › Agents & models" }
-                        Pop {
-                            id: mpop; objectName: "startModelPop"; width: 380; padding: 6
-                            // under the chip, its right edge on the chip's; above it when there is more room there
-                            property bool up: false
-                            x: Math.round(parent.width - width); y: up ? -height - 6 : parent.height + 6
-                            origin: up ? Popup.BottomRight : Popup.TopRight
-                            height: Math.min(mp.implicitHeight + 12, (sc.Window.height || 800) * 0.6)
-                            onAboutToShow: { var at = mchip.mapToItem(null, 0, 0).y, h = sc.Window.height || 800
-                                up = h - (at + mchip.height + 6) - 8 < height && at - 6 - 8 > h - (at + mchip.height + 6) - 8
-                                mp.reset() }
-                            onOpened: mp.opened()
-                            onClosed: Qt.callLater(function () {
-                                Store.retryAfterPick = false
-                                if (Store.pendingSend) { Store.chatPrefill(Store.pendingSend); Store.pendingSend = "" } })
-                            Flickable { anchors.fill: parent; clip: true; contentHeight: mp.implicitHeight; boundsBehavior: Flickable.StopAtBounds
-                                ScrollBar.vertical: ScrollBar { width: 6 }
-                                TalkModelPicker { id: mp; width: parent.width; onDone: mpop.close() } } } }
+                    // (the agent and model that design it are chosen under the bar: StartModel.qml, in Home's options line)
                     // the one filled button. It is lit whenever an agent can take the request; with nothing written
                     // yet a click puts the cursor in the field.
                     Rectangle { id: go; objectName: "startSend"
@@ -303,7 +263,6 @@ Item {
         }
     }
     function pickFiles() { Store.ask(pick) }
-    function pickModel() { if (Store.chatReady && !mpop.opened) mpop.open() }      // the agent and model picker, opened from elsewhere
     function openLink() { linking = true; lf.input.forceActiveFocus() }
     function addLink(t) {
         t = String(t || "").trim(); if (!t) return

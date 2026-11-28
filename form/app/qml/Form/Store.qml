@@ -1925,12 +1925,12 @@ QtObject {
         var v = onboardStep, send = function () { return post("/setup/step", { step: v }).then(function () {}, function () {}) }
         _stepSave = _stepSave ? _stepSave.then(send) : send()
     }
-    // tab: general | printer | chat | apps | updates | advanced | software. "agents" (what the tab reads) means chat;
+    // tab: general | printer | chat | costs | apps | appearance | backups | updates | advanced | software. "agents" (what the tab reads) means chat;
     // a tab that does not exist, or Printing while printing is off, opens General instead of an empty sheet.
     function openSettings(tab) {
         var t = tab === "agents" ? "chat" : tab
         if (t === "engines") t = "software"
-        if (["general", "printer", "chat", "costs", "apps", "backups", "updates", "advanced", "software"].indexOf(t) < 0 || (t === "printer" && !printOn)) t = "general"
+        if (["general", "printer", "chat", "costs", "apps", "appearance", "backups", "updates", "advanced", "software"].indexOf(t) < 0 || (t === "printer" && !printOn)) t = "general"
         openSheet("settings", { tab: t }); loadConfig(); checkSoftware(); loadCaps()
     }
     // "Update now" (pip / uv / source installs): the upgrade command runs as an install job with a streamed log.

@@ -583,12 +583,21 @@ class Conversations:
             if thread is not None and (meta.get("thread") or meta["id"]) != thread:
                 continue
             if words:
-                hay = (meta.get("title", "") + " " + meta.get("preview", "")).lower()
+                title, preview = str(meta.get("title", "")), str(meta.get("preview", ""))
+                hay, said_in = (title + " " + preview).lower(), None
                 if not all(w in hay for w in words):
-                    hay += " " + " ".join(str(e.get("text", "")) for e in self.events(d.name) if e.get("t") in ("user", "text")).lower()
+                    said_in = self._said(d.name)
+                    hay += " " + " ".join(said_in).lower()
                     if not all(w in hay for w in words):
                         continue
-                    meta = dict(meta, match=self._snippet(hay, words[0]))
+                # words that are not all in the title were said in the conversation: `match` is the line around the
+                # first of them inside the one message that holds it, as it was written, your own messages before
+                # the replies (the palette's "search everywhere" quotes it)
+                if not all(w in title.lower() for w in words):
+                    said_in = said_in if said_in is not None else self._said(d.name)
+                    hit = next(((m, w) for w in words for m in said_in if w in m.lower()), None)
+                    if hit:
+                        meta = dict(meta, match=self._snippet(hit[0], hit[1]))
             out.append(meta)
         out.sort(key=lambda m: (not m.get("pinned"), -m.get("updated", 0)))
         if words:                                   # one row per thread: the branches say the same things
@@ -601,9 +610,15 @@ class Conversations:
             out = one
         return out[:limit]
 
+    def _said(self, cid: str) -> list[str]:
+        """Every message of a conversation as text: what the person wrote first, then the replies."""
+        evs = self.events(cid)
+        return ([str(e.get("text", "")) for e in evs if e.get("t") == "user"]
+                + [str(e.get("text", "")) for e in evs if e.get("t") == "text"])
+
     @staticmethod
     def _snippet(hay: str, word: str, span: int = 60) -> str:
-        i = hay.find(word)
+        i = hay.lower().find(word)
         if i < 0:
             return ""
         a, b = max(0, i - span // 2), min(len(hay), i + len(word) + span)

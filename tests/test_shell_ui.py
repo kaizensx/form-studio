@@ -97,7 +97,7 @@ class Sheets(unittest.TestCase):
         for name in set(self.files().values()):
             m = re.search(r"property int sheetWidth: ([^\n;]+)", read(name))
             if m:
-                self.assertRegex(m.group(1), r"Theme\.sheet(S|M|L|Xl)\b", name + " invents a sheet width")
+                self.assertRegex(m.group(1), r"Theme\.sheet(S|M|L|Xl|Xxl)\b", name + " invents a sheet width")
 
     def test_no_sheet_hand_rolls_its_bottom_padding(self):
         for name in set(self.files().values()):

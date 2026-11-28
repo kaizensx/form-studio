@@ -29,6 +29,7 @@ Item {
     readonly property bool open: !!Store.sheet
     readonly property Item sheet: ld.item
     readonly property bool fills: !!sheet && sheet.fillsBody === true
+    readonly property bool bare: !!sheet && sheet.bareHead === true      // no title bar: the sheet lays out the whole card (Settings)
     property string file: ""                 // stays set while the sheet fades out
     visible: scrim.opacity > 0.001
     onOpenChanged: { if (open) { file = files[Store.sheet.kind] || ""; Qt.callLater(card.grab); landed.restart() } else unload.restart() }
@@ -43,15 +44,15 @@ Item {
     FocusScope {
         id: card
         objectName: "sheetCard"
-        readonly property int pad: 24
-        readonly property int headH: host.sheet && host.sheet.note ? 68 : 58       // a title with a line under it needs the same air above as beside
+        readonly property int pad: host.bare ? 0 : 24
+        readonly property int headH: host.bare ? 0 : host.sheet && host.sheet.note ? 68 : 58       // a title with a line under it needs the same air above as beside
         readonly property int tabsH: tabs.visible ? 34 : 0
         readonly property int footH: foot.visible ? 60 : 0
         readonly property real bodyH: host.sheet ? (host.sheet.sheetHeight ? host.sheet.sheetHeight : host.sheet.implicitHeight) : 160
         anchors.horizontalCenter: parent.horizontalCenter
         y: Math.max(40, Math.round((parent.height - height) / 2 - parent.height * 0.02))
-        width: Math.min(parent.width - 64, host.sheet && host.sheet.sheetWidth ? host.sheet.sheetWidth : Theme.sheetM)
-        height: Math.min(parent.height - 88, headH + tabsH + bodyH + pad + (foot.visible ? 0 : 4) + footH)
+        width: Math.min(parent.width - (host.bare && parent.width >= 1200 ? 240 : 64), host.sheet && host.sheet.sheetWidth ? host.sheet.sheetWidth : Theme.sheetM)
+        height: Math.min(parent.height - (host.bare ? 104 : 88), headH + tabsH + bodyH + pad + (foot.visible || host.bare ? 0 : 4) + footH)
         opacity: host.open ? 1 : 0
         scale: host.open ? 1 : Theme.from(0.98)
         transform: Translate { y: host.open ? 0 : Theme.shift(12)
@@ -95,7 +96,7 @@ Item {
         MouseArea { anchors.fill: parent; onWheel: function (w) { w.accepted = true } }
 
         // header
-        Column { x: card.pad; width: parent.width - card.pad * 2 - 36; anchors.verticalCenter: head.verticalCenter; spacing: 1
+        Column { visible: !host.bare; x: card.pad; width: parent.width - card.pad * 2 - 36; anchors.verticalCenter: head.verticalCenter; spacing: 1
             Row { width: parent.width; spacing: 8
                 Txt { id: sheetTitle; kind: "lead"; font.weight: Theme.wSemi; font.letterSpacing: -0.2; text: host.sheet && host.sheet.title ? host.sheet.title : ""
                     width: Math.min(implicitWidth, parent.width - (sheetBadge.visible ? sheetBadge.width + 8 : 0)); elide: Text.ElideRight; wrapMode: Text.NoWrap }
@@ -104,7 +105,7 @@ Item {
                     tip: host.sheet && host.sheet.badgeTip ? host.sheet.badgeTip : "" } }
             Txt { kind: "fine"; visible: text !== ""; text: host.sheet && host.sheet.note ? host.sheet.note : ""; width: parent.width; elide: Text.ElideRight; wrapMode: Text.NoWrap } }
         Item { id: head; width: parent.width; height: card.headH }
-        Btn { kind: "quiet"; icon: "x"; tip: "Close"; keys: "Esc"; anchors.right: parent.right; anchors.rightMargin: 14; anchors.verticalCenter: head.verticalCenter; activeFocusOnTab: false
+        Btn { kind: "quiet"; icon: "x"; tip: "Close"; keys: "Esc"; anchors.right: parent.right; anchors.rightMargin: 14; y: host.bare ? 14 : Math.round((card.headH - height) / 2); activeFocusOnTab: false; z: 2
             onClicked: Store.openSheet(null) }
         Tabs { id: tabs; visible: !!host.sheet && !!host.sheet.tabs && host.sheet.tabs.length > 0
             x: card.pad; y: card.headH - 4; width: parent.width - card.pad * 2
@@ -115,7 +116,7 @@ Item {
         Flickable {
             id: flick
             objectName: "sheetScroll"
-            x: 0; y: card.headH + card.tabsH; width: parent.width; height: parent.height - y - card.footH - (foot.visible ? 0 : 4)
+            x: 0; y: card.headH + card.tabsH; width: parent.width; height: parent.height - y - card.footH - (foot.visible || host.bare ? 0 : 4)
             clip: true; boundsBehavior: Flickable.StopAtBounds; interactive: !host.fills
             contentHeight: host.fills ? height : (host.sheet ? host.sheet.implicitHeight : 0) + card.pad + (tabs.visible ? 18 : 2)
             ScrollBar.vertical: ScrollBar { width: 6; policy: flick.contentHeight > flick.height + 1 ? ScrollBar.AsNeeded : ScrollBar.AlwaysOff }
