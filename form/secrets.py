@@ -44,6 +44,14 @@ KNOWN = {
     "deepseek_api_key": _key("DeepSeek API key", ["deepseek"], "DEEPSEEK_API_KEY", "DeepSeek models through the DeepSeek API.",
                              "https://platform.deepseek.com/api_keys"),
     "groq_api_key": _key("Groq API key", ["groq"], "GROQ_API_KEY", "Open models served by Groq.", "https://console.groq.com/keys"),
+    # mesh generators (form/generate): used only when the person also turns the generator on, and only after they
+    # agree to what a run sends
+    "meshy_api_key": _key("Meshy API key", ["meshy"], "MESHY_API_KEY",
+                          "Meshy text and image to 3D, opt-in. Billed to that Meshy account.",
+                          "https://docs.meshy.ai/en/api/text-to-3d"),
+    "tripo_api_key": _key("Tripo API key", ["tripo"], "TRIPO_API_KEY",
+                          "Tripo text and image to 3D, opt-in. Billed to that Tripo account.",
+                          "https://developers.tripo3d.ai/en/docs/quick-start"),
 }
 
 

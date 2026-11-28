@@ -3569,6 +3569,14 @@ def build() -> MCPServer:
     fea_tools.register_tools(mcp, studio, _run, RO, RW, _origin)
     from .calc import tools as calc_tools     # engineering calculators that write geometry: calculate (form/calc)
     calc_tools.register_tools(mcp, studio, _run, RO, RW, _origin)
+    from .makers import tools as maker_tools  # makers' generators: make_name_tag, make_lithophane, ... (form/makers)
+
+    def _maker_made(pid, tool, ctx):
+        act(pid, "project", f"Made by {tool}", ctx)
+        _made(pid, tool)
+    maker_tools.register_tools(mcp, studio, _run, RW, made=_maker_made)
+    from .generate import tools as gen_tools  # image or words to a mesh to CAD: mesh_generators, generate_mesh
+    gen_tools.register_tools(mcp, studio, _run, RO, RW, made=_maker_made)
     from .printphys import tools as print_tools   # print physics: print_orient, print_strength, print_warp (form/printphys)
     print_tools.register_tools(mcp, studio, _run, RO, RW, _origin)
     from .inverse import tools as inverse_tools   # inverse design: inverse_design, get_inverse_design (form/inverse)

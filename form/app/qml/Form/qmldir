@@ -4,6 +4,7 @@ singleton Icons 1.0 Icons.qml
 singleton Store 1.0 Store.qml
 singleton Results 1.0 Results.qml
 Txt 1.0 Txt.qml
+MakersRow 1.0 MakersRow.qml
 Glass 1.0 Glass.qml
 Fade 1.0 Fade.qml
 Glow 1.0 Glow.qml

@@ -14,7 +14,9 @@ import "F.js" as F
 //   · the shelf: your designs as live parts, each standing in its own pool of light, one per design family (a design
 //     with its copies, variants and picked concepts: they share lineage.root); a family opens under its row. The first
 //     row shows what fits and "All N designs" shows the rest. Then your recent conversations.
-// Nothing pre-made: no recipes, no briefs, no example projects. Every design starts from what the person describes.
+// Nothing pre-made: no recipe gallery, no briefs, no example projects. Every design starts from what the person
+// describes, or from one of the makers' generators under the bar (MakersRow: a name tag, a lithophane, a jar ...),
+// each of which makes a real, editable design.
 Item {
     id: home
     objectName: "homeView"
@@ -272,6 +274,8 @@ Item {
                                 text: Store.printerName ? Store.printerName : "Choose a printer"
                                 tip: "The printer the next design is checked and sliced for. Click to change it."
                                 onClicked: Store.openSheet("printer") } } }
+                    // the makers' generators: a name tag, a lithophane, a jar ... made in one click, still editable
+                    MakersRow { visible: !home.chatting; width: parent.width; x: opts.inset }
                     Note { visible: !!Store.fatal; width: parent.width; kind: "red"; title: Store.fatal ? Store.fatal.message : ""; text: Store.fatal ? (Store.fatal.hint || "") : "" }
                 }
                 // first day: what is turning on the bench, said honestly (kernel geometry, an example, not one of yours)

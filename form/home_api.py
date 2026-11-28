@@ -42,6 +42,12 @@ def route_get(st, path: str, q: dict):
             return got
     if path == "/api/starters":
         return starters.for_studio(st, limit=int(q.get("limit") or 8))
+    if path == "/api/generate/providers":         # mesh generators: what is set up, nothing is sent (form/generate)
+        from . import generate
+        return generate.providers(st.cfg)
+    if path == "/api/makers":                     # the makers' generators Home offers as start options (form/makers)
+        from . import makers
+        return {"generators": makers.catalogue()}
     if path == "/api/recipes/library":
         lib = recipe_lib.everything(st.root, st.recipes.builtins())
         items = recipe_lib.search(lib["items"], q.get("q", ""), q.get("section", ""), q.get("tag", ""), q.get("sort", "name"))
@@ -84,6 +90,29 @@ def route_post(st, path: str, body, q: dict):
         got = _call(recipe_share.route_post, st, path, body, q)
         if got is not None:
             return got
+    if path in ("/api/generate/enable", "/api/generate/disclose", "/api/generate/run", "/api/generate/trellis2"):
+        # the app's Settings and its disclosure dialog: the person turns a generator on, reads what a run sends and
+        # presses Send, which posts the consent token of the disclosure they read (form/generate)
+        from . import generate
+        try:
+            if path.endswith("/enable"):
+                return generate.enable(st.cfg, str(b.get("provider", "")), bool(b.get("on", True)))
+            if path.endswith("/trellis2"):
+                return generate.set_trellis(st.cfg, str(b.get("folder", "")), str(b.get("python", "")))
+            if path.endswith("/disclose"):
+                return generate.disclose(st.cfg, str(b.get("provider", "")), b.get("text") or None, b.get("image") or None)
+            return generate.make(st, str(b.get("provider", "")), b.get("text") or None, b.get("image") or None,
+                                 str(b.get("consent", "")), float(b.get("size_mm") or generate.DEFAULT_SIZE_MM))
+        except generate.GenerateError as e:
+            raise StudioError(str(e), e.hint, status=e.status) from None
+    m = re.fullmatch(r"/api/makers/([a-z_0-9]+)", path)
+    if m:                                         # make a generator's design: {preset, values, text, image, name, purpose}
+        from . import makers
+        try:
+            return makers.make(st, m.group(1), b.get("values") or {}, b.get("text"), b.get("image") or None,
+                               str(b.get("preset") or ""), str(b.get("name") or ""), b.get("purpose") or None)
+        except makers.MakeError as e:
+            raise StudioError(str(e), e.hint, status=422, params=e.params) from None
     if path.startswith("/api/starters/"):
         verb = path.rsplit("/", 1)[1]
         root = st.root

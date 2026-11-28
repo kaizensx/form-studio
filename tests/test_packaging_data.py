@@ -13,6 +13,15 @@ class PackagedData(unittest.TestCase):
         from form import exemplars
         self.assertGreaterEqual(len(exemplars.catalogue()), 56)
 
+    def test_maker_templates_and_the_trellis_runner_ship_as_files(self):
+        spec = (ROOT / "packaging" / "form.spec").read_text(encoding="utf-8")
+        self.assertIn('"form/makers/templates"', spec)
+        self.assertIn('"trellis_run.py"', spec)
+        from form import makers
+        for g in makers.GENERATORS.values():
+            if g.kind == "source":
+                self.assertTrue((makers.TEMPLATES / f"{g.target}.py").is_file(), g.target)
+
     def test_rule_and_bend_tables_ship_as_files(self):
         # manufacturability and sheet metal read their limits from TOML tables at run time
         spec = (ROOT / "packaging" / "form.spec").read_text(encoding="utf-8")

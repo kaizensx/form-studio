@@ -90,6 +90,10 @@ datas += collect_data_files("form", include_py_files=False)
 # exemplar designs are read as source text by design_examples, so they ship as files too
 datas += [(str(p), "form/exemplars") for p in (ROOT / "form" / "exemplars").glob("*.py") if not p.name.startswith("_")]
 datas += [(str(ROOT / "form" / "exemplars" / "LICENSE-CADEvolve"), "form/exemplars")]   # ported exemplars carry their licence
+# the makers' generators read their templates as source text (form/makers), and TRELLIS.2's own Python runs
+# trellis_run.py as a file (form/generate)
+datas += [(str(p), "form/makers/templates") for p in (ROOT / "form" / "makers" / "templates").glob("*.py")]
+datas += [(str(ROOT / "form" / "generate" / "trellis_run.py"), "form/generate")]
 
 # Qt modules the interface does not use; leaving them out halves the download
 # (QtPdf stays: the drawing check reads a person's PDF drawing with it, form/drawing/qtpaint.py)

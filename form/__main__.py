@@ -35,6 +35,11 @@
                                      `form study strength ...` is the same); JSON
   form study list|run|show <project> [id] [--force]   the Bench: every study, route and document, with its state
   form bench list|run|publish|cadbench|oracle          benchmarks: own suites and Parametric CAD Bench v3, published
+  form make <generator> [preset] key=value ... [--text T] [--image F]   a print-ready, editable design from a
+                                     generator: name_tag, lithophane, gridfinity, knob, cable_clip, hook, stand,
+                                     drawer_divider, hinge_box, threaded_jar, spur_gears (form make list); JSON
+  form generate list|enable|run <provider> --text T | --image F   a mesh from words or a picture (TRELLIS.2 here, or
+                                     Meshy or Tripo on your key; opt-in, told what is sent), split into parts, as CAD
   form calc <calculator> key=value ... [--build]   size a snap fit, hinge, spring, bolted joint, gear pair, cam or fit
                                      from a standard's equations; every number with its source (form calc list); JSON
   form testplan <project> [--out DIR]                 what to measure on the made part: PDF, Markdown, checklist
@@ -305,6 +310,12 @@ def main(argv=None):
     if argv[:1] == ["stack"]:                      # tolerance stack-up from the assembly (form/stack)
         from .stack.cli import main as stack_main
         return stack_main(argv[1:])
+    if argv[:1] == ["generate"]:                   # image or words to a mesh, then editable CAD (form/generate)
+        from .generate.cli import main as gen_main
+        return gen_main(argv[1:])
+    if argv[:1] == ["make"]:                       # makers' generators: name tags, lithophanes, jars ... (form/makers)
+        from .makers.cli import main as make_main
+        return make_main(argv[1:])
     if argv[:1] == ["calc"]:                       # engineering calculators that write geometry (form/calc)
         from .calc.cli import main as calc_main
         return calc_main(argv[1:])
