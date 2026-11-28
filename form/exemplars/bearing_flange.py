@@ -93,6 +93,21 @@ class Design(FeatureDesign):
                  "value": f"{b['limits'][0]:.3f} - {b['limits'][1]:.3f}", "unit": "mm", "feature": "seat",
                  "formula": b["why"], "interface": True}]
 
+    def drawing(self, v):
+        """What the shop drawing states beyond the sizes (form/drawing): the back face is datum A, the seat bore
+        datum B, the seat is H7 (the housing tolerance derived() gives), square to A, the screws located from A and B."""
+        seat = {"feature": "seat", "cylinder": True}
+        return {
+            "datums": [{"letter": "A", "at": {"feature": "plate", "normal": [0, 0, -1]}}, {"letter": "B", "at": seat}],
+            "fits": [{"at": seat, "class": craft.bearing_fit(self.setup(v)["name"], "housing", "inner")["tolerance"]}],
+            "gdt": [{"type": "flatness", "value": 0.05, "at": {"feature": "plate", "normal": [0, 0, -1]}},
+                    {"type": "perpendicularity", "value": 0.02, "diameter": True, "datums": ["A"], "at": seat},
+                    {"type": "position", "value": 0.2, "diameter": True, "modifier": "M", "datums": ["A", "B"],
+                     "at": {"feature": "screws", "cylinder": True, "d": M5[0]}}],
+            "surface": [{"ra": 1.6, "process": "removal", "at": seat}],
+            "notes": ["Break sharp edges 0.2 x 45°"],
+        }
+
     @feature("Plate")                                       # the skeleton: the plate, back face on z = 0
     def plate(self, v, body):
         return Box(v["side"], v["side"], v["t"], align=BOTTOM)

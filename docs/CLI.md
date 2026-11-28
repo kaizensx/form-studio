@@ -164,6 +164,11 @@ message, with what the design is for.
 | `form verify <project> <release>` | Re-hash a release against its manifest |
 | `form release-files <project> [release] [--out FILE.zip]` | Every file of a release in one .zip: models, G-code, sliced 3MF, report, documents and manifest (the newest release by default) |
 | `form instructions <project> [--rev N] [--out FILE.pdf]` | Assembly instructions as a PDF: a parts page, then one page per part in the order the assembly attaches them |
+| `form drawing <project> [--sheet A3] [--projection first\|third] [--no-prove] [--out FILE.pdf]` | The engineering drawing from the solid: PDF, SVG, DXF, previews and the sheet scene, with the report (bindings, completeness, overlaps) |
+| `form drawing pmi <project> [--out FILE.step]` | STEP AP242 with semantic PMI on the faces, read back and compared annotation by annotation |
+| `form drawing check <project> <file> [--rows JSON]` | Check a person's drawing (PDF, DXF or image with the agent's rows) against the part, one row per dimension |
+| `form drawing spec <project> '<json>'` | Declare datums, GD&T, fits, surface texture, general tolerance and notes for the drawing |
+| `form drawing set <project> <dimension id> <value> [--expect-head N]` | Change a dimension: commits its parameter |
 
 ## Any MCP tool
 

@@ -841,6 +841,25 @@ def make_handler(st: Studio):
             if action == "instructions":
                 from . import instructions
                 return self._json(instructions.build(st, p, int(body["rev"]) if body.get("rev") is not None else None))
+            if action in ("drawing", "drawing_spec", "drawing_set", "drawing_pmi", "drawing_check"):
+                from . import drawing as dr
+                rev = int(body["rev"]) if body.get("rev") is not None else None
+                try:
+                    if action == "drawing_spec":
+                        return self._json(dr.set_spec(st, p["id"], body.get("spec") or {}, bool(body.get("replace"))))
+                    if action == "drawing_set":            # dragging or typing a dimension edits its parameter
+                        out = dr.set_dimension(st, p, str(body["dimension"]), float(body["value"]),
+                                               body.get("expect_head"), rev)
+                        return self._json({**out, "commit": {"head": out["commit"]["head"]}, "job": auto(out["commit"])})
+                    if action == "drawing_pmi":
+                        return self._json(dr.export_pmi(st, p, rev))
+                    if action == "drawing_check":
+                        from .drawing import check
+                        return self._json(check.run(st, p, str(body["source"]), body.get("rows"), rev))
+                    return self._json(dr.build(st, p, rev, sheet=body.get("sheet"), projection=body.get("projection"),
+                                               prove=body.get("prove", True) is not False))
+                except dr.DrawingError as e:
+                    raise StudioError(str(e), e.hint)
             if action == "preview":
                 return self._json(st.preview(p, body.get("values", {})))
             if action == "commit":

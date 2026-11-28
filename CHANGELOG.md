@@ -4,6 +4,34 @@
 
 ### New
 
+- **Engineering drawings from the solid.** A shop drawing of any design on A4 to A0 or ANSI A to E: the views
+  projected by OCCT's hidden-line removal on the B-rep (first or third angle, ISO 5456-2), a full section through the
+  bores with hatching and its cutting plane, a detail view of a chamfer too small to read at the sheet's scale, an
+  isometric, the largest ISO 5455 scale that fits, an ISO 5457 border and an ISO 7200 title block that leaves a field
+  empty when Form Studio does not know it. Vector PDF (drawn by Qt, fonts embedded), SVG and DXF, plus paper and night
+  previews; the sheet itself is a scene graph (`sheet.json`) for the direction-I sheet pane to draw.
+- **A dimension is its parameter.** Sizes are measured on the B-rep and each size parameter is bound to the one it
+  equals, proved by building the design again with the parameter nudged. The drawing says "5 of 7 size parameters
+  dimensioned, 0 twice", lists each parameter it cannot show with the sizes it drives, and changing a dimension
+  commits a new value for its parameter. Placement is a layout algorithm: linear dimensions packed into tiers
+  (baseline nests, chain shares a line, ISO 129-1), leaders and frames searched for free space, and every sheet is
+  checked for overlaps.
+- **Fits, general tolerances, GD&T and surface texture.** ISO 286 limits computed from the standard's formulas (IT5
+  to IT11, deviations d to u, the delta rule for K to U holes) and checked cell by cell against the published
+  tables; the few cells where the standard's own table differs from its formula are listed and say so. ISO 2768
+  general tolerances, ISO 1101 feature control frames, ISO 5459 datums and ISO 21920-1 surface symbols, drawn only
+  where the design (a `drawing()` method) or the person declares them, and refused when the declaration breaks the
+  standard (a datum on a flatness, perpendicularity without one).
+- **STEP AP242 with semantic PMI.** Dimensions with their limits, datums and geometric tolerances attached to the
+  solid's faces through OCCT's XCAF document, then the file is read back and compared annotation by annotation:
+  14 of 14 on the bearing flange.
+- **Check against a drawing.** A person's drawing (PDF, DXF or an image) checked dimension by dimension against the
+  part: expected and measured, the tolerance it was judged by, PASS, FAIL or UNSURE, a crop of the sheet and a render
+  with the measured feature lit. A PDF's text layer and DXF entities are read exactly; an image is read by the agent,
+  row by row with its place on the sheet, and anything it is unsure of stays UNSURE. Form Studio runs no OCR.
+- MCP tools `drawing`, `export_pmi` and `check_drawing` (100 tools); `form drawing <project> [--sheet A3]
+  [--projection first] [--out part.pdf]`, `form drawing pmi|check|spec|set ...`; a Drawing section with "Drawing,
+  A3", "STEP with PMI" in the app's documents.
 - **Engineering calculators that write the part.** Seven calculators size a part from what it has to do, by a named
   standard's equations, and write it as a design with parameters: snap joints (cantilever and annular, Bayer's
   snap-fit guide), living hinges (elastic by strain, or moulded PP and PE from cited practice), springs
@@ -158,6 +186,9 @@
   about 190 MB. Without it a study computes nothing and says how to get it.
 
 ### Fixed
+
+- A commit no longer fails on a design whose `derived()` reports a value as text (the bearing flange's housing
+  limits).
 
 - **Parts that do not fit one plate go onto more plates, never off the plate.** A design whose parts (or copies of
   it) do not fit the printer's bed is packed onto as many plates as it takes: largest first, turned about Z where

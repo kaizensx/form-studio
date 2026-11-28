@@ -1401,3 +1401,5 @@ from .handfeat import KERNEL_OPS as _HAND_OPS  # noqa: E402  (picked edges and f
 OPS.update(_HAND_OPS)
 from .massprops import KERNEL_OPS as _MASS_OPS  # noqa: E402  (mass, centre of mass and inertia from the B-rep)
 OPS.update(_MASS_OPS)
+from .drawing.kernel_ops import KERNEL_OPS as _DRAWING_OPS  # noqa: E402  (drawing views, sections, PMI)
+OPS.update(_DRAWING_OPS)
