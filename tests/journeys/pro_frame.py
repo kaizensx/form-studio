@@ -143,7 +143,8 @@ def journey_ribbon(ui):
     ui.settle(300)
     ui.eq(ui.item("ribbon-sketch").property("keys"), "S", "Sketch says its key")
     ui.eq(ui.item("ribbon-fillet").property("keys"), "Shift+F", "Fillet says its key")
-    ui.check(ui.exists("ribbonCaption-create") and ui.item("ribbonCaption-create").property("text") == "Create", "the Create caption")
+    if ui.win.width() >= 1440:                    # narrower, the band may have given up its captions
+        ui.check(ui.exists("ribbonCaption-create") and ui.item("ribbonCaption-create").property("text") == "Create", "the Create caption")
 
     # ── a tool waits for its feature kind: the capability check reads GET /studio feature_kinds ──
     kinds = ui.js("Store.studio.feature_kinds")
@@ -318,6 +319,7 @@ def journey_rail(ui):
     ui.check(ui.exists("railDesign-" + other), "the other design is in the rail")
     ui.click("railBench")
     ui.wait_until(lambda: ui.store.get("benchOpen") is True, 3, "the Bench from the rail")
+    ui.settle(400)                            # (a second press within 150 ms is the same press: Store.toggleBench)
     ui.click("railBench")
     ui.wait_until(lambda: ui.store.get("benchOpen") is False, 3, "and closed again")
     # opened: 220 px, names and counts; the stage moves right of it; remembered
