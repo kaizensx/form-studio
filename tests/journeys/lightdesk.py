@@ -114,7 +114,8 @@ def run(ui):
     # begin right of it. A window under 1200 px has room for the column or the panes: the panes fold to one button.
     t = _rect(ui, "talk")
     pc = rects["programPane"]; gut = ui.win.width() - (pc[0] + pc[2])          # the gutter the pane on the right keeps
-    ui.check(abs(t[0] - gut) <= 1 and abs(t[1] - pc[1]) <= 1 and abs(t[1] + t[3] - (ui.win.height() - gut)) <= 1,
+    rail = 44 + 8 if ui.exists("projectRail") and ui._shown(ui.item("projectRail")) else 0     # the folded project rail stands at the edge
+    ui.check(abs(t[0] - gut - rail) <= 1 and abs(t[1] - pc[1]) <= 1 and abs(t[1] + t[3] - (ui.win.height() - gut)) <= 1,
              f"the conversation is a column on the left, with the gutters of the panes on the right ({gut}): {t}")
     ui.check(_rect(ui, "toolDock")[0] >= t[0] + t[2] + 8, f"the tool dock stands right of it: {_rect(ui, 'toolDock')}")
     ui.check(float(ui.item("viewport").property("insetLeft")) >= t[0] + t[2] + 40, "the part is framed right of the column (the tool dock floats at the stage's edge)")

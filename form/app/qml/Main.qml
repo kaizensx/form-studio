@@ -69,7 +69,19 @@ Window {
     function setBackdrop() { if (!win.plates) Store.backdrop = room }
     Connections { target: Store; function onScreenChanged() { win.setBackdrop() } }
 
-    TopBar { id: top; width: parent.width; inset: win.mac && !win.full ? top.buttonsX + 54 + 8 : 0; z: 10; logoHeld: splash.visible && splash.carrying }
+    // the project rail of a workspace (ProjectRail.qml): folded, the conversation's column gives it its 52 px, so the
+    // stage keeps its width; opened, the column and the stage move right of it
+    readonly property bool railOn: Store.screen === "work" && !Store.focusView
+    readonly property real railRoom: railOn ? (Frame.railOpen ? 220 + Theme.gap : 44 + 8) : 0
+    ProjectRail {
+        id: rail; z: 6; source: Store.backdrop
+        col: talk.col
+        visible: win.railOn && Store.screen === "work" && (tall || avail >= 12 + 4 * rowH)
+        fullH: win.height - Theme.paneTop - Theme.edge
+        x: Theme.edge + (tall ? 0 : 2); y: tall ? Theme.paneTop : Frame.dockFoot + 12
+    }
+
+    TopBar { id: top;width: parent.width; inset: win.mac && !win.full ? top.buttonsX + 54 + 8 : 0; z: 10; logoHeld: splash.visible && splash.carrying }
 
     // The conversation. In a workspace: one bar under the part, clear of the view buttons on its left and the panes on
     // its right; it opens upward into the transcript sheet with a spring and folds back while a build plays. On Home:
@@ -126,7 +138,7 @@ Window {
                                     : Store.screen === "home" ? Store.talkOpen && (Store.chatItems.length > 0 || Store.chatBusy) : false
         // the bar: where it may be, and how tall
         readonly property bool tight: win.width < 1300                         // the view buttons fold to one
-        readonly property real leftLimit: tight ? 140 : 328
+        readonly property real leftLimit: (tight ? 140 : 328) + (win.railOn && Frame.railOpen ? 220 + Theme.gap : 0)     // the opened rail moves the size line right
         readonly property real rightLimit: win.width - Theme.edge - Theme.paneW - Theme.gap
         // One rule for where the bar stands: on the window's centre line, as wide as fits there between the view
         // buttons and the panes (600 at most). Only in a window so narrow that this would leave it under 440 px does
@@ -142,15 +154,15 @@ Window {
         property real k: expanded ? 1 : 0
         Behavior on k { enabled: win.restored && !Theme.reduced; SpringAnimation { spring: Theme.springK; damping: Theme.springDamp; mass: 0.9; epsilon: 0.001 } }
         roomAbove: win.height - 110
-        width: bar ? barW : col ? colW : Math.max(minW, Math.min(maxW, Store.talkWidth))
+        width: bar ? barW : col ? colW - (win.railOn && !Frame.railOpen ? 52 : 0) : Math.max(minW, Math.min(maxW, Store.talkWidth))
         height: bar ? Math.round(barHeight + (sheetH - barHeight) * Math.max(0, k)) : col ? win.height - Theme.paneTop - Theme.edge : win.height - top.height - Theme.gap
-        x: bar ? barX : col ? Theme.edge : shown ? Theme.gap : -width - Theme.gap - 40
+        x: bar ? barX : col ? Theme.edge + win.railRoom : shown ? Theme.gap : -width - Theme.gap - 40
         y: bar ? win.height - Theme.edge - height : col ? Theme.paneTop : top.height
         // the column and the bar are two places: one fades in where it stands, it does not fly across the part
         onColChanged: if (win.restored && Store.screen === "work") swap.restart()
         NumberAnimation { id: swap; target: talk; property: "opacity"; from: 0; to: 1; duration: Theme.base; easing.type: Easing.OutCubic }
         // where the column ends, for the workspace: its tools and its stage begin right of it
-        Binding { target: Store; property: "talkCol"; value: talk.col ? Theme.edge + talk.colW : 0 }
+        Binding { target: Store; property: "talkCol"; value: talk.col ? Theme.edge + talk.colW + (win.railOn && Frame.railOpen ? 220 + Theme.gap : 0) : 0 }
         Behavior on y { enabled: talk.gliding; NumberAnimation { duration: Theme.move(talk.glideMs); easing.type: Easing.BezierSpline; easing.bezierCurve: Theme.easeDrawer } }
         Behavior on height { enabled: talk.gliding; NumberAnimation { duration: Theme.move(talk.glideMs); easing.type: Easing.BezierSpline; easing.bezierCurve: Theme.easeDrawer } }
         Behavior on x { enabled: talk.gliding || (!talk.bar && !talk.col); NumberAnimation { duration: Theme.move(talk.gliding ? talk.glideMs : 260); easing.type: Easing.BezierSpline; easing.bezierCurve: Theme.easeDrawer } }
@@ -243,10 +255,15 @@ Window {
     function commitKey() { if (Store.hasDraft && !Store.draftError) Store.commit() }
     Shortcut { sequences: ["Ctrl+K"]; onActivated: Store.paletteOpen = !Store.paletteOpen; onActivatedAmbiguously: Store.paletteOpen = !Store.paletteOpen }
     Shortcut { sequence: "Escape"; onActivated: win.esc() }
-    Shortcut { sequence: "Ctrl+1"; onActivated: win.stageKey("shape"); onActivatedAmbiguously: win.stageKey("shape") }
-    Shortcut { sequence: "Ctrl+2"; onActivated: win.stageKey("prove"); onActivatedAmbiguously: win.stageKey("prove") }
-    Shortcut { sequence: "Ctrl+3"; onActivated: win.stageKey("release"); onActivatedAmbiguously: win.stageKey("release") }
-    Shortcut { sequence: "Ctrl+4"; onActivated: win.stageKey("document"); onActivatedAmbiguously: win.stageKey("document") }
+    Shortcut { sequence: Theme.modeMod + "+1"; onActivated: win.stageKey("shape"); onActivatedAmbiguously: win.stageKey("shape") }
+    Shortcut { sequence: Theme.modeMod + "+2"; onActivated: win.stageKey("prove"); onActivatedAmbiguously: win.stageKey("prove") }
+    Shortcut { sequence: Theme.modeMod + "+3"; onActivated: win.stageKey("release"); onActivatedAmbiguously: win.stageKey("release") }
+    Shortcut { sequence: Theme.modeMod + "+4"; onActivated: win.stageKey("document"); onActivatedAmbiguously: win.stageKey("document") }
+    // the document tabs: 1 is the model, 2..8 the tabs after it, 9 the last (as in a browser)
+    function tabKey(n) { if (Store.screen === "work" && !Store.sheet && !Store.paletteOpen) Frame.activateIndex(n === 9 ? Frame.all.length - 1 : n - 1) }
+    Repeater { model: 9
+        Item { required property int index
+            Shortcut { sequence: Theme.tabMod + "+" + (index + 1); onActivated: win.tabKey(index + 1); onActivatedAmbiguously: win.tabKey(index + 1) } } }
     Shortcut { sequence: "Ctrl+I"; enabled: Store.screen === "work" && !!Store.data; onActivated: Store.toggleOverview(); onActivatedAmbiguously: Store.toggleOverview() }
     Shortcut { sequence: "Ctrl+B"; enabled: Store.screen === "work" && !!Store.data; onActivated: Store.toggleBench(); onActivatedAmbiguously: Store.toggleBench() }
     Shortcut { sequence: "Ctrl+Return"; onActivated: win.commitKey(); onActivatedAmbiguously: win.commitKey() }

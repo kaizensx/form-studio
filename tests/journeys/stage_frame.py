@@ -94,7 +94,8 @@ def run(ui):
     mid = ui.js("Store.viewer.dist")
     ui.settle(1400)
     d1 = _inside(ui, "the vase once the suggestions are in")["dist"]
-    ui.check(d1 > d0 * 1.02, "the camera pulled back for the taller bar (%.0f, %.0f)" % (d0, d1))
+    # (1 %: under the ribbon a low window frames the vase by its width as much as by its height, so the bar moves it less)
+    ui.check(d1 > d0 * 1.01, "the camera pulled back for the taller bar (%.0f, %.0f)" % (d0, d1))
     if not ui.js("Theme.reduced"):
         ui.check(d0 * 0.999 < mid < d1 * 1.001, "it glides there (%.0f half way between %.0f and %.0f)" % (mid, d0, d1))
     # and back, and again: the same two framings, no creep

@@ -8,7 +8,7 @@ import os
 import time
 from pathlib import Path
 
-from _lib import close_sheet_esc, head, make, open_sheet_wait, sheet, toasts_gone, wait_job, printing_on, click_stage, dock
+from _lib import close_sheet_esc, head, make, open_sheet_wait, sheet, toasts_gone, wait_job, printing_on, click_stage, dock, mode_key, TAB_KEY
 
 DATA = "fresh"
 S = {}
@@ -687,9 +687,9 @@ def journey_every_listed_shortcut(ui):
         "V": lambda: (ui.key("M"), ui.key("V"), ui.wait_until(lambda: tool(ui) == "select", 3, "V to pick Select")),
         "M": lambda: (a_tool("M", "measure"), ui.key("V")),
         "X": do_x,
-        "A": lambda: (a_tool("A", "analyze"), ui.key("V"), stage("Ctrl+1", "shape")),      # A, E and T go to Check
+        "A": lambda: (a_tool("A", "analyze"), ui.key("V"), stage(mode_key(1), "shape")),      # A, E and T go to Check
         "E": do_e,
-        "T": lambda: (a_tool("T", "history"), ui.key("T"), ui.wait_until(lambda: ui.store.get("timelineOpen") is False, 3, "T to close"), stage("Ctrl+1", "shape")),
+        "T": lambda: (a_tool("T", "history"), ui.key("T"), ui.wait_until(lambda: ui.store.get("timelineOpen") is False, 3, "T to close"), stage(mode_key(1), "shape")),
         "Esc": do_esc,
         "Return": do_return, "Shift+Return": lambda: None, "Up": do_up,
         "F": do_f,
@@ -697,8 +697,9 @@ def journey_every_listed_shortcut(ui):
         "4": lambda: view("4", "top"), "5": lambda: (view("5", "under"), view("1", "iso")),
         ".": do_dot, "H": do_h, "Alt+H": do_shift_h, "Right-click": do_right_click,
         "Ctrl+K": do_palette, "Ctrl+N": do_new, "Ctrl+Shift+O": do_new_chat, "Ctrl+J": do_j, "Ctrl+Shift+H": do_home, "Ctrl+[": do_back, "Ctrl+.": do_focus, "Ctrl+,": do_settings,
-        "Ctrl+1": lambda: (stage("Ctrl+2", "prove"), stage("Ctrl+1", "shape")), "Ctrl+2": lambda: stage("Ctrl+2", "prove"), "Ctrl+3": lambda: stage("Ctrl+3", "release"),
-        "Ctrl+4": lambda: (stage("Ctrl+4", "document"), stage("Ctrl+1", "shape")), "Ctrl+I": do_overview,
+        mode_key(1): lambda: (stage(mode_key(2), "prove"), stage(mode_key(1), "shape")), mode_key(2): lambda: stage(mode_key(2), "prove"), mode_key(3): lambda: stage(mode_key(3), "release"),
+        mode_key(4): lambda: (stage(mode_key(4), "document"), stage(mode_key(1), "shape")), "Ctrl+I": do_overview,
+        TAB_KEY + "+1": lambda: (ui.key(TAB_KEY + "+1"), ui.wait_until(lambda: ui.js("Frame.active") == "design", 3, "the model tab")),
         "Ctrl+Return": do_commit, "?": do_question,
     }
     missing = [k for k in listed if k not in checks]

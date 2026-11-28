@@ -4,6 +4,20 @@
 
 ### Added
 
+- **The tools, labelled.** The mode's tools stand in a slim band of glass at the head of the stage, each with its
+  icon and its name, in groups with a caption: Create, Modify, Reference and Insert in Design; Inspect, Studies and
+  Review in Check; Print, Machine and Output in Make; Sheets, Lists and Picture in Document. The dock keeps Select,
+  Measure, Section and Annotate. A study, route or document in the band (Strength, DFM, Fit, Stack-up, Motion, Print
+  orient, CAM, Flat pattern, Board, Drawing, PMI, BOM, Report) opens its row of the Bench. Keys are in the tooltips.
+  In a narrow window the band gives up labels, then captions, then puts the last tools under More; Hide folds it
+  back into the icon dock, and it stays that way. The stage loses 44 px of height to it and no width.
+- **Document tabs.** The model, each result opened on the part, the drawing, the results report, a version compare
+  and a CNC job each have a tab beside the design's name. Close them, drag them into order, switch with ⌘1 to ⌘9
+  (Alt elsewhere). They come back when the design is opened again. The modes are now ⌃1 to ⌃4 on macOS.
+- **The project rail.** Home, the Bench, the designs you worked on last with how many conversations each has,
+  Trash and Settings, in a 44 px column at the left of a design; opened, 220 px with the names. Folded it takes no
+  width from the stage.
+
 - **Home, as drawn for direction I.** The agent and model that design the next request are chosen under the
   composer, at the right end of the *Make it for* line, not inside the prompt well. The makers' generators are one
   quiet line under it (*Or make*: the ones that fit, then *More* with the rest and *Generate from words or a

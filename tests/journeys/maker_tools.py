@@ -1,7 +1,7 @@
 """The 12.1 maker tools in the window: text on a face picked in Annotate (a new revision with a text feature), the
 geometric diff between that revision and the one before (added material, computed on the solids), and assembly
 instructions as a PDF from the assembly declaration. Every number checked here is read back from the engine."""
-from _lib import fold, open_project, open_sheet_wait, sheet, toasts_gone, wait_job
+from _lib import fold, open_project, open_sheet_wait, sheet, toasts_gone, wait_job, mode_key
 
 DATA = "fresh"
 S = {}
@@ -97,7 +97,7 @@ def journey_text_on_a_face(ui):
 
 
 def journey_geometric_diff(ui):
-    ui.key("Ctrl+3")
+    ui.key(mode_key(3))
     ui.wait_until(lambda: ui.store.get("stage") == "release", 3, "the Release stage")
     ui.settle(500)
     btn = ui.item(text="Compare with head")

@@ -29,6 +29,12 @@ def start_purposes() -> tuple:
     return PURPOSES
 
 
+def _feature_kinds() -> list:
+    """Every feature kind the engine can add by hand (form/modelling.py): picked features and sketch features."""
+    from . import modelling
+    return list(dict.fromkeys(list(modelling.KINDS) + list(getattr(modelling, "EXTRA_KINDS", ()))))
+
+
 def _attachment(name: str) -> str:
     """A Content-Disposition value for a download: an ASCII fallback name plus the exact name, percent-encoded."""
     name = _HEADER_CTL.sub("", str(name))
@@ -195,7 +201,10 @@ def make_handler(st: Studio):
                                    "recipes": [r.public() for r in st.recipes.builtins().values()],
                                    # every built-in's title, legacy ones too: older designs still name them
                                    "recipe_titles": {k: r.title for k, r in st.recipes.all_builtins().items()},
-                                   "assistant": advisor.cli_status(st.cfg)})
+                                   "assistant": advisor.cli_status(st.cfg),
+                                   # the feature kinds the engine builds by hand: the app's ribbon shows a tool
+                                   # only once its kind is listed (form/modelling.py KINDS)
+                                   "feature_kinds": _feature_kinds()})
             # -- slicer picker: every slicer FORM knows, installed or not --
             if path == "/api/studio/slicers":
                 from . import slicer as slicer_mod

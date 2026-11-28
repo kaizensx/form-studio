@@ -69,7 +69,7 @@ Glass {
                         color: tab.note[1] === "fail" ? Theme.signal : tab.on ? (tab.note[1] === "warn" ? Theme.amber : Theme.datum) : tabs.noteColor(tab.note[1])
                         Behavior on color { Tint {} } } }
                 MouseArea { id: tm; anchors.fill: parent; hoverEnabled: true; onClicked: Store.setStage(tab.modelData.id) }
-                Tip { show: tm.containsMouse; below: true; text: tab.modelData.hint; keys: "Ctrl+" + Store.stageKey[tab.modelData.id] }
+                Tip { show: tm.containsMouse; below: true; text: tab.modelData.hint; keys: Theme.modeMod + "+" + Store.stageKey[tab.modelData.id] }
             }
         }
     }

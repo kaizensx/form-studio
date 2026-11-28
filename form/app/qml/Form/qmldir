@@ -91,3 +91,6 @@ DrawingPane 1.0 DrawingPane.qml
 OverLine 1.0 OverLine.qml
 InkLine 1.0 InkLine.qml
 FrontChart 1.0 FrontChart.qml
+# the pro frame: document tabs, the project rail, the ribbon
+singleton Frame 1.0 Frame.qml
+ProjectRail 1.0 ProjectRail.qml

@@ -1,7 +1,7 @@
 """Direction I (docs/design/directions/i/IA.md), as a person meets it: four modes at the top, the Overview from the
 design capsule, Fit as a study in Check, the view cube and the shading chip at the stage's top right, and the legend
 strip under the part while a result is shown on it."""
-from _lib import goto, phone_dock, plate_toggle, toasts_gone
+from _lib import goto, phone_dock, plate_toggle, toasts_gone, mode_key
 
 DATA = "fresh"
 
@@ -22,11 +22,11 @@ def run(ui):
     ui.eq(ui.js("Store.stages.map(function (s) { return s.title }).join(' ')"), "Design Check Make Document", "the four modes")
     for gone in ("stage-brief", "stage-fit"):
         ui.check(not ui.exists(gone), f"{gone} is no longer a tab")
-    for sid, key in (("prove", "Ctrl+2"), ("release", "Ctrl+3"), ("document", "Ctrl+4"), ("shape", "Ctrl+1")):
+    for sid, key in (("prove", mode_key(2)), ("release", mode_key(3)), ("document", mode_key(4)), ("shape", mode_key(1))):
         goto(ui, sid)
         ui.eq(ui.js("Store.mode"), sid, f"the mode after a click on {sid}")
         ui.check(len(ui.texts(ui.item("stage-" + sid))) >= 2 and ui.texts(ui.item("stage-" + sid))[1] != "", f"{sid} carries its one line of state: {ui.texts(ui.item('stage-' + sid))}")
-    for sid, key in (("prove", "Ctrl+2"), ("release", "Ctrl+3"), ("document", "Ctrl+4"), ("shape", "Ctrl+1")):
+    for sid, key in (("prove", mode_key(2)), ("release", mode_key(3)), ("document", mode_key(4)), ("shape", mode_key(1))):
         ui.key(key)
         ui.wait_until(lambda: ui.store.get("stage") == sid, 3, f"{key} to go to {sid}")
     ui.check(ui.find(name="printerChip") is None, "the printer is not named in Design")

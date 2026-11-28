@@ -1,7 +1,9 @@
 import QtQuick
 import QtQuick.Controls
 import QtQuick.Window
+import QtCore
 import "F.js" as F
+import "ToolSet.js" as ToolSet
 import "." as Tools      // Timeline and ContextMenu are also Qt type names; qualify ours
 
 // A project, as Lightdesk: the 3D view fills the window and everything else is a pane of glass over it.
@@ -72,7 +74,11 @@ Item {
     Connections { target: Store; function onTalkColChanged() { vp.layoutChanged() } }
     readonly property real colFoot: ws.height - Theme.edge        // the foot of the side columns
     readonly property real paneX: panesOff ? ws.width - Theme.edge - 44 : insp.x      // where the right column begins
-    property real shift: col ? Store.talkCol + Theme.gap - Theme.edge : 0
+    // (the project rail opened takes 220 px at the left: with the conversation folded the stage starts right of it)
+    property real shift: col ? Store.talkCol + Theme.gap - Theme.edge : (Frame.railOpen && !Store.focusView ? 220 + Theme.gap : 0)
+    // the folded rail stands under the dock, above the size line (ProjectRail.qml, placed by Main.qml)
+    Binding { target: Frame; property: "dockFoot"; value: rail.y + rail.height }
+    Binding { target: Frame; property: "footTop"; value: status.y - 48 }
     Behavior on shift { enabled: insp.settled && !Store.talkDragging; NumberAnimation { duration: Motion.camera; easing.type: Easing.BezierSpline; easing.bezierCurve: Motion.out } }
     // a design that declares how its parts go together: assembled / exploded / as printed. Separate bodies
     // with no declaration (form/recipes/assembly.py from_solids): as modelled / pulled apart.
@@ -94,6 +100,113 @@ Item {
     // the bed of the printer this design uses (form/printers.py), for the plate caption
     readonly property string bed: d && d.printer ? d.printer.env.envelope.slice(0, 2).map(function (x) { return F.fmt(x, 0) }).join(" × ") : "180 × 180"
     readonly property bool mapBlocked: !!Store.analysisMap && (Store.hasDraft || !!Store.compare)
+
+    // ── the ribbon: the mode's tools, labelled and grouped at the head of the stage (ToolRibbon.qml, ToolSet.js) ──
+    // Hidden (its own Hide, remembered between runs) the tools are icons in the dock again, as before.
+    Settings { id: wsMem; category: "workspace"; property bool ribbon: true }
+    readonly property bool ribbonOn: wsMem.ribbon && !!Store.view
+    function setRibbon(on) { wsMem.ribbon = on }
+    // where the stage's head begins: under the ribbon when it shows (38 + 6: the stage gives up 44 px, no more)
+    readonly property real headY: Theme.paneTop + (ribbonOn ? 44 : 0)
+    // the feature kinds the engine builds (GET /studio, form/modelling.py KINDS): a tool waiting for one appears
+    // when it is listed (sweep, loft, rib, mirror, draft, split, move face, planes)
+    readonly property var kinds: Store.studio && Store.studio.feature_kinds ? Store.studio.feature_kinds
+                                 : ["fillet", "chamfer", "hole", "pattern", "shell", "extrude", "cut", "revolve"]
+    function _benchFor(t) {                     // the Bench entry a tool opens: current first, then any that applies
+        var ids = t.need && t.need.bench ? t.need.bench : [], best = null
+        for (var i = 0; i < ids.length; i++) {
+            var e = Store.benchEntry(ids[i])
+            if (!e || e.state === "n/a") continue
+            if (e.state === "current") return e
+            if (!best) best = e
+        }
+        return best
+    }
+    function _toolDef(id) {
+        var gs = ToolSet.MODES[Store.mode] || []
+        for (var g = 0; g < gs.length; g++) for (var i = 0; i < gs[g].tools.length; i++) if (gs[g].tools[i].id === id) return gs[g].tools[i]
+        for (var m in ToolSet.MODES) for (var g2 = 0; g2 < ToolSet.MODES[m].length; g2++)
+            for (var j = 0; j < ToolSet.MODES[m][g2].tools.length; j++) if (ToolSet.MODES[m][g2].tools[j].id === id) return ToolSet.MODES[m][g2].tools[j]
+        return null
+    }
+    function toolAvail(t) {
+        var n = t.need
+        if (!n) return true
+        if (n.kind) { for (var i = 0; i < n.kind.length; i++) if (ws.kinds.indexOf(n.kind[i]) >= 0) return true; return false }
+        if (n.bench) return !!ws._benchFor(t)
+        if (n.when === "assembly") return !!Store.assembly
+        if (n.when === "plates") return !!Store.assembly && Store.printUi
+        if (n.when === "print") return Store.printUi
+        if (n.when === "game") return Store.gameDesign
+        if (n.when === "companions") return !!(Store.shown && Store.shown.companions && Store.shown.companions.length)
+        return true
+    }
+    // the groups of the mode in front, cut to the tools this design can use; a group left empty is not shown
+    // (kept as text and handed on only when it changes: the Bench is polled while a study runs, and a new list each
+    // time would make the ribbon's buttons anew under the pointer, dropping a click)
+    readonly property string _groupsSig: {
+        Store.bench; Store.assembly; Store.printUi; Store.shown; ws.kinds         // what availability reads
+        return JSON.stringify((ToolSet.MODES[Store.mode] || []).map(function (g) {
+            return { id: g.id, caption: g.caption, tools: g.tools.filter(function (t) { return ws.toolAvail(t) }) }
+        }).filter(function (g) { return g.tools.length > 0 }))
+    }
+    readonly property var ribbonGroups: JSON.parse(_groupsSig)
+    readonly property var _sketchKinds: ["sketch", "extrude", "cut", "revolve"]
+    readonly property var _annotateKinds: ["fillet", "chamfer", "hole", "shell", "part", "text"]
+    // what the ribbon shows of a tool: lit, marked, off, and the label of a switch
+    function toolState(id) {
+        var t = ws._toolDef(id), sim = ws.sim
+        if (_sketchKinds.indexOf(id) >= 0) return { active: sketch.busyHere && Ws.want === id, enabled: !sim && !Store.hasDraft,
+                                                    hint: Store.hasDraft ? "Commit or discard the draft first." : undefined }
+        if (_annotateKinds.indexOf(id) >= 0) return { active: ws.tool === "annotate" && Ws.want === id, enabled: !sim }
+        if (id === "pattern") return { active: Ws.want === "pattern", enabled: !sim }
+        if (id === "analyze") return { active: ws.tool === "analyze" && !sim, marked: !!Store.analysisMap }
+        if (id === "mass") return { active: Store.massOn, toggle: true, enabled: !sim, label: Store.massOn ? "Hide mass" : "Mass" }
+        if (id === "section") return { active: ws.tool === "section" && !sim, marked: !!Store.sectionNow() }
+        if (id === "assembly") return { active: ws.tool === "assembly" && !sim, marked: Store.asmMode !== "print" }
+        if (id === "history") return { active: ws.tool === "history" && !sim, marked: !!Store.scrub }
+        if (id === "holds") return { active: vp.showCompanions, toggle: true, enabled: !sim, label: Store.companions ? "Hide what it holds" : "What it holds" }
+        if (id === "plates") return { active: Store.asmMode === "print" && ws.tool === "assembly" }
+        if (id === "slice") return { active: sim, enabled: !!ws.d && !!ws.d.slice, hint: ws.d && ws.d.slice ? undefined : "Needs a current slice of this revision." }
+        if (id === "game" || id === "render") return { enabled: !Store.hasDraft, hint: Store.hasDraft ? "Commit or discard the draft first." : undefined }
+        if (id === "views") return { active: ws.tool === "views" && !sim, enabled: !sim }
+        if (id === "dims") return { active: Store.dims, toggle: true, enabled: !sim, label: Store.dims ? "Hide dimensions" : "Dimensions" }
+        if (id === "frame") return { enabled: !sim, label: Store.feature ? "Frame selection" : "Frame" }
+        if (t && t.need && t.need.bench) {
+            var e = ws._benchFor(t)
+            if (!e) return { enabled: false }
+            var ch = Store.benchChapter(e)
+            return { active: (Results.id === e.id && Results.on) || (Store.mode === Store.benchModeOf(ch) && (Store.benchSel[ch] || "") === e.id),
+                     marked: e.state === "current", hint: (t.hint || "") + " " + Store.benchSays(e).replace(/^./, function (c) { return c.toUpperCase() }) + "." }
+        }
+        if (t && t.need && t.need.kind) return { active: ws.tool === "annotate" && Ws.want === id, enabled: !sim && !Store.hasDraft }
+        return {}
+    }
+    function toolRun(id) {
+        var t = ws._toolDef(id)
+        if (_sketchKinds.indexOf(id) >= 0) { ws.setTool("sketch", id); return }
+        if (_annotateKinds.indexOf(id) >= 0) { ws.setTool("annotate", id); return }
+        if (id === "pattern") { ws.setTool("select", "pattern"); return }
+        if (id === "analyze" || id === "section" || id === "assembly" || id === "history" || id === "views") { ws.setTool(id); return }
+        if (id === "mass") { Store.massOn = !Store.massOn; return }
+        if (id === "holds") { Store.toggleCompanions(); return }
+        if (id === "plates") { if (ws.tool !== "assembly") ws.setTool("assembly"); Store.setAsmMode("print"); return }
+        if (id === "slice") { if (ws.sim) Store.showLayers(false); else Store.simulate({ at: 0, play: true }); return }
+        if (id === "game") { Store.openSheet("game"); return }
+        if (id === "render") { Store.openSheet("render"); return }
+        if (id === "dims") { Store.toggleDims(); return }
+        if (id === "frame") { Store.frameSelection(); return }
+        if (t && t.need && t.need.bench) {                // a study, route or document: its row opened in the Bench pane
+            var e = ws._benchFor(t)
+            if (!e) return
+            var ch = Store.benchChapter(e), m = Store.benchModeOf(ch)
+            if (Store.mode !== m) Store.setStage(m)
+            Store.benchPick(ch, e)
+            return
+        }
+        // a feature kind the engine has just learnt (more-features): picked on the part, its panel in the pane
+        if (t && t.need && t.need.kind) ws.setTool("annotate", id)
+    }
     function setTool(t, want) {
         if (ws.sim) Store.showLayers(false)
         want = want || ""
@@ -251,7 +364,7 @@ Item {
             readonly property bool cueing: cue.shown || ws.cueRoom
             readonly property real floorY: cueing ? Math.min(Store.barRestY, Store.barY, status.restY, cue.rest + 100) : Math.min(Store.barY, status.y, strip.on ? strip.y - 8 : 1e9, rstrip.on ? rstrip.y - 8 : 1e9)
             readonly property real cueLift: cueing ? Math.round(centre.height * 0.045) : 0
-            readonly property real top: Theme.paneTop + 4 - cueLift
+            readonly property real top: ws.headY + 4 - cueLift
             readonly property real bottom: centre.height - Math.max(60, centre.height - floorY + 26 + cueLift)
         }
         // the room: the 3D view and what belongs to it. This is what the panes blur, so nothing of theirs is in it.
@@ -311,7 +424,7 @@ Item {
             onHoveredValue: function (v, x, y, on) { vchip.on = on; vchip.v = v; vchip.x = Math.min(x + 14, centre.width - vchip.width - 8); vchip.y = y + 14 }
         }
         Loader { id: lv; anchors.fill: parent; active: !!Store.layers; source: "LayerView.qml"
-            onLoaded: { item.leftInset = Qt.binding(function () { return Theme.edge + 62 + ws.shift }); item.topInset = Theme.paneTop + 4; item.rightInset = Qt.binding(function () { return centre.width - ws.paneX + 12 }); item.stripHeight = Qt.binding(function () { return Math.max(60, centre.height - Store.barY) }); item.axisX = Qt.binding(function () { return lay.mid }) } }
+            onLoaded: { item.leftInset = Qt.binding(function () { return Theme.edge + 62 + ws.shift }); item.topInset = Qt.binding(function () { return ws.headY + 4 }); item.rightInset = Qt.binding(function () { return centre.width - ws.paneX + 12 }); item.stripHeight = Qt.binding(function () { return Math.max(60, centre.height - Store.barY) }); item.axisX = Qt.binding(function () { return lay.mid }) } }
         // the corners of the room fall away
         Room { anchors.fill: parent; wall: false; poolK: 0; visible: !Store.layers }
         }
@@ -331,7 +444,7 @@ Item {
 
         // a sketch drawn on the part: the profile on its plane, its tools in the capsule, what to make of it at the foot
         SketchOnPart { id: sketch; anchors.fill: parent; z: 4; vp: vp; source: studio
-            capX: Theme.edge + 60 + ws.shift; capY: Theme.paneTop + 2
+            capX: Theme.edge + 60 + ws.shift; capY: ws.headY + 2
             capMax: Math.max(240, ws.paneX - capX - Theme.gap - (cube.visible ? cube.width + Theme.gap : 0))
             midX: ws.col ? (lay.freeL + lay.freeR) / 2 : lay.mid
             footL: rail.visible && rail.y + rail.height + 8 > footY - 44 ? capX : Theme.edge + ws.shift; footR: ws.paneX - Theme.gap
@@ -444,7 +557,7 @@ Item {
         Glass {
             id: rail; objectName: "toolDock"
             source: studio; arrive: 3
-            x: Theme.edge + ws.shift; y: Theme.paneTop; z: 6; width: 48; height: railCol.height + 12; radius: 24
+            x: Theme.edge + ws.shift; y: ws.headY; z: 6; width: 48; height: railCol.height + 12; radius: 24
             visible: !!Store.view
             readonly property string mode: Store.mode
             // while a build plays the tools step back: the part and its cue have the room
@@ -460,9 +573,10 @@ Item {
                     active: ws.tool === "section" && !ws.sim; marked: !!Store.sectionNow(); onClicked: ws.setTool("section") }
                 RailBtn { objectName: "railAnnotate"; icon: "map_pin"; label: "Annotate"; keys: "N"; hint: "Pick faces, edges and points or paint a region; see what the solid says there, keep it with a note, ask the agent about it."
                     active: ws.tool === "annotate" && !ws.sim && !Ws.want; marked: Store.annotations.length > 0 || Store.selItems.length > 0; onClicked: ws.setTool("annotate") }
-                Item { width: 36; height: 9; Rectangle { objectName: "railSep"; x: 8; y: 4; width: 20; height: 1; color: Theme.rule } }
+                // with the ribbon at the head of the stage the dock keeps the four; the mode's tools are in the ribbon
+                Item { visible: !ws.ribbonOn; width: 36; height: 9; Rectangle { objectName: "railSep"; x: 8; y: 4; width: 20; height: 1; color: Theme.rule } }
                 Item {
-                    id: modeBox; objectName: "railModeBox"; width: 36; clip: true
+                    id: modeBox; objectName: "railModeBox"; width: 36; clip: true; visible: !ws.ribbonOn
                     readonly property Item cur: rail.mode === "prove" ? gCheck : rail.mode === "release" ? gMake : rail.mode === "document" ? gDoc : gDesign
                     height: cur.implicitHeight
                     Behavior on height { NumberAnimation { duration: Theme.move(Theme.base); easing.type: Easing.BezierSpline; easing.bezierCurve: Motion.out } }
@@ -530,14 +644,30 @@ Item {
                             enabled: !Store.hasDraft; onClicked: Store.openSheet("render") }
                     }
                 }
+                // the ribbon folded away: one button brings it back
+                Item { visible: !ws.ribbonOn; width: 36; height: 9; Rectangle { x: 8; y: 4; width: 20; height: 1; color: Theme.rule } }
+                RailBtn { objectName: "railRibbon"; visible: !ws.ribbonOn; icon: "panel_top"; label: "Show the tools"
+                    hint: "The mode’s tools, labelled and grouped, at the head of the stage."; onClicked: ws.setRibbon(true) }
             }
             }
+        }
+
+        // ── the ribbon: the mode's tools with their labels, in groups, at the head of the stage ──
+        // From the dock's left edge to the view cube; nothing on the stage is laid out under it but the head.
+        ToolRibbon {
+            id: ribbon; source: studio; arrive: 3; z: 6
+            visible: ws.ribbonOn
+            x: Theme.edge + ws.shift; y: Theme.paneTop
+            maxWidth: Math.max(200, (cube.visible ? cube.x : ws.paneX) - Theme.gap - x)
+            groups: ws.ribbonGroups; host: ws; modeKey: Store.mode
+            onHideAsked: ws.setRibbon(false)
+            opacity: ws.cueOn ? 0.45 : 1; Behavior on opacity { NumberAnimation { duration: Theme.cross } }
         }
 
         // ── options of the active tool: one capsule at the head of the stage, always in the same place ──
         Item {
             id: opts
-            x: Theme.edge + 60 + ws.shift; y: Theme.paneTop + 2; z: 5; visible: !ws.sim && !!Store.view && !sketch.busyHere
+            x: Theme.edge + 60 + ws.shift; y: ws.headY + 2; z: 5; visible: !ws.sim && !!Store.view && !sketch.busyHere
             readonly property real room: Math.max(160, capsule.maxWidth - capsule.lead - 6)
             readonly property bool any: ws.tool === "annotate" || ws.tool === "measure" || ws.tool === "section" || ws.tool === "analyze" || ws.tool === "views"
                                         || (ws.tool === "assembly" && !!Store.assembly) || Ws.want === "pattern"
@@ -545,7 +675,7 @@ Item {
             ToolCapsule {
                 id: capsule; objectName: "toolCapsule"; source: studio; visible: opts.any
                 maxWidth: Math.max(200, ws.paneX - opts.x - Theme.gap - (cube.visible ? cube.width + Theme.gap : 0))
-                title: Ws.want === "pattern" ? "Pattern" : ws.tool === "annotate" ? ({ fillet: "Fillet", chamfer: "Chamfer", hole: "Hole", shell: "Shell", part: "Part here" }[Ws.want] || "Annotate")
+                title: Ws.want === "pattern" ? "Pattern" : ws.tool === "annotate" ? ({ fillet: "Fillet", chamfer: "Chamfer", hole: "Hole", shell: "Shell", part: "Part here", text: "Text" }[Ws.want] || "Annotate")
                      : ws.tool === "measure" ? "Measure" : ws.tool === "section" ? "Section" : ws.tool === "analyze" ? "Analyze" : ws.tool === "assembly" ? "Assembly" : ws.tool === "views" ? "Views" : ""
             HudBar { id: viewsBar; objectName: "viewsBar"; shown: ws.tool === "views"; maxWidth: opts.room; cut: true
                 Seg { height: 28; model: [{ value: "front", text: "Front" }, { value: "side", text: "Side" }, { value: "top", text: "Top" }, { value: "iso", text: "Three-quarter" }]
@@ -668,13 +798,13 @@ Item {
             y: Math.round((ws.col ? centre.height - Theme.edge : Math.min(centre.height - Theme.edge, Store.barY - Theme.gap)) - height) }
         // Document: the drawing's sheet takes the stage
         Loader { id: sheetPane; z: 4; active: Results.kind === "drawing" && Results.on && !ws.sim
-            x: Math.round(lay.freeL - 28); y: Theme.paneTop; width: Math.round(lay.freeR - x); height: Math.round(Math.min(centre.height - Theme.edge, Store.barY - Theme.gap) - y)
+            x: Math.round(lay.freeL - 28); y: ws.headY; width: Math.round(lay.freeR - x); height: Math.round(Math.min(centre.height - Theme.edge, Store.barY - Theme.gap) - y)
             sourceComponent: DrawingPane { } }
 
         // an agent is working on another design than this one: named, never jumped to once you are working here
         Rectangle {
             id: elsewhere; objectName: "agentElsewhere"; z: 6
-            x: Math.round(lay.mid - width / 2); y: Theme.paneTop + 4
+            x: Math.round(lay.mid - width / 2); y: ws.headY + 4
             visible: !!Store.agentElsewhere && !ws.sim
             width: er.implicitWidth + 24; height: 34; radius: 17; color: Theme.glassSolid; border.color: Theme.rule2
             Row { id: er; x: 14; anchors.verticalCenter: parent.verticalCenter; spacing: 8
@@ -811,7 +941,7 @@ Item {
             source: studio; z: 7
             visible: Store.timelineOpen && !!Store.project && !ws.sim
             width: Math.max(320, Math.min(760, ws.paneX - Theme.edge - 60 - ws.shift - 24)); height: 48; radius: 24
-            x: Math.round(Math.max(Theme.edge + 60 + ws.shift, Math.min(lay.mid - width / 2, ws.paneX - 12 - width))); y: Theme.paneTop + 2 + (opts.height > 0 ? opts.height + 8 : 0)
+            x: Math.round(Math.max(Theme.edge + 60 + ws.shift, Math.min(lay.mid - width / 2, ws.paneX - 12 - width))); y: ws.headY + 2 + (opts.height > 0 ? opts.height + 8 : 0)
             MouseArea { anchors.fill: parent; acceptedButtons: Qt.AllButtons; onWheel: function (w) { w.accepted = true } }
             Tools.Timeline { id: tline; x: 8; width: parent.width - 16; height: 40; anchors.verticalCenter: parent.verticalCenter }
         }

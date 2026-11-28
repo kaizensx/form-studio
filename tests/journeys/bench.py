@@ -6,7 +6,7 @@ FORM_BENCH_CROPS=<dir> also saves the Program pane at 200 % (bench-review-*.png,
 import os
 from pathlib import Path
 
-from _lib import make, printing_on, toasts_gone, wait_job
+from _lib import make, printing_on, toasts_gone, wait_job, mode_key
 
 DATA = "fresh"
 S = {}
@@ -55,7 +55,7 @@ def journey_setup(ui):
 
 
 def journey_review(ui):
-    ui.key("Ctrl+2")
+    ui.key(mode_key(2))
     ui.wait_until(lambda: ui.store.get("stage") == "prove", 3, "Check")
     ui.wait_until(lambda: ui.find(name="bench-checks"), 10, "the Bench in the Review pane")
     rows = [e for e in bench(ui)["entries"] if e["chapter"] == "check" and e["state"] != "n/a"]
@@ -174,12 +174,12 @@ def journey_stale(ui):
 
 
 def journey_make(ui):
-    ui.key("Ctrl+3")
+    ui.key(mode_key(3))
     ui.wait_until(lambda: ui.store.get("stage") == "release", 3, "Make")
     ui.wait_until(lambda: ui.find(name="bench-exports"), 10, "the Bench in the Make pane")
     ui.eq(entry(ui, "exports")["state"], "current", "the exports are current")
     ui.check(ui.find(name="bench-release") is not None, "the release is a route")
-    ui.key("Ctrl+4")                                   # the documents are the Document mode's chapter
+    ui.key(mode_key(4))                                   # the documents are the Document mode's chapter
     ui.wait_until(lambda: ui.store.get("stage") == "document", 3, "Document")
     ui.wait_until(lambda: ui.find(name="bench-doc.bom"), 10, "the documents in the Document pane")
     ui.eq(entry(ui, "doc.bom")["state"], "never", "the parts list was never written for this revision")
