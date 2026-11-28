@@ -843,7 +843,7 @@ def _features_live(ctx) -> dict:
     detail = " ".join(f"{f}: {(why.get(f) or {}).get('message') or 'left out of the build'}." for f in by["skipped"])
     if by["suppressed"]:
         detail = (detail + " " if detail else "") + "Suppressed by hand: " + ", ".join(by["suppressed"]) + "."
-    return {"headline": " · ".join(bits), "evidence": "computed (the head's build log)", "detail": detail,
+    return {"headline": " · ".join(bits), "evidence": "computed", "detail": detail,
             "data": {"built": built, **by}}
 
 
@@ -853,6 +853,6 @@ def register_studies(register) -> None:
     studies.APPLIES.setdefault("features", (lambda c: bool(_head_log(c)),
                                             "Only for a design written as features (a FeatureDesign)."))
     register(studies.Study("features", "study", "Features", "Every feature of the head as its build log records it: "
-                           "built, suppressed by hand, or left out with the reason.", "computed (the head's build log)",
+                           "built, suppressed by hand, or left out with the reason.", "computed",
                            run=_features_live, live=True, needs=("features",), inputs=("design code", "values"),
                            app="tree", tool="get_design_source", order=5))

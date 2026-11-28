@@ -59,7 +59,7 @@ class HandEditsMakeTheBenchStale(unittest.TestCase):
         e = r["entry"]
         self.assertEqual(e["state"], "current")
         self.assertEqual(e["rev"], self.p()["head"])
-        self.assertIn(" g · computed", e["headline"])
+        self.assertRegex(e["headline"], r"^[\d.]+ g · AL-6061, 2700 kg/m³$")
         self.assertEqual(e["evidence"], massprops.EVIDENCE_BREP)
         want = massprops.compute(self.st, self.p())["total"]["mass_g"]
         self.assertAlmostEqual(e["data"]["total"]["mass_g"], want, places=6)

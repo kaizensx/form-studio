@@ -411,9 +411,21 @@ BENCH = {"id": "mass", "group": "studies", "label": "Mass & inertia", "stage": "
          "mcp": "mass_properties", "cli": "form mass <project>"}
 
 
+def _bench_headline(res: dict) -> str:
+    """The Bench line's number: the grams and what they were weighed in (its evidence class is shown beside it)."""
+    t = res.get("total")
+    if not t:
+        return "no material chosen"
+    mats = {x["material"]["id"]: x["material"] for x in res["parts"] if x.get("material")}
+    if len(mats) == 1:
+        m = next(iter(mats.values()))
+        return f"{t['mass_g']:.4g} g · {m['id']}, {m['density_kg_m3']:g} kg/m³"
+    return f"{t['mass_g']:.4g} g · {len(mats)} materials"
+
+
 def _bench_result(res: dict) -> dict:
     t = res.get("total")
-    return {"headline": res.get("headline") or headline(res), "evidence": res.get("evidence") or EVIDENCE_BREP,
+    return {"headline": _bench_headline(res), "evidence": res.get("evidence") or EVIDENCE_BREP,
             "detail": res.get("text") or "",
             "data": {"total": t, "volume_mm3": res.get("volume_mm3"), "frame": res.get("frame"),
                      "missing_material": res.get("missing_material"), "materials": res.get("materials"),
