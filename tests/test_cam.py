@@ -700,6 +700,9 @@ CONFIRMED = {**OPTS, "feeds": {"6mm-flat": SPEC}, "machine": MACH}
 class Project(unittest.TestCase):
     @classmethod
     def setUpClass(cls):
+        # every test module sets FORM_DATA when it is imported; in one process the last one imported wins, so this
+        # class says its own folder again before it makes its Studio (and the CLI below is pointed at the same one)
+        os.environ["FORM_DATA"] = TMP
         cls.st = Studio(config.load())
         cls.p = cls.st.create_design("Pocket plate", DESIGN, purpose="model", process="cnc")
 
@@ -837,7 +840,7 @@ class Project(unittest.TestCase):
         self.assertAlmostEqual(out["simulation"]["summary"]["removed_mm3"], want, delta=0.01 * want)
 
     def test_6_cli_and_mcp(self):
-        env = {**os.environ, "FORM_DATA": TMP, "PYTHONPATH": str(ROOT)}
+        env = {**os.environ, "FORM_DATA": str(self.st.root), "PYTHONPATH": str(ROOT)}
         r = subprocess.run([sys.executable, "-m", "form", "cam", "status", self.p["id"]], capture_output=True, text=True, env=env, cwd=ROOT)
         self.assertEqual(r.returncode, 0, r.stderr)
         self.assertIn(json.loads(r.stdout)["state"], ("current", "stale", "planned", "posted"))
