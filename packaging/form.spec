@@ -36,6 +36,8 @@ datas += [(str(ROOT / "form" / "dfm" / "rules"), "form/dfm/rules"),
           (str(ROOT / "form" / "sheet" / "services"), "form/sheet/services"),
           # CAM's speeds and feeds table with its sources (form/cam/feeds.py)
           (str(ROOT / "form" / "cam" / "feeds.toml"), "form/cam"),
+          # the cost models' sourced rates (form/costing)
+          (str(ROOT / "form" / "costing" / "rates.toml"), "form/costing"),
           # the API names the design preflight checks against (form/preflight.py; scripts/gen_preflight_api.py)
           (str(ROOT / "form" / "preflight_api.json"), "form")]
 binaries, hidden = [], []

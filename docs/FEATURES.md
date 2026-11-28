@@ -657,6 +657,16 @@ volume and where it is, rapids through stock, shank and holder collisions, and t
 limits. A program goes into a release only with a current simulation, nothing assumed and your approval, labelled
 "simulated, not proven on a machine" until you record what it did on one. MCP `cam_plan`, `cam_post`,
 `cam_simulate`; `form cam`. See [CAM.md](CAM.md).
+**Cost per process, with sourced rates.** What a design costs by FDM, SLA, SLS, MJF, metal LPBF, 3-axis CNC,
+injection moulding or sheet metal, plus the parts you buy, built from its own drivers: the slicer's grams and hours,
+the CAM simulation's cycle time, the setups, projected area and walls that manufacturability measures, and the sheet
+unfold's flat area, cut length and bends. Moulding follows Boothroyd, Dewhurst and Knight: clamp force and machine,
+fill, cooling and resetting times, mould base and cavity hours. Every rate is published, cited and dated, or a
+process parameter labelled assumed; money is never assumed, and a line nobody priced is left out and says what to
+set. Cost per part against quantity, the cheapest process at each quantity and where one process overtakes another
+("Injection moulding costs less per part than FDM printing from about 628 parts"), each with its arithmetic. Your
+shop's rates and currency in Settings › Costs. `form cost`; MCP `estimate_cost`, `cost_compare`, `cost_rates`; the
+Bench's Cost. See [COST.md](COST.md).
 
 ## Analysis, measurement and annotations
 

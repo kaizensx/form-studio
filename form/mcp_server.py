@@ -2900,18 +2900,78 @@ def build() -> MCPServer:
 
     @mcp.tool(annotations=RO)
     async def estimate_cost(project: str, price_per_kg: float | None = None, kwh_price: float | None = None,
-                            watts: float | None = None, machine_rate_per_h: float | None = None, copies: int = 1) -> dict:
-        """Estimate the print cost. Filament, electricity and machine-time cost of the current slice, per plate and for `copies`, plus the same
-        volume in the other materials the slicer has presets for. Grams and hours are the slicer's simulation; prices
-        are the user's (saved ones are used when you pass none). Never invent a price: when a cost is null, "needs"
-        says which number to ask the user for. No currency is assumed."""
+                            watts: float | None = None, machine_rate_per_h: float | None = None, copies: int = 1,
+                            process: str = "", quantities: list | None = None, options: dict | None = None,
+                            shop: str = "", currency: str = "", rates: dict | None = None, full: bool = False) -> dict:
+        """Estimate the cost. Without `process`: the print cost of the current slice as before (filament, electricity
+        and machine time per plate and for `copies`, plus the same volume in the slicer's other materials; grams and
+        hours are the slicer's simulation, prices the user's; when a cost is null, "needs" says which number to ask
+        for; no currency is assumed).
+        With `process` (fdm, sla, sls, mjf, lpbf, cnc, injection, sheet_metal, purchased): the cost of that process
+        built from its drivers, as fixed lines (tooling, setups, programming) and per-part lines, each with its
+        formula and the evidence of every input, and the cost per part at each of `quantities` (default 1, 10, 100,
+        1000, 10000). FDM uses the slicer's grams and hours when sliced; CNC the current CAM simulation's cycle time
+        and the setups manufacturability counts; moulding follows Boothroyd-Dewhurst-Knight (clamp from projected
+        area, cycle = fill + cooling h²/(π²α)·ln(4/π·(Ti−Tm)/(Tx−Tm)) + resetting, mould base and cavity points);
+        sheet metal the unfold's flat area, cut length and bends; purchased parts the parts list at prices the person
+        gave. Rates come from a table where each is sourced (published, cited, dated) or an assumed process parameter;
+        money is never assumed. `shop` picks one of the person's shops (their rates, specified); `currency` converts
+        with the ECB reference rate or the shop's own; `rates` overrides rates for this call ({"labour": 45});
+        `options` per process ({"injection": {"resin": "ABS", "cavities": 2}, "cnc": {"tool_d": 6}}). A line without
+        a value has amount null and `needs`: it is left out of the totals (not_counted), never guessed. full=true
+        returns every input with its source."""
         st = studio()
         def go():
-            from . import cost
-            given = {"price_per_kg": price_per_kg, "kwh_price": kwh_price, "watts": watts, "machine_rate_per_h": machine_rate_per_h}
-            out = cost.project(st, st.load(project), copies, given)
-            out.pop("prefs", None)
-            return out
+            p = st.load(project)
+            if not process and not quantities:
+                from . import cost
+                given = {"price_per_kg": price_per_kg, "kwh_price": kwh_price, "watts": watts, "machine_rate_per_h": machine_rate_per_h}
+                out = cost.project(st, p, copies, given)
+                out.pop("prefs", None)
+                return out
+            from . import costing
+            r = costing.estimate(st, p, process or "fdm", quantities, options, shop or None, currency or None, rates)
+            return r if full else costing.brief(r)
+        return await _run(go)
+
+    @mcp.tool(annotations=RO)
+    async def cost_compare(project: str, processes: list | None = None, quantities: list | None = None,
+                           options: dict | None = None, shop: str = "", currency: str = "", rates: dict | None = None,
+                           full: bool = False) -> dict:
+        """Compare cost per part against quantity across processes. Default: every printing technology, CNC and
+        moulding, plus sheet metal for a sheet part. Returns the cheapest process at each quantity, `switches` (where
+        the cheapest changes, e.g. "Injection moulding costs less per part than FDM printing from about 628 parts")
+        and every pairwise crossover, each with its arithmetic (ΔF / ΔV) and the evidence of the lines it rests on.
+        Crossovers use counted lines only; a process with lines not counted says which. Purchased parts are listed
+        apart. Same rates, shops and options as estimate_cost. A quote-style estimate, not a quote."""
+        st = studio()
+        def go():
+            from . import costing
+            r = costing.compare(st, st.load(project), processes, quantities, options, shop or None, currency or None, rates)
+            return r if full else costing.brief(r)
+        return await _run(go)
+
+    @mcp.tool()
+    async def cost_rates(action: str = "list", shop: str = "", label: str | None = None, currency: str | None = None,
+                         rates: dict | None = None, fx: dict | None = None, part_prices: dict | None = None,
+                         activate: bool = False) -> dict:
+        """Read or set the rates the cost models use. action "list": every rate as the shop resolves it (value,
+        unit, evidence sourced|specified|assumed|missing, source with URL, date and quote), the published value beside
+        the shop's own, the exchange rates and the sources. action "set": change a shop (created when new): label,
+        currency (ISO code), rates {id: value} (null forgets an override, so the published rate applies again),
+        fx {"USD": 1.1} (units of that currency per 1 EUR), part_prices {designation: price} for purchased parts,
+        activate=true makes it the shop costs use. action "delete": remove a shop. Set only numbers the person gave
+        you; they are recorded as specified. Never set a rate or a price they did not give."""
+        st = studio()
+        def go():
+            from .costing import rates as cr
+            if action == "list":
+                return cr.listing(st.cfg, shop or None)
+            if action in ("set", "delete"):
+                cr.update_shop(st.cfg, shop, label, currency, rates, fx, activate, delete=action == "delete",
+                               part_prices=part_prices)
+                return cr.listing(st.cfg, None if action == "delete" else (shop or None))
+            raise StudioError('action is "list", "set" or "delete".')
         return await _run(go)
 
     @mcp.tool(annotations=RO)

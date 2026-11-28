@@ -10,6 +10,7 @@ import "F.js" as F
 //   Agents & models      every way chat can reach a model, and the defaults for new conversations
 //   Engines & software   the installer registry: installed or not, Install, and "Use in Form Studio" for each engine
 //   Printing             only with the 3D printing capability: the default printer, the slicer, the plate
+//   Costs                the cost models' rates: published (cited, dated), assumed parameters, or yours per shop
 //   Other apps           where Blender, OpenSCAD and FreeCAD are, and what "Open in…" hands files to
 //   Updates              update checks and the channel, the version you run
 //   Advanced             limits and fallbacks, with the key each one has in studio.toml
@@ -20,7 +21,7 @@ import "F.js" as F
 // other keys stay, and the previous file is kept as a backup next to it (form/config_edit.py). Things that apply at
 // once say so and do not wait for Save: appearance, "Set up for" (form/capabilities.py: on installs what it needs,
 // off hides it and never uninstalls), the default printer, and "Use in Form Studio".
-// Open with Store.openSettings("general" | "printer" | "chat" | "apps" | "updates" | "advanced" | "software").
+// Open with Store.openSettings("general" | "printer" | "chat" | "costs" | "apps" | "updates" | "advanced" | "software").
 // The search in the rail finds rows on every page. The sheet lays out its own body (fillsBody, SheetHost.qml): the
 // rail stays put and only the page scrolls.
 Item {
@@ -42,13 +43,15 @@ Item {
         .concat(Store.printOn ? [{ value: "printer", text: "Printing", icon: "printer", group: "Making",
           sub: "The printer the checks and slices use, and how parts are laid out on its bed." }] : [])
         .concat([
+        { value: "costs", text: "Costs", icon: "coins", group: "Making",
+          sub: "The rates cost estimates use: each published with its source and date, or yours, per shop." },
         { value: "apps", text: "Other apps", icon: "layout_grid", group: "Making",
           sub: "Where the apps Form Studio works with are, and what “Open in…” hands a file to." },
         { value: "updates", text: "Updates", icon: "refresh_cw", group: "System",
           sub: "How Form Studio finds out about a newer version. Nothing is downloaded or installed by itself." },
         { value: "advanced", text: "Advanced", icon: "wrench", group: "System",
           sub: "Limits and fallbacks. Each row shows its key in studio.toml." }])
-    readonly property var tabNames: ({ general: "General", printer: "Printing", chat: "Agents & models", apps: "Other apps", updates: "Updates", advanced: "Advanced", software: "Engines & software" })
+    readonly property var tabNames: ({ general: "General", printer: "Printing", chat: "Agents & models", apps: "Other apps", costs: "Costs", updates: "Updates", advanced: "Advanced", software: "Engines & software" })
     readonly property var section: { for (var i = 0; i < sections.length; i++) if (sections[i].value === tab) return sections[i]; return sections[0] }
     readonly property bool onSoftware: tab === "software" && !searching      // the action bar installs; elsewhere it saves
     function accept() { if (!onSoftware && dirty > 0) save() }
@@ -237,6 +240,7 @@ Item {
             Loader { width: parent.width; active: !st.searching && st.tab === "software"; visible: active; sourceComponent: softwarePage }
             Loader { width: parent.width; active: !st.searching && st.tab === "printer" && !!st.cfg; visible: active; sourceComponent: printingPage }
             Loader { width: parent.width; active: !st.searching && st.tab === "apps" && !!st.cfg; visible: active; sourceComponent: appsPage }
+            Loader { width: parent.width; active: !st.searching && st.tab === "costs"; visible: active; sourceComponent: costsPage }
             Loader { width: parent.width; active: !st.searching && st.tab === "updates" && !!st.cfg; visible: active; sourceComponent: updatesPage }
             Loader { width: parent.width; active: !st.searching && st.tab === "advanced" && !!st.cfg; visible: active; sourceComponent: advancedPage }
         }
@@ -440,6 +444,13 @@ Item {
                     Btn { small: true; icon: "printer"; text: "Compare slicers…"; onClicked: Store.openSheet("slicer") }
                     Btn { small: true; kind: "quiet"; icon: "package"; text: "Slicers under Engines & software"; onClicked: st.tab = "software" } } }
         } }
+
+    // ── Costs: the rates cost estimates use, per shop (form/costing/rates.py) ─────────────────────────────────────
+    Component { id: costsPage
+        Column { spacing: 26
+            Group { title: "Rates"; applies: "Applies at once"
+                sub: "Each rate is published (with its source and the date it was read), yours, or an assumed process parameter. Money is never assumed."
+                CostRates { objectName: "settingsCostRates" } } } }
 
     // ── Other apps ───────────────────────────────────────────────────────────────────────────────────────────────
     Component { id: appsPage

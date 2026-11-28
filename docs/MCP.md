@@ -211,7 +211,9 @@ instead.
 | [`set_appearance`](#set_appearance) | changes | Set the colour and material of a design. |
 | [`suggest_orientation`](#suggest_orientation) | read-only | Rank the ways the part can lie on the plate: the six axis orientations plus every flat face on its convex hull. |
 | [`print_simulation`](#print_simulation) | read-only | Simulate the print layer by layer. |
-| [`estimate_cost`](#estimate_cost) | read-only | Estimate the print cost. Filament, electricity and machine-time cost of the current slice, per plate and for `copies`, plus the same volume in the other materials the slicer has presets for. |
+| [`estimate_cost`](#estimate_cost) | read-only | Estimate the cost. Without `process`: the print cost of the current slice as before (filament, electricity and machine time per plate and for `copies`, plus the same volume in the slicer's other materials; grams and hours are the slicer's simulation, prices the user's; when a cost is null, "needs" says which number to ask for; no currency is assumed). |
+| [`cost_compare`](#cost_compare) | read-only | Compare cost per part against quantity across processes. |
+| [`cost_rates`](#cost_rates) | changes | Read or set the rates the cost models use. |
 | [`plate_plan`](#plate_plan) | read-only | Plan the plates. How the design's printed parts go onto plates: each part as it lies on its own (orientation, size, material), the plates they are packed onto when the design does not fit one plate (or its parts differ in material), parts too big for the plate (with their size against the bed and what would make them fit), and per plate the slicer's time and filament when it has been sliced. |
 | [`set_part_print`](#set_part_print) | changes | Set one part's print settings. |
 | [`pack_plate`](#pack_plate) | read-only | Pack copies on a plate. Do `copies` of this design fit on one plate? |
@@ -2080,10 +2082,23 @@ plate: which plate (1-based) when the design was sliced on several (plate_plan).
 
 *Read-only.*
 
-Estimate the print cost. Filament, electricity and machine-time cost of the current slice, per plate and for `copies`, plus the same
-volume in the other materials the slicer has presets for. Grams and hours are the slicer's simulation; prices
-are the user's (saved ones are used when you pass none). Never invent a price: when a cost is null, "needs"
-says which number to ask the user for. No currency is assumed.
+Estimate the cost. Without `process`: the print cost of the current slice as before (filament, electricity
+and machine time per plate and for `copies`, plus the same volume in the slicer's other materials; grams and
+hours are the slicer's simulation, prices the user's; when a cost is null, "needs" says which number to ask
+for; no currency is assumed).
+With `process` (fdm, sla, sls, mjf, lpbf, cnc, injection, sheet_metal, purchased): the cost of that process
+built from its drivers, as fixed lines (tooling, setups, programming) and per-part lines, each with its
+formula and the evidence of every input, and the cost per part at each of `quantities` (default 1, 10, 100,
+1000, 10000). FDM uses the slicer's grams and hours when sliced; CNC the current CAM simulation's cycle time
+and the setups manufacturability counts; moulding follows Boothroyd-Dewhurst-Knight (clamp from projected
+area, cycle = fill + cooling h²/(π²α)·ln(4/π·(Ti−Tm)/(Tx−Tm)) + resetting, mould base and cavity points);
+sheet metal the unfold's flat area, cut length and bends; purchased parts the parts list at prices the person
+gave. Rates come from a table where each is sourced (published, cited, dated) or an assumed process parameter;
+money is never assumed. `shop` picks one of the person's shops (their rates, specified); `currency` converts
+with the ECB reference rate or the shop's own; `rates` overrides rates for this call ({"labour": 45});
+`options` per process ({"injection": {"resin": "ABS", "cavities": 2}, "cnc": {"tool_d": 6}}). A line without
+a value has amount null and `needs`: it is left out of the totals (not_counted), never guessed. full=true
+returns every input with its source.
 
 | Argument | Type | Required |
 |---|---|---|
@@ -2093,6 +2108,56 @@ says which number to ask the user for. No currency is assumed.
 | `watts` | number \| null |  |
 | `machine_rate_per_h` | number \| null |  |
 | `copies` | integer |  |
+| `process` | string |  |
+| `quantities` | array \| null |  |
+| `options` | object \| null |  |
+| `shop` | string |  |
+| `currency` | string |  |
+| `rates` | object \| null |  |
+| `full` | boolean |  |
+
+### `cost_compare`
+
+*Read-only.*
+
+Compare cost per part against quantity across processes. Default: every printing technology, CNC and
+moulding, plus sheet metal for a sheet part. Returns the cheapest process at each quantity, `switches` (where
+the cheapest changes, e.g. "Injection moulding costs less per part than FDM printing from about 628 parts")
+and every pairwise crossover, each with its arithmetic (ΔF / ΔV) and the evidence of the lines it rests on.
+Crossovers use counted lines only; a process with lines not counted says which. Purchased parts are listed
+apart. Same rates, shops and options as estimate_cost. A quote-style estimate, not a quote.
+
+| Argument | Type | Required |
+|---|---|---|
+| `project` | string | yes |
+| `processes` | array \| null |  |
+| `quantities` | array \| null |  |
+| `options` | object \| null |  |
+| `shop` | string |  |
+| `currency` | string |  |
+| `rates` | object \| null |  |
+| `full` | boolean |  |
+
+### `cost_rates`
+
+Read or set the rates the cost models use. action "list": every rate as the shop resolves it (value,
+unit, evidence sourced|specified|assumed|missing, source with URL, date and quote), the published value beside
+the shop's own, the exchange rates and the sources. action "set": change a shop (created when new): label,
+currency (ISO code), rates {id: value} (null forgets an override, so the published rate applies again),
+fx {"USD": 1.1} (units of that currency per 1 EUR), part_prices {designation: price} for purchased parts,
+activate=true makes it the shop costs use. action "delete": remove a shop. Set only numbers the person gave
+you; they are recorded as specified. Never set a rate or a price they did not give.
+
+| Argument | Type | Required |
+|---|---|---|
+| `action` | string |  |
+| `shop` | string |  |
+| `label` | string \| null |  |
+| `currency` | string \| null |  |
+| `rates` | object \| null |  |
+| `fx` | object \| null |  |
+| `part_prices` | object \| null |  |
+| `activate` | boolean |  |
 
 ### `plate_plan`
 

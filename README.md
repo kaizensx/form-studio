@@ -336,6 +336,7 @@ form tool get_project '{"project": "desk-stand"}'                               
 | **CNC toolpaths and their stock simulation** | [docs/CAM.md](docs/CAM.md) |
 | **Print physics: orientation, strength as printed, warp risk** | [docs/PRINT_PHYSICS.md](docs/PRINT_PHYSICS.md) |
 | **Inverse design and topology optimisation, with their verification** | [docs/OPTIMISATION.md](docs/OPTIMISATION.md) |
+| **Cost per process, with sourced rates** | [docs/COST.md](docs/COST.md) |
 
 ## Community
 
