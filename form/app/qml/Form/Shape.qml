@@ -21,7 +21,17 @@ Column {
     // or the build-up of a new revision) the listing runs: the gutter lights down to the line being built, the lines
     // above it are ticked, the ones below wait. All of it follows the real build (Store.building, Store.revealing,
     // Store.builtIds, Store.stageLog); the listing counts nothing itself.
-    readonly property real paneHeight: root.f ? -1 : program.listingHeight
+    readonly property real paneHeight: root.f || Store.treeLower === "source" ? -1 : program.listingHeight
+    // what a line says of its feature: the values it is made of (its own parameters, as the head has them)
+    function valueOf(id) {
+        var vs = Store.head ? Store.head.values : null, ps = root.paramsOf(id), out = [], unit = ""
+        for (var i = 0; vs && i < ps.length && out.length < 3; i++) { var v = vs[ps[i].key]; if (typeof v === "number") { out.push(String(Number(v.toFixed(2)))); unit = ps[i].unit || "" } }
+        return out.length === 1 ? out[0] + (unit ? " " + unit : "") : out.join(" × ")
+    }
+    readonly property int headN: Store.project ? Store.project.head : 0
+    onHeadNChanged: loadTree()
+    Component.onCompleted: loadTree()
+    Timer { id: passed; interval: 420; onTriggered: Store.hover("") }
     readonly property bool streaming: !!Store.building && Store.building.project === Store.pid
     readonly property bool running: streaming || Store.revealing.length > 0
     readonly property int stepAt: streaming ? Store.building.at : Store.buildAt
@@ -60,6 +70,7 @@ Column {
             if (ask !== root._ask || !Store.viewer) return
             Store.scrub = { rev: head, view: v, upto: fid }
             Store.viewer.flagged = []; Store.viewer.setModel(v); Store.viewer.setGhost(null)
+            Store.hover(fid); passed.restart()                     // the feature the bar passes lights once on the part
         }, function (e) { Store.fail(e) })
     }
     function treeOp(op) {
@@ -128,11 +139,14 @@ Column {
     Column {
         id: program; objectName: "program"
         readonly property real listingHeight: 40 + listing.height + 6      // the pane is this tall; what follows is a scroll away
-        visible: !root.f; width: parent.width
+        width: parent.width
         Item { width: parent.width; height: 40
-            Txt { id: pt; x: 12; anchors.verticalCenter: parent.verticalCenter; text: "Program"; font.weight: Theme.wSemi; font.pixelSize: 14; font.letterSpacing: -0.15 }
+            Txt { id: pt; x: 12; anchors.verticalCenter: parent.verticalCenter; text: "Tree"; font.weight: Theme.wSemi; font.pixelSize: 14; font.letterSpacing: -0.15 }
             Txt { anchors.left: pt.right; anchors.leftMargin: 8; anchors.baseline: pt.baseline; mono: true; font.pixelSize: 11; tone: 3; text: Store.recipe ? String(Store.recipe.features.length) : "" }
-            Txt { visible: !root.running; anchors.right: parent.right; anchors.rightMargin: 12; anchors.verticalCenter: parent.verticalCenter; font.pixelSize: 12; tone: 3; text: "build order" }
+            // under the tree: the values of the open feature, or the design's source with that feature's lines lit
+            Seg { objectName: "treeLower"; visible: !root.running && !!root.tree; anchors.right: parent.right; anchors.rightMargin: 8; anchors.verticalCenter: parent.verticalCenter; implicitHeight: 26
+                model: [{ value: "values", text: "Values" }, { value: "source", text: "Source", tip: "The design's code: every feature is a method. The open feature's lines are lit." }]
+                value: Store.treeLower; onPicked: function (v) { Store.treeLower = v } }
             Row { objectName: "programRun"; visible: root.running; anchors.right: parent.right; anchors.rightMargin: 12; anchors.verticalCenter: parent.verticalCenter; spacing: 9
                 Item { width: 14; height: 14; anchors.verticalCenter: parent.verticalCenter
                     Rectangle { anchors.centerIn: parent; width: 14; height: 14; radius: 7; color: Theme.alpha(Theme.datum, 0.22) }
@@ -184,8 +198,11 @@ Column {
                         onBuiltChanged: if (built && root.running) landed.restart()
                         readonly property real lineH: Math.max(32, why.visible ? why.implicitHeight + 30 : 0)
                         width: lines.width; height: lineH + (ex.visible ? ex.implicitHeight + 10 : 0)
+                        readonly property bool picked: Store.feature === modelData.id && !root.running
+                        readonly property var made: { var r = root.treeRow(modelData.id); return r && r.made ? r.made : null }
+                        readonly property string val: root.valueOf(modelData.id)
                         Rectangle { width: parent.width; height: fr.lineH; radius: 10
-                            color: fm.pressed ? Theme.washPress : fm.containsMouse && !fr.arriving ? Theme.washHover : "transparent"
+                            color: fr.picked ? Theme.glass2 : fm.pressed ? Theme.washPress : fm.containsMouse && !fr.arriving ? Theme.washHover : "transparent"
                             Behavior on color { Tint {} } }
                         Item { objectName: "featureArriving"; width: 1; height: 1; opacity: fr.arriving ? 1 : 0 }       // what the tree and tests read
                         // its number in the build order
@@ -215,10 +232,15 @@ Column {
                             text: fr.out ? Store.leftOutReason(fr.out) : "" }
                         // its role, lettered in neutral mono; "building" on the line that runs
                         Txt { id: kw; objectName: "featureRole"; anchors.right: parent.right; anchors.rightMargin: 12; y: (32 - height) / 2; mono: true; font.pixelSize: 11; font.weight: Theme.wMedium; font.letterSpacing: 1.0
-                            font.capitalization: Font.AllUppercase; wrapMode: Text.NoWrap
-                            text: fr.arriving ? "building" : fr.out ? "left out" : fr.sup ? "suppressed" : fr.modelData.role
+                            readonly property bool word: fr.arriving || !!fr.out || fr.sup
+                            font.capitalization: word ? Font.AllUppercase : Font.MixedCase; wrapMode: Text.NoWrap
+                            // its value, and who made it (the role told less than the value)
+                            text: fr.arriving ? "building" : fr.out ? "left out" : fr.sup ? "suppressed" : fr.val
                             visible: !(fm.containsMouse || more.hovered) || root.running
                             color: fr.arriving ? Theme.datum : fr.out ? Theme.amber : Theme.ink3; opacity: fr.built ? 0.6 : fr.todo ? 0.5 : 1 }
+                        Icon { objectName: "featureAuthor"; visible: !!fr.made && kw.visible && !kw.word; anchors.right: kw.left; anchors.rightMargin: kw.text !== "" ? 7 : 0; y: (32 - height) / 2
+                            readonly property bool you: !!fr.made && Store.who(fr.made.origin).indexOf("you") === 0
+                            name: you ? "user" : "sparkles"; size: 12; color: Theme.ink3 }
                         MouseArea { id: fm; width: parent.width; height: fr.lineH; hoverEnabled: true; acceptedButtons: Qt.LeftButton | Qt.RightButton
                             onClicked: function (m) {
                                 if (m.button === Qt.RightButton && !root.running) rowMenu.show(fr.index, fr, m.x, m.y)
@@ -241,7 +263,8 @@ Column {
                                 if (a < 1 || b < 1 || a === b) return
                                 root.treeOp(b < a ? { op: "move", feature: fs[a].id, before: fs[b].id } : { op: "move", feature: fs[a].id, after: fs[b].id }) }
                             onCanceled: { root.dragFrom = -1; root.dragTo = -1 } }
-                        Tip { show: fm.containsMouse && !!fr.modelData.doc && !fr.out; text: fr.modelData.doc || "" }
+                        Tip { show: fm.containsMouse && (!!fr.modelData.doc || !!fr.made) && !fr.out
+                            text: (fr.modelData.doc || "") + (fr.made ? (fr.modelData.doc ? "\n" : "") + "Made by " + Store.who(fr.made.origin) + " in " + F.pad(fr.made.rev) + "." : "") }
                         // under the line: rename it, pattern it, or what it depends on
                         Column { id: ex; objectName: "featureTools"; x: 64; y: fr.lineH + 2; width: parent.width - 76; spacing: 6; visible: fr.tools && !root.running
                             Field { id: rn; objectName: "renameField"; width: parent.width; visible: root.openWhat === "rename"; text: fr.modelData.label
@@ -288,6 +311,23 @@ Column {
             }
         }
         Item { width: 1; height: 6 }
+        // the design's source, under the tree: the same thing the values and the handles change. Read from the head.
+        Rectangle { id: src; objectName: "treeSource"; visible: Store.treeLower === "source" && !!root.tree && !!root.tree.source && !root.running
+            x: 6; width: parent.width - 12; height: visible ? Math.min(264, src.rows.length * 16 + 16) : 0; radius: 10; color: Theme.glassWell; border.color: Theme.rule; clip: true
+            readonly property var rows: root.tree && root.tree.source ? String(root.tree.source).replace(/\s+$/, "").split("\n") : []
+            readonly property var lit: { var r = root.treeRow(Store.feature || root.rollTo); return r && r.lines ? r.lines : null }
+            onLitChanged: if (lit && visible) sv.positionViewAtIndex(Math.max(0, lit[0] - 2), ListView.Beginning)
+            onVisibleChanged: if (lit && visible) sv.positionViewAtIndex(Math.max(0, lit[0] - 2), ListView.Beginning)
+            ListView { id: sv; anchors.fill: parent; anchors.margins: 8; clip: true; boundsBehavior: Flickable.StopAtBounds; model: src.rows
+                delegate: Item { id: ln
+                    required property string modelData
+                    required property int index
+                    readonly property bool on: !!src.lit && index + 1 >= src.lit[0] && index + 1 <= src.lit[1]
+                    width: sv.width; height: 16
+                    Rectangle { objectName: ln.on ? "treeSourceLit" : ""; visible: ln.on; anchors.fill: parent; color: Theme.alpha(Theme.datum, Theme.dark ? 0.14 : 0.1) }
+                    Txt { width: 24; horizontalAlignment: Text.AlignRight; anchors.verticalCenter: parent.verticalCenter; mono: true; font.pixelSize: 11; color: ln.on ? Theme.datum : Theme.ink3; wrapMode: Text.NoWrap; text: ln.index + 1 }
+                    Txt { x: 34; width: parent.width - 34; anchors.verticalCenter: parent.verticalCenter; mono: true; font.pixelSize: 11; tone: ln.on ? 1 : 2; wrapMode: Text.NoWrap; elide: Text.ElideRight; textFormat: Text.PlainText; text: ln.modelData } } } }
+        Item { width: 1; height: src.visible ? 8 : 0 }
     }
     Column {
         visible: !root.f; x: 10; width: parent.width - 20
@@ -310,7 +350,7 @@ Column {
     Column {
         visible: !!root.f; x: 10; width: parent.width - 20
         Item { width: parent.width; height: 34
-            Btn { kind: "quiet"; small: true; icon: "arrow_left"; text: "All features"; x: -8; anchors.verticalCenter: parent.verticalCenter; onClicked: Store.select("") } }
+            Btn { kind: "quiet"; small: true; icon: "x"; text: "Close"; tip: "Back to the design's general values"; x: -8; anchors.verticalCenter: parent.verticalCenter; onClicked: Store.select("") } }
         Row { spacing: 8
             Txt { kind: "h2"; text: root.f ? root.f.label : "" }
             Tag { text: root.f ? root.f.role : ""; anchors.verticalCenter: parent.verticalCenter } }

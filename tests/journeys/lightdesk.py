@@ -77,8 +77,7 @@ def run(ui):
     # the program: one line per feature, in build order, numbered
     feats = ui.js("Store.recipe.features.map(function (f) { return f.id })")
     ui.check(len(feats) >= 6 and all(ui.exists("feature-" + f) for f in feats), f"every feature is a line of the program: {feats}")
-    ui.expect("Program", "programPane")
-    ui.expect("build order", "programPane")
+    ui.expect("Tree", "programPane")
 
     # the size line is the solid's own bounding box and volume
     bb = ui.js("Store.shown.bbox")
