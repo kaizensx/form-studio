@@ -13,8 +13,11 @@ computed again on the new solid.
 """
 from __future__ import annotations
 
+from . import modelling_more as _more
+
 OPTIONS = ("sketch", "axis_entity", "label", "radius", "length", "thickness", "standard", "size", "fit", "nominal", "d", "style", "depth", "of", "mode",
            "count", "pitch", "angle", "axis", "origin", "after", "head_d", "head_depth", "head_clearance")
+OPTIONS += tuple(k for k in _more.END_OPTIONS + _more.OPTIONS if k not in OPTIONS)   # end conditions, the more kinds
 
 
 def route_global_post(st, path: str, body):

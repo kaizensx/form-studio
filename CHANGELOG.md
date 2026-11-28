@@ -36,6 +36,21 @@
   its numbers. The topology playback has not been run on a machine with the FEA engine yet.
 - **A Bench row shows a short number** (`row`: `SF 2.41`, `gap 3.000 mm`, `38 % lighter`); the card keeps the
   engine's sentence. An engine may give its own `row`.
+- **More modelling features, written into the design's code** (`form/handmore.py`, `form/modelling_more.py`).
+  Sweep (along a sketch or the part's edges, with a twist), loft (two or more sections, ruled or smooth), rib (from
+  an open line, out to the faces it meets), mirror (features or the whole body), draft (faces against a neutral
+  plane), move face (push or pull as a parametric offset), thicken (a face or a sketch), boolean (combine, subtract,
+  intersect bodies), split (by a plane, keeping both bodies or one side), variable-radius fillet, and datum planes
+  and axes that sketches, mirrors, splits and patterns use. Each is one named feature with its sizes as parameters,
+  previewed in the kernel and refused with the reason when it cannot be made. MCP `add_feature` kinds with
+  `options`; `form model`.
+- **End conditions on extrude, cut and revolve**: blind, through all, up to next, up to a face, up to a vertex,
+  offset from a face, mid-plane, a second direction, reverse, draft, and a thin wall; a revolve by two angles,
+  centred, or up to a face. Designs written before keep the same solid.
+- **The PartDesign export knows them.** Pad and Pocket types (UpToFirst, UpToFace with Offset, two sides, taper,
+  symmetric, reversed), two-angle Revolutions, AdditivePipe/SubtractivePipe, AdditiveLoft, Mirrored, Draft and datum
+  Planes (their offset bound to the spreadsheet) come back native and checked against Form Studio's solid; the
+  rest goes in decomposed or frozen with the reason.
 
 - **A reply ends in Sources, built from the tool log** (direction I, wave O). Every tool call of a turn whose result
   says how its content is known is one numbered row with its evidence word: SIMULATED, COMPUTED, SPECIFIED, OPENED,

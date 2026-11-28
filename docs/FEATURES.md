@@ -772,6 +772,26 @@ far the gap moves. The method, the rules and the verification table are in [TOLE
   vertical, dimensions solved live by form.sketch2d with the degrees of freedom left, each dimension a parameter of
   the design. The sketch is data inside its feature's method, so `get_sketch` and `edit_sketch` (MCP) and `form
   sketch` read and change exactly what the editor shows.
+- **End conditions on extrude, cut and revolve.** Blind, through all, up to next, up to a picked face, up to a
+  vertex, offset from a face, mid-plane; a second direction with its own condition; reverse; a draft angle; a thin
+  wall (one side, centred, or two thicknesses). A revolve turns by an angle, two angles, centred, or up to a face
+  through its axis. Each number is a parameter of the design. `form model --end`; MCP `add_feature` (`options`).
+- **Sweep, loft and rib.** A profile swept along a sketched path or a chain of the part's edges, with a twist; a
+  loft through two or more sections, ruled or smooth; a rib from an open line, grown out to the faces it meets.
+  Added, cut, or kept as a new body.
+- **Mirror, draft, move face, thicken.** Mirror features or the whole body about a plane or a face; draft picked
+  faces against a neutral plane; push or pull a face, written as a parametric offset; thicken a face or a sketch.
+- **Multi-body.** A sketch extruded as a new body, a thicken as a new body, or a split by a plane makes a design of
+  several bodies; combine, subtract or intersect them, each named by a point inside it.
+- **Variable-radius fillet.** The radius runs linearly from one end of each edge to the other (OCCT's two-radius
+  fillet); made at the radii given or refused.
+- **Datum planes and axes.** Offset and turned from XY, XZ, YZ or a face, or through three points; axes through two
+  points, along an edge or where two planes meet. Sketches, mirrors and splits use datum planes, and a datum's
+  offset is a parameter, so changing it moves everything on it. Every one of these is a named feature with
+  parameters in the design's code, previewed in the kernel and refused with the reason when it cannot be made.
+  The FreeCAD PartDesign export writes Pad/Pocket types, two-angle revolutions, Pipe, Loft, Mirrored, Draft and
+  datum Planes natively; what PartDesign has no feature for (rib, thin wall, twist, move face, thicken, split,
+  boolean, variable fillet) goes in decomposed or frozen, saying why.
 - **The feature tree by hand.** The Program's rollback bar shows the part as it stood after any feature, from the
   checkpoints and without saving; each line's menu suppresses, restores, renames and moves it and says what it
   depends on; a line dragged by its number moves it. A move that empties a feature, or puts one before a feature it

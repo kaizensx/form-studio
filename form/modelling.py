@@ -43,7 +43,9 @@ from . import edits, featureprog
 
 TREE_OPS = ("suppress", "restore", "move", "rename")
 SKETCH_KINDS = ("extrude", "cut", "revolve")
-KINDS = ("fillet", "chamfer", "hole", "pattern", "shell") + SKETCH_KINDS
+from .modelling_more import KINDS as MORE_KINDS  # noqa: E402
+
+KINDS = ("fillet", "chamfer", "hole", "pattern", "shell") + SKETCH_KINDS + MORE_KINDS
 ROLES = {"fillet": "finish", "chamfer": "finish", "hole": "interface", "pattern": "structure", "shell": "structure",
          "extrude": "structure", "cut": "structure", "revolve": "structure"}
 EVIDENCE = "computed (B-rep)"
@@ -475,6 +477,16 @@ def plan(st, p: dict, kind: str, picks: list | None = None, **o) -> dict:
     picked = None
     if kind in SKETCH_KINDS:
         return _plan_sketch(st, p, c, kind, fid, n, picks, o)
+    if kind in MORE_KINDS:
+        from . import modelling_more
+        return modelling_more.plan(st, p, c, kind, fid, n, picks, o)
+    if kind == "pattern" and isinstance(o.get("axis"), str) and o["axis"] in ids:   # a datum axis
+        from . import modelling_more
+        ax = modelling_more.axis_from_datum(c["source"], o["axis"])
+        if ax is None:
+            raise _err(f"{o['axis']} is an axis on an edge or where planes meet; a pattern reads an axis written by "
+                       "points or a base axis.", "Give the axis as x, y, z or three numbers.")
+        o = {**o, "axis": ax[1], **({"origin": ax[0]} if (o.get("mode") or "linear") == "polar" else {})}
     if kind == "pattern" and picks:                    # the direction (and a polar axis) from a picked edge
         at = picks[0].get("at") if isinstance(picks[0], dict) else picks[0]
         d = st._k("model_pick", key=st.geometry_key(p, c["rid"], vals), recipe_id=c["rid"], values=vals,
@@ -586,21 +598,24 @@ def plan(st, p: dict, kind: str, picks: list | None = None, **o) -> dict:
 
 # ---- sketches (B3): a sketch on a datum or a picked face, extruded, cut or revolved ---------------------------------
 
-def _sketch_code(kind: str, fid: str, label: str, data: dict, axis: int | None = None) -> str:
+def _sketch_code(kind: str, fid: str, label: str, data: dict, axis: int | None = None, extra: str = "",
+                 new: bool = False) -> str:
     from . import handsketch
     lit = handsketch.literal(data, "        ")
+    mode = "new" if new else "add" if kind in ("extrude", "revolve") else "cut"
     if kind == "revolve":
         call = (f"handsketch.revolve(body, self._form_trail, sketch, v, {_q(fid)}, {int(axis)}, "
-                f"v[{_q(fid + '_angle')}], {_q('add')})")
+                f"v[{_q(fid + '_angle')}], {_q(mode)}{extra})")
     else:
         call = (f"handsketch.extrude(body, self._form_trail, sketch, v, {_q(fid)}, v[{_q(fid + '_depth')}], "
-                f"{_q('add' if kind == 'extrude' else 'cut')})")
+                f"{_q(mode)}{extra})")
     return (f"@feature({_q(label)}, role=\"structure\")\ndef {fid}(self, v, body):\n"
             f"    from form import handsketch\n    sketch = {lit}\n    return {call}\n")
 
 
-def _sketch_parts(kind, fid, n, data, o):
-    """(params, code, summary, label) of one sketch feature."""
+def _sketch_parts(kind, fid, n, data, o, ends=None):
+    """(params, code, summary, label) of one sketch feature. ends: (keyword arguments, their parameters, a summary
+    suffix) of its end conditions (form/modelling_more.end_args)."""
     from . import handsketch
     sol = handsketch.solve(data)
     if not sol["ok"]:
@@ -618,15 +633,21 @@ def _sketch_parts(kind, fid, n, data, o):
     else:
         dflt = 10.0 if kind == "extrude" else 0.0
         depth = _num(o, "depth", 0, 5000, "The depth", dflt)
-        if kind == "extrude" and depth <= 0:
+        if kind == "extrude" and depth <= 0 and (o.get("end") or "blind") in ("blind", "mid"):
             raise _err("An extrusion needs a depth above 0.")
         params.append(_param(f"{fid}_depth", f"{label} depth" + (" (0 = through)" if kind == "cut" else ""), depth, 0 if kind == "cut" else 0.1,
                              max(depth * 5, 50), fid, "along the sketch plane's normal" + (", into the part" if kind == "cut" else "")))
         summary = f"{label}: the sketch {'extruded' if kind == 'extrude' else 'cut'} " + \
             (f"{depth:g} mm" if depth else "through everything")
+    extra, eparams, said = ends or ("", [], "")
+    params += eparams
+    if said:
+        summary += f", {said}"
+    if o.get("new_body"):
+        summary += ", as a new body"
     nd = len([x for x in sol["dims"] if x["name"]])
     summary += f" ({nd} dimension{'s' if nd != 1 else ''} as parameters, {'fully constrained' if sol['fully_constrained'] else str(sol['dof']) + ' degrees of freedom left'})"
-    return params, _sketch_code(kind, fid, label, data, axis), summary, label
+    return params, _sketch_code(kind, fid, label, data, axis, extra, bool(o.get("new_body"))), summary, label
 
 
 def sketch_plane(st, p: dict, at) -> dict:
@@ -643,13 +664,17 @@ def _plan_sketch(st, p, c, kind, fid, n, picks, o):
     if not isinstance(data, dict):
         raise _err(f"A {kind} needs its sketch.", "Give sketch: {plane, points, entities, constraints} "
                    "(get_sketch shows the form), or draw it in the sketch editor.")
-    data = handsketch.check(data)
+    from . import modelling_more
+    data = handsketch.check(modelling_more.expand_sketch_plane(c, data))
     picked = None
     if picks and not o.get("keep_plane"):
         picked = sketch_plane(st, p, (picks[0].get("at") if isinstance(picks[0], dict) else picks[0]))
         data = {**data, "plane": picked["plane"]}
-    params, code, summary, label = _sketch_parts(kind, fid, n, data, o)
-    ops = [{"op": "insert", "param": prm} for prm in params]
+    label = o.get("label") or f"{kind.capitalize()} {n}"
+    ends = modelling_more.end_args(st, p, c, kind, fid, label, o)
+    params, code, summary, label = _sketch_parts(kind, fid, n, data, o, ends)
+    ops = modelling_more._solids_ops(st, p, c, 1) if o.get("new_body") else []
+    ops += [{"op": "insert", "param": prm} for prm in params]
     ops.append({"op": "insert", "feature": fid, "code": code, "label": label, "role": "structure",
                 **({"after": o["after"]} if o.get("after") else {})})
     return {"feature": fid, "label": label, "kind": kind, "summary": summary, "ops": ops, "picked": picked,

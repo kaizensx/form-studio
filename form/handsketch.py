@@ -59,8 +59,8 @@ def check(data) -> dict:
     pl = d["plane"]
     if "datum" in pl and pl["datum"] not in DATUMS:
         raise _bad(f"Unknown datum plane {pl['datum']!r}.", "XY, XZ or YZ.")
-    if "datum" not in pl and "face" not in pl:
-        raise _bad("The plane is a datum (XY, XZ, YZ) or a picked face.")
+    if not any(k in pl for k in ("datum", "face", "ref", "base", "through")):
+        raise _bad("The plane is a datum (XY, XZ, YZ), a picked face or a datum plane.")
     n = len(d["points"])
     for i, p in enumerate(d["points"]):
         if not (isinstance(p, (list, tuple)) and len(p) == 2 and all(isinstance(x, (int, float)) and math.isfinite(x) for x in p)):
@@ -398,23 +398,90 @@ def apply_ops(data: dict, ops: list) -> tuple[dict, list]:
 
 # ---- kernel side: the plane, and the features ---------------------------------------------------------------------
 
-def plane_of(data: dict, body, trail, what: str):
-    """The build123d Plane the sketch lies on, now."""
+END_CONDITIONS = ("blind", "through", "next", "face", "vertex", "offset", "mid")
+THIN_MODES = ("one", "mid", "two")
+REVOLVE_ENDS = ("angle", "face")
+
+
+def _val(x, v, what: str = "") -> float:
+    """A number in a plane or end condition: a literal, or the key of a parameter (read from v)."""
+    if isinstance(x, str):
+        if v is None or x not in v:
+            raise RecipeError(f"{what}: it reads the parameter {x}, which the design does not have", what,
+                              f"Add the parameter {x}, or write the number.")
+        return float(v[x])
+    return float(x or 0)
+
+
+def plane_of(data: dict, body, trail, what: str, v: dict | None = None):
+    """The build123d Plane the sketch lies on, now: a datum (XY, XZ, YZ with an offset), a picked face, or a datum
+    plane feature ({"ref": "datum_plane_1", ...its definition}; form/handmore.py)."""
+    return resolve_plane(data["plane"], body, trail, what, v)
+
+
+def resolve_plane(pl: dict, body, trail, what: str, v: dict | None = None):
+    """A plane from its definition. Datum planes (form/handmore.py datum_plane) are written as their definition:
+    base (XY, XZ, YZ or a face query), offset and angle (numbers or parameter keys), about (x or y: the base plane's
+    own axis the angle turns about), or through (three points)."""
     from build123d import Plane, Vector
-    pl = data["plane"]
-    if "datum" in pl:
+    if not isinstance(pl, dict):
+        raise RecipeError(f"{what}: a plane is an object (datum, face or a datum plane's definition)", what, "")
+    if "through" in pl:
+        p = [Vector(*q) for q in pl["through"]]
+        if len(p) != 3:
+            raise RecipeError(f"{what}: a plane through points needs three points", what, "Give three points.")
+        x, n = p[1] - p[0], (p[1] - p[0]).cross(p[2] - p[0])
+        if x.length < 1e-6 or n.length < 1e-6 * max(1.0, x.length ** 2):
+            raise RecipeError(f"{what}: the three points are on one line, so they make no plane", what,
+                              "Pick three points that are not in a row.")
+        plane = Plane(origin=p[0], x_dir=x.normalized(), z_dir=n.normalized())
+    elif "base" in pl or "ref" in pl:
+        base = pl.get("base", "XY")
+        if isinstance(base, str):
+            if base not in DATUMS:
+                raise RecipeError(f"{what}: unknown base plane {base!r}", what, "XY, XZ or YZ, or a picked face.")
+            x, _y, z = DATUMS[base]
+            plane = Plane(origin=(0, 0, 0), x_dir=x, z_dir=z)
+        else:
+            plane = _face_plane(base.get("face", base), body, trail, what)
+        ang = _val(pl.get("angle", 0), v, what)
+        if abs(ang) > 1e-12:
+            plane = plane.rotated((ang, 0, 0) if pl.get("about", "x") == "x" else (0, ang, 0))
+        off = _val(pl.get("offset", 0), v, what)
+        if abs(off) > 1e-12:
+            plane = plane.offset(off)
+    elif "datum" in pl:
         x, _y, z = DATUMS[pl["datum"]]
         n = Vector(*z)
-        return Plane(origin=n * float(pl.get("offset") or 0), x_dir=x, z_dir=z)
-    if body is None:
-        raise RecipeError(f"{what}: its sketch is on a face, but there is no body yet", what,
-                          "Sketch the first feature on a datum plane (XY, XZ or YZ).")
+        plane = Plane(origin=n * _val(pl.get("offset") or 0, v, what), x_dir=x, z_dir=z)
+    elif "face" in pl:
+        if body is None:
+            raise RecipeError(f"{what}: its sketch is on a face, but there is no body yet", what,
+                              "Sketch the first feature on a datum plane (XY, XZ or YZ).")
+        from . import handfeat
+        f = handfeat.find_face(body, trail, pl["face"], what)
+        n = Vector(*handfeat._vec(f.normal_at(f.center()))).normalized()
+        if "origin" in pl:
+            o = Vector(*pl["origin"])
+            o = o - n * ((o - f.center()).dot(n))
+            return Plane(origin=o, x_dir=tuple(pl["x"]), z_dir=tuple(handfeat._vec(n)))
+        return Plane(origin=f.center(), z_dir=n)
+    else:
+        raise RecipeError(f"{what}: the plane is a datum (XY, XZ, YZ), a picked face or a datum plane", what, "")
+    return plane
+
+
+def _face_plane(q: dict, body, trail, what: str):
+    """The plane of a picked flat face, found again on this rebuild (origin at its centre, z along its normal)."""
+    from build123d import Plane, Vector
+
     from . import handfeat
-    f = handfeat.find_face(body, trail, pl["face"], what)
-    n = Vector(*handfeat._vec(f.normal_at(f.center()))).normalized()
-    o = Vector(*pl["origin"])
-    o = o - n * ((o - f.center()).dot(n))
-    return Plane(origin=o, x_dir=tuple(pl["x"]), z_dir=tuple(handfeat._vec(n)))
+    if body is None:
+        raise RecipeError(f"{what}: it is on a face, but there is no body yet", what, "Use a datum plane.")
+    f = handfeat.find_face(body, trail, q, what)
+    if f.geom_type.name != "PLANE":
+        raise RecipeError(f"{what}: its face is {f.geom_type.name.lower()}, not flat", what, "Pick a flat face.")
+    return Plane(origin=f.center(), z_dir=Vector(*handfeat._vec(f.normal_at(f.center()))).normalized())
 
 
 def profile(data: dict, v: dict, prefix: str, plane):
@@ -426,43 +493,212 @@ def profile(data: dict, v: dict, prefix: str, plane):
     return plane.location * face
 
 
-def extrude(body, trail, data: dict, v: dict, fid: str, depth: float, mode: str = "add"):
-    """The sketch's profile extruded depth mm along the plane's normal (add), or cut into the body (depth 0 = through
-    everything, both ways on a datum)."""
+def open_wire(data: dict, v: dict, prefix: str, plane, what: str):
+    """The sketch's drawn (not construction) lines and arcs as one connected 3D wire, open or closed: a sweep's
+    path or a rib's line."""
+    from build123d import Edge, Vector, Wire
+    sk, vals = build(data, v, prefix)
+    try:
+        eds = sk.edges2d(vals)
+    except SketchError as e:
+        raise RecipeError(f"{what}: {e}", what, e.hint)
+    if not eds:
+        raise RecipeError(f"{what}: the sketch has no lines or arcs", what, "Draw the path or the rib's line.")
+    edges = []
+    for ed in eds:
+        if ed["kind"] == "line":
+            edges.append(Edge.make_line(Vector(*ed["a"], 0), Vector(*ed["b"], 0)))
+        elif ed["kind"] == "arc":
+            edges.append(Edge.make_three_point_arc(Vector(*ed["s"], 0), Vector(*ed["m"], 0), Vector(*ed["e"], 0)))
+        else:
+            raise RecipeError(f"{what}: a circle is not a path or a rib line", what, "Use lines and arcs.")
+    try:
+        ws = Wire.combine(edges)
+    except Exception as e:                                    # noqa: BLE001
+        raise RecipeError(f"{what}: its lines do not join into one chain ({type(e).__name__})", what,
+                          "Join them end to end (coincident).")
+    if len(ws) != 1:
+        raise RecipeError(f"{what}: its lines make {len(ws)} separate chains, not one", what,
+                          "Join them end to end into one chain.")
+    return plane.location * ws[0]
+
+
+def _thin(face, t: float, mode: str, t2: float, what: str):
+    """A closed profile as a wall: one (outside, t), mid (t centred on the outline) or two (t outside, t2 inside)."""
+    from build123d import Kind, offset
+    if t <= 0:
+        raise RecipeError(f"{what}: a thin feature's wall needs a thickness above 0", what, "Set thin.")
+    if mode not in THIN_MODES:
+        raise RecipeError(f"{what}: unknown thin mode {mode!r}", what, "one, mid or two.")
+    out_t, in_t = {"one": (t, 0.0), "mid": (t / 2, t / 2), "two": (t, t2)}[mode]
+    if mode == "two" and t2 <= 0:
+        raise RecipeError(f"{what}: a two-sided wall needs its inside thickness above 0", what, "Set thin2.")
+    try:
+        outer = offset(face, out_t, kind=Kind.INTERSECTION) if out_t > 0 else face
+        inner = offset(face, -in_t, kind=Kind.INTERSECTION) if in_t > 0 else face
+        ring = outer - inner
+    except Exception as e:                                    # noqa: BLE001
+        raise RecipeError(f"{what}: the profile cannot be offset by {max(out_t, in_t):g} mm ({type(e).__name__})",
+                          what, "Make the wall thinner than the profile's narrowest part.")
+    if not ring.faces() or ring.area <= 1e-9:
+        raise RecipeError(f"{what}: the wall leaves no area", what, "Make the wall thinner.")
+    return ring
+
+
+def _far(body, plane) -> float:
+    if body is None:
+        return 1000.0
+    bb = body.bounding_box()
+    c = [(bb.min.X, bb.min.Y, bb.min.Z), (bb.max.X, bb.max.Y, bb.max.Z)]
+    return 2 * (math.dist(*c) + math.dist(tuple(plane.origin), tuple((a + b) / 2 for a, b in zip(*c)))) + 2
+
+
+def _inner_point(f):
+    """A point inside the profile (its centre when that is inside, else a sampled one)."""
+    c = f.center()
+    for face in f.faces():
+        if face.is_inside(c):
+            return c
+        for u in (0.5, 0.25, 0.75, 0.1, 0.9):
+            for w in (0.5, 0.25, 0.75, 0.1, 0.9):
+                p = face.position_at(u, w)
+                if face.is_inside(p):
+                    return p
+    return c
+
+
+def _upto_next(f, plane, d, body, what, draft, add):
+    """Up to next: the profile extruded far along d, kept only up to the first face of the body it meets (a pad fills
+    the gap to that face; a cut goes on until it leaves the material it starts in)."""
+    from build123d import extrude as _ex
+    long = _ex(f, amount=_far(body, plane), dir=d, taper=draft)
+    pieces = (long - body) if add else (long & body)
+    probe = _inner_point(f) + d * 1e-3
+    keep = [s for s in (pieces.solids() if pieces is not None else []) if s.is_inside(probe)]
+    if not keep:
+        raise RecipeError(f"{what}: up to next: {'the body is already there' if add else 'there is no material'} "
+                          "where the profile starts", what, "Reverse the direction, or use blind.")
+    tool = keep[0]
+    reach = max((q.center() - plane.origin).dot(d) for q in tool.vertices())
+    if reach > 0.9 * _far(body, plane):
+        raise RecipeError(f"{what}: up to next meets no face ahead", what, "Reverse the direction, or use blind.")
+    return tool
+
+
+def _upto_depth(plane, d, target_plane, offset, what):
+    """How far along d (from the sketch plane) a flat target is, when it is parallel to the sketch plane; else None."""
+    m = target_plane.z_dir
+    if abs(abs(m.dot(plane.z_dir)) - 1) > 1e-7:
+        return None
+    dist = (target_plane.origin - plane.origin).dot(d) - offset
+    if dist <= 1e-6:
+        raise RecipeError(f"{what}: the face it goes up to is not ahead of the sketch ({dist:.3f} mm along the "
+                          "direction)", what, "Reverse the direction, or pick a face on the other side.")
+    return dist
+
+
+def _one_side(f, plane, d, body, trail, v, what, end, depth, to, offset, draft, add=True):
+    """The tool of one direction: the profile f extruded along the unit vector d under one end condition."""
+    from build123d import Plane, Vector, extrude, split
+    from build123d import Keep
+    if end in ("blind", "mid"):
+        if depth <= 0:
+            raise RecipeError(f"{what}: a blind extrusion needs a depth above 0", what, "Set its depth.")
+        return extrude(f, amount=depth / 2 if end == "mid" else depth, dir=d, both=end == "mid", taper=draft)
+    if end == "through":
+        return extrude(f, amount=_far(body, plane), dir=d, taper=draft)
+    if end == "next":
+        if body is None:
+            raise RecipeError(f"{what}: up to next needs a body to reach", what, "Use blind for the first feature.")
+        return _upto_next(f, plane, d, body, what, draft, add)
+    if end == "vertex":
+        if not to:
+            raise RecipeError(f"{what}: up to vertex needs the point", what, "Pick a vertex.")
+        dist = (Vector(*to) - plane.origin).dot(d)
+        if dist <= 1e-6:
+            raise RecipeError(f"{what}: the vertex is not ahead of the sketch ({dist:.3f} mm)", what,
+                              "Reverse the direction, or pick another vertex.")
+        return extrude(f, amount=dist, dir=d, taper=draft)
+    if end in ("face", "offset"):
+        if not to:
+            raise RecipeError(f"{what}: up to face needs the picked face", what, "Pick the face to go up to.")
+        tp = _face_plane(to, body, trail, what)
+        off = offset if end == "offset" else 0.0
+        dist = _upto_depth(plane, d, tp, off, what)
+        if dist is not None:
+            return extrude(f, amount=dist, dir=d, taper=draft)
+        long = extrude(f, amount=_far(body, plane), dir=d, taper=draft)
+        cut_at = Plane(origin=tp.origin - tp.z_dir * (off if tp.z_dir.dot(d) > 0 else -off), z_dir=tp.z_dir)
+        keep = Keep.BOTTOM if cut_at.z_dir.dot(d) > 0 else Keep.TOP
+        out = split(long, bisect_by=cut_at, keep=keep)
+        if out is None or not out.solids() or out.volume <= 1e-9:
+            raise RecipeError(f"{what}: the face it goes up to does not cross its path", what, "Pick another face.")
+        return out
+    raise RecipeError(f"{what}: unknown end condition {end!r}", what, ", ".join(END_CONDITIONS) + ".")
+
+
+def extrude(body, trail, data: dict, v: dict, fid: str, depth: float, mode: str = "add", *, end: str = "",
+            to=None, offset: float = 0.0, reverse: bool = False, draft: float = 0.0, end2: str = "",
+            depth2: float = 0.0, to2=None, offset2: float = 0.0, draft2: float = 0.0, thin: float = 0.0,
+            thin_mode: str = "one", thin2: float = 0.0):
+    """The sketch's profile extruded depth mm along the plane's normal (add), cut into the body (cut) or kept as a new
+    body beside it (new). Without end: the classic behaviour (a cut of depth 0 goes through everything, both ways on
+    a datum). end: blind | through | next (up to the next face of the body) | face (up to a picked flat face, `to`
+    its query) | vertex (up to a point, `to` [x, y, z]) | offset (from a picked face, `offset` mm short of it) |
+    mid (depth centred on the sketch). reverse flips the direction (a cut goes into the part by default). end2 is a
+    second direction with its own condition (depth2, to2, offset2, draft2). draft: degrees of taper (positive
+    narrows). thin: a wall of this thickness along the profile instead of the filled profile (thin_mode one: outside,
+    mid: centred, two: thin outside and thin2 inside)."""
+    from build123d import Compound
     from build123d import extrude as _extrude
     from .craft import safe_cut, safe_union
-    plane = plane_of(data, body, trail, fid)
+    plane = plane_of(data, body, trail, fid, v)
     f = profile(data, v, fid + "_", plane)
-    if mode == "add":
-        if depth <= 0:
-            raise RecipeError(f"{fid}: an extrusion needs a depth above 0", fid, "Set its depth.")
-        tool = _extrude(f, amount=float(depth))
-        if body is None:
-            return tool
-        try:
-            return safe_union(body, tool)
-        except RecipeError as e:
-            raise RecipeError(f"{fid}: {e}", fid, e.hint or "The extrusion does not touch the part: sketch on its face.")
-    if body is None:
-        raise RecipeError(f"{fid}: a cut needs a body to cut", fid, "Extrude first.")
-    if depth and depth > 0:
-        tool = _extrude(f, amount=-float(depth))
+    if mode not in ("add", "cut", "new"):
+        raise RecipeError(f"{fid}: mode is add, cut or new, not {mode!r}", fid, "")
+    if thin:
+        f = _thin(f, float(thin), thin_mode, float(thin2 or 0), fid)
+    if not end and not end2 and not draft and not reverse:
+        # the classic behaviour, kept exactly (designs written before end conditions build the same solid)
+        if mode in ("add", "new"):
+            if depth <= 0:
+                raise RecipeError(f"{fid}: an extrusion needs a depth above 0", fid, "Set its depth.")
+            tool = _extrude(f, amount=float(depth))
+        else:
+            if body is None:
+                raise RecipeError(f"{fid}: a cut needs a body to cut", fid, "Extrude first.")
+            if depth and depth > 0:
+                tool = _extrude(f, amount=-float(depth))
+            else:
+                L = _far(body, plane)
+                tool = _extrude(f, amount=L, both=True) if "datum" in data["plane"] else _extrude(f, amount=-L)
     else:
-        bb = body.bounding_box()
-        L = 2 * math.dist((bb.min.X, bb.min.Y, bb.min.Z), (bb.max.X, bb.max.Y, bb.max.Z)) + 2
-        tool = _extrude(f, amount=L, both=True) if "datum" in data["plane"] else _extrude(f, amount=-L)
+        if mode == "cut" and body is None:
+            raise RecipeError(f"{fid}: a cut needs a body to cut", fid, "Extrude first.")
+        n = plane.z_dir
+        s = (-1.0 if mode == "cut" else 1.0) * (-1.0 if reverse else 1.0)
+        e1 = end or ("blind" if depth and depth > 0 else ("through" if mode == "cut" else "blind"))
+        tool = _one_side(f, plane, n * s, body, trail, v, fid, e1, float(depth or 0), to, float(offset or 0),
+                         float(draft or 0), mode != "cut")
+        if end2:
+            if e1 == "mid":
+                raise RecipeError(f"{fid}: mid-plane already goes both ways", fid, "Use blind with a second direction.")
+            t2 = _one_side(f, plane, n * -s, body, trail, v, fid, end2, float(depth2 or 0), to2, float(offset2 or 0),
+                           float(draft2 or 0), mode != "cut")
+            tool = tool + t2
+    if body is None:
+        return tool
+    if mode == "new":
+        return Compound(list(body.solids()) + list(tool.solids()))
     try:
-        return safe_cut(body, tool)
+        return safe_union(body, tool) if mode == "add" else safe_cut(body, tool)
     except RecipeError as e:
-        raise RecipeError(f"{fid}: {e}", fid, e.hint or "The cut does not reach the part.")
+        raise RecipeError(f"{fid}: {e}", fid, e.hint or ("The extrusion does not touch the part: sketch on its face."
+                                                          if mode == "add" else "The cut does not reach the part."))
 
 
-def revolve(body, trail, data: dict, v: dict, fid: str, axis_entity: int, angle: float, mode: str = "add"):
-    """The profile turned about one of the sketch's lines (often a construction line) by angle degrees."""
+def _axis_of(data, v, fid, plane, axis_entity):
     from build123d import Axis, Vector
-    from build123d import revolve as _revolve
-    from .craft import safe_cut, safe_union
-    plane = plane_of(data, body, trail, fid)
     sk, vals = build(data, v, fid + "_")
     sol = sk.solve(vals)
     d = check(data)
@@ -470,8 +706,63 @@ def revolve(body, trail, data: dict, v: dict, fid: str, axis_entity: int, angle:
         raise RecipeError(f"{fid}: the axis is entity {axis_entity}, which is not a line", fid, "Pick a line.")
     a, b = (sol.pts[j] for j in d["entities"][axis_entity]["p"])
     pa, pb = plane.from_local_coords(Vector(a[0], a[1], 0)), plane.from_local_coords(Vector(b[0], b[1], 0))
+    return Axis(tuple(pa), tuple(pb - pa))
+
+
+def _angle_to_face(f, axis, tp, what) -> float:
+    """The angle (degrees, in the revolve's positive sense) from the profile to a flat face whose plane holds the
+    axis: what a revolve up to that face turns."""
+    from build123d import Vector
+    a = axis.direction.normalized()
+    o = axis.position
+    if abs(tp.z_dir.dot(a)) > 1e-6 or abs((o - tp.origin).dot(tp.z_dir)) > 1e-6:
+        raise RecipeError(f"{what}: a revolve goes up to a flat face whose plane holds its axis; this one does not",
+                          what, "Pick a face through the axis, or give the angle.")
+
+    def flat(p):
+        r = Vector(p) - o
+        return r - a * r.dot(a)
+    u, w = flat(f.center()), flat(tp.origin)
+    if u.length < 1e-9 or w.length < 1e-9:
+        raise RecipeError(f"{what}: the profile or the face sits on the axis", what, "Give the angle.")
+    ang = math.degrees(math.atan2(u.cross(w).dot(a), u.dot(w))) % 360.0
+    if ang < 1e-6:
+        raise RecipeError(f"{what}: the face is where the profile already is", what, "Pick another face.")
+    return ang
+
+
+def revolve(body, trail, data: dict, v: dict, fid: str, axis_entity: int, angle: float, mode: str = "add", *,
+            end: str = "angle", to=None, angle2: float = 0.0, mid: bool = False, reverse: bool = False):
+    """The profile turned about one of the sketch's lines (often a construction line) by angle degrees. end: angle |
+    face (up to a picked flat face whose plane holds the axis, `to` its query). angle2: a second direction, turned
+    the other way. mid: the angle centred on the sketch. reverse: the other way round."""
+    from build123d import revolve as _revolve
+    from .craft import safe_cut, safe_union
+    plane = plane_of(data, body, trail, fid, v)
+    d = check(data)
+    axis = _axis_of(data, v, fid, plane, axis_entity)
     f = profile(d, v, fid + "_", plane)       # the axis may be an edge of the profile, or a construction line beside it
-    tool = _revolve(f, Axis(tuple(pa), tuple(pb - pa)), float(angle))
+    if end not in REVOLVE_ENDS:
+        raise RecipeError(f"{fid}: unknown revolve end {end!r}", fid, "angle or face.")
+    if end == "face":
+        if not to:
+            raise RecipeError(f"{fid}: up to face needs the picked face", fid, "Pick the face.")
+        ang = _angle_to_face(f, axis if not reverse else axis.reverse(), _face_plane(to, body, trail, fid), fid)
+    else:
+        ang = float(angle)
+    if not 0 < ang <= 360 or not 0 <= float(angle2 or 0) <= 360 or ang + float(angle2 or 0) > 360 + 1e-9:
+        raise RecipeError(f"{fid}: the angles {ang:g}° and {float(angle2 or 0):g}° must be above 0 and at most 360° "
+                          "together", fid, "Make them smaller.")
+    start = -ang / 2 if mid else -float(angle2 or 0)
+    total = ang + (0.0 if mid else float(angle2 or 0))
+    if reverse:
+        start, total = -(start + total), total
+    if abs(start) > 1e-12:
+        f = f.rotate(axis, start)
+    tool = _revolve(f, axis, total)
     if body is None:
         return tool
+    if mode == "new":
+        from build123d import Compound
+        return Compound(list(body.solids()) + list(tool.solids()))
     return safe_union(body, tool) if mode == "add" else safe_cut(body, tool)
