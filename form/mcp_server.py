@@ -2128,6 +2128,27 @@ def build() -> MCPServer:
                     "note": "The spreadsheet records values; the STEP is a frozen solid. Edit the design in Form Studio and export again."}
         return await _run(go)
 
+    @mcp.tool(annotations=ToolAnnotations(read_only_hint=False, destructive_hint=False, idempotent_hint=True,
+                                          open_world_hint=False))
+    async def freecad_partdesign(project: str, out: str = "", edit: dict | None = None, ctx: Context = None) -> dict:
+        """The design as a native FreeCAD PartDesign feature tree (.FCStd) with editable history, built and checked in
+        FreeCAD's command line (freecadcmd). Sketches (Sketcher constraints, named dimensions), Pad, Pocket,
+        Revolution, Groove, Fillet, Chamfer, Hole (ISO size when it matches), LinearPattern, PolarPattern and
+        Thickness; a "Params" spreadsheet holds every parameter and the feature sizes are expressions on its cells.
+        A feature of free code is decomposed into sketch + Pad/Pocket where it is a prism, else it is a frozen solid.
+        out: the .FCStd path or a folder (default: the project's partdesign folder); the FreeCAD script that made it
+        (<name>.py) and the step solids (<name>_steps/) are written next to it. edit: {parameter: value} also sets
+        those cells in FreeCAD, recomputes, and compares with Form Studio's build at those values (the file keeps the
+        exported values). Returns per feature: native | decomposed | frozen | failed, editable only when FreeCAD
+        recomputed it to Form Studio's solid; the parameters bound to cells; volume, bounding box and face count
+        parity. FreeCAD's topological naming is still fragile (read the toponaming note)."""
+        st = studio()
+        from . import partdesign
+        res = await _run(lambda: partdesign.export(st, st.load(project), out or None, edit or None))
+        act(project, "look", f"Exported a FreeCAD PartDesign tree: {len(res['editable'])} editable feature(s), "
+                             f"{len(res['non_parametric'])} non-parametric", ctx)
+        return res
+
     # ---- analysis on the model (form/analysis.py): maps, measuring, print orientation -------------
     @mcp.tool(annotations=RO, structured_output=False)
     async def analyze(project: str, map: str = "thickness", view: str = "iso", rev: int | None = None, ctx: Context = None) -> list:

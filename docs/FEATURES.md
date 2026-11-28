@@ -633,11 +633,11 @@ either. A real thin fin still fails.
 
 | Program | What Form Studio does with it |
 |---|---|
-| FreeCAD | Opens the STEP, runs a re-import check, and writes a macro with every parameter in a spreadsheet |
+| FreeCAD | Opens the STEP, runs a re-import check, writes a macro with every parameter in a spreadsheet, and exports a native PartDesign feature tree (`freecad_partdesign`, `form export fcstd`): sketches with constraints and named dimensions, Pad, Pocket, Revolution, Groove, Fillet, Chamfer, Hole with ISO sizes, Linear and Polar patterns, Thickness, sizes bound to a Params spreadsheet; built and recomputed in FreeCAD, each feature checked against Form Studio's solid, free code decomposed into Pad/Pocket where it is a prism and frozen otherwise, and said so |
 | OpenSCAD | Builds `.scad` designs; Customizer ranges become parameters |
 | Blender | Photoreal renders; its 3D-Print Toolbox checks when the add-on is installed |
 | Your slicer | Slices, and opens the 3MF or G-code in it |
-| Any MCP client | The full engine over 103 tools ([MCP reference](MCP.md)) |
+| Any MCP client | The full engine over 104 tools ([MCP reference](MCP.md)) |
 
 When a program's version outside the supported range is why something failed, the error names the supported versions
 and what to do.

@@ -1395,3 +1395,5 @@ from .handfeat import KERNEL_OPS as _HAND_OPS  # noqa: E402  (picked edges and f
 OPS.update(_HAND_OPS)
 from .massprops import KERNEL_OPS as _MASS_OPS  # noqa: E402  (mass, centre of mass and inertia from the B-rep)
 OPS.update(_MASS_OPS)
+from .partdesign import KERNEL_OPS as _PD_OPS  # noqa: E402  (a FreeCAD PartDesign feature tree)
+OPS.update(_PD_OPS)

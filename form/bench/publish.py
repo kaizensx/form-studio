@@ -103,10 +103,12 @@ def markdown() -> str:
             "- **Agent:** the agent's own CLI through Form Studio's adapter (`form/agents`), with Form Studio's MCP "
             "server attached, exactly as a conversation in the app runs it, plus Read, Write and Edit inside the trial "
             "folder and Bash limited to FreeCAD's command line. The verifier accepts only a FreeCAD PartDesign feature "
-            "tree and Form Studio has no PartDesign export yet, so the agent writes the FreeCAD script itself.",
+            "tree: the agent builds with Form Studio's tools and writes the answer with `freecad_partdesign`, Form "
+            "Studio's PartDesign export (recomputed and checked in FreeCAD); writing the FreeCAD script itself stays "
+            "the fallback.",
             "- **Prompt:** each task's `instruction.md` as published, with `/app` replaced by the trial's folder, after "
-            "a short preamble saying where that folder is, that Form Studio's tools are attached and where FreeCAD's "
-            "command line is.",
+            "a short preamble saying where that folder is, that Form Studio's tools are attached, that "
+            "`freecad_partdesign` writes the answer files, and where FreeCAD's command line is.",
             "- **Isolation:** each trial has its own Form Studio data folder and settings. The agent sees only the "
             "task's environment files (the drawing); `solution/` and `tests/` stay out of its folder.",
             "- **Scoring:** the task's own `tests/test.sh` and `run_scorer.py` in the image its `tests/Dockerfile` "

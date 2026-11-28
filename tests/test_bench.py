@@ -116,6 +116,11 @@ class StandInPlumbing(unittest.TestCase):
             from form import cad_bridges
             if os.environ.get("FORM_FREECADCMD") or cad_bridges.find_freecad({}):
                 self.assertIn("answer.FCStd", t["answers"])
+                # the answer came from Form Studio's PartDesign export, not from a script the agent wrote
+                self.assertIn("freecad_partdesign", t["agent"]["form_tools"])
+                self.assertIn("answer_steps", seen["files"])
+                self.assertIn("FreeCAD PartDesign export written by Form Studio",
+                              (trial / "app" / "answer.py").read_text(encoding="utf-8"))
         finally:
             shutil.rmtree(out, ignore_errors=True)
 

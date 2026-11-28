@@ -20,8 +20,9 @@ What differs from a leaderboard run, and is written into every result:
   with one substitution: "/app" becomes the trial's folder. A preamble says where that folder is, that Form Studio's
   MCP tools are attached, and where FreeCAD's command line is (FreeCAD as installed here, not the image's 1.1.0);
 * the agent's tools are Form Studio's MCP tools plus Read, Write and Edit inside the trial folder and Bash limited to
-  FreeCAD's command line (Form Studio has no FreeCAD PartDesign export yet, and the verifier accepts only a
-  PartDesign feature tree, so the agent writes the FreeCAD script itself);
+  FreeCAD's command line. The verifier accepts only a PartDesign feature tree: the agent builds with Form Studio's
+  tools and exports with freecad_partdesign (form/partdesign.py), and writes the FreeCAD script itself only as the
+  fallback;
 * the result is not a Harbor job and cannot be submitted as one. A leaderboard row needs `harbor run` with an
   adapter that installs Form Studio in the task's container (not written yet).
 
@@ -118,15 +119,20 @@ def prompt_for(task: Path, ws: Path, freecad: str | None) -> str:
     pre = ("This is a benchmark task (Parametric CAD Bench v3), run through Form Studio. The task's folder /app is "
            f"{ws.as_posix()} here: read and write files only there. Form Studio's MCP tools are attached: use them to "
            "design, build and check the part as you would for a person. The answer must be the FreeCAD files the task "
-           "names, so write the FreeCAD script yourself and run it with FreeCAD's command line:\n\n    " + run +
-           "\n\nThe task as published follows.\n\n---\n\n")
+           "names. Write them with Form Studio's freecad_partdesign tool (out = the .FCStd path the task names, for "
+           f"example {ws.as_posix()}/answer.FCStd): it exports the design as a PartDesign feature tree, recomputes it in "
+           "FreeCAD, checks it against Form Studio's solid, and writes the FreeCAD script that made it next to it (an "
+           "export to answer.FCStd writes answer.py). When a file the task names is still missing, or a feature you need "
+           "editable came out frozen, write the FreeCAD script yourself and run it with FreeCAD's command line:\n\n    "
+           + run + "\n\nThe task as published follows.\n\n---\n\n")
     return pre + text
 
 
 def harness_note() -> str:
     return ("Prompt: instruction.md as published, '/app' replaced by the trial folder, after a preamble naming that "
             "folder, Form Studio's MCP tools and FreeCAD's command line. Tools: Form Studio's MCP tools; Read, Write and "
-            "Edit in the trial folder; Bash limited to FreeCAD's command line. Agent on the host, not in the task's "
+            "Edit in the trial folder; Bash limited to FreeCAD's command line. The answer files come from freecad_partdesign "
+            "(Form Studio's PartDesign export), the agent's own FreeCAD script as the fallback. Agent on the host, not in the task's "
             "container; FreeCAD as installed on the host. Scoring: the task's own verifier image and scripts, unchanged, "
             "no network. One attempt per task, no retries.")
 

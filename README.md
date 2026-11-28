@@ -56,7 +56,7 @@ Parametric build123d on OpenCascade, every requirement proved on the solid, on y
 <p align="center">
   <picture>
     <source media="(prefers-color-scheme: dark)" srcset="docs/readme/numbers-1-dark.svg">
-    <img src="docs/readme/numbers-1-light.svg" width="414" alt="103 MCP tools for any agent. 18 agent apps, model APIs and local models.">
+    <img src="docs/readme/numbers-1-light.svg" width="414" alt="104 MCP tools for any agent. 18 agent apps, model APIs and local models.">
   </picture>
   <picture>
     <source media="(prefers-color-scheme: dark)" srcset="docs/readme/numbers-2-dark.svg">
@@ -86,7 +86,7 @@ Form Studio sits between your agent and the CAD kernel and keeps the record of w
 ```mermaid
 flowchart LR
   you(["You: words, a photo,<br/>a sketch, a part, a link"]) --> agent["Your agent<br/>app, model API or local model"]
-  agent -- "103 MCP tools · form CLI" --> engine["Form Studio engine<br/>parameters with provenance<br/>revisions · hashed outputs"]
+  agent -- "104 MCP tools · form CLI" --> engine["Form Studio engine<br/>parameters with provenance<br/>revisions · hashed outputs"]
   engine --> kernel["CAD kernel<br/>build123d on OpenCascade"]
   kernel --> checks["Checks<br/>solid · mesh · fits · joints"]
   checks --> release{{"You approve<br/>files frozen with SHA-256"}}
@@ -183,7 +183,7 @@ One design, the output you need:
 
 | Output | What you get |
 |---|---|
-| **CAD exchange** | STEP from the B-rep, re-imported in FreeCAD as a check; FreeCAD macros to carry on in FreeCAD, and OpenSCAD designs welcome as a source. |
+| **CAD exchange** | STEP from the B-rep, re-imported in FreeCAD as a check; a native FreeCAD PartDesign feature tree (sketches, pads, holes, fillets, patterns, a spreadsheet of the parameters) with editable history, recomputed in FreeCAD and checked against the solid; and OpenSCAD designs welcome as a source. |
 | **CNC, laser and moulding** | Mark a design *Just a 3D model* for its process: its thinnest feature is compared with what that process can make, and no print checks get in the way. Give it an engineering material (aluminium 6061 or 7075, steel, stainless, brass, titanium, woods, POM and more) for its look and its computed mass. |
 | **Renders and the web** | OBJ and GLB, four-view sheets, turntable videos and photoreal renders in Blender. |
 | **Game engines (Beta)** | Four levels of detail inside triangle budgets, UVs, baked textures and collision, for Unreal, Unity, Godot and glTF. Every asset passes its technical checks; visual quality is still improving. |
@@ -327,7 +327,7 @@ form tool get_project '{"project": "desk-stand"}'                               
 | | |
 |---|---|
 | **Every command** | [docs/CLI.md](docs/CLI.md) |
-| **103 MCP tools** | [docs/MCP.md](docs/MCP.md) |
+| **104 MCP tools** | [docs/MCP.md](docs/MCP.md) |
 | **How the engine is built** | [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) |
 
 ## Community

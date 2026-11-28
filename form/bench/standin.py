@@ -7,9 +7,10 @@ does through the same doors:
 
 1. starts Form Studio's MCP server from --mcp (the command, arguments and environment the harness gives every agent)
    and calls form_overview and create_design with a block of the prompt's three largest millimetre values;
-2. writes answer.py: a FreeCAD PartDesign Body with one sketch and one Pad of that block, saving the FCStd file(s)
-   the task names next to the script (answer.FCStd, or answer_base.FCStd and answer_edit.FCStd);
-3. runs answer.py with FreeCAD's command line.
+2. exports it with freecad_partdesign as the FCStd file(s) the task names (answer.FCStd, or answer_base.FCStd and
+   answer_edit.FCStd): a PartDesign Body built and checked in FreeCAD, with the script that made it as answer.py;
+3. only when that export is not possible (no FreeCAD, or it fails): writes answer.py itself (one sketch and one Pad
+   of the block) and runs it with FreeCAD's command line, the free-form path a real agent keeps as its fallback.
 
 The block is the same for every task of one prompt, so a run scores low, and the same every time.
 """
@@ -88,6 +89,31 @@ def dims(prompt: str) -> tuple[float, float, float]:
     return vals[0], vals[1], vals[2]
 
 
+RUN_EXPORTS = '''# Written by the bench's stand-in agent: runs the FreeCAD scripts Form Studio's PartDesign export wrote.
+import os
+import runpy
+
+here = os.path.dirname(os.path.abspath(__file__))
+for name in {names!r}:
+    runpy.run_path(os.path.join(here, name), run_name="__main__")
+'''
+
+
+def project_id(text: str) -> str:
+    """The project id in create_design's answer (JSON), or ""."""
+    try:
+        d = json.JSONDecoder().raw_decode((text or "").lstrip())[0]     # the first object (more text may follow)
+    except ValueError:
+        m = re.search(r'"(?:project|id)"\s*:\s*"([^"]+)"', text or "")
+        return m.group(1) if m else ""
+    if isinstance(d, dict):
+        if isinstance(d.get("project"), str):                # the digest create_design returns names it
+            return d["project"]
+        p = d.get("project") if isinstance(d.get("project"), dict) else d
+        return str(p.get("id") or "")
+    return ""
+
+
 class MCP:
     """A minimal MCP client over stdio (newline-delimited JSON-RPC)."""
 
@@ -150,6 +176,8 @@ def main(argv=None) -> int:
     cwd = Path(a.cwd)
     x, y, z = dims(a.prompt)
     i = 0
+    suffixes = ["_base", "_edit"] if "_base.FCStd" in a.prompt else [""]
+    exported: list = []
     try:
         mcp = MCP(json.loads(a.mcp), str(cwd))
         try:
@@ -158,16 +186,31 @@ def main(argv=None) -> int:
             args = {"name": "Bench block", "source": DESIGN.format(x=x, y=y, z=z), "purpose": "model", "refine": "off",
                     "run": False}
             i += 1
-            tool(i, "mcp__form__create_design", {"name": args["name"], "purpose": "model"}, mcp.call("create_design", args))
+            made = mcp.call("create_design", args)
+            tool(i, "mcp__form__create_design", {"name": args["name"], "purpose": "model"}, made)
+            pid = project_id(made)
+            if pid and a.freecad:
+                for suffix in suffixes:
+                    target = str(cwd / f"answer{suffix}.FCStd")
+                    i += 1
+                    res = mcp.call("freecad_partdesign", {"project": pid, "out": target})
+                    tool(i, "mcp__form__freecad_partdesign", {"project": pid, "out": target}, res)
+                    exported += [] if res.startswith("ERROR") else [suffix]
         finally:
             mcp.close()
     except Exception as e:                                  # noqa: BLE001 - reported, the FreeCAD answer is still written
         out({"type": "assistant", "message": {"content": [{"type": "text", "text": f"Form Studio's MCP server: {e}"}]}})
-    suffixes = ["_base", "_edit"] if "_base.FCStd" in a.prompt else [""]
     script = cwd / "answer.py"
-    script.write_text(ANSWER.format(x=x, y=y, z=z, suffixes=suffixes), encoding="utf-8")
-    i += 1
-    tool(i, "Write", {"file_path": str(script)}, "written")
+    if exported == suffixes:                                # the PartDesign export wrote every file the task names
+        if suffixes != [""]:                                # answer.py runs the export scripts it wrote
+            script.write_text(RUN_EXPORTS.format(names=[f"answer{s}.py" for s in suffixes]), encoding="utf-8")
+            i += 1
+            tool(i, "Write", {"file_path": str(script)}, "written")
+        a.freecad = ""                                      # nothing left to run: the export ran FreeCAD itself
+    else:
+        script.write_text(ANSWER.format(x=x, y=y, z=z, suffixes=suffixes), encoding="utf-8")
+        i += 1
+        tool(i, "Write", {"file_path": str(script)}, "written")
     if a.freecad:
         r = subprocess.run([a.freecad, "-c", f"import runpy; runpy.run_path({str(script)!r}, run_name='__main__')"],
                            capture_output=True, text=True, timeout=600, cwd=str(cwd))
