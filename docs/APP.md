@@ -64,6 +64,16 @@ of the accent. Shadows, glows, glass and the room are dithered, so no gradient s
 | **Review** | Every check with its evidence, print orientation, the plates, and the slice: time, filament, layers, Watch it print. A 3D model shows the checks that apply to it and says which do not |
 | **Make** | The release gate, approval (over failed checks only with a reason for each, on the record), the released files with their hashes, and the revision history. With 3D printing on, a 3D model is marked for printing here in one click |
 
+**The Bench.** The top of the Review pane lists every study of the design, and the top of the Make pane every
+route out of Form Studio and every document, in the Program's style: a state mark on the gutter, the name, the
+headline number in mono with the evidence it rests on, and the state on the right (current · r03, stale · r02,
+never run, failed, running, needs, n/a). A line that is not current runs on click (or from its run mark, on the
+activity bar); a current one opens what it made (the map on the part, the simulation, the sheet, or its file). The
+engine decides every state from keys: an entry is current only when a result exists for the head revision's inputs,
+and a stale one names the revision it describes. The agent runs the same entries with `list_studies`, `run_study`
+and `get_study`, and the terminal with `form study list|run|show <project> [id]`. The command palette finds every
+entry. Studies only the agent can do (the design critique) ask the agent; the release is only ever yours.
+
 The stages follow the work: describe it, design it, review it, make it. Fit sits between Design and Review for a
 design made for 3D printing. They were called Brief, Shape, Prove and Release; the CLI, MCP and `--stage` keep those
 ids (`brief`, `shape`, `fit`, `prove`, `release`), and the old names still find each stage in the command palette.

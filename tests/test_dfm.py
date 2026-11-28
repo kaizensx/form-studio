@@ -292,6 +292,7 @@ class Fixes(unittest.TestCase):
 
     @classmethod
     def setUpClass(cls):
+        cls.data = os.environ["FORM_DATA"]            # the data folder this Studio uses (another module may set it)
         cls.st = Studio(config.load())
 
     @classmethod
@@ -457,7 +458,7 @@ class Design(FeatureDesign):
 
     def test_cli_prints_json(self):
         p = self._new("Cli", self.CUP)
-        env = {**os.environ, "FORM_DATA": TMP, "PYTHONPATH": str(ROOT)}
+        env = {**os.environ, "FORM_DATA": self.data, "PYTHONPATH": str(ROOT)}
         r = subprocess.run([sys.executable, "-m", "form", "dfm", p["id"], "--process", "injection", "--set", "resin=abs"],
                            capture_output=True, text=True, env=env, cwd=str(ROOT), timeout=600)
         self.assertEqual(r.returncode, 0, r.stderr[-2000:])

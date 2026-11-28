@@ -1395,3 +1395,7 @@ from .dfm.measure import KERNEL_OPS as _DFM_OPS  # noqa: E402  (manufacturabilit
 OPS.update(_DFM_OPS)
 from .sheet.ops import KERNEL_OPS as _SHEET_OPS  # noqa: E402  (sheet metal: unfold, flat profiles)
 OPS.update(_SHEET_OPS)
+from .handfeat import KERNEL_OPS as _HAND_OPS  # noqa: E402  (picked edges and faces as stable queries)
+OPS.update(_HAND_OPS)
+from .massprops import KERNEL_OPS as _MASS_OPS  # noqa: E402  (mass, centre of mass and inertia from the B-rep)
+OPS.update(_MASS_OPS)

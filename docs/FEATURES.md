@@ -433,6 +433,23 @@ mesh of a curved surface can be farther from any smooth surface than the toleran
 export are 0.03 to 0.04 mm from the gear they came from). Units are millimetres unless the file says otherwise (3MF
 does). Nothing is decimated: a mesh over 200,000 triangles shows progress and takes minutes.
 
+## The Bench: every study, route and document, as a record
+
+One registry (`form/studies.py`) lists everything that can be asked of a design, in three groups: **Studies**
+(Review: checks, assembly and joint sweep, the brief's requirements, wall thickness, overhangs, layer cross-section,
+small features, fit, design critique, slice, print simulation, print orientation, every printer, cost, make it
+lighter), **Routes** (Make: STEP/STL/OBJ/GLB, 3MF with colours, slicer project, FreeCAD macro, project archive, game
+asset, release) and **Documents** (Make: parts list, assembly notes, motion checks, print report, measurement plan,
+assembly instructions, four-view sheet, photoreal render, turntable, share card). Each entry has a state (never run,
+current, stale, failed, running, unavailable with why, n/a with why), the revision it describes, its headline number
+with its evidence class, and a run action wired to the same code as its own tool. Results are stored beside the
+revision under a key of its inputs, so a new revision makes them stale by construction and nothing is ever marked
+current by hand. The same listing is `list_studies` / `run_study` / `get_study` over MCP and `form study` in the
+terminal; later studies register into it (`studies.PROVIDERS`) and appear everywhere at once. Mass and inertia, the
+materials with the document each value comes from (`form/massprops.py`) and the feature tree's state (`Features`:
+built, suppressed by hand, left out with the reason; `form/modelling.py`) are registered this way. A change made by
+hand is one revision of the design's code, so the studies of the revision before it show stale.
+
 ## Checks and evidence
 
 ![Review: the checks of a revision, each with its evidence](images/prove.webp)
@@ -515,6 +532,23 @@ anything. `form sheet`; MCP `flat_pattern`, `cut_file_check`, `bend_order`, `ser
   boss (M2 to M5, with the ISO tap drill, a heat-set insert hole or the ISO 273 clearance) or a cantilever snap-fit
   hook, checked against your nozzle and written into the design's code. `form feature`; MCP `add_feature`,
   `remove_feature`.
+- **Fillet, chamfer, hole, pattern and shell by picking.** In Annotate, **Fillet or chamfer…** on picked edges, or
+  **Hole or shell…** on a flat face (hole sizes from ISO 273, the tap drill table or an ISO 286 fit; plain,
+  counterbore or countersink); in the Program, a line's **Pattern…** repeats it in a line or around an axis.
+  **Preview** builds the draft in the kernel with its change in volume; **Add to design** writes one feature method
+  and its parameters into the design's code, so the agent, `optimize` and `geometry_diff` work on it like any other.
+  Picked edges and faces are stable queries (the features that made them, their kind, direction and place), not
+  indexes. `form model`; MCP `add_feature` (kinds `fillet`, `chamfer`, `hole`, `pattern`, `shell`).
+- **Sketch on a plane or a face, then extrude, cut or revolve.** **Model it by hand** on the blank canvas, **Sketch
+  here…** on a picked flat face, or the dock's **Sketch**: lines, rectangles and circles that snap horizontal and
+  vertical, dimensions solved live by form.sketch2d with the degrees of freedom left, each dimension a parameter of
+  the design. The sketch is data inside its feature's method, so `get_sketch` and `edit_sketch` (MCP) and `form
+  sketch` read and change exactly what the editor shows.
+- **The feature tree by hand.** The Program's rollback bar shows the part as it stood after any feature, from the
+  checkpoints and without saving; each line's menu suppresses, restores, renames and moves it and says what it
+  depends on; a line dragged by its number moves it. A move that empties a feature, or puts one before a feature it
+  reads, is refused with the reason. `form tree`, `form render --upto`; MCP `edit_design` ops `suppress`, `restore`,
+  `move`, `rename`, `render(upto=)`, `get_design_source` (`tree`).
 - **Section (X):** a clipping plane through the solid with filled cut faces.
 - **Orientation finder:** ranks print orientations by overhang area, support, contact and height, with the numbers
   behind the ranking, and applies the one you choose.
@@ -550,6 +584,28 @@ anything. `form sheet`; MCP `flat_pattern`, `cut_file_check`, `bend_order`, `ser
 - **Used in the checks:** heat, sunlight, warping, and flexible or fibre-filled filament.
 - **Picks the filament.** A material selects the printer's matching filament preset, one material per plate.
   `form appearance`, `form material`; MCP `set_appearance`.
+
+## Mass properties and engineering materials
+
+- **Mass, centre of mass, inertia tensor and principal axes, computed on the B-rep** (OCCT `BRepGProp`), per part
+  and for the whole design. An assembly is reported assembled, at any pose of its joints (`pose={"lid_hinge": 90}`);
+  each part's tensor is rotated with it and the parts are combined with the parallel-axis theorem. Units mm, g,
+  g·mm² (also kg·m²). Verified against closed-form solids (box, cylinder, hollow tube, hollow sphere, two offset
+  bodies, a hinged arm in three poses) to 1e-6 relative in `tests/test_massprops.py`.
+- **Every density says where it comes from.** A part's mass is its B-rep volume times its material's density, and the
+  result names the document the density was read from. A part without a material has no mass: the volume centroid
+  is given instead, never a default. A what-if material is computed without saving anything.
+- **A sourced materials library** (`form/material_data.py`, read through `form/material_library.py`): density,
+  Young's modulus, Poisson's ratio, yield and ultimate strength, elongation, thermal expansion and conductivity, heat
+  deflection, for 10 printing filaments and 18 engineering metals, plastics and woods. Every value carries its source
+  document, URL, the line it was read from and the date it was read (2026-11-28). Printed filaments carry the
+  manufacturer's X-Y and Z specimen values and the Z knock-down that follows from them (labelled modelled). A value no
+  source gave is reported as unsourced (PLA's Poisson's ratio, PTFE's tensile modulus, ...), never filled in.
+- **In the window:** the grams on the size line, pressed, show the centre of mass and the principal axes on the
+  part and a glass readout with the mass, its material and density source, the centre, the principal moments and one
+  line per part; the same toggle is in Analyze. Concept cards show each concept's mass and material.
+- MCP `mass_properties`; `form mass <project> [--part P] [--pose JSON] [--material M] [--frame as_built|assembled]`,
+  `form materials [ID]`.
 
 ## Pictures: renders, share cards, animations
 
@@ -600,7 +656,7 @@ anything. `form sheet`; MCP `flat_pattern`, `cut_file_check`, `bend_order`, `ser
 | OpenSCAD | Builds `.scad` designs; Customizer ranges become parameters |
 | Blender | Photoreal renders; its 3D-Print Toolbox checks when the add-on is installed |
 | Your slicer | Slices, and opens the 3MF or G-code in it |
-| Any MCP client | The full engine over 103 tools ([MCP reference](MCP.md)) |
+| Any MCP client | The full engine over 109 tools ([MCP reference](MCP.md)) |
 
 When a program's version outside the supported range is why something failed, the error names the supported versions
 and what to do.

@@ -82,7 +82,7 @@ class MaterialRules(unittest.TestCase):
         eng = materials.engineering()
         for k in ("AL-6061", "AL-7075", "STEEL", "STAINLESS", "BRASS", "TITANIUM", "OAK", "WALNUT", "POM"):
             self.assertIn(k, eng)
-        self.assertEqual(eng["AL-6061"]["density_g_cm3"], 2.7)            # bd_materials typical value
+        self.assertEqual(eng["AL-6061"]["density_g_cm3"], 2.7)            # the sourced datasheet value (MatWeb, AA typical)
         self.assertEqual(eng["BRASS"]["finish"], "metal")
         self.assertEqual(materials.clean_material("aluminium 7075"), "AL-7075")
         self.assertEqual(materials.clean_material("delrin"), "POM")
@@ -91,7 +91,7 @@ class MaterialRules(unittest.TestCase):
         self.assertEqual(materials.mass_g(10000, "AL-6061"), 27.0)              # 10 cm³ x 2.7 g/cm³
         p = {"purpose": "model", "material": "BRASS"}
         m = materials.mass(p, 10000)
-        self.assertEqual((m["grams"], m["evidence"]), (85.0, "computed"))
+        self.assertEqual((m["grams"], m["evidence"]), (84.98, "computed"))                # 10 cm³ x 8.498 g/cm³ (copper.org)
         self.assertEqual(materials.resolved(p)["color"], eng["BRASS"]["color"])
         self.assertEqual(materials.check_items(p, {}, {}), [])                  # no filament notes for brass
         kinds = {x["id"]: x["kind"] for x in materials.catalogue()["materials"]}

@@ -34,7 +34,22 @@ def _inputs(st, p) -> dict:
     return {"p": p, "rev": rev, "keys": keys, "recipe": recipe, "status": status, "checks": cur("checks"),
             "slice": cur("slice"), "exports": cur("exports"), "view": view, "asm": view.get("assembly"),
             "kernel": st.kernel_id(), "recipe_sha": st.recipe_sha(st.rid(p)), "rid": st.rid(p),
-            "key": H("maker-docs", DOCS_VERSION, keys, status["checks"]["state"], status["slice"]["state"])}
+            "key": docs_key(keys, status)}
+
+
+def docs_key(keys: dict, status: dict) -> str:
+    """The key the working documents are kept under: the revision's keys and whether checks and slice are current."""
+    from .studio import H
+    return H("maker-docs", DOCS_VERSION, keys, status["checks"]["state"], status["slice"]["state"])
+
+
+def cached(st, p, keys: dict | None = None, status: dict | None = None) -> dict | None:
+    """{file name: sha256} of the working documents already written for the head, else None (nothing is written)."""
+    base = st.dir(p["id"]) / "artifacts" / "docs" / docs_key(keys or st.keys(p), status or st.status(p))
+    try:
+        return json.loads((base / "index.json").read_text(encoding="utf-8")) if (base / "index.json").is_file() else None
+    except (OSError, ValueError):
+        return None
 
 
 def _stamp(d, release):

@@ -172,3 +172,120 @@ def catalogue() -> list[dict]:
             continue
         out.append({x: m[x] for x in ("id", "name", "category", "density_kg_m3", "color", "finish", "source")})
     return out
+
+
+# ── Sourced engineering properties (form/material_data.py) ──────────────────────────────────────────────────────
+# The one source the mass properties (form/massprops.py), the strength studies and the manufacturability rules read.
+# Keys are the stored material keys of form/materials.py: the filaments (PLA, PETG, ...) and the engineering materials
+# (AL-6061, STAINLESS, OAK, POM, ...). Every value names its document, URL, the line it was read from and the date.
+
+EVIDENCE_SPECIFIED = "specified (datasheet)"
+EVIDENCE_TYPICAL = "typical (bd_materials catalogue, no per-value citation)"
+EVIDENCE_MODELLED = "modelled"
+UNSOURCED = "unsourced"
+PROPERTY_UNITS = {"density": "kg/m3", "E": "GPa", "E_xy": "GPa", "E_z": "GPa", "poisson": "", "yield": "MPa",
+                  "uts": "MPa", "uts_xy": "MPa", "uts_z": "MPa", "elongation": "%", "elongation_xy": "%",
+                  "elongation_z": "%", "flex_mod_xy": "GPa", "flex_mod_z": "GPa", "flex_str_xy": "MPa",
+                  "flex_str_z": "MPa", "cte": "1/K", "k": "W/(m·K)", "hdt_045": "°C", "hdt_18": "°C", "vicat": "°C",
+                  "sg_12": "", "moe": "GPa", "mor": "MPa"}
+# the in-plane value a direction-free name means for a printed part (E -> E_xy); the Z value is across the layers
+_PRINTED = {"E": "E_xy", "uts": "uts_xy", "elongation": "elongation_xy"}
+
+
+def _data() -> dict:
+    from .material_data import DATA
+    return DATA
+
+
+def _store_key(key) -> str:
+    from . import materials
+    k = materials._key(key)
+    if k is None:
+        raise KeyError(f"Unknown material “{key}”. {materials.known()}")
+    return k
+
+
+def properties(key) -> dict:
+    """Every sourced property of a stored material key: {prop: {value, unit, [min, max, spread], condition, source,
+    url, quote, retrieved, evidence}}. Empty when nothing is sourced for it."""
+    from .material_data import RETRIEVED
+    m = _data().get(_store_key(key))
+    if not m:
+        return {}
+    return {k: {**v, "retrieved": RETRIEVED, "evidence": EVIDENCE_SPECIFIED} for k, v in m["properties"].items()}
+
+
+def prop(key, name: str, direction: str = "") -> dict:
+    """One property: the sourced record, or {"status": "unsourced"} (never a default). For a printed filament,
+    direction "xy" (in the layers, the default) or "z" (across them) picks E/uts/elongation; "E" means E_xy."""
+    props = properties(key)
+    n = name
+    if name in _PRINTED and name not in props:
+        n = (name + "_z") if direction == "z" else _PRINTED[name]
+    if n in props:
+        return {"name": n, **props[n]}
+    return {"name": n, "status": UNSOURCED, "unit": PROPERTY_UNITS.get(n, ""),
+            "note": f"No source in Form Studio's library gives {n} for {key}; it is left out rather than assumed."}
+
+
+def knockdown_z(key) -> dict:
+    """For a printed filament: the ratio of each Z (across the layers) value to its X-Y value, from the same
+    datasheet. Labelled modelled: these are the datasheet's specimens, not this part."""
+    props, out = properties(key), {}
+    for base in ("E", "uts", "elongation", "flex_mod", "flex_str"):
+        a, b = props.get(base + "_xy"), props.get(base + "_z")
+        if a and b and a.get("value") and b.get("value") is not None:
+            out[base] = {"ratio": round(b["value"] / a["value"], 3), "xy": a["value"], "z": b["value"], "unit": a["unit"],
+                         "evidence": EVIDENCE_MODELLED, "source": a["source"],
+                         "note": "Z / X-Y of the datasheet's printed specimens (100 % infill); a part's infill, walls "
+                                 "and print settings change it."}
+    return out
+
+
+def density(key) -> dict:
+    """Density of a stored material key, kg/m3, with where it comes from: the sourced datasheet value, else (an
+    engineering material) bd_materials' typical value, said so. Raises KeyError for an unknown material."""
+    from . import materials
+    k = _store_key(key)
+    p = properties(k).get("density")
+    if p and p.get("value"):
+        return {"value": float(p["value"]), "source": p["source"], "url": p["url"], "retrieved": p["retrieved"],
+                "evidence": EVIDENCE_SPECIFIED, "condition": p.get("condition", "")}
+    if k in materials.ENGINEERING_SPEC:
+        m = get(materials.ENGINEERING_SPEC[k][0])
+        return {"value": float(m["density_kg_m3"]), "source": m["source"], "url": None, "retrieved": None,
+                "evidence": EVIDENCE_TYPICAL if m["source"] == SOURCE else "typical (Form Studio fallback table)"}
+    info = materials.info(k)
+    return {"value": float(info["density_g_cm3"]) * 1000.0, "source": "Form Studio filament table", "url": None,
+            "retrieved": None, "evidence": UNSOURCED}
+
+
+def record(key) -> dict:
+    """The full library entry of a stored material key: label, kind, grade, density (with its source), every sourced
+    property, a filament's Z knock-down, and which of the properties the studies read are unsourced."""
+    from . import materials
+    k = _store_key(key)
+    info = materials.info(k) or {}
+    m = _data().get(k) or {}
+    props = properties(k)
+    wanted = ["density", "E", "poisson", "yield", "uts", "cte"]
+    if info.get("kind") == "filament":
+        wanted = ["density", "E_xy", "E_z", "poisson", "uts_xy", "uts_z", "hdt_045"]
+    elif info.get("category") == "wood":
+        wanted = ["sg_12", "moe", "mor"]
+    out = {"id": k, "label": info.get("label", k), "kind": info.get("kind"), "category": info.get("category", "plastic"),
+           "grade": m.get("grade", ""), "density": density(k), "properties": props,
+           "unsourced": [w for w in wanted if w not in props]}
+    if info.get("kind") == "filament":
+        out["knockdown_z"] = knockdown_z(k)
+        out["note"] = ("Printed-specimen values from one manufacturer's datasheet; a part's infill, walls, layer "
+                       "height and print temperature change them. Not simulated per part.")
+    elif info.get("category") == "wood":
+        out["note"] = "Wood is anisotropic: MOE and MOR are along the grain in bending, at 12 % moisture."
+    return out
+
+
+def library() -> list:
+    """Every material a design can be given, as record() entries (filaments first)."""
+    from . import materials
+    return [record(k) for k in list(materials.MATERIALS) + list(materials.engineering())]

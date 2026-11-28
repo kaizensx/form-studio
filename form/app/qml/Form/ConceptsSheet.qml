@@ -48,7 +48,7 @@ Item {
                 Rectangle {
                     id: c; objectName: "conceptCard"; required property var modelData; required property int index
                     readonly property bool on: cs.hot === modelData.project
-                    width: cards.cw; height: 420; radius: Theme.rLg + 2
+                    width: cards.cw; height: 440; radius: Theme.rLg + 2
                     color: on || ch.hovered ? Theme.glass2 : Theme.glass; border.color: on ? Theme.alpha(Theme.datum, 0.7) : "transparent"
                     Behavior on border.color { Tint {} }
                     opacity: 0; Component.onCompleted: cIn.start()
@@ -71,8 +71,20 @@ Item {
                                 Txt { mono: true; font.pixelSize: 12; text: c.modelData.numbers && c.modelData.numbers.size_mm ? c.modelData.numbers.size_mm.map(function (v) { return F.fmt(v, 0) }).join(" × ") + " mm" : "—" } }
                             Column { spacing: 1
                                 Txt { kind: "cap"; text: "Volume" }
-                                Txt { mono: true; font.pixelSize: 12; text: c.modelData.numbers && c.modelData.numbers.volume_cm3 !== undefined ? F.fmt(c.modelData.numbers.volume_cm3, 1) + " cm³" : "—" } } }
-                        Tag { visible: !!c.modelData.numbers; text: "computed"; kind: "x"; tint: Theme.datum } }
+                                Txt { mono: true; font.pixelSize: 12; text: c.modelData.numbers && c.modelData.numbers.volume_cm3 !== undefined ? F.fmt(c.modelData.numbers.volume_cm3, 1) + " cm³" : "—" } }
+                            Column { spacing: 1; objectName: "conceptMass"
+                                Txt { kind: "cap"; text: "Mass" }
+                                Txt { mono: true; font.pixelSize: 12; text: c.modelData.numbers && c.modelData.numbers.mass_g !== undefined ? F.fmt(c.modelData.numbers.mass_g, c.modelData.numbers.mass_g < 100 ? 1 : 0) + " g" : "—" } } }
+                        // the material the mass is for, and how it is known: chosen, or assumed when the concept has none
+                        Row { spacing: 8; visible: !!c.modelData.numbers; width: parent.width
+                            readonly property var mat: c.modelData.numbers ? c.modelData.numbers.material : null
+                            readonly property bool assumed: !!mat && String(mat.why || "").indexOf("assumed") === 0
+                            Tag { id: ctag; text: "computed"; kind: "x"; tint: Theme.datum; anchors.verticalCenter: parent.verticalCenter }
+                            Tag { visible: parent.assumed; text: "assumed"; kind: "x"; tint: Theme.amber; anchors.verticalCenter: parent.verticalCenter }
+                            Txt { kind: "fine"; tone: 2; anchors.verticalCenter: parent.verticalCenter; wrapMode: Text.NoWrap; elide: Text.ElideRight
+                                width: parent.width - ctag.width - (parent.assumed ? 70 : 0) - 16
+                                text: parent.mat ? "in " + parent.mat.label + (parent.mat.density_kg_m3 ? " · " + F.fmt(parent.mat.density_kg_m3, 0) + " kg/m³" : "") + (parent.mat.kind === "filament" ? ", solid" : "")
+                                    : "no material: no mass" } } }
                     Btn { objectName: "conceptPick"; anchors.right: parent.right; anchors.bottom: parent.bottom; anchors.margins: 14
                         kind: c.on ? "primary" : "default"; icon: "check"; text: "Continue with " + c.modelData.letter
                         onClicked: run(function () { return Store.pickConcept(cs.g.id, c.modelData.project, cs.keep) }) }

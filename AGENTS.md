@@ -19,6 +19,7 @@ Prefer the MCP server (`form-mcp`). Without MCP, the `form` CLI does the same an
 | Look at it | `render` (`view="sheet"` for four views) | `form render <project> --view sheet` |
 | Keep a change | `commit_change` with `expect_head` | `form commit <project> lean=18 --expect-head 3` |
 | Regenerate outputs | `run_pipeline` / `get_job` | `form run <project>` |
+| Every study, route and document with its state (the Bench) | `list_studies` → `run_study`, `get_study` | `form study list <project>`, `form study run <project> map.thickness` |
 | Ask for release | `request_release` (the user approves in the app) | — |
 | Design from your own code (the usual case) | `design_guide` → `create_design` → `edit_design` (ops, not the file) | — |
 | Say what must be true, and read what was measured | `design_brief` (contract and audit) → `get_project` (`proof`) | — |
@@ -29,7 +30,11 @@ Prefer the MCP server (`form-mcp`). Without MCP, the `form` CLI does the same an
 | Ask the person a blocking question | `ask_user` (a card in Form Studio's chat; elsewhere it tells you to ask yourself) | `form chat` prompts in the terminal |
 | Ask the person to measure a dimension | `ask_measurement` (where, tolerance, diagram; the answer is committed with how it was measured) | `form chat` prompts in the terminal |
 | Offer next steps | `suggest_replies` (up to three buttons under the reply) | — |
+| Mass, centre of mass, inertia (per part, assembled at a pose) and the sourced materials library | `mass_properties` | `form mass <p> --pose '{"lid_hinge": 90}'`, `form materials AL-6061` |
 | Put text on a flat face (a feature in the source) | `add_text`, `remove_text` | `form engrave <p> TEXT --at x,y,z --normal x,y,z` |
+| Work the feature tree: suppress, restore, move, rename; see the part up to one feature | `edit_design` ops `suppress`/`restore`/`move`/`rename`, `render(upto=)`, `get_design_source` (`tree`) | `form tree <p> [suppress\|restore\|move\|rename F]`, `form tree <p> --upto F` |
+| Fillet, chamfer, hole (ISO 273, tap drill, ISO 286), pattern or shell on picked geometry (one feature in the source) | `add_feature` kinds `fillet`, `chamfer`, `hole`, `pattern`, `shell` (`preview=True` saves nothing) | `form model <p> fillet --at x,y,z --radius 2` |
+| Read or change a feature's sketch (constraints, dimensions as parameters); extrude, cut or revolve one | `get_sketch`, `edit_sketch`; `add_feature` kinds `extrude`, `cut`, `revolve` | `form sketch <p> F`, `form model <p> extrude --sketch s.json` |
 | See what changed in the solid between revisions | `geometry_diff` | `form diff <p> 1 3 --png diff.png` |
 | Can it be made (CNC, moulding, FDM, SLA, SLS, MJF, LPBF), with fixes proved by checking again | `manufacturability` → `apply_fix` | `form dfm <p> --process cnc --set tool_d=6 --set material=metal [--fix RULE]` |
 | Sheet metal: flat pattern DXF (proved by folding back), cut-file check, bend order, a service's limits | `flat_pattern`, `cut_file_check`, `bend_order`, `service_preflight` | `form sheet flat <p> --set material=steel_mild`, `form sheet check part.dxf --set t=2` |

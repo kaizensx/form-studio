@@ -485,6 +485,7 @@ class Studio(unittest.TestCase):
     def setUpClass(cls):
         from form import config
         from form.studio import Studio as S
+        cls.data = os.environ["FORM_DATA"]            # the data folder this Studio uses (another module may set it)
         cls.st = S(config.load())
         cls.p = cls.st.create_design("Tray", DESIGN, purpose="model")
 
@@ -514,16 +515,16 @@ class Studio(unittest.TestCase):
         self.assertFalse(f["sent"])
 
     def test_cli_prints_json(self):
-        env = {**os.environ, "FORM_DATA": TMP, "PYTHONPATH": str(ROOT)}
+        env = {**os.environ, "FORM_DATA": self.data, "PYTHONPATH": str(ROOT)}
         r = subprocess.run([sys.executable, "-m", "form", "sheet", "flat", self.p["id"], "--set", "material=steel_mild"],
                            capture_output=True, text=True, env=env, cwd=str(ROOT), timeout=600)
-        self.assertEqual(r.returncode, 0, r.stderr[-2000:])
+        self.assertEqual(r.returncode, 0, r.stderr[-2000:] + r.stdout[-2000:])
         out = json.loads(r.stdout)
         self.assertTrue(out["ok"])
         self.assertEqual(len(out["bends"]), 4)
         r = subprocess.run([sys.executable, "-m", "form", "sheet", "check", out["dxf"], "--set", "t=1.5"],
                            capture_output=True, text=True, env=env, cwd=str(ROOT), timeout=600)
-        self.assertEqual(r.returncode, 0, r.stderr[-2000:])
+        self.assertEqual(r.returncode, 0, r.stderr[-2000:] + r.stdout[-2000:])
         self.assertEqual(json.loads(r.stdout)["verdict"], "pass")
 
     def test_bench_entries(self):
