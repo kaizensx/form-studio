@@ -116,7 +116,7 @@ instead.
 
 ## Tools at a glance
 
-103 tools. Read-only tools never change a project.
+106 tools. Read-only tools never change a project.
 
 | Tool | Access | What it does |
 |---|---|---|
@@ -167,7 +167,7 @@ instead.
 | [`explore_alternatives`](#explore_alternatives) | read-only | Build a small grid of real variants (1-2 parameters, up to 5 values each) and rank them. |
 | [`optimize`](#optimize) | read-only | Optimize a design. Goal seek: search parameter ranges for the best design that meets constraints. |
 | [`slice_test_piece`](#slice_test_piece) | changes | Cut a thin ring through the fit interface of this revision and slice it, so a cheap test print can check the fit before the whole part. |
-| [`record_physical_result`](#record_physical_result) | changes | Record what the USER observed after a real print. |
+| [`record_physical_result`](#record_physical_result) | changes | Record what the USER observed or measured on the real part. |
 | [`request_release`](#request_release) | read-only | Check whether the head revision can be released and hand the decision to the user. |
 | [`verify_release`](#verify_release) | read-only | Re-hash every file of a release against its manifest and say whether it still matches the head revision. |
 | [`open_in`](#open_in) | changes | Open a current output in the user's own software: what = step \| stl \| 3mf \| gcode \| folder. |
@@ -223,6 +223,9 @@ instead.
 | [`list_studies`](#list_studies) | read-only | List every study, route and document of a design with its state: the Bench. |
 | [`run_study`](#run_study) | changes | Run one Bench entry for the head revision (ids from list_studies). |
 | [`get_study`](#get_study) | read-only | Read one Bench entry: its state, the revision it describes, its headline with evidence, its files and stored numbers, and the log of its runs. |
+| [`test_plan`](#test_plan) | changes | The physical test plan of a design's head revision, from what it claims: one test per brief requirement, per fit (ISO 286 holes and pairs, the fit window, assembly mates), per critical dimension (brief and interface parameters, measured or specified values, the overall size) and per strength-study load. |
+| [`results_report`](#results_report) | changes | The results report of a design's head revision: the design with its revision and hashes, every check and study with its evidence class and stated error, the physical results recorded against the test plan, open items and a verdict. |
+| [`backup`](#backup) | changes | Backups of every design and conversation, and Recently deleted. |
 
 ## Tools
 
@@ -1136,10 +1139,14 @@ before the whole part. Returns its STL path and simulated time and material.
 
 ### `record_physical_result`
 
-Record what the USER observed after a real print. Never call this with values the user did not report.
+Record what the USER observed or measured on the real part. Never call this with values the user did not
+report: every value here is kept with provenance "measured".
 kind="fit": result is too_tight | good | too_loose for this revision.
 kind="widths": measured pairs [{"nominal": mm, "measured": mm}] from a coupon (source="coupon") or this part
 (source="part"); they calibrate this printer profile for every future design.
+kind="test": a result against the test plan (test_plan lists the ids): test=<id> with the readings
+values=[...] in the test's unit, or result="pass" | "fail" for a pass/fail test; instrument= what was used,
+by= who measured. It is judged against the plan's limits, and the results report shows it.
 
 | Argument | Type | Required |
 |---|---|---|
@@ -1149,6 +1156,10 @@ kind="widths": measured pairs [{"nominal": mm, "measured": mm}] from a coupon (s
 | `widths` | array \| null |  |
 | `source` | string |  |
 | `note` | string |  |
+| `test` | string \| null |  |
+| `values` | array \| null |  |
+| `instrument` | string |  |
+| `by` | string |  |
 
 ### `request_release`
 
@@ -2056,6 +2067,52 @@ stored numbers, and the log of its runs. Reads only.
 |---|---|---|
 | `project` | string | yes |
 | `id` | string | yes |
+
+### `test_plan`
+
+The physical test plan of a design's head revision, from what it claims: one test per brief requirement,
+per fit (ISO 286 holes and pairs, the fit window, assembly mates), per critical dimension (brief and
+interface parameters, measured or specified values, the overall size) and per strength-study load. Each test:
+id, what to measure, instrument (10:1 rule), limits and their source (untoleranced: ISO 2768-1 m), readings,
+and when it passes. Writes TEST_PLAN.pdf, TEST_PLAN.md and TEST_CHECKLIST.csv (copied to out_dir if given).
+Results go in with record_physical_result(kind="test", test=<id>, values=[...] or result="pass"|"fail",
+instrument=...), only for what the person measured.
+
+| Argument | Type | Required |
+|---|---|---|
+| `project` | string | yes |
+| `out_dir` | string \| null |  |
+
+### `results_report`
+
+The results report of a design's head revision: the design with its revision and hashes, every check and
+study with its evidence class and stated error, the physical results recorded against the test plan, open
+items and a verdict. PASS only when every required test is measured within limits and nothing is open;
+anything unchecked is NOT A PASS; a measured failure is FAIL. Writes RESULTS_REPORT.pdf and .md (copied to
+out_dir if given). Report the verdict as it is.
+
+| Argument | Type | Required |
+|---|---|---|
+| `project` | string | yes |
+| `out_dir` | string \| null |  |
+
+### `backup`
+
+Backups of every design and conversation, and Recently deleted. action:
+status (settings, last run, backups in the folder, the bin); run (back up now to the folder and, if set, push
+to the person's own Git repository; then verify and prune); list; verify (file: a backup name, default the
+newest; every file against its SHA-256); restore (file, optional projects=[ids]; an existing design is skipped
+unless replace=True, which moves it to Recently deleted first); deleted (the bin, 30 days, with which backup
+holds each); undelete (entry from deleted). Restore and undelete only when the person asks. Destinations are
+set by the person in Settings › Backups; this tool never creates a repository or changes where backups go.
+
+| Argument | Type | Required |
+|---|---|---|
+| `action` | string |  |
+| `file` | string \| null |  |
+| `projects` | array \| null |  |
+| `replace` | boolean |  |
+| `entry` | string \| null |  |
 
 ## Prompts
 

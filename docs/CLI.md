@@ -106,6 +106,12 @@ message, with what the design is for.
 | `form delete <project> --yes` | Move a project to the trash inside the projects folder |
 | `form export <project> [--out FILE.formstudio] [--no-conversations]` | The design, its history, its conversations and the code it was built from, as one file |
 | `form import FILE.formstudio \| FILE.formproj \| CONVERSATION.json` | Import; a clashing id gets a new one and nothing is overwritten |
+| `form testplan <project> [--out DIR]` | The test plan: each requirement, fit, critical dimension and load with its instrument, limits, readings and when it passes; TEST_PLAN.pdf, TEST_PLAN.md and TEST_CHECKLIST.csv |
+| `form testplan record <project> TEST V1 V2 ... [--instrument I] [--by NAME]`, `--result pass\|fail`, `--csv FILLED.csv` | Record what you measured against one test (or every filled row of the checklist), with provenance measured |
+| `form report <project> [--out DIR]` | The results report: measured results against the plan, every check and study with its evidence, open items and the verdict (PASS, NOT A PASS, FAIL); exits 0 only on PASS |
+| `form backup status\|run [--if-due]\|list\|verify [FILE]` | Back up every design and conversation to the folder (and Git repository) in Settings › Backups; check a backup's SHA-256s |
+| `form backup restore FILE [--project ID ...] [--replace]` | Restore from a backup file or a clone of the backup repository; an existing design is kept unless `--replace` (then it goes to Recently deleted) |
+| `form backup deleted\|undelete ENTRY\|purge` | Recently deleted: 30 days, and longer while no backup holds a design |
 
 ## Look and analyse
 

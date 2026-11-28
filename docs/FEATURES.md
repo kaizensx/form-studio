@@ -440,7 +440,7 @@ One registry (`form/studies.py`) lists everything that can be asked of a design,
 small features, fit, design critique, slice, print simulation, print orientation, every printer, cost, make it
 lighter), **Routes** (Make: STEP/STL/OBJ/GLB, 3MF with colours, slicer project, FreeCAD macro, project archive, game
 asset, release) and **Documents** (Make: parts list, assembly notes, motion checks, print report, measurement plan,
-assembly instructions, four-view sheet, photoreal render, turntable, share card). Each entry has a state (never run,
+assembly instructions, four-view sheet, photoreal render, turntable, share card, test plan, results report). Each entry has a state (never run,
 current, stale, failed, running, unavailable with why, n/a with why), the revision it describes, its headline number
 with its evidence class, and a run action wired to the same code as its own tool. Results are stored beside the
 revision under a key of its inputs, so a new revision makes them stale by construction and nothing is ever marked
@@ -637,7 +637,7 @@ either. A real thin fin still fails.
 | OpenSCAD | Builds `.scad` designs; Customizer ranges become parameters |
 | Blender | Photoreal renders; its 3D-Print Toolbox checks when the add-on is installed |
 | Your slicer | Slices, and opens the 3MF or G-code in it |
-| Any MCP client | The full engine over 103 tools ([MCP reference](MCP.md)) |
+| Any MCP client | The full engine over 106 tools ([MCP reference](MCP.md)) |
 
 When a program's version outside the supported range is why something failed, the error names the supported versions
 and what to do.
@@ -710,12 +710,27 @@ and what to do.
 
 ![Add a provider: the address, what was found, and the models it lists](images/provider-added.webp)
 
+## Test plan and results report
+
+- **Test plan** (`form/reports.py`): one test per requirement of the brief, per fit (ISO 286 holes and pairs, the fit
+  window, assembly mates), per critical dimension (brief and interface parameters, measured or specified values, the
+  overall size) and per strength-study load. Each says the instrument (10:1 rule), the limits and their source
+  (untoleranced: ISO 2768-1 m), the readings and when it passes. PDF set in Geist (`form/pdfdoc.py`: vector text,
+  fonts embedded), Markdown and a checklist CSV that is filled in and recorded with `form testplan record --csv`.
+- **Results** are recorded only as measured (`record_physical_result(kind="test")`), with the instrument and the limits
+  they were judged against.
+- **Results report**: design, revision and hashes; every check and study with its evidence class and stated error;
+  the physical results against the plan; open items; a verdict that is PASS only with every required test measured
+  and nothing open. A claim with no physical test (a face count) is listed as not tested, with why.
+
 ## Moving and sharing designs
 
 - **One file per design.** Export a design with its revisions, conversations and the code it was built from as one
   `.formstudio` file, and import it on another computer. Clashing ids get new ones and nothing is overwritten; older
   `.formproj` files still import. `form export`, `form import`; MCP `export_project`, `import_project`.
 - **Conversations** export alone as Markdown (to read) or JSON (to import again). `form export-conversation`.
+- **Backups** (`form/backup.py`): every design and conversation on a schedule to a folder you choose, optionally pushed to a Git repository you own with your own credentials (never created for you, never a stored password). One .zip per backup with the SHA-256 of every file, verified after writing, the oldest pruned; a restore writes back the same bytes. Settings › Backups, `form backup`, MCP `backup`.
+- **Recently deleted**: 30 days with the days left and the backup that holds each design; put back with its conversations; after 30 days a design leaves only when a verified backup holds it.
 
 ## Building blocks for agents
 

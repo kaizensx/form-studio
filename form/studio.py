@@ -2028,11 +2028,19 @@ class Studio:
                 if body.get("result") not in ("too_tight", "good", "too_loose"):
                     raise StudioError("Choose how the printed part fitted.")
                 rec["result"] = body["result"]
+            elif kind == "test":                      # a reading against the test plan, checked by form/reports.py
+                tr = body.get("test_record")
+                if not isinstance(tr, dict) or not tr.get("test") or tr.get("source") != "measured":
+                    raise StudioError("A test result is recorded through the test plan.",
+                                      "record_physical_result(kind=\"test\", test=<id>, values=[...]) or `form testplan record`.")
+                rec.update({"test_record": tr, "source": "measured"})
             else:
                 raise StudioError("Unknown evidence type.")
             p["evidence"].append(rec)
             self.decide(p, "evidence", f"Physical result recorded for r{p['head']}: " +
-                        (f"{len(rec['pairs'])} measured width(s)" if kind == "widths" else rec["result"].replace("_", " ")))
+                        (f"{len(rec['pairs'])} measured width(s)" if kind == "widths" else
+                         f"{rec['test_record']['title']}: {rec['test_record']['verdict']} (measured)" if kind == "test" else
+                         rec["result"].replace("_", " ")))
             self.save(p)
             return rec
 
@@ -2076,7 +2084,7 @@ class Studio:
         if unmet:
             reasons.append(unmet)
             blocking.append(unmet)
-        physical = [e for e in p["evidence"] if e["rev"] == p["head"] and (e["kind"] == "fit" or e.get("source") == "part")]
+        physical = [e for e in p["evidence"] if e["rev"] == p["head"] and (e["kind"] in ("fit", "test") or e.get("source") == "part")]
         model = bool(off) and off.get("why") == "purpose"
         level = ("Geometry computed · game asset, not for 3D printing" if purpose_mod.is_game(p) else
                  "Geometry computed · 3D model, not for 3D printing") if model else \
@@ -2165,7 +2173,7 @@ class Studio:
                 "acknowledged_warnings": [w for w in g["warnings"]], "released_with_failed_checks": overridden,
                 "note": note, "evidence_level": g["evidence_level"] + (" · released with failed checks" if overridden else ""),
                 "documents": sorted(documents),
-                "physical_evidence": [e for e in p["evidence"] if e["rev"] == rev["n"] and (e["kind"] == "fit" or e.get("source") == "part")],
+                "physical_evidence": [e for e in p["evidence"] if e["rev"] == rev["n"] and (e["kind"] in ("fit", "test") or e.get("source") == "part")],
                 "limits": (["A 3D model: print checks and slicing do not apply."] if model else
                            ["Not sliced (Design only): print time, filament and toolpaths were not estimated."] if not sl else
                            ["Slicer output is a simulation, not a print."]) + ["No structural analysis was performed."]

@@ -1765,12 +1765,27 @@ def build() -> MCPServer:
 
     @mcp.tool(annotations=RW)
     async def record_physical_result(project: str, kind: str, result: str | None = None,
-                                     widths: list[dict] | None = None, source: str = "part", note: str = "") -> dict:
-        """Record what the USER observed after a real print. Never call this with values the user did not report.
+                                     widths: list[dict] | None = None, source: str = "part", note: str = "",
+                                     test: str | None = None, values: list[float] | None = None,
+                                     instrument: str = "", by: str = "") -> dict:
+        """Record what the USER observed or measured on the real part. Never call this with values the user did not
+        report: every value here is kept with provenance "measured".
         kind="fit": result is too_tight | good | too_loose for this revision.
         kind="widths": measured pairs [{"nominal": mm, "measured": mm}] from a coupon (source="coupon") or this part
-        (source="part"); they calibrate this printer profile for every future design."""
+        (source="part"); they calibrate this printer profile for every future design.
+        kind="test": a result against the test plan (test_plan lists the ids): test=<id> with the readings
+        values=[...] in the test's unit, or result="pass" | "fail" for a pass/fail test; instrument= what was used,
+        by= who measured. It is judged against the plan's limits, and the results report shows it."""
         st = studio()
+        if kind == "test":
+            from . import reports
+
+            def rec_test():
+                return reports.record(st, project, test or "", values=values, result=result, instrument=instrument,
+                                      by=by, note=note)
+            rec = await _run(rec_test)
+            return {"recorded": rec, "verdict": rec["test_record"]["verdict"],
+                    "next": "results_report shows every result against the plan, with what is still open."}
         body = {"kind": kind, "note": note}
         if kind == "fit":
             body["result"] = result
@@ -2843,6 +2858,9 @@ def build() -> MCPServer:
     game.register(mcp, studio, _run)
     from . import studies                     # the Bench: list_studies, run_study, get_study (form/studies.py)
     studies.register_mcp(mcp, studio, _run)
+    from . import backup, reports
+    reports.register_mcp(mcp, studio, _run)
+    backup.register_mcp(mcp, studio, _run)
     return mcp
 
 

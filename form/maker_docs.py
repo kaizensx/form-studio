@@ -235,7 +235,8 @@ def print_report(d, release=None) -> str:
             ("Physical fit / functional tests", None)]
     phys = [e for e in p["evidence"] if e["rev"] == rev["n"]]
     if phys:
-        rows[-1] = ("Physical fit / functional tests", ("PASS" if all(e.get("result", "good") == "good" for e in phys) else "FAIL",
+        rows[-1] = ("Physical fit / functional tests", ("PASS" if all((e.get("test_record") or {}).get("verdict") == "pass" if e.get("kind") == "test"
+                                                                       else e.get("result", "good") == "good" for e in phys) else "FAIL",
                                                         f"{len(phys)} physical record(s) for this revision"))
     for label, r in rows:
         if label == "Assembly motion and tool access" and r is None and not d["asm"]:

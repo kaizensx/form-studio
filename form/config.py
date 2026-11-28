@@ -83,6 +83,12 @@ DEFAULTS = {
     # `refine = False` on a design class. game: game assets (Beta) are refined only when this is true or when it is
     # asked for one design (refine_design action="on"); CAD designs follow enabled.
     "refine": {"enabled": True, "game": False},
+    # Backups of every design and conversation (form/backup.py): to a folder you choose (outside the project folder),
+    # and optionally pushed to a Git repository you created, with your own Git credentials. every: hourly | daily |
+    # weekly; keep: how many backup files stay in the folder; built: include STEP, STL, renders and slices (they are
+    # made again from the revisions; the Git copy never has them). Off until a destination is chosen and enabled.
+    "backup": {"enabled": False, "every": "daily", "folder": "", "keep": 10, "conversations": True, "built": True,
+               "git_remote": "", "git_branch": "main"},
     # Open the bench in your browser when an agent starts working (MCP server).
     "bench": {"auto_open": True},
     # Look for a newer FORM release on GitHub at most once a day (public release metadata only; nothing is

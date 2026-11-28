@@ -4,6 +4,33 @@
 
 ### New
 
+- **Test plan.** For any design, Form Studio writes what to measure on the made part, from what the design claims:
+  one test for each requirement of the brief, each fit (an ISO 286 hole, an ISO 286 pair in the code, the fit window of
+  a part that meets another, each mate of an assembly with its designed clearance), each critical dimension (the
+  brief's and the interfaces', every measured or specified value, the overall size) and each load of a strength study.
+  Each test names the instrument (its resolution a tenth of the tolerance band or finer), the limits and where they
+  come from (a dimension the design gives no tolerance gets ISO 2768-1 m, and says so), how many readings, and when it
+  passes. A PDF set in Geist with a checklist to fill in, Markdown, and the checklist as CSV. Document › **Test plan**
+  on the Bench; `test_plan` (MCP); `form testplan`.
+- **Results are measured, and only measured.** `record_physical_result(kind="test", test=..., values=[...])` or
+  `form testplan record` (one test, or the filled checklist) keeps each reading with provenance "measured", the
+  instrument, who measured it and the limits it was judged against.
+- **Results report.** One document for the head revision: the design with its revision, geometry key, design-code
+  and STEP SHA-256; every check and study with its evidence class and what it states about its error; the physical
+  results against the test plan; the open items; and a verdict. PASS only when every required test is measured within
+  its limits and nothing is open; anything unchecked is NOT A PASS; a measured failure is FAIL. The physical section
+  holds only numbers a person measured. PDF and Markdown. Document › **Results report** on the Bench;
+  `results_report` (MCP); `form report`.
+- **Backups.** Every design and conversation (the reference leaves conversations out), on a schedule (hourly, daily
+  or weekly) while Form Studio is open, to a folder you choose, and optionally pushed to a Git repository you created,
+  with your own Git sign-in. Each backup is one .zip with the SHA-256 of every file; it is read back and checked after
+  it is written, the oldest beyond the number you keep are removed (nothing else in the folder is touched), and a
+  restore writes back the same bytes. Form Studio never creates a repository and refuses an address with a password
+  in it. Settings › **Backups**; `backup` (MCP); `form backup`.
+- **Recently deleted, 30 days.** A deleted design is listed with the days it has left and the backup that holds it,
+  and comes back with its conversations attached. After 30 days it leaves only when a verified backup holds it.
+  106 MCP tools.
+
 - **The Bench.** Every study, route and document of a design in one listing: at the top of the Review pane the
   studies (checks, assembly and joints, requirements, analysis maps, fit, critique, slice, print simulation,
   orientation, every printer, cost, make it lighter), at the top of the Make pane the routes (exports, 3MF with

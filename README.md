@@ -56,7 +56,7 @@ Parametric build123d on OpenCascade, every requirement proved on the solid, on y
 <p align="center">
   <picture>
     <source media="(prefers-color-scheme: dark)" srcset="docs/readme/numbers-1-dark.svg">
-    <img src="docs/readme/numbers-1-light.svg" width="414" alt="103 MCP tools for any agent. 18 agent apps, model APIs and local models.">
+    <img src="docs/readme/numbers-1-light.svg" width="414" alt="106 MCP tools for any agent. 18 agent apps, model APIs and local models.">
   </picture>
   <picture>
     <source media="(prefers-color-scheme: dark)" srcset="docs/readme/numbers-2-dark.svg">
@@ -86,7 +86,7 @@ Form Studio sits between your agent and the CAD kernel and keeps the record of w
 ```mermaid
 flowchart LR
   you(["You: words, a photo,<br/>a sketch, a part, a link"]) --> agent["Your agent<br/>app, model API or local model"]
-  agent -- "103 MCP tools · form CLI" --> engine["Form Studio engine<br/>parameters with provenance<br/>revisions · hashed outputs"]
+  agent -- "106 MCP tools · form CLI" --> engine["Form Studio engine<br/>parameters with provenance<br/>revisions · hashed outputs"]
   engine --> kernel["CAD kernel<br/>build123d on OpenCascade"]
   kernel --> checks["Checks<br/>solid · mesh · fits · joints"]
   checks --> release{{"You approve<br/>files frozen with SHA-256"}}
@@ -168,7 +168,7 @@ Whatever you bring is assessed first. **Triage** reads a mesh, a STEP, a photo, 
   </picture>
 </p>
 
-Every revision is checked on the B-rep and its mesh: a valid solid, a closed export mesh, the STL against the CAD volume, the STEP re-imported in FreeCAD, fits, joints and loads. Each result says whether it was computed, a stated rule of thumb or a model. Compare any two revisions on the solids themselves, branch, keep variants, and go back at any point. Only a person approves a release, and its files are frozen with their hashes and a report of every check.
+Every revision is checked on the B-rep and its mesh: a valid solid, a closed export mesh, the STL against the CAD volume, the STEP re-imported in FreeCAD, fits, joints and loads. Each result says whether it was computed, a stated rule of thumb or a model. Compare any two revisions on the solids themselves, branch, keep variants, and go back at any point. Only a person approves a release, and its files are frozen with their hashes and a report of every check. For the part you made, a test plan says what to measure, with which instrument and limits, and the results report holds only what was measured: it is never a pass while anything is unchecked. Designs and conversations are backed up on a schedule to a folder you choose, or a Git repository you own.
 
 ## Make it
 
@@ -327,7 +327,7 @@ form tool get_project '{"project": "desk-stand"}'                               
 | | |
 |---|---|
 | **Every command** | [docs/CLI.md](docs/CLI.md) |
-| **103 MCP tools** | [docs/MCP.md](docs/MCP.md) |
+| **106 MCP tools** | [docs/MCP.md](docs/MCP.md) |
 | **How the engine is built** | [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) |
 
 ## Community

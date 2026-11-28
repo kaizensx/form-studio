@@ -20,7 +20,8 @@ import "F.js" as F
 // other keys stay, and the previous file is kept as a backup next to it (form/config_edit.py). Things that apply at
 // once say so and do not wait for Save: appearance, "Set up for" (form/capabilities.py: on installs what it needs,
 // off hides it and never uninstalls), the default printer, and "Use in Form Studio".
-// Open with Store.openSettings("general" | "printer" | "chat" | "apps" | "updates" | "advanced" | "software").
+//   Backups              the schedule and destinations, the last backup, verify and restore, Recently deleted
+// Open with Store.openSettings("general" | "printer" | "chat" | "apps" | "backups" | "updates" | "advanced" | "software").
 // The search in the rail finds rows on every page. The sheet lays out its own body (fillsBody, SheetHost.qml): the
 // rail stays put and only the page scrolls.
 Item {
@@ -44,11 +45,13 @@ Item {
         .concat([
         { value: "apps", text: "Other apps", icon: "layout_grid", group: "Making",
           sub: "Where the apps Form Studio works with are, and what “Open in…” hands a file to." },
+        { value: "backups", text: "Backups", icon: "archive", group: "System",
+          sub: "Every design and conversation, copied on a schedule to a folder you choose, and to your own Git repository if you want." },
         { value: "updates", text: "Updates", icon: "refresh_cw", group: "System",
           sub: "How Form Studio finds out about a newer version. Nothing is downloaded or installed by itself." },
         { value: "advanced", text: "Advanced", icon: "wrench", group: "System",
           sub: "Limits and fallbacks. Each row shows its key in studio.toml." }])
-    readonly property var tabNames: ({ general: "General", printer: "Printing", chat: "Agents & models", apps: "Other apps", updates: "Updates", advanced: "Advanced", software: "Engines & software" })
+    readonly property var tabNames: ({ general: "General", printer: "Printing", chat: "Agents & models", apps: "Other apps", backups: "Backups", updates: "Updates", advanced: "Advanced", software: "Engines & software" })
     readonly property var section: { for (var i = 0; i < sections.length; i++) if (sections[i].value === tab) return sections[i]; return sections[0] }
     readonly property bool onSoftware: tab === "software" && !searching      // the action bar installs; elsewhere it saves
     function accept() { if (!onSoftware && dirty > 0) save() }
@@ -141,8 +144,8 @@ Item {
         return s.replace(/^file:\/\//, "")
     }
     property var pathRow: null
-    function choosePath(r) { st.pathRow = r; if (r.key === "data.dir") Store.ask(folderDlg); else Store.ask(fileDlg) }
-    FolderDialog { id: folderDlg; title: "Choose the project folder"; onAccepted: if (st.pathRow) st.setEdit(st.pathRow, st.localPath(selectedFolder)) }
+    function choosePath(r) { st.pathRow = r; if (r.key === "data.dir" || r.key === "backup.folder") Store.ask(folderDlg); else Store.ask(fileDlg) }
+    FolderDialog { id: folderDlg; title: st.pathRow && st.pathRow.key === "backup.folder" ? "Choose the backup folder" : "Choose the project folder"; onAccepted: if (st.pathRow) st.setEdit(st.pathRow, st.localPath(selectedFolder)) }
     FileDialog { id: fileDlg; title: "Choose the program"; onAccepted: if (st.pathRow) st.setEdit(st.pathRow, st.localPath(selectedFile)) }
 
     // ── the rail: search, then the pages in their groups ─────────────────────────────────────────────────────────
@@ -237,6 +240,7 @@ Item {
             Loader { width: parent.width; active: !st.searching && st.tab === "software"; visible: active; sourceComponent: softwarePage }
             Loader { width: parent.width; active: !st.searching && st.tab === "printer" && !!st.cfg; visible: active; sourceComponent: printingPage }
             Loader { width: parent.width; active: !st.searching && st.tab === "apps" && !!st.cfg; visible: active; sourceComponent: appsPage }
+            Loader { width: parent.width; active: !st.searching && st.tab === "backups" && !!st.cfg; visible: active; sourceComponent: backupsPage }
             Loader { width: parent.width; active: !st.searching && st.tab === "updates" && !!st.cfg; visible: active; sourceComponent: updatesPage }
             Loader { width: parent.width; active: !st.searching && st.tab === "advanced" && !!st.cfg; visible: active; sourceComponent: advancedPage }
         }
@@ -448,6 +452,100 @@ Item {
                 SettingsRows { sheet: st; rows: st.rowsOf("apps", function (r) { return r.type === "path" }) } }
             Group { title: "Open in…"; sub: "What a file is handed to when you open it from Form Studio."
                 SettingsRows { sheet: st; rows: st.rowsOf("apps", function (r) { return r.type !== "path" }) } }
+        } }
+
+    // ── Backups (form/backup.py): GET /backup is the status, the backups in the folder and Recently deleted ─────────
+    property var bk: null
+    function loadBackup() { Store.get("/backup").then(function (r) { st.bk = r }, function () {}) }
+    Timer { interval: 1500; repeat: true; running: st.tab === "backups" && !!st.bk && st.bk.running; onTriggered: st.loadBackup() }
+    readonly property bool bkSaved: !!st.bk && (!!st.bk.settings.folder || !!st.bk.settings.git_remote)
+    function backupNow() {
+        Store.post("/backup/run", {}).then(function () {
+            Store.toast("Backing up", "Every design and conversation, then every file is read back and checked.")
+            st.bk = Object.assign({}, st.bk, { running: true }) }, Store.fail) }
+    function verifyBackup(name) {
+        Store.post("/backup/verify", { name: name }).then(function (r) {
+            Store.toast(r.ok ? "Backup verified" : "This backup is damaged",
+                        r.ok ? F.plural(r.checked, "file") + " match their SHA-256"
+                             : r.damaged.length + " damaged, " + r.missing.length + " missing, " + r.extra.length + " unexpected") }, Store.fail) }
+    function restoreBackup(name) {
+        Store.post("/backup/restore", { name: name }).then(function (r) {
+            Store.toast(r.restored.length ? "Restored " + F.plural(r.restored.length, "design") : "Nothing to restore",
+                        r.skipped.length ? F.plural(r.skipped.length, "design") + " already here, kept as they are." : "Every file was checked against the backup first.")
+            Store.reloadStudio(); st.loadBackup() }, Store.fail) }
+    function undelete(entry) {
+        Store.post("/backup/undelete", { entry: entry }).then(function (r) {
+            Store.toast("Put back", (r.renamed_from ? "As " + r.id + ": the name was taken. " : "")
+                        + (r.conversations_reattached ? F.plural(r.conversations_reattached, "conversation") + " attached again." : ""))
+            Store.reloadStudio(); st.loadBackup() }, Store.fail) }
+    // one quiet row of a list on glass: a title, one fine line, its actions on the right
+    component BkRow: Item {
+        id: br
+        property string title: ""
+        property string line: ""
+        property bool mono: false
+        property color lineColor: Theme.ink3
+        default property alias actions: acts.data
+        width: parent ? parent.width : 0; height: 52
+        Column { x: 18; anchors.verticalCenter: parent.verticalCenter; width: parent.width - 36 - acts.width - 12; spacing: 3
+            Txt { text: br.title; mono: br.mono; font.weight: Theme.wMedium; width: parent.width; elide: Text.ElideMiddle; wrapMode: Text.NoWrap }
+            Txt { kind: "fine"; text: br.line; color: br.lineColor; width: parent.width; elide: Text.ElideRight; wrapMode: Text.NoWrap } }
+        Row { id: acts; anchors.right: parent.right; anchors.rightMargin: 14; anchors.verticalCenter: parent.verticalCenter; spacing: 6 }
+    }
+    Component { id: backupsPage
+        Column { spacing: 26
+            Component.onCompleted: st.loadBackup()
+            Group { title: "Now"; sub: st.bk ? st.bk.note : ""
+                Rectangle { id: bkNow; objectName: "settingsBackupStatus"; width: parent.width; height: 72; radius: 16; color: Theme.glass
+                    readonly property var last: st.bk ? st.bk.last : null
+                    readonly property var ok: st.bk ? st.bk.last_ok : null
+                    Rectangle { x: 18; anchors.verticalCenter: parent.verticalCenter; width: 38; height: 38; radius: Theme.rMd; color: Theme.glass2
+                        Icon { name: "archive"; size: 17; anchors.centerIn: parent; color: Theme.ink2 } }
+                    Column { x: 70; anchors.verticalCenter: parent.verticalCenter; width: parent.width - 70 - nowBtn.width - 36; spacing: 3
+                        Txt { width: parent.width; font.weight: Theme.wMedium; elide: Text.ElideRight; wrapMode: Text.NoWrap
+                            text: !st.bk ? "Reading…" : st.bk.running ? "Backing up…"
+                                : bkNow.ok ? "Last backup " + F.ago(bkNow.ok.ts)
+                                    + (bkNow.ok.folder ? " · " + F.bytes(bkNow.ok.folder.bytes) + " · " + (bkNow.ok.folder.verified ? "every file verified" : "not verified") : "")
+                                    + (bkNow.ok.git ? " · pushed to Git" : "")
+                                : "No backup yet" }
+                        Txt { kind: "fine"; width: parent.width; elide: Text.ElideRight; wrapMode: Text.NoWrap
+                            color: st.bk && (st.bk.problem || (bkNow.last && !bkNow.last.ok)) ? Theme.amber : Theme.ink3
+                            text: !st.bk ? "" : st.bk.problem ? st.bk.problem.message + " " + st.bk.problem.hint
+                                : bkNow.last && !bkNow.last.ok && bkNow.last.error ? "The last run did not finish: " + bkNow.last.error.message
+                                : !st.bkSaved ? "Choose a backup folder below, then save."
+                                : !st.bk.settings.enabled ? "Automatic backups are off: back up by hand, or turn them on below."
+                                : st.bk.next ? (st.bk.due ? "Due now: the next one starts within minutes" : "Next in about " + F.dur(Math.max(60, st.bk.next - Date.now() / 1000))) + ", while Form Studio is open"
+                                : "" } }
+                    Btn { id: nowBtn; objectName: "backupNow"; anchors.right: parent.right; anchors.rightMargin: 18; anchors.verticalCenter: parent.verticalCenter
+                        small: true; kind: "primary"; icon: "archive"; text: "Back up now"; busy: !!st.bk && st.bk.running
+                        enabled: st.bkSaved && !(st.bk && st.bk.running) && st.dirtyIn("backups") === 0
+                        tip: st.dirtyIn("backups") ? "Save your changes first" : ""
+                        onClicked: st.backupNow() } } }
+            Group { title: "Schedule and folder"; sub: "Each backup is one .zip file with the SHA-256 of every file in it."
+                SettingsRows { sheet: st; rows: st.rowsOf("backups", function (r) { return r.key.indexOf("backup.git") !== 0 }) } }
+            Group { title: "Git repository"; sub: "Optional: a private repository you created. Pushed with your own Git sign-in; Form Studio never creates one and never stores a password."
+                SettingsRows { sheet: st; rows: st.rowsOf("backups", function (r) { return r.key.indexOf("backup.git") === 0 }) } }
+            Group { title: "Backups in the folder"; visible: !!st.bk && st.bk.count > 0
+                sub: st.bk ? F.plural(st.bk.count, "backup") + " · " + F.bytes(st.bk.bytes) + ". Restore puts back the designs and conversations that are not here; nothing here is overwritten." : ""
+                Rectangle { width: parent.width; height: bkList.implicitHeight + 8; radius: 16; color: Theme.glass
+                    Column { id: bkList; y: 4; width: parent.width
+                        Repeater { model: st.bk ? st.bk.backups.slice(0, 8) : []
+                            BkRow { id: bkRow; required property var modelData
+                                title: modelData.name; mono: true; line: F.bytes(modelData.bytes) + " · " + F.ago(modelData.mtime)
+                                Btn { small: true; kind: "quiet"; icon: "shield_check"; text: "Verify"; onClicked: st.verifyBackup(bkRow.modelData.name) }
+                                Btn { small: true; kind: "quiet"; icon: "history"; text: "Restore"; onClicked: st.restoreBackup(bkRow.modelData.name) } } } } } }
+            Group { title: "Recently deleted"; sub: "Deleted designs stay here for 30 days. After that, one leaves only when a verified backup holds it."
+                Txt { visible: !!st.bk && st.bk.deleted.length === 0; kind: "fine"; tone: 3; text: "Nothing deleted." }
+                Rectangle { objectName: "backupDeleted"; visible: !!st.bk && st.bk.deleted.length > 0; width: parent.width; height: delList.implicitHeight + 8; radius: 16; color: Theme.glass
+                    Column { id: delList; y: 4; width: parent.width
+                        Repeater { model: st.bk ? st.bk.deleted : []
+                            BkRow { id: delRow; required property var modelData
+                                title: modelData.name
+                                line: "Deleted " + F.ago(modelData.deleted_ts) + " · "
+                                      + (modelData.expired ? "kept: no backup holds it yet" : F.plural(modelData.days_left, "day") + " left")
+                                      + (modelData.backup ? " · in " + modelData.backup : "")
+                                lineColor: modelData.expired ? Theme.amber : Theme.ink3
+                                Btn { small: true; kind: "quiet"; icon: "rotate_ccw"; text: "Put back"; onClicked: st.undelete(delRow.modelData.entry) } } } } } }
         } }
 
     // ── Updates ──────────────────────────────────────────────────────────────────────────────────────────────────

@@ -27,6 +27,10 @@
   form replace --photo broken.jpg [--name X]           a replacement for a broken part, from a photo, in a chat
   form feature <project> boss --at x,y,z --normal ...  a screw boss or snap-fit hook in the code
   form study list|run|show <project> [id] [--force]   the Bench: every study, route and document, with its state
+  form testplan <project> [--out DIR]                 what to measure on the made part: PDF, Markdown, checklist
+  form testplan record <project> TEST V... | --csv F   record what you measured (provenance measured)
+  form report <project> [--out DIR]                   the results report: measured against the plan, open items, verdict
+  form backup status|run|list|verify|restore|deleted|undelete|purge   backups and Recently deleted
   form tree <project> [suppress|restore|move|rename FEATURE] [--upto FEATURE]   the feature tree, by hand
   form model <project> fillet|chamfer|hole|pattern|shell --at x,y,z ... [--preview]   a picked feature as code
   form model <project> extrude|cut|revolve --sketch F.json [--at x,y,z] [--depth D]    a feature from a sketch
@@ -257,6 +261,15 @@ def main(argv=None):
     if argv[:1] == ["study"]:                      # the Bench: every study, route and document with its state (form/studies.py)
         from .studies import main_cli as study_main
         return study_main(argv[1:])
+    if argv[:1] == ["testplan"]:                   # what to measure on the made part, and results (form/reports.py)
+        from .reports import main_testplan
+        return main_testplan(argv[1:])
+    if argv[:1] == ["report"]:                     # the results report: measured against the plan, and what is open
+        from .reports import main_report
+        return main_report(argv[1:])
+    if argv[:1] == ["backup"]:                     # backups of designs and conversations, recently deleted (form/backup.py)
+        from .backup import main as backup_main
+        return backup_main(argv[1:])
     if argv[:1] == ["tool"]:                       # any MCP tool, headless, with the same arguments and rules
         return _tool(argv[1:])
     if argv[:1] == ["capabilities"]:
