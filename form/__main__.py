@@ -32,6 +32,10 @@
   form study list|run|show <project> [id] [--force]   the Bench: every study, route and document, with its state
   form calc <calculator> key=value ... [--build]   size a snap fit, hinge, spring, bolted joint, gear pair, cam or fit
                                      from a standard's equations; every number with its source (form calc list); JSON
+  form tree <project> [suppress|restore|move|rename FEATURE] [--upto FEATURE]   the feature tree, by hand
+  form model <project> fillet|chamfer|hole|pattern|shell --at x,y,z ... [--preview]   a picked feature as code
+  form model <project> extrude|cut|revolve --sketch F.json [--at x,y,z] [--depth D]    a feature from a sketch
+  form sketch <project> FEATURE [--ops JSON] [--set name=v]   a feature's sketch, solved; edit it
   form verify <project> <release>    re-hash a release against its manifest
   form chat "message" [--project ID] [--conversation ID] [--agent claude|codex] [--model X] [--attach FILE] [--json]
                                      one message to an agent with FORM's tools; streams the reply, saves the conversation
@@ -348,6 +352,7 @@ def main(argv=None):
             c.add_argument("--view", default="iso")
             c.add_argument("--highlight")
             c.add_argument("--out")
+            c.add_argument("--upto", metavar="FEATURE", help="the head as it stood after this feature (never saved)")
     o = sub.add_parser("optimize", help="goal seek over parameters")
     o.add_argument("project")
     o.add_argument("--vary", action="append", required=True, help="key:min:max (repeat)")
@@ -380,6 +385,7 @@ def main(argv=None):
     so.add_argument("--printer", metavar="ID", help="a printer id from `form printers` (default: the design's printer)")
     so.add_argument("--explain", action="store_true", help="lead the JSON with each decision as one plain line")
     so.add_argument("--no-open", action="store_true", help="slice and write the project 3MF, but do not open the slicer")
+    so.add_argument("--copies", type=int, default=1, help="this many of the design, on as many plates as it takes")
     cp = sub.add_parser("compare-printers", help="slice the design on every printer in your slicers: time, filament, cost")
     cp.add_argument("project")
     cp.add_argument("--limit", type=int, default=8, help="how many printers (the selected ones first)")
@@ -399,6 +405,57 @@ def main(argv=None):
     fe.add_argument("--list", action="store_true")
     fe.add_argument("--remove", metavar="ID")
     fe.add_argument("--expect-head", type=int)
+    # -- modelling by hand (form/modelling.py): the feature tree and picked features, written as the design's code --
+    tr = sub.add_parser("tree", help="the feature tree: tree <project> (build order, suppressed, what each reads) | "
+                                     "suppress|restore FEATURE | move FEATURE --after|--before F | rename FEATURE "
+                                     "[--label L] [--id I] | --upto FEATURE (the rollback view)")
+    tr.add_argument("project")
+    tr.add_argument("action", nargs="?", choices=["suppress", "restore", "move", "rename"])
+    tr.add_argument("feature", nargs="?")
+    tr.add_argument("--after")
+    tr.add_argument("--before")
+    tr.add_argument("--label")
+    tr.add_argument("--id", dest="new_id")
+    tr.add_argument("--upto", metavar="FEATURE", help="the head as it stood after this feature (never saved)")
+    tr.add_argument("--png", help="with --upto: write a picture of it here")
+    tr.add_argument("--preview", action="store_true", help="build and report, save nothing")
+    tr.add_argument("--expect-head", type=int)
+    mo = sub.add_parser("model", help="a picked feature as code: model <project> fillet|chamfer|hole|pattern|shell "
+                                      "[--at x,y,z ...] [options] [--preview]")
+    mo.add_argument("project")
+    mo.add_argument("kind", choices=["fillet", "chamfer", "hole", "pattern", "shell", "extrude", "cut", "revolve"])
+    mo.add_argument("--sketch", metavar="FILE.json", help="extrude, cut, revolve: the sketch ({plane, points, entities, "
+                    "constraints}); with --at, it goes on the face at that point")
+    mo.add_argument("--axis-entity", type=int, help="revolve: the sketch line it turns about")
+    mo.add_argument("--at", action="append", default=[], metavar="x,y,z", help="a point on an edge (fillet, chamfer) "
+                    "or on a face (hole, shell); repeat for several edges")
+    for k in ("radius", "length", "thickness", "nominal", "d", "depth", "pitch", "angle", "head_d", "head_depth"):
+        mo.add_argument("--" + k.replace("_", "-"), dest=k, type=float)
+    mo.add_argument("--count", type=int)
+    mo.add_argument("--standard", choices=["clearance", "tapped", "iso286", "plain"])
+    mo.add_argument("--size", help="hole screw size, M2 to M6")
+    mo.add_argument("--fit", help="close|normal|loose (clearance) or a hole tolerance such as H7 (iso286)")
+    mo.add_argument("--style", choices=["plain", "counterbore", "countersink"])
+    mo.add_argument("--of", help="pattern: the feature to repeat")
+    mo.add_argument("--mode", choices=["linear", "polar"])
+    mo.add_argument("--axis", help="x, y, z or x,y,z")
+    mo.add_argument("--origin", metavar="x,y,z", help="polar pattern: a point on the axis")
+    mo.add_argument("--after", help="the feature it goes after (default: last)")
+    mo.add_argument("--preview", action="store_true", help="build and report, save nothing")
+    mo.add_argument("--expect-head", type=int)
+    sk = sub.add_parser("sketch", help="a feature's sketch: sketch <project> FEATURE (solved, degrees of freedom) | "
+                                       "--ops JSON|- | --set NAME=VALUE ... [--preview] | sketch --new NAME --file F.json "
+                                       "[--depth D] (a new design from a sketch on a datum plane)")
+    sk.add_argument("project", nargs="?")
+    sk.add_argument("feature", nargs="?")
+    sk.add_argument("--ops", help="edit_sketch ops as JSON, or - for stdin")
+    sk.add_argument("--set", action="append", default=[], metavar="NAME=VALUE", help="a named dimension's value")
+    sk.add_argument("--preview", action="store_true")
+    sk.add_argument("--expect-head", type=int)
+    sk.add_argument("--new", metavar="NAME", help="start a design from --file (extruded --depth mm)")
+    sk.add_argument("--file", metavar="F.json")
+    sk.add_argument("--depth", type=float, default=10.0)
+    sk.add_argument("--purpose", default="model")
     # -- analysis on the model (form/analysis.py) --
     az = sub.add_parser("analyze", help="an analysis map: wall thickness, overhangs, layer cross-section, small features")
     az.add_argument("project")
@@ -441,11 +498,12 @@ def main(argv=None):
     co.add_argument("--machine-rate", type=float, help="per hour")
     co.add_argument("--copies", type=int, default=1)
     co.add_argument("--save", action="store_true", help="remember the given prices in <data dir>/cost.json")
-    pk = sub.add_parser("pack", help="do N copies fit on one plate?")
+    pk = sub.add_parser("pack", help="do N copies fit on one plate? (and how many plates they take)")
     pk.add_argument("project")
     pk.add_argument("--copies", type=int, default=1)
     pk.add_argument("--spacing", type=float, help="gap between parts in mm (default 6)")
     pk.add_argument("--no-rotate", action="store_true")
+    pk.add_argument("--3mf", dest="threemf", metavar="DIR", help="write the copies on their plates as a 3MF (or several) into DIR")
     # ---- design tools: variants, share card, history, label text ----
     va = sub.add_parser("variants", help="named variants: list, save, promote, delete")
     va.add_argument("action", choices=["list", "save", "promote", "delete"])
@@ -647,12 +705,17 @@ def main(argv=None):
         elif a.cmd == "render":
             from . import render
             p = st.load(a.project)
-            v = st.view(p)
+            if a.upto:
+                from . import modelling
+                v = modelling.view_upto(st, p, a.upto)
+            else:
+                v = st.view(p)
             feats = [{"id": f.id, "label": f.label} for f in st.recipe(p).features]
             views = ["iso", "front", "top", "right"] if a.view == "sheet" else [a.view]
             size = (640, 460) if a.view == "sheet" else (960, 680)
-            pngs = [render.render_png(v, feats, vw, a.highlight, size=size, title=f"{p['name']} - r{p['head']:02d}") for vw in views]
-            out = a.out or f"{a.project}_r{p['head']:02d}_{a.view}.png"
+            title = f"{p['name']} - r{p['head']:02d}" + (f" up to {a.upto} (not saved)" if a.upto else "")
+            pngs = [render.render_png(v, feats, vw, a.highlight, size=size, title=title) for vw in views]
+            out = a.out or f"{a.project}_r{p['head']:02d}_{a.view}{'_upto-' + a.upto if a.upto else ''}.png"
             with open(out, "wb") as f:
                 f.write(pngs[0] if len(pngs) == 1 else render.contact_sheet(pngs))
             _print({"png": out})
@@ -700,7 +763,7 @@ def main(argv=None):
                 _print(lighten.search(st, p, builds=a.builds, require=a.require or None, study=a.study))
         elif a.cmd == "slicer-open":
             from . import slicer_open
-            r = slicer_open.run(st, st.load(a.project), a.printer, open_app=not a.no_open)
+            r = slicer_open.run(st, st.load(a.project), a.printer, open_app=not a.no_open, copies=a.copies)
             if a.explain:
                 r = {"explain": slicer_open.explain(r).splitlines(), **r}
             _print(r)
@@ -725,6 +788,86 @@ def main(argv=None):
                 out = fh.add(st, p, a.kind, xyz(a.at), xyz(a.normal), a.expect_head, "cli", **o)
                 out["checks"] = fh.checks(out["features"][-1], st.slicer_info(p=p).get("nozzle_mm"), a.allow_strain)
                 _print(out)
+        elif a.cmd == "sketch":
+            from . import modelling
+            if a.new:
+                if not a.file:
+                    raise StudioError("--new needs --file F.json (the sketch).")
+                data = json.loads(Path(a.file).read_text(encoding="utf-8"))
+                p = modelling.start_from_sketch(st, a.new, data, "extrude", a.purpose, depth=a.depth)
+                job = st.run_sync(p["id"])
+                _print({"project": p["id"], "head": p["head"], "pipeline": job_digest(job)})
+                return 0
+            if not (a.project and a.feature):
+                raise StudioError("Give a project and the feature whose sketch it is.", "`form tree <project>` lists them.")
+            p = st.load(a.project)
+            ops = json.loads(sys.stdin.read() if a.ops == "-" else a.ops) if a.ops else []
+            for kv in a.set:
+                k, _, val = kv.partition("=")
+                ops.append({"op": "set", "name": k, "value": float(val)})
+            if not ops:
+                _print(modelling.get_sketch(st, p, a.feature))
+            else:
+                eops, _new = modelling.sketch_edit_ops(st, p, a.feature, ops)
+                if a.preview:
+                    pv = modelling.preview(st, p, eops)
+                    pv.pop("rid", None)
+                    _print({"saved": False, "ops": eops, "preview": pv})
+                else:
+                    r = modelling.commit(st, p, eops, a.expect_head, "cli", note=f"Changed the sketch of {a.feature}")
+                    r.pop("project")
+                    st.activity(a.project, "commit", f"r{r['head']:02d}: {r['said']}", by="cli")
+                    _print({**r, "pipeline": job_digest(st.run_sync(a.project))})
+        elif a.cmd in ("tree", "model"):
+            from . import modelling
+            p = st.load(a.project)
+            xyz = lambda t: [float(x) for x in t.split(",")]
+            if a.cmd == "tree" and a.upto:
+                v = modelling.view_upto(st, p, a.upto)
+                out = {"upto": v["upto"], "volume_mm3": v["volume_mm3"], "bbox": v["bbox"], "faces": v["faces"]}
+                if a.png:
+                    from . import render
+                    feats = [{"id": f.id, "label": f.label} for f in st.recipe(p).features]
+                    with open(a.png, "wb") as fh_:
+                        fh_.write(render.render_png(v, feats, "iso", None, size=(960, 680),
+                                                    title=f"{p['name']} - r{p['head']:02d} up to {a.upto} (not saved)"))
+                    out["png"] = a.png
+                _print(out)
+            elif a.cmd == "tree" and not a.action:
+                _print(modelling.tree(st, p))
+            else:
+                if a.cmd == "tree":
+                    if not a.feature:
+                        raise StudioError(f"{a.action} needs a feature id.", "`form tree <project>` lists them.")
+                    op = {"op": a.action, "feature": a.feature}
+                    op.update({k: v for k, v in (("after", a.after), ("before", a.before), ("label", a.label),
+                                                 ("id", a.new_id)) if v})
+                    ops, planned = [op], None
+                else:
+                    o = {k: getattr(a, k) for k in ("radius", "length", "thickness", "nominal", "d", "depth", "pitch",
+                                                    "angle", "head_d", "head_depth", "count", "standard", "size", "fit",
+                                                    "style", "of", "mode", "after") if getattr(a, k) is not None}
+                    if a.axis:
+                        o["axis"] = a.axis if a.axis.lower().lstrip("+-") in ("x", "y", "z") else xyz(a.axis)
+                    if a.origin:
+                        o["origin"] = xyz(a.origin)
+                    if a.sketch:
+                        o["sketch"] = json.loads(Path(a.sketch).read_text(encoding="utf-8"))
+                    if a.axis_entity is not None:
+                        o["axis_entity"] = a.axis_entity
+                    planned = modelling.plan(st, p, a.kind, [{"at": xyz(t)} for t in a.at], **o)
+                    ops = planned["ops"]
+                if a.preview:
+                    pv = modelling.preview(st, p, ops)
+                    pv.pop("rid", None)
+                    _print({"saved": False, "ops": ops, "preview": pv,
+                            **({"summary": planned["summary"], "picked": planned["picked"]} if planned else {})})
+                else:
+                    r = modelling.commit(st, p, ops, a.expect_head, "cli", planned=planned)
+                    r.pop("project")
+                    st.activity(a.project, "commit", f"r{r['head']:02d}: {r['said']}", by="cli")
+                    job = st.run_sync(a.project)
+                    _print({**r, "pipeline": job_digest(job)})
         elif a.cmd == "analyze":
             from . import analysis
             p = st.load(a.project)
@@ -906,6 +1049,9 @@ def main(argv=None):
         elif a.cmd == "pack":
             from . import packing
             res = packing.project(st, st.load(a.project), a.copies, a.spacing, not a.no_rotate)
+            if a.threemf:
+                from . import plates as plates_mod
+                res["export"] = plates_mod.write_3mf(st, st.load(a.project), Path(a.threemf).expanduser(), a.copies)
             _print(res)
             return 0 if res["fits"] else 1
         elif a.cmd == "variants":

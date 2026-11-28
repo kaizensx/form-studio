@@ -375,11 +375,12 @@ def app_bundle(app: str) -> str:
     return app
 
 
-def launch(resolved: dict, path: Path) -> dict:
-    """Open the project in the slicer's own app (form/cad_bridges.open_file; FORM_FAKE_LAUNCH records instead)."""
+def launch(resolved: dict, path: Path, new_instance: bool = False) -> dict:
+    """Open the project in the slicer's own app (form/cad_bridges.open_file; FORM_FAKE_LAUNCH records instead).
+    new_instance: in a window of its own (macOS open -n), for a slicer that holds one project per window."""
     from .cad_bridges import open_file
     try:
-        return open_file(str(path), app_bundle(resolved.get("app") or ""))
+        return open_file(str(path), app_bundle(resolved.get("app") or ""), new_instance=new_instance)
     except (RuntimeError, OSError) as e:
         raise _err(f"{resolved.get('label') or 'The slicer'} could not be opened: {e}",
                    f"Open {path.name} from the slicer's File menu; it is at {path}.")
@@ -590,15 +591,53 @@ def _plates(st, p, ex_dir: Path, ex: dict, orient: dict | None, keys: dict, out:
     return [ex_dir / ex["files"]["stl"]["name"]]
 
 
-def run(st, p, printer: str | None = None, open_app: bool = True) -> dict:
-    """Choose, slice for real, write and check the project 3MF, and open it in the slicer. See the module docstring."""
-    from . import slicer
+def _part_rows(st, p, multi: bool, single: Path, work: Path) -> list:
+    """The printed parts as they lie: each part of a design of several (form/plates.py), or the one oriented STL."""
+    from . import materials as looks
+    from . import plates as plates_mod
+    if multi:
+        return plates_mod.project_parts(st, p, work / "parts")
+    pts = plates_mod.read_triangles(single).reshape(-1, 3)
+    size = (pts.max(axis=0) - pts.min(axis=0)).tolist() if len(pts) else [0, 0, 0]
+    look = looks.resolved(p, "")
+    return [{"id": p["id"], "label": p["name"], "stl": str(single), "size": size,
+             "material": look.get("material") or "", "color": look.get("color") or ""}]
+
+
+def _layout(st, p, res: dict, parts: list, copies: int) -> dict:
+    """The plate plan on the bed of the printer the slice uses, with the brim the decisions chose (form/plates.py)."""
+    from . import plates as plates_mod
+    pe = st.printer_env(p)
+    bed = [float(x) for x in (res.get("envelope_mm") or pe["envelope"])]
+    machine = ((res.get("presets") or {}).get("machine") or {}).get("data") or {}
+    room, why = plates_mod.clearance(res)
+    pl = plates_mod.plan(plates_mod.copies_of(parts, copies), bed, plates_mod.spacing(st.cfg), pe["margin"], room,
+                         plates_mod.bed_zones(machine))
+    if why:
+        pl["clearance_source"] = why
+    return pl
+
+
+def _plate_names(plan: dict) -> dict:
+    return {x["n"]: [q["label"] for q in x["parts"]] for x in plan["plates"]}
+
+
+def run(st, p, printer: str | None = None, open_app: bool = True, copies: int = 1) -> dict:
+    """Choose, slice for real, write and check the project 3MF, and open it in the slicer. See the module docstring.
+
+    Parts that do not fit one plate (a design of several parts, or `copies` of it) are packed onto as many plates as
+    it takes on the chosen printer's bed (form/plates.py). Bambu Studio, OrcaSlicer and the Orca forks get one
+    project with every plate, sliced plate by plate by the program itself; PrusaSlicer and its forks get one project
+    per plate (each opened in its own window) and a 3MF with every plate for PrusaSlicer 2.9's several beds."""
+    from . import plate3mf, slicer
+    from . import plates as plates_mod
     from .studio import H, _slicer_tag
     keys = st.keys(p)
     ex = st.read(p, "exports", keys["exports"])
     if not ex:
         raise _err("There is no current exported model.", "Run the pipeline first.")
     multi = getattr(st.recipe(p), "solids", 1) > 1
+    copies = max(1, int(copies or 1))
     from . import capabilities, purpose
     if not capabilities.has(st.cfg, "print"):
         raise _err("3D printing is off.", "Turn it on in Settings (Set up for › 3D printing).")
@@ -607,67 +646,170 @@ def run(st, p, printer: str | None = None, open_app: bool = True) -> dict:
                    "Make it printable first (Prove › Make it for 3D printing), then open it in your slicer.")
     orient = None if multi else _orientation(st, p)
     side = st.dir(p["id"]) / "artifacts" / "side"
-    work = side / ("slicer-open-" + H("slicer-open-geo", VERSION, keys["exports"], orient and orient["id"]))
+    work = side / ("slicer-open-" + H("slicer-open-geo", VERSION, keys["exports"], keys.get("checks"), orient and orient["id"]))
     work.mkdir(parents=True, exist_ok=True)
     ex_dir = st.apath(p, "exports", keys["exports"])
-    stls = _plates(st, p, ex_dir, ex, orient, keys, work)
-    pl = plan(st, p, printer, _orient=orient, _stl=stls[0])
+    whole = _plates(st, p, ex_dir, ex, orient, keys, work)[0] if not multi else ex_dir / ex["files"]["stl"]["name"]
+    parts = _part_rows(st, p, multi, whole, work)
+    pl = plan(st, p, printer, _orient=orient, _stl=Path(parts[0]["stl"]) if multi else whole)
     res = _with_changes(pl["resolved"], pl["changes"])
+    layout = _layout(st, p, res, parts, copies)
+    bed = layout["bed_mm"]
+    one_plate = copies == 1 and not layout["too_big"] and (
+        not multi or not plates_mod.needed(parts, ex.get("print_bbox") or [0, 0, 0], bed, layout["margin_mm"]))
     presets = {k: v.get("sha") for k, v in res["presets"].items()}
-    key = H("slicer-open", VERSION, keys["exports"], [s.name for s in stls], orient and orient["id"], presets, *_slicer_tag(res))
-    out = side / ("slicer-open-" + key)
     label = res.get("label") or slicer.label(pl["choice"]["kind"])
-    name = f"{p['id']}_r{p['head']:02d}_{_safe(pl['choice']['machine'])}"
-    rows = []
-    for n, stl in enumerate(stls, 1):
-        pdir = out / f"plate_{n}"
-        meta_f = pdir / "meta.json"
-        if meta_f.is_file():
-            row = json.loads(meta_f.read_text(encoding="utf-8"))
-        else:
-            tmp = pdir.with_name(pdir.name + ".tmp")
-            shutil.rmtree(tmp, ignore_errors=True)
-            info = slicer.slice_stl(res, stl, tmp, timeout=st.cfg["slicer"]["timeout_s"])
-            proj = info.get("threemf") or info.get("project_3mf")
-            if not proj or not (tmp / proj).is_file():
-                raise _err(f"{label} sliced the part but wrote no project file.",
-                           "Update the slicer, or open the G-code instead.", 502)
-            final = f"{name}" + (f"_plate{n}" if len(stls) > 1 else "") + ".3mf"
-            shutil.move(str(tmp / proj), tmp / final)
-            marked = mark_changed(tmp / final, list(pl["changes"])) if family(pl["choice"]["kind"]) == "bbl" else False
-            row = {"n": n, "project": final, "marked_as_edits": marked,
-                   **{k: info.get(k) for k in ("time_s", "filament_g", "filament_mm", "layers", "max_z_mm", "support_used",
-                                               "slicer_version", "warnings")}}
-            (tmp / "meta.json").write_text(json.dumps(row, indent=1), encoding="utf-8")
-            shutil.rmtree(pdir, ignore_errors=True)
-            tmp.rename(pdir)
-        row["path"] = str(pdir / row["project"])
-        row["verified"] = verify(Path(row["path"]), pl["changes"])
-        rows.append(row)
+    name = f"{p['id']}_r{p['head']:02d}_{_safe(pl['choice']['machine'])}" + (f"_x{copies}" if copies > 1 else "")
+    together = not one_plate and slicer.takes_plates(res)
+    lay_key = None if one_plate else [[(q["id"], q["x"], q["y"], q["rotated"]) for q in x["parts"]] for x in layout["plates"]]
+    key = H("slicer-open", VERSION, keys["exports"], whole.name, [x["id"] for x in parts], orient and orient["id"], presets,
+            lay_key, together, *_slicer_tag(res))
+    out = side / ("slicer-open-" + key)
+    stl_of = {}
+    for x in parts:
+        stl_of[x["id"]] = Path(x["stl"])
+    for x in layout["plates"]:
+        for q in x["parts"]:
+            stl_of.setdefault(q["id"], stl_of.get(str(q["id"]).split("#")[0]))
+    if one_plate:
+        stls = [whole]
+    elif together:
+        stls = []
+    else:                                               # one model per plate, the parts at their packed places
+        stls = []
+        for x in layout["plates"]:
+            f = work / f"plate_{x['n']}_{H('plate', lay_key, x['n'])}.stl"
+            if not f.is_file():
+                plates_mod.write_plate_stl(f, x["parts"], stl_of)
+            stls.append(f)
+    if not one_plate and not layout["plates"]:
+        b = layout["too_big"][0]
+        raise _err(f"{b['label']} is {' × '.join(f'{v:g}' for v in b['size'])} mm: larger than the plate of "
+                   f"{pl['choice']['machine']} ({bed[0]:g} × {bed[1]:g} mm) however it lies.", " ".join(b["suggestions"]), 422)
+    rows, extra = [], {}
+    if together:
+        rows, extra = _slice_together(st, p, res, pl, layout, parts, out, name, label)
+    else:
+        for n, stl in enumerate(stls, 1):
+            pdir = out / f"plate_{n}"
+            meta_f = pdir / "meta.json"
+            if meta_f.is_file():
+                row = json.loads(meta_f.read_text(encoding="utf-8"))
+            else:
+                tmp = pdir.with_name(pdir.name + ".tmp")
+                shutil.rmtree(tmp, ignore_errors=True)
+                info = slicer.slice_stl(res, stl, tmp, timeout=st.cfg["slicer"]["timeout_s"])
+                proj = info.get("threemf") or info.get("project_3mf")
+                if not proj or not (tmp / proj).is_file():
+                    raise _err(f"{label} sliced the part but wrote no project file.",
+                               "Update the slicer, or open the G-code instead.", 502)
+                final = f"{name}" + (f"_plate{n}" if len(stls) > 1 else "") + ".3mf"
+                shutil.move(str(tmp / proj), tmp / final)
+                marked = mark_changed(tmp / final, list(pl["changes"])) if family(pl["choice"]["kind"]) == "bbl" else False
+                row = {"n": n, "project": final, "marked_as_edits": marked,
+                       **{k: info.get(k) for k in ("time_s", "filament_g", "filament_mm", "layers", "max_z_mm", "support_used",
+                                                   "slicer_version", "warnings")}}
+                (tmp / "meta.json").write_text(json.dumps(row, indent=1), encoding="utf-8")
+                shutil.rmtree(pdir, ignore_errors=True)
+                tmp.rename(pdir)
+            row["path"] = str(pdir / row["project"])
+            row["verified"] = verify(Path(row["path"]), pl["changes"])
+            if not one_plate:
+                row["parts"] = _plate_names(layout).get(n, [])
+            rows.append(row)
+        if not one_plate and family(pl["choice"]["kind"]) != "bbl":
+            # every plate in one 3MF too, for PrusaSlicer 2.9's several beds (no settings in it: those are the projects')
+            meshes = {x["id"]: plate3mf.mesh_of(plates_mod.read_triangles(Path(x["stl"]))) for x in parts}
+            files = plate3mf.write_all(out, f"{name}_all_plates", layout["plates"], meshes, "prusa", bed,
+                                       f"{p['name']} r{p['head']:02d}")
+            extra["all_plates_files"] = [str(f) for f in files]
 
     def total(k):
         vals = [r.get(k) for r in rows]
         return None if any(v is None for v in vals) else round(sum(vals), 3)
-    ok = all(v["ok"] for r in rows for v in r["verified"].values())
+    ok = all(v["ok"] for r in rows for v in (r.get("verified") or {}).values())
+    projects = list(dict.fromkeys(r["path"] for r in rows))
     result = {
         "project": p["id"], "rev": p["head"], "slicer": label, "kind": pl["choice"]["kind"], "printer": pl["choice"]["machine"],
         "process": pl["choice"]["process"], "filament": pl["choice"]["filament"],
         "decisions": pl["decisions"], "overrides": pl["changes"], "not_written": pl["skipped"],
         "inputs": {k: v for k, v in pl["inputs"].items() if k not in ("preset",)},
-        "plates": rows, "time_s": total("time_s"), "filament_g": total("filament_g"),
-        "file": rows[0]["path"], "settings_in_file": ok,
+        "plates": rows, "plate_count": len(rows), "time_s": total("time_s"), "filament_g": total("filament_g"),
+        "file": projects[0], "files": projects, "settings_in_file": ok, "copies": copies,
+        "layout": {k: layout[k] for k in ("count", "bed_mm", "spacing_mm", "margin_mm", "clearance_mm", "evidence", "note")},
         "evidence": "simulated",
         "note": ("The settings are Form Studio's choices for this part: each says whether it is computed from the geometry or "
                  "a heuristic. Time and grams are the slicer's simulation of its own slice. Nothing was printed or sent anywhere."),
+        **extra,
     }
+    if layout["too_big"]:
+        result["too_big"] = layout["too_big"]
+        result["warning"] = ("Not in the project, larger than the plate however it lies: "
+                             + "; ".join(f"{b['label']} {' × '.join(f'{v:g}' for v in b['size'])} mm" for b in layout["too_big"])
+                             + ". " + " ".join(layout["too_big"][0]["suggestions"]))
     if not ok:
-        result["warning"] = "Some settings were not found in the project file: see plates[].verified."
-    if len(rows) > 1:
-        result["other_plates"] = ("Each plate is its own project. Plate 1 opens now; open the others from "
-                                  f"{label}'s File menu: " + ", ".join(r["path"] for r in rows[1:]))
+        result["warning"] = (result.get("warning", "") + " Some settings were not found in the project file: "
+                             "see plates[].verified.").strip()
+    if len(projects) > 1:
+        result["other_plates"] = (f"{label} takes one plate per project: each plate is its own project, and each opens "
+                                  "in its own window." + (" Every plate is also in one 3MF for PrusaSlicer 2.9 or later: "
+                                                          + ", ".join(extra["all_plates_files"]) if extra.get("all_plates_files") else ""))
     if open_app:
-        result["opened"] = launch(res, Path(rows[0]["path"]))
+        opened = [launch(res, Path(f), new_instance=len(projects) > 1) for f in projects]
+        result["opened"] = opened[0] if len(opened) == 1 else opened
     return result
+
+
+def _slice_together(st, p, res: dict, pl: dict, layout: dict, parts: list, out: Path, name: str,
+                    label: str) -> tuple[list, dict]:
+    """Every plate in one project: the plates 3MF (form/plate3mf.py, the program's plate entries) sliced by the
+    program, which writes each plate's G-code into the project it saves. Rows from its own slice_info."""
+    from . import plate3mf, slicer
+    from . import plates as plates_mod
+    meta_f = out / "meta.json"
+    if meta_f.is_file():
+        meta = json.loads(meta_f.read_text(encoding="utf-8"))
+    else:
+        tmp = out.with_name(out.name + ".tmp")
+        shutil.rmtree(tmp, ignore_errors=True)
+        tmp.mkdir(parents=True)
+        meshes = {x["id"]: plate3mf.mesh_of(plates_mod.read_triangles(Path(x["stl"]))) for x in parts}
+        inp = tmp / "plates.in.3mf"
+        plate3mf.write(inp, layout["plates"], meshes, "bbl", layout["bed_mm"], f"{p['name']} r{p['head']:02d}")
+        info = slicer.slice_plates(res, inp, tmp / "sliced", timeout=st.cfg["slicer"]["timeout_s"] * max(1, layout["count"]))
+        proj = tmp / "sliced" / (info.get("threemf") or "plate.3mf")
+        if not proj.is_file():
+            raise _err(f"{label} sliced the plates but wrote no project file.", "Update the slicer, or open the G-code instead.", 502)
+        final = f"{name}_{layout['count']}plates.3mf"
+        shutil.move(str(proj), tmp / final)
+        marked = mark_changed(tmp / final, list(pl["changes"]))
+        read = plate3mf.read(tmp / final)
+        meta = {"project": final, "marked_as_edits": marked, "plates": info.get("plates") or [],
+                "read": read["plates"], "slicer_version": info.get("slicer_version"), "warnings": info.get("warnings")}
+        shutil.rmtree(tmp / "sliced", ignore_errors=True)
+        (tmp / "meta.json").write_text(json.dumps(meta, indent=1), encoding="utf-8")
+        shutil.rmtree(out, ignore_errors=True)
+        tmp.rename(out)
+    path = out / meta["project"]
+    verified = verify(path, pl["changes"])
+    names = _plate_names(layout)
+    on = {x["n"]: x["objects"] for x in meta["read"]}            # the plates the saved project holds (its own record)
+    rows = []
+    for r in meta["plates"]:
+        rows.append({"n": r["n"], "project": meta["project"], "path": str(path), "time_s": r.get("time_s"),
+                     "filament_g": r.get("filament_g"), "support_used": r.get("support_used"), "outside": r.get("outside"),
+                     "parts": on.get(r["n"]) or names.get(r["n"], []),       # what the project says is on it
+                     "slicer_version": meta.get("slicer_version"), "verified": verified,
+                     "marked_as_edits": meta.get("marked_as_edits")})
+    extra = {"plates_in_project": len(meta["read"]), "plates_sliced": len(meta["plates"])}
+    if len(meta["plates"]) != layout["count"] or len(meta["read"]) != layout["count"]:
+        extra["plates_warning"] = (f"Form Studio laid out {layout['count']} plates; {label} read {len(meta['read'])} and "
+                                   f"sliced {len(meta['plates'])}.")
+    elif any(sorted(on.get(n, [])) != sorted(v) for n, v in names.items()):
+        extra["plates_warning"] = f"{label} put the parts on its plates differently from Form Studio's plan."
+    if any(r.get("outside") for r in rows):
+        extra["plates_warning"] = (extra.get("plates_warning", "") + f" {label} says a part is outside its plate.").strip()
+    return rows, extra
 
 
 def explain(result: dict) -> str:

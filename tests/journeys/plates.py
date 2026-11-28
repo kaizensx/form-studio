@@ -39,6 +39,34 @@ def journey_two_plates(ui):
     ui.shot("prove-plate-2")
 
 
+def drawn_box(ui, pid):
+    """Where a part is drawn now, on the plate: its print box's corners through the part's transform and the shift."""
+    return ui.js("(function(){ var v = Store.viewer, x = v.partById(%r), xf = v.partXf(x), b = x.print_bbox, lo = [1e9, 1e9, 1e9], hi = [-1e9, -1e9, -1e9];"
+                 " for (var m = 0; m < 8; m++) { var p = xf.rot.times(Qt.vector3d(b[m & 1][0], b[(m >> 1) & 1][1], b[(m >> 2) & 1][2])).plus(xf.pos).plus(v.shift);"
+                 " lo = [Math.min(lo[0], p.x), Math.min(lo[1], p.y), Math.min(lo[2], p.z)]; hi = [Math.max(hi[0], p.x), Math.max(hi[1], p.y), Math.max(hi[2], p.z)] }"
+                 " return [lo, hi] })()" % pid)
+
+
+def journey_every_plate_in_the_view(ui):
+    """The 3D view shows both plates, each part lying on its own as it prints, never off a plate or under it."""
+    ui.wait_until(lambda: ui.js("Store.viewer.platesOn") is True, 10, "the parts laid out on their plates")
+    ui.eq(ui.js("Store.viewer.plateCount"), 2, "two plates drawn")
+    ui.check(ui.js("Store.viewer.plateBed[0]") == data(ui)["checks"]["context"]["plates"]["bed_mm"][0], "each the bed's own size")
+    ui.wait_until(lambda: ui.sees("Plate 1 of 2") and ui.sees("Plate 2 of 2"), 5, "each plate says which it is")
+    plan = data(ui)["checks"]["context"]["plates"]
+    bed, gap = plan["bed_mm"], ui.js("Store.viewer.plateGapMm")
+    sx, sy = ui.js("[Store.viewer.shift.x, Store.viewer.shift.y]")
+    for plate in plan["plates"]:
+        x0 = sx + (plate["n"] - 1) * (bed[0] + gap)
+        for q in plate["parts"]:
+            lo, hi = drawn_box(ui, q["id"])
+            ui.check(lo[2] > -1e-3, f"{q['id']} rests on the plate (lowest z {lo[2]:.3f})")
+            ui.check(x0 - 1e-3 <= lo[0] and hi[0] <= x0 + bed[0] + 1e-3 and sy - 1e-3 <= lo[1] and hi[1] <= sy + bed[1] + 1e-3,
+                     f"{q['id']} lies on plate {plate['n']}: {lo} {hi}")
+    ui.settle(600)
+    ui.shot("plates-in-the-view")
+
+
 def journey_simulate_a_plate(ui):
     ui.click_text("Inspect layers")
     ui.wait_until(lambda: ui.find(name="printSim") is not None, 10, "the print simulation")
@@ -67,3 +95,81 @@ def journey_design_only_and_back(ui):
     ui.wait_until(lambda: not data(ui)["project"].get("design_only"), 10, "slicing on for this design")
     wait_job(ui, S["pid"])
     ui.eq(data(ui)["status"]["slice"]["state"], "current", "the earlier slice is current again (same inputs, same key)")
+
+
+# Built lying down: a post modelled along X beside its base, stood upright on the base by its placement, both exploded
+# offsets pointing down (tests/fixtures/lying_design.py). The base is the anchor: it rests on the ground and stays
+# exactly there when the set is pulled apart; the post goes out and up instead of through the ground.
+def journey_lying_down_assembly_rests_on_the_ground(ui):
+    import sys
+    from pathlib import Path
+    sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
+    from fixtures.lying_design import LYING
+    from _lib import click_stage, open_project
+    d = ui.studio.create_design("Lying post", LYING)
+    ui.api("/projects/" + d["id"] + "/run", {"nodes": [], "force": False})
+    wait_job(ui, d["id"])
+    open_project(ui, d["id"])
+    ui.wait_until(lambda: ui.store.get("assembly") is not None, 20, "the post and its base as an assembly")
+    click_stage(ui)
+    ui.key("E")
+    ui.wait_until(lambda: ui.js("Ws.tool") == "assembly", 5, "E to open Assembly")
+    bar = ui.item("asmBar")
+    ui.eq(ui.js("Store.viewer.anchorId"), "base", "the base is the anchor")
+    seen = {}
+    for mode, label in (("assembled", "Assembled"), ("exploded", "Exploded")):
+        ui.click_text(label, within=bar)
+        ui.wait_until(lambda: ui.store.get("asmMode") == mode, 3, mode)
+        ui.settle(900)                       # the parts glide to their places
+        seen[mode] = {pid: drawn_box(ui, pid) for pid in ("base", "post")}
+        lows = [b[0][2] for b in seen[mode].values()]
+        ui.check(min(lows) > -1e-3, f"{mode}: nothing under the ground (lowest {min(lows):.3f} mm)")
+        ui.check(abs(seen[mode]["base"][0][2]) < 1e-2, f"{mode}: the base rests on the ground ({seen[mode]['base'][0][2]:.3f} mm)")
+        lo, hi = seen[mode]["post"]
+        ui.check(hi[2] - lo[2] > 50, f"{mode}: the post stands upright ({hi[2] - lo[2]:.1f} mm tall)")
+        ui.shot(f"lying-{mode}")
+    a, e = seen["assembled"], seen["exploded"]
+    ui.check(all(abs(a["base"][k][i] - e["base"][k][i]) < 1e-3 for k in (0, 1) for i in range(3)),
+             f"the anchor does not move when the set is pulled apart: {a['base']} vs {e['base']}")
+    ui.check(e["post"][0][2] > a["post"][0][2] + 20, "the post goes up, not through the ground")
+
+
+# A front flap hinged on the box's bottom front edge, swung through 180° forward and down past the plate's side
+# (tests/fixtures/lying_design.py FLAP). At rest the box sits on the ground; once the lid moves, the whole set is lifted
+# by what the flap reaches over the hinge's whole range, so nothing is ever under the ground and the lift does not
+# change while the flap swings.
+def journey_a_swung_lid_never_goes_under_the_ground(ui):
+    import sys
+    from pathlib import Path
+    sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
+    from fixtures.lying_design import FLAP
+    from _lib import click_stage, open_project
+    d = ui.studio.create_design("Box with a flap", FLAP)
+    ui.api("/projects/" + d["id"] + "/run", {"nodes": [], "force": False})
+    wait_job(ui, d["id"])
+    open_project(ui, d["id"])
+    ui.wait_until(lambda: ui.store.get("assembly") is not None, 20, "the box and its lid as an assembly")
+    click_stage(ui)
+    ui.key("E")
+    ui.wait_until(lambda: ui.js("Ws.tool") == "assembly", 5, "E to open Assembly")
+    ui.click_text("Assembled", within=ui.item("asmBar"))
+    ui.wait_until(lambda: ui.store.get("asmMode") == "assembled", 3, "assembled")
+    ui.settle(900)
+    rest = drawn_box(ui, "box")
+    ui.check(abs(rest[0][2]) < 1e-2, f"at rest the box stands on the ground ({rest[0][2]:.3f} mm)")
+    lifts, lows = [], []
+    for deg in (1, 30, 60, 90, 120, 150, 180):
+        ui.run_js(f"Store.setPose('flap', {deg})")
+        ui.settle(500)                       # the lift glides in on the first move; the shift then stays
+        box, lid = drawn_box(ui, "box"), drawn_box(ui, "lid")
+        lows.append(min(box[0][2], lid[0][2]))
+        lifts.append(box[0][2] - rest[0][2])
+        ui.check(lows[-1] > -1e-3, f"lid at {deg}°: nothing under the ground (lowest {lows[-1]:.3f} mm)")
+        if deg in (90, 180):
+            ui.shot(f"flap-{deg}")
+    ui.check(max(lifts) - min(lifts) < 1e-3, f"the lift is the same through the swing: {[round(x, 3) for x in lifts]}")
+    ui.check(lifts[0] > 15, f"the set is lifted for the lid's swing ({lifts[0]:.2f} mm)")
+    ui.check(min(lows) < 1, f"and only as much as it needs: the lid's lowest point touches the ground ({min(lows):.3f} mm)")
+    ui.run_js("Store.setPose('flap', 0)")
+    ui.settle(700)
+    ui.check(abs(drawn_box(ui, "box")[0][2]) < 1e-2, "closed again, the box is back on the ground")

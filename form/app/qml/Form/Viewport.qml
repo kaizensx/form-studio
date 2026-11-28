@@ -48,8 +48,30 @@ Item {
     property real plateK: stageMode === "plate" ? 1 : 0
     Behavior on plateK { NumberAnimation { duration: Motion.slow; easing.type: Easing.OutCubic } }
     readonly property bool plateShown: plateK > 0.001
+    // ── several plates (form/plates.py): parts that do not fit one plate are drawn where the plate plan puts them,
+    // each lying as it prints, on plates side by side ("Plate 1 of N" under each). A part too big for any plate stands
+    // beside the last plate, off it, and says so. Only on the build plate, and only for the print layout.
+    property var platePlan: null             // the checks' plan (context.plates): plates, parts with "matrix", too_big
+    readonly property var _planAt: {         // part id -> { n: plate (count + 1: beside them), m: 3×4 matrix }
+        var out = ({}), pl = platePlan
+        if (!pl || !pl.plates) return out
+        for (var i = 0; i < pl.plates.length; i++)
+            for (var k = 0; k < pl.plates[i].parts.length; k++) { var q = pl.plates[i].parts[k]; if (q.matrix) out[q.id] = { n: pl.plates[i].n, m: q.matrix } }
+        for (var j = 0; j < (pl.too_big || []).length; j++) { var b = pl.too_big[j]; if (b.matrix) out[b.id] = { n: pl.plates.length + 1, m: b.matrix, big: true } }
+        return out
+    }
+    readonly property bool platesOn: stageMode === "plate" && !!asm && asmMode === "print" && !!platePlan && !!platePlan.needed
+        && !!platePlan.plates && platePlan.plates.length + (platePlan.too_big || []).length > 0
+        && asm.parts.every(function (x) { return !!_planAt[x.id] })
+    readonly property var plateBed: platePlan && platePlan.bed_mm ? platePlan.bed_mm : [plateSize, plateSize, plateSize]
+    readonly property real plateGapMm: Math.round(Math.max(plateBed[0], plateBed[1]) * 0.2)
+    readonly property int plateCount: platesOn ? platePlan.plates.length : 0
+    function plateOffset(n) { return (n - 1) * (plateBed[0] + plateGapMm) }      // plate n's left edge, layout x
+    onPlatesOnChanged: { asmTween = true; _frame(); asmTweenOff.restart() }
+    onPlatePlanChanged: _frame()
     // what the camera frames and the floor fades from: the plate in plate mode, the part (with some floor) otherwise
-    readonly property real groundSpan: stageMode === "plate" ? plateSize : Math.max(80, 2.4 * radius(bounds))
+    readonly property real groundSpan: stageMode === "plate" ? (platesOn ? Math.max(plateSize, bounds.hi.x - bounds.lo.x) : plateSize)
+        : Math.max(80, 2.4 * radius(bounds))
     property var bounds: ({ lo: Qt.vector3d(-40, -40, 0), hi: Qt.vector3d(40, 40, 40) })   // on the plate
     property vector3d shift: Qt.vector3d(0, 0, 0)
     property var marker: null                // { at:[x,y,z], to:[x,y,z] } in design coordinates
@@ -149,12 +171,24 @@ Item {
         return j ? [j.id] : []
     }
     function partXf(x) { return _xf(x, asmOn ? asmMode : "print") }
-    function _xf(x, mode) {                  // part as printed → where it is drawn in this mode: { pos, rot }
-        if (mode === "print") return { pos: Qt.vector3d(0, 0, 0), rot: Qt.quaternion(1, 0, 0, 0) }
+    function _quat(m) {                      // the rotation of a 3×4 matrix (rows) as a quaternion
+        var t = m[0][0] + m[1][1] + m[2][2], w, x, y, z, s
+        if (t > 0) { s = Math.sqrt(t + 1) * 2; w = s / 4; x = (m[2][1] - m[1][2]) / s; y = (m[0][2] - m[2][0]) / s; z = (m[1][0] - m[0][1]) / s }
+        else if (m[0][0] > m[1][1] && m[0][0] > m[2][2]) { s = Math.sqrt(1 + m[0][0] - m[1][1] - m[2][2]) * 2; w = (m[2][1] - m[1][2]) / s; x = s / 4; y = (m[0][1] + m[1][0]) / s; z = (m[0][2] + m[2][0]) / s }
+        else if (m[1][1] > m[2][2]) { s = Math.sqrt(1 + m[1][1] - m[0][0] - m[2][2]) * 2; w = (m[0][2] - m[2][0]) / s; x = (m[0][1] + m[1][0]) / s; y = s / 4; z = (m[1][2] + m[2][1]) / s }
+        else { s = Math.sqrt(1 + m[2][2] - m[0][0] - m[1][1]) * 2; w = (m[1][0] - m[0][1]) / s; x = (m[0][2] + m[2][0]) / s; y = (m[1][2] + m[2][1]) / s; z = s / 4 }
+        return Qt.quaternion(w, x, y, z).normalized()
+    }
+    function _xf(x, mode, at) {              // part as printed → where it is drawn in this mode (at: a pose, default the shown one)
+        if (mode === "print") {
+            var at = platesOn ? _planAt[x.id] : null
+            if (!at) return { pos: Qt.vector3d(0, 0, 0), rot: Qt.quaternion(1, 0, 0, 0) }
+            return { pos: Qt.vector3d(at.m[0][3] + plateOffset(at.n), at.m[1][3], at.m[2][3]), rot: _quat(at.m) }
+        }
         var pl = x.placement, t = Qt.vector3d(pl.t[0], pl.t[1], pl.t[2]), q = Qt.quaternion(pl.q[0], pl.q[1], pl.q[2], pl.q[3])
         var ch = chainOf(x)
         for (var i = ch.length - 1; i >= 0; i--) {
-            var j = jointById(ch[i]), v = j ? (pose[j.id] || 0) : 0
+            var j = jointById(ch[i]), v = j ? ((at || pose)[j.id] || 0) : 0
             if (!j || !v || j.kind === "fixed") continue
             var ax = Qt.vector3d(j.axis[0], j.axis[1], j.axis[2]).normalized()
             if (j.kind === "hinge") {
@@ -162,8 +196,29 @@ Item {
                 t = r.times(t.minus(o)).plus(o); q = r.times(q)
             } else t = t.plus(ax.times(v))
         }
-        if (mode === "exploded") { var e = x.explode_total || x.explode; t = t.plus(Qt.vector3d(e[0], e[1], e[2]).times(explode)) }
+        if (mode === "exploded") t = t.plus(explodeOff(x))
         return { pos: t, rot: q }
+    }
+    // Pulled apart about an anchor (form/poses.py): the part fixed to the world with the largest footprint stays exactly
+    // where it rests; every other part moves by its exploded offset less the anchor's, and an offset that would take it
+    // below the ground has its vertical part turned upward. So the set rests on z >= 0 and the anchor never moves.
+    readonly property string anchorId: {
+        if (!asm) return ""
+        if (asm.anchor) return asm.anchor
+        var roots = asm.parts.filter(function (x) { return !x.parent }), best = null
+        if (!roots.length) roots = asm.parts
+        function area(x) { return Math.max(0, x.bbox[1][0] - x.bbox[0][0]) * Math.max(0, x.bbox[1][1] - x.bbox[0][1]) }
+        var big = Math.max.apply(null, roots.map(area))
+        roots.filter(function (x) { return area(x) >= 0.95 * big - 1e-9 }).forEach(function (x) {
+            if (!best || Math.round(x.bbox[0][2]) < Math.round(best.bbox[0][2])) best = x })
+        return best ? best.id : ""
+    }
+    readonly property real restLift: asm ? -Math.min.apply(null, asm.parts.map(function (x) { return x.bbox[0][2] })) : 0
+    function explodeOff(x) {
+        if (!x || x.id === anchorId) return Qt.vector3d(0, 0, 0)
+        var a = partById(anchorId), ae = a ? (a.explode_total || a.explode) : [0, 0, 0], e = x.explode_total || x.explode
+        var d = Qt.vector3d(e[0] - ae[0], e[1] - ae[1], e[2] - ae[2]).times(explode)
+        return x.bbox[0][2] + restLift + d.z < -1e-9 ? Qt.vector3d(d.x, d.y, -d.z) : d
     }
     // ── points on parts, from the print frame (where the engine computes) to where the part is drawn now ──
     // Measurements and selections keep their points on the part as printed, with the part's id, so they ride along
@@ -173,7 +228,7 @@ Item {
         for (var i = 0; i < ps.length; i++) if (ps[i].id === id) return ps[i]
         return null
     }
-    function shownXf(part) { var x = part && asmOn ? partById(part) : null; return x ? partXf(x) : null }
+    function shownXf(part) { var x = part && (asmOn || platesOn) ? partById(part) : null; return x ? partXf(x) : null }
     function shownPoint(part, p) {
         if (!p) return p
         var xf = shownXf(part)
@@ -209,18 +264,46 @@ Item {
         return out
     }
     readonly property var shownFrom: measureFrom ? { at: shownPoint(measureFrom.part, measureFrom.at) } : null
-    function _frame() {                      // centre what is shown on the plate; bounds follow the mode
+    property real _lift: 0
+    // How far the set is lifted for the shown pose: 0 while every part stays above the plate; otherwise what the lowest
+    // point reaches over the whole range of each joint that is swung (the others as shown), so a sweep has one lift.
+    // rest: the assembled rest (mm added to z). Part boxes as printed, carried through each sampled pose.
+    function poseLift(mode, rest) {
+        if (!asm) return 0
+        var low = 1e9, moved = false, js = asm.joints || []
+        function lowest(at) {
+            for (var k = 0; k < asm.parts.length; k++) {
+                var y = asm.parts[k], pb = y.print_bbox, xf = _xf(y, mode, at)
+                if (!pb || !y.placement) continue
+                for (var m = 0; m < 8; m++)
+                    low = Math.min(low, xf.rot.times(Qt.vector3d(pb[m & 1][0], pb[(m >> 1) & 1][1], pb[(m >> 2) & 1][2])).plus(xf.pos).z)
+            }
+        }
+        for (var i = 0; i < js.length; i++) {
+            var j = js[i]
+            if (j.kind === "fixed" || !(pose[j.id] || 0)) continue
+            moved = true
+            var n = Math.max(2, Math.min(48, j.samples || 24))
+            for (var s = 0; s <= n; s++) {
+                var at = Object.assign({}, pose); at[j.id] = j.range[0] + (j.range[1] - j.range[0]) * s / n
+                lowest(at)
+            }
+        }
+        if (!moved) return 0
+        lowest(pose)
+        return Math.max(0, -(low + rest))
+    }
+    function _frame() {                      // rest what is shown on the plate and centre it; bounds follow the mode
         if (!model) return
         // read the mode directly: this runs from onAsmModeChanged, possibly before the asmOn binding has updated
         var a = model.assembly && !model.assembly.error ? model.assembly : null, on = !!a && asmMode !== "print"
         var b = on ? a.bbox : model.bbox
-        var sh = Qt.vector3d(-(b[0][0] + b[1][0]) / 2, -(b[0][1] + b[1][1]) / 2, -b[0][2])
-        shift = sh                           // may animate; bounds use the target, not the value mid-animation
-        shiftTo = sh
         var lo = Qt.vector3d(b[0][0], b[0][1], b[0][2]), hi = Qt.vector3d(b[1][0], b[1][1], b[1][2])
         // assembled or pulled apart: each part's box as printed, moved where it is drawn (its joints' pose included:
-        // a lid opened stands above the box), so the framing holds the whole arrangement
-        var posed = on && a.parts.every(function (x) { return !!x.print_bbox && !!x.placement })
+        // a lid opened stands above the box), so the framing holds the whole arrangement. On several plates: the
+        // plates and every part on them.
+        var laid = !on && platesOn && !!a && a.parts.every(function (x) { return !!x.print_bbox })
+        var posed = (on || laid) && a.parts.every(function (x) { return !!x.print_bbox && (laid || !!x.placement) })
         if (posed) {
             lo = Qt.vector3d(1e9, 1e9, 1e9); hi = Qt.vector3d(-1e9, -1e9, -1e9)
             for (var k = 0; k < a.parts.length; k++) {
@@ -234,14 +317,34 @@ Item {
         } else if (on && asmMode === "exploded") {
             var asm = a
             for (var i = 0; i < asm.parts.length; i++) {
-                var x = asm.parts[i], xe = x.explode_total || x.explode, e = Qt.vector3d(xe[0], xe[1], xe[2]).times(explode)
+                var x = asm.parts[i], e = explodeOff(x)
                 lo = Qt.vector3d(Math.min(lo.x, x.bbox[0][0] + e.x), Math.min(lo.y, x.bbox[0][1] + e.y), Math.min(lo.z, x.bbox[0][2] + e.z))
                 hi = Qt.vector3d(Math.max(hi.x, x.bbox[1][0] + e.x), Math.max(hi.y, x.bbox[1][1] + e.y), Math.max(hi.z, x.bbox[1][2] + e.z))
             }
         }
+        if (laid && !!platePlan) {           // the plates themselves are part of what is shown (the plan goes null a moment on a commit)
+            var n = platePlan.plates.length
+            lo = Qt.vector3d(Math.min(lo.x, 0), Math.min(lo.y, 0), lo.z)
+            hi = Qt.vector3d(Math.max(hi.x, plateOffset(n) + plateBed[0]), Math.max(hi.y, plateBed[1]), hi.z)
+        }
+        // Resting on the plate. Assembled, pulled apart or with a joint swung, the set keeps the rest of its assembled
+        // pose (its lowest point at z = 0, a part built lying down and stood upright by its placement included), so the
+        // anchor never moves between them, and pulling apart keeps every part above the ground (explodeOff). The print
+        // layout and the plates are centred on what they show.
+        // Nothing is ever drawn under the plate: a pose that would take a part below it lifts the whole set, by what
+        // the lowest point reaches over each swung joint's whole range (poseLift), so the lift stays the same through
+        // a sweep, and glides in when a joint first moves.
+        var lift = on ? poseLift(asmMode, -b[0][2]) : 0
+        var sh = on ? Qt.vector3d(-(b[0][0] + b[1][0]) / 2, -(b[0][1] + b[1][1]) / 2, -b[0][2] + lift)
+                    : Qt.vector3d(-(lo.x + hi.x) / 2, -(lo.y + hi.y) / 2, -lo.z)
+        if (Math.abs(lift - _lift) > 1e-6) { _lift = lift; liftTween = true; liftTweenOff.restart() }
+        shift = sh                           // may animate; bounds use the target, not the value mid-animation
+        shiftTo = sh
         bounds = { lo: lo.plus(sh), hi: hi.plus(sh) }
     }
-    Behavior on shift { enabled: vp.asmTween; Vector3dAnimation { duration: Motion.part; easing.type: Easing.BezierSpline; easing.bezierCurve: Motion.out } }
+    property bool liftTween: false           // the shift glides when a pose first lifts the set (the parts keep following the slider)
+    Timer { id: liftTweenOff; interval: Motion.part + 60; onTriggered: vp.liftTween = false }
+    Behavior on shift { enabled: vp.asmTween || vp.liftTween; Vector3dAnimation { duration: Motion.part; easing.type: Easing.BezierSpline; easing.bezierCurve: Motion.out } }
 
     // ── what the part holds (companions): a reference outline, not part of the print ──
     // A device can be several times taller than the part that holds it. The camera frames the part, so a tall
@@ -819,20 +922,48 @@ Item {
             // the printer's build plate (stageMode "plate" only): a slightly lighter slab, a 10 mm grid, a firm outline.
             // The slab's tone eases in from the floor's, so the plate arrives and leaves instead of cutting.
             Model { objectName: "buildPlate"; source: "#Rectangle"; scale: Qt.vector3d(vp.plateSize / 100, vp.plateSize / 100, 1); z: -cam.floorGap; receivesShadows: true; castsShadows: false; pickable: false
-                visible: vp.plateShown
+                visible: vp.plateShown && !vp.platesOn
                 materials: PrincipledMaterial { baseColor: Qt.tint(Theme.benchGround, Theme.alpha(Theme.benchPlate, vp.plateK)); roughness: 1; specularAmount: 0
                     cullMode: Material.NoCulling; opacity: cam.under ? 0.3 * cam.belowK : 1 } }
-            Model { pickable: false; castsShadows: false; visible: vp.plateK >= 0.5
+            Model { pickable: false; castsShadows: false; visible: vp.plateK >= 0.5 && !vp.platesOn
                 geometry: LineGeometry { points: {
                     var p = [], h = vp.plateSize / 2
                     for (var x = -h; x <= h + 1e-6; x += 10) { p.push(x, -h, 0, x, h, 0); p.push(-h, x, 0, h, x, 0) }
                     return p } }
                 materials: CustomMaterial { shadingMode: CustomMaterial.Unshaded; fragmentShader: "shaders/line.frag"; vertexShader: "shaders/line.vert"
                     property color uColor: Theme.benchGrid; property vector3d uClipN; property real uClipD; property real uClip: 0 } }
-            Model { pickable: false; castsShadows: false; visible: vp.plateK >= 0.5
+            Model { pickable: false; castsShadows: false; visible: vp.plateK >= 0.5 && !vp.platesOn
                 geometry: LineGeometry { points: { var h = vp.plateSize / 2; return [-h, -h, 0, h, -h, 0, h, -h, 0, h, h, 0, h, h, 0, -h, h, 0, -h, h, 0, -h, -h, 0] } }
                 materials: CustomMaterial { shadingMode: CustomMaterial.Unshaded; fragmentShader: "shaders/line.frag"; vertexShader: "shaders/line.vert"
                     property color uColor: Theme.benchEdge; property vector3d uClipN; property real uClipD; property real uClip: 0 } }
+            // several plates: each one the bed's real size, side by side, with its grid and outline
+            Repeater3D {
+                model: vp.platesOn ? vp.plateCount : 0
+                Node {
+                    id: pnode
+                    required property int index
+                    objectName: "buildPlate" + (index + 1)
+                    readonly property real w: vp.plateBed[0]
+                    readonly property real d: vp.plateBed[1]
+                    position: Qt.vector3d(vp.shift.x + vp.plateOffset(index + 1) + w / 2, vp.shift.y + d / 2, 0)
+                    Model { source: "#Rectangle"; scale: Qt.vector3d(pnode.w / 100, pnode.d / 100, 1); z: -cam.floorGap; receivesShadows: true; castsShadows: false; pickable: false
+                        materials: PrincipledMaterial { baseColor: Qt.tint(Theme.benchGround, Theme.alpha(Theme.benchPlate, vp.plateK)); roughness: 1; specularAmount: 0
+                            cullMode: Material.NoCulling; opacity: cam.under ? 0.3 * cam.belowK : 1 } }
+                    Model { pickable: false; castsShadows: false; visible: vp.plateK >= 0.5
+                        geometry: LineGeometry { points: {
+                            var p = [], hw = pnode.w / 2, hd = pnode.d / 2
+                            for (var x = -hw; x <= hw + 1e-6; x += 10) p.push(x, -hd, 0, x, hd, 0)
+                            for (var y = -hd; y <= hd + 1e-6; y += 10) p.push(-hw, y, 0, hw, y, 0)
+                            return p } }
+                        materials: CustomMaterial { shadingMode: CustomMaterial.Unshaded; fragmentShader: "shaders/line.frag"; vertexShader: "shaders/line.vert"
+                            property color uColor: Theme.benchGrid; property vector3d uClipN; property real uClipD; property real uClip: 0 } }
+                    Model { pickable: false; castsShadows: false; visible: vp.plateK >= 0.5
+                        geometry: LineGeometry { points: { var hw = pnode.w / 2, hd = pnode.d / 2
+                            return [-hw, -hd, 0, hw, -hd, 0, hw, -hd, 0, hw, hd, 0, hw, hd, 0, -hw, hd, 0, -hw, hd, 0, -hw, -hd, 0] } }
+                        materials: CustomMaterial { shadingMode: CustomMaterial.Unshaded; fragmentShader: "shaders/line.frag"; vertexShader: "shaders/line.vert"
+                            property color uColor: Theme.benchEdge; property vector3d uClipN; property real uClipD; property real uClip: 0 } }
+                }
+            }
 
             Node {
                 id: design
@@ -1142,7 +1273,7 @@ Item {
 
             // overall dimensions, drawn like a drawing: extension lines, a dimension line, the number
             // (only where the lit lines over the view are not drawn: the small views)
-            Model { visible: vp.lite && vp.showDims && !!vp.model && vp.asmMode !== "exploded" && !vp.dimsHeld && vp._altMix < 0.5; pickable: false; castsShadows: false
+            Model { visible: vp.lite && vp.showDims && !!vp.model && vp.asmMode !== "exploded" && !vp.platesOn && !vp.dimsHeld && vp._altMix < 0.5; pickable: false; castsShadows: false
                 geometry: LineGeometry { points: {
                     var o = 7, t = 2.2, p = []
                     var x0 = vp.dimLo.x, x1 = vp.dimHi.x, y0 = vp.dimLo.y, y1 = vp.dimHi.y, z0 = vp.dimLo.z, z1 = vp.dimHi.z
@@ -1248,6 +1379,13 @@ Item {
                      { x: Math.round(p.x - 12 - w), y: Math.round(p.y - h / 2) }] : []
             items.push({ kind: "ref", w: w, h: h, cands: c, prev: it.cand }); refs.push(it)
         }
+        for (i = 0; i < plateLabels.count; i++) {      // "Plate 1 of N" at the front edge of each plate
+            it = plateLabels.itemAt(i); if (!it) continue
+            var bx = shift.x + plateOffset(it.n) + plateBed[0] / 2
+            p = _px(Qt.vector3d(bx, shift.y - 3, 0)); w = it.width; h = it.height
+            c = p ? [{ x: Math.round(p.x - w / 2), y: Math.round(p.y + 6) }, { x: Math.round(p.x - w / 2), y: Math.round(p.y + 22) }] : []
+            items.push({ kind: "ref", w: w, h: h, cands: c, prev: it.cand }); refs.push(it)
+        }
         if (!items.length) return
         // labels of markers and measurements stay left of labelRight (the dock sits right of it)
         var out = Labels.place(items, { l: 4, t: 4, r: labelRight - 6, b: height - 4 })
@@ -1258,7 +1396,31 @@ Item {
             if (r.visible && (it.x !== r.x || it.y !== r.y)) { it.x = r.x; it.y = r.y }
         }
     }
-    FrameAnimation { running: vp.visible && (dimLabels.count + pinLabels.count + refLabels.count) > 0; onTriggered: vp._seatLabels() }
+    FrameAnimation { running: vp.visible && (dimLabels.count + pinLabels.count + refLabels.count + plateLabels.count) > 0; onTriggered: vp._seatLabels() }
+
+    // several plates: which plate is which, and a part that fits none of them
+    Repeater {
+        id: plateLabels
+        model: vp.platesOn && vp.plateK >= 0.5 && !vp.lite ? vp.plateCount + ((vp.platePlan.too_big || []).length ? 1 : 0) : 0
+        Rectangle {
+            required property int index
+            readonly property int n: index + 1
+            readonly property bool beside: n > vp.plateCount
+            objectName: "plateLabel" + n
+            property bool shown: false
+            property int cand: -1
+            width: plt.implicitWidth + 14; height: 20; radius: Theme.rXs
+            color: Theme.alpha(Theme.plate, 0.9)
+            border.color: beside ? Theme.alpha(Theme.signal, 0.6) : Theme.alpha(Theme.ink4, 0.5)
+            opacity: shown ? 1 : 0; visible: opacity > 0.01
+            Behavior on opacity { NumberAnimation { duration: 120 } }
+            Text { id: plt; anchors.centerIn: parent; color: parent.beside ? Theme.signal : Theme.ink2; font.family: Theme.sans
+                font.pixelSize: Theme.tFine; font.weight: 550; renderType: Theme.textRender
+                text: parent.beside ? (vp.platePlan.too_big.length > 1 ? "Too big for the plate: " + vp.platePlan.too_big.map(function (b) { return b.label }).join(", ")
+                                                                       : vp.platePlan.too_big[0].label + " is too big for the plate")
+                                    : "Plate " + parent.n + " of " + vp.plateCount }
+        }
+    }
 
     // the dimension lines: a thin line in the accent with a dot at each end, as on a drawing. Nothing around them: the
     // line is the light. Drawn from the projected ends (dimPx), so a still view costs nothing. When they come on, each
@@ -1285,7 +1447,7 @@ Item {
     // dimension numbers, on the 3D dimension lines: small capsules, the number in mono
     Repeater {
         id: dimLabels
-        model: vp.showDims && vp.model && !(vp.asmOn && vp.asmMode === "exploded") && !vp.dimsHeld && vp._altMix < 0.5 ? 3 : 0
+        model: vp.showDims && vp.model && !(vp.asmOn && vp.asmMode === "exploded") && !vp.platesOn && !vp.dimsHeld && vp._altMix < 0.5 ? 3 : 0
         Rectangle {
             id: dl
             objectName: "dimLabel"

@@ -222,6 +222,10 @@ def make_handler(st: Studio):
             if rest == "":
                 return self._json(st.state(pid))
             p = st.load(pid)
+            from . import modelling_api                    # the feature tree and the rollback view (form/modelling.py)
+            got = modelling_api.route_get(st, p, rest, q)
+            if got is not None:
+                return self._json(got)
             if rest == "/refine":                          # the refinement job and the head's refine changes
                 from .refine import jobs as refine_jobs
                 return self._json(refine_jobs.status(st, pid))
@@ -653,6 +657,10 @@ def make_handler(st: Studio):
                 owned = printers_mod.route_post(st, path, body)
                 if owned is not None:
                     return self._json(owned)
+            from . import modelling_api                    # sketches drawn by hand, before a project exists
+            got = modelling_api.route_global_post(st, path, body)
+            if got is not None:
+                return self._json(got)
             m = re.fullmatch(r"/api/projects/([a-z0-9-]+)/([a-z_]+)", path)
             if not m:
                 raise StudioError("Not found.", status=404)
@@ -673,6 +681,10 @@ def make_handler(st: Studio):
                 st.activity(None, "project", f"Moved {pid} to the trash folder.", by="you")
                 return self._json(res)
             p = st.load(pid)
+            from . import modelling_api                    # the feature tree and picked features (form/modelling.py)
+            got = modelling_api.route_post(st, p, action, body)
+            if got is not None:
+                return self._json(got)
             recipe = st.recipe(p)
             auto = lambda proj: st.run(pid) if proj.get("auto_run", True) else None
             # -- the game asset (form/game/app.py): build, validate or export; reads the project, never changes it --

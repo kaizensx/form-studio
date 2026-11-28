@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+### New
+
 - **Engineering calculators that write the part.** Seven calculators size a part from what it has to do, by a named
   standard's equations, and write it as a design with parameters: snap joints (cantilever and annular, Bayer's
   snap-fit guide), living hinges (elastic by strain, or moulded PP and PE from cited practice), springs
@@ -14,10 +16,9 @@
   against 72 published quantities; a snap hook is also checked by finite elements where the strength engine is
   installed. [docs/CALCULATORS.md](docs/CALCULATORS.md).
 - **`calculate`** (MCP) and **`form calc <calculator> key=value ... [--build]`** (terminal, JSON), and the Bench
-  entry **Engineering calculation**. 104 MCP tools.
+  entry **Engineering calculation**. 106 MCP tools.
 - ISO 286 tables and published fastener dimensions moved to modules with no CAD kernel behind them
   (`form/iso286.py`, `form/hardware_tables.py`); `form.craft.fits` and `form.parts` read the same copy.
-
 - **The Bench.** Every study, route and document of a design in one listing: at the top of the Review pane the
   studies (checks, assembly and joints, requirements, analysis maps, fit, critique, slice, print simulation,
   orientation, every printer, cost, make it lighter), at the top of the Make pane the routes (exports, 3MF with
@@ -27,10 +28,42 @@
   or why it cannot run here), its headline number with its evidence, and runs on click; a current one opens what it
   made. States come from keys of the head revision's inputs, never set by hand. The command palette finds every
   entry.
-- **`list_studies`, `run_study`, `get_study`** (MCP) and **`form study list|run|show <project> [id]`** (terminal):
-  the same Bench, headless. 100 MCP tools.
-### New
-
+- **`list_studies`, `run_study`, `get_study`** (MCP) and **`form study list|run|show <project> [id]`** (terminal): the
+  same Bench, headless. 103 MCP tools. Mass & inertia, Materials & sources (each value with its document) and Features
+  (built, suppressed by hand, left out with the reason) are Bench studies too; a change made by hand is a new
+  revision, so every study of the revision before it shows stale. The command palette also finds the hand tools:
+  Sketch on a plane, Fillet or chamfer, Hole, shell or sketch on a face, Feature tree.
+- **Model by hand, in the same code the agent writes.** The Program pane is a feature tree you can work in: drag
+  the rollback bar up to any feature and the part shows as it stood then, from the feature checkpoints (a few
+  milliseconds; nothing is saved); a line's menu suppresses and restores it, renames it in place, moves it up or
+  down, and says what it depends on (the parameters it reads, the features it names, what reads it); drag a line
+  by its number to reorder. A move that would make a feature do nothing, or come before one it reads, is refused
+  with the reason. Each action is one revision of the design's code, and the checks run again.
+- **Fillet, chamfer, hole, pattern and shell on what you pick.** Pick edges in Annotate for a fillet or a chamfer,
+  a flat face for a hole (ISO 273 clearance, tap drill, an ISO 286 fit such as H7, or a plain Ø; plain,
+  counterbore or countersink, each size with its source) or a shell open there, or a feature in the Program for a
+  linear or polar pattern. Preview builds it in the kernel and shows the draft over the head with the change in
+  volume; Add to design writes one named feature method and its parameters. Edges and faces are kept as stable
+  queries (the features that made them, their kind, direction and place), so a parameter change keeps them; a
+  rebuild that cannot find one leaves the feature out and says which. Fix with your agent puts a refusal in the
+  conversation.
+- **Sketch, then extrude, cut or revolve.** Start blank → **Model it by hand** opens a sketch editor on a datum
+  plane; in a design, **Sketch here…** puts it on a picked flat face (its outline drawn as a reference) and the tool
+  dock's **Sketch** on a datum. Draw lines, rectangles and circles; lines drawn nearly level or upright snap
+  horizontal or vertical; dimension a line or a circle and the solver (form.sketch2d) keeps it true, with the
+  degrees of freedom left in mono. Every dimension is a parameter of the design, so changing one later re-solves the
+  sketch. A sketch feature's line menu has **Edit sketch…**. The bracket from Start blank (an L profile, four
+  dimensions, a 40 mm extrusion, an M4 hole, a 2 mm fillet) is a timed interface test.
+- **Hand tools in the dock and in the conversation.** The tool dock has a group for Sketch, Fillet or chamfer and
+  Hole, shell or sketch on a face. A pattern can take its direction from a picked edge (a straight edge: along it; a
+  round one: around its axis). Every change made by hand appears in the open conversation as the same revision
+  card an agent's change gets. Preview and Add to design stay pinned at the foot of the selection pane.
+- **The same headless.** New MCP tools `get_sketch` and `edit_sketch` (ops on points, lines, circles, arcs,
+  constraints and dimensions; refused when the sketch would not solve or close); `add_feature` kinds `extrude`,
+  `cut` and `revolve` with a sketch; `form sketch`, `form model ... extrude|cut|revolve`. `edit_design` gains the ops `suppress`, `restore`, `move` and `rename`; `add_feature`
+  the kinds `fillet`, `chamfer`, `hole`, `pattern` and `shell` (with `preview`); `render(upto=)` and
+  `get_design_source`'s `tree`. In the terminal: `form tree <project>` (and `suppress|restore|move|rename`,
+  `--upto`), `form model <project> fillet|chamfer|hole|pattern|shell`, `form render --upto`.
 - **Mass properties from the B-rep.** Mass, centre of mass, inertia tensor and principal axes of every part and of
   the whole, computed by OCCT on the solid; an assembly at any pose of its joints. The grams on the size line show
   the centre of mass and the principal axes on the part with a glass readout (also in Analyze). MCP
@@ -95,6 +128,29 @@
 - **The solver is an optional engine.** "Strength studies (FEA)" in Settings, Engines & software installs Netgen
   (LGPL-2.1, unmodified wheels), scikit-fem and SciPy (BSD-3-Clause) and PyAMG (MIT) into a Python of their own,
   about 190 MB. Without it a study computes nothing and says how to get it.
+
+### Fixed
+
+- **Parts that do not fit one plate go onto more plates, never off the plate.** A design whose parts (or copies of
+  it) do not fit the printer's bed is packed onto as many plates as it takes: largest first, turned about Z where
+  that helps, with the gap between parts, room for the brim the slicer will add and the bed's excluded zones (an
+  X1's cutter corner, the square inside a round bed). The 3D view shows every plate side by side, "Plate 1 of N"
+  under each, each part lying as it prints. The exported 3MF carries every plate in the form the slicer reads as
+  plates: Bambu Studio and OrcaSlicer (and ElegooSlicer, Snapmaker Orca) get their plate entries, PrusaSlicer 2.9 its
+  bed grid. Open in slicer now opens one project with every plate, each sliced by the slicer itself (time and grams
+  per plate and in all); PrusaSlicer, which keeps one plate per project, opens one window per plate. A part larger
+  than the plate however it lies is never placed: it is named with its size against the bed and what would make it
+  fit (another side down, a scale, a split, a larger printer). `open_in_slicer` and `form slicer-open` take
+  `copies`, `pack_plate` and `form pack` say how many plates the copies take, `plate_plan(write_3mf=true)` and
+  `form pack --3mf DIR` write them.
+- **Assembled and exploded views rest on the ground, and pull apart about the base.** The assembled set rests on
+  the plate or studio floor (its lowest point at z = 0), a part built lying down and stood upright by its placement
+  included. Pulling it apart keeps the anchor (the part fixed to the world with the largest footprint) exactly where
+  it rests: the other parts move away from it, and an offset that would go through the ground is turned upward.
+  Swinging a joint keeps the fixed part where it is, unless the swing would take a part below the ground: then the
+  whole set is lifted just enough for the lowest point the joint reaches over its whole range, so the lift stays
+  the same through the motion and nothing is ever drawn under the plate. The same in the app and in
+  `render(view="exploded")`.
 
 ## 1.1.0
 

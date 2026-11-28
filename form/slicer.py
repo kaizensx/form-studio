@@ -131,6 +131,31 @@ def slice_stl(resolved: dict, stl, out_dir, timeout: float = 600) -> dict:
     return info
 
 
+def takes_plates(resolved: dict) -> bool:
+    """Whether this slicer's CLI slices a 3MF of several plates as one project (Bambu Studio, OrcaSlicer and the Orca
+    forks: their project format has plates). PrusaSlicer and its forks are handed one plate at a time."""
+    return hasattr(_for(resolved), "FAMILY")
+
+
+def slice_plates(resolved: dict, threemf, out_dir, timeout: float = 600) -> dict:
+    """Slice a 3MF of several plates (form/plate3mf.py) as one project: every plate, nothing re-arranged."""
+    from .adapters import _bbl
+    a = _for(resolved)
+    if not hasattr(a, "FAMILY"):
+        raise SlicerBlocked(f"{label(resolved.get('kind', 'bambu'))} is handed one plate at a time.")
+    try:
+        info = _bbl.slice_plates(a.FAMILY, resolved, Path(threemf), Path(out_dir), timeout)
+    except SlicerFailed as e:
+        why = explain_failure(resolved, str(e), e.log)
+        if why:
+            raise SlicerFailed(why[0], why[1], e.log) from e
+        raise
+    kind = resolved.get("kind", "bambu")
+    info.setdefault("slicer_kind", kind)
+    info.setdefault("slicer_name", label(kind))
+    return info
+
+
 def parse_layers(path, kind: str | None = None) -> list:
     """Layers of a G-code file written by `kind` (default Bambu Studio)."""
     return adapter(kind or "bambu").parse_layers(Path(path))

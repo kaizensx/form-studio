@@ -1050,6 +1050,25 @@ def _printed_parts(model, orientation="as_modelled", orient=None, envelope=(180,
     return out
 
 
+def _flat_matrix(solid, orientation) -> list:
+    """3×4: the part as modelled -> laid flat as `orientation` says, centred on the origin, standing on z = 0 (what
+    _oriented does), so a view can draw the part where a plate plan puts it (form/plates.py on_plate)."""
+    R = _rotation_matrix(orientation)
+    bb = _rotated(solid, orientation).bounding_box()
+    t = np.array([-(bb.min.X + bb.max.X) / 2, -(bb.min.Y + bb.max.Y) / 2, -bb.min.Z])
+    return [[round(float(v), 6) for v in row] for row in np.hstack([R, t[:, None]])]
+
+
+def _printed_parts_with_matrix(model, orientation="as_modelled", orient=None, envelope=(180, 180, 180), margin=2.0):
+    """_printed_parts with each part's _flat_matrix: [(id, label, material, oriented solid, orientation, matrix)]."""
+    from . import assembly as asm
+    rows = _printed_parts(model, orientation, orient, envelope, margin)
+    if not rows:
+        return []
+    a = asm.get(model)
+    return [r + (_flat_matrix(solid, r[4]),) for r, solid in zip(rows, a["printed"])]
+
+
 def op_plate_parts(key, recipe_id, values, out_dir, name, orientation="as_modelled", orient=None, envelope=(180, 180, 180),
                    margin=2.0, tol=0.01, ang=0.1):
     """Each printed part as its own STL, centred and standing on z = 0, for the plate plan (form/plates.py)."""
@@ -1057,12 +1076,12 @@ def op_plate_parts(key, recipe_id, values, out_dir, name, orientation="as_modell
     out = Path(out_dir)
     out.mkdir(parents=True, exist_ok=True)
     parts = []
-    for pid, label, material, solid, o in _printed_parts(model, orientation, orient, envelope, margin):
+    for pid, label, material, solid, o, m in _printed_parts_with_matrix(model, orientation, orient, envelope, margin):
         stl = out / f"{name}_{pid}.stl"
         write_stl(solid, stl, tol, ang)
         bb = solid.bounding_box()
         parts.append({"id": pid, "label": label, "material": material, "orientation": o, "stl": str(stl),
-                      "size": [bb.size.X, bb.size.Y, bb.size.Z], "volume_mm3": float(solid.volume)})
+                      "size": [bb.size.X, bb.size.Y, bb.size.Z], "volume_mm3": float(solid.volume), "matrix": m})
     return {"parts": parts}
 
 
@@ -1132,11 +1151,11 @@ def op_analyse(key, recipe_id, values, stl_path=None, nozzle=0.4, envelope=(180,
                     "expected_solids": getattr(model["recipe"], "solids", 1),
                     "volume_mm3": model["volume"], "mesh_design": bool(getattr(model["recipe"], "mesh", False))},
            "interface_audit": model["recipe"].measure(model["values"], model["by_feature"])}
-    parts = _printed_parts(model, orientation, orient, envelope, margin)   # each part as it lies on a plate by itself
+    parts = _printed_parts_with_matrix(model, orientation, orient, envelope, margin)   # each part as it lies by itself
     if parts:
         out["parts"] = [{"id": pid, "label": label, "material": material, "orientation": o,
-                         "size": [round(b.size.X, 3), round(b.size.Y, 3), round(b.size.Z, 3)]}
-                        for pid, label, material, solid, o in parts for b in [solid.bounding_box()]]
+                         "size": [round(b.size.X, 3), round(b.size.Y, 3), round(b.size.Z, 3)], "matrix": m}
+                        for pid, label, material, solid, o, m in parts for b in [solid.bounding_box()]]
     if assembly:                                       # normally its own op (op_assembly), with its own time budget
         from . import assembly as asm
         assembly_checks = asm.analyse(model)           # [] for a single part
@@ -1374,5 +1393,7 @@ from .candidates import KERNEL_OPS as _CANDIDATE_OPS  # noqa: E402  (several can
 OPS.update(_CANDIDATE_OPS)
 from .fea.prep import KERNEL_OPS as _FEA_OPS  # noqa: E402  (strength studies: the solid as STEP, the picked faces)
 OPS.update(_FEA_OPS)
+from .handfeat import KERNEL_OPS as _HAND_OPS  # noqa: E402  (picked edges and faces as stable queries)
+OPS.update(_HAND_OPS)
 from .massprops import KERNEL_OPS as _MASS_OPS  # noqa: E402  (mass, centre of mass and inertia from the B-rep)
 OPS.update(_MASS_OPS)

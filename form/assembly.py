@@ -206,7 +206,8 @@ def view(model, b64, edges_fn) -> dict:
                       "chain": [x.id for x in spec.chain(p.id)], "bbox": bb,
                       "print_bbox": _bbox(printed), "volume_mm3": float(printed.volume), "edges": b64(edges_fn(printed))})
     out = spec.public()
-    out.update({"error": None, "parts": parts, "bbox": [lo.tolist(), hi.tolist()],
+    from .poses import anchor_of                      # the part that stays put when the set is pulled apart
+    out.update({"error": None, "parts": parts, "anchor": anchor_of(parts), "bbox": [lo.tolist(), hi.tolist()],
                 "bbox_exploded": [np.minimum(lo, elo).tolist(), np.maximum(hi, ehi).tolist()]})
     return out
 
